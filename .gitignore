@@ -1,0 +1,11 @@
+.DS_Store
+.build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.firebase/
+node_modules/
+.env*
+work/
+__pycache__/
+*.pyc

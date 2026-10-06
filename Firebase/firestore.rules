@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function owner(uid) { return signedIn() && request.auth.uid == uid; }
+  function admin() { return signedIn() && request.auth.token.admin == true; }
+  function validName(n) { return n is string && n.size() >= 2 && n.size() <= 20; }
+  function validCard(c) {
+   return c.wordFull is string && c.wordFull.size() >= 3 && c.wordFull.size() <= 80
+    && c.wordNoVowels is string && c.wordNoVowels.size() >= 1 && c.wordNoVowels.size() <= 40
+    && c.normalizedAnswer is string && c.normalizedAnswer.size() >= 3 && c.normalizedAnswer.size() <= 40
+    && c.hint is string && c.hint.size() >= 5 && c.hint.size() <= 160
+    && c.category in ['Général','Football','Cinéma','Géographie','Animaux','Objets']
+    && c.difficulty in ['Facile','Moyen','Difficile'];
+  }
+  match /users/{uid} {
+   allow read: if owner(uid) || admin();
+   allow create: if owner(uid)
+    && request.resource.data.keys().hasOnly(['uid','username','createdAt','updatedAt','score','gamesPlayed','correctAnswers','bestTimeMs','currentStreak'])
+    && request.resource.data.uid == uid && validName(request.resource.data.username)
+    && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+    && request.resource.data.score == 0 && request.resource.data.gamesPlayed == 0
+    && request.resource.data.correctAnswers == 0 && request.resource.data.bestTimeMs == null && request.resource.data.currentStreak == 0;
+   allow update: if owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt'])
+    && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time;
+   allow delete: if false;
+  }
+  match /cards/{cardId} {
+   allow read: if signedIn() && (resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
+   allow create: if signedIn() && validCard(request.resource.data)
+    && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status'])
+    && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending';
+   allow update: if admin() && resource.data.status in ['pending','approved','rejected'] && validCard(request.resource.data)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels'])
+    && request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+   allow delete: if false;
+  }
+  match /attempts/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   allow write: if false;
+  }
+  match /dailyChallenges/{day} { allow read: if signedIn(); allow write: if false; }
+  match /dailyResults/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   allow write: if false;
+  }
+  match /reports/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   allow create: if signedIn()
+    && request.resource.data.keys().hasOnly(['userId','cardId','reason','createdAt','status'])
+    && request.resource.data.userId == request.auth.uid && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
+    && id == request.auth.uid + '_' + request.resource.data.cardId
+    && get(/databases/$(database)/documents/cards/$(request.resource.data.cardId)).data.status == 'approved'
+    && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 300
+    && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt'])
+    && request.resource.data.status == 'resolved' && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+   allow delete: if false;
+  }
+  match /{document=**} { allow read, write: if false; }
+ }
+}
