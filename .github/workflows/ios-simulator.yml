@@ -1,0 +1,177 @@
+name: CNSNN - iOS Simulator
+
+# Manual only: no builds on pushes, no deployment, no Apple signing secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      run_ui_tests:
+        description: Exécuter aussi les tests UI (plus long)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A new manual run on the same branch replaces the previous run.
+concurrency:
+  group: cnsnn-ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Compiler et tester CNSNN
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+      NSUnbufferedIO: 'YES'
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Vérifier Xcode 27 et la structure du projet
+        run: |
+          set -euo pipefail
+          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cnsnn-ci/logs"
+          xcodebuild -version | tee "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"
+          if ! grep -Eq '^Xcode 27([.]|$)' "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"; then
+            echo '::error::Le runner doit fournir Xcode 27.'
+            exit 1
+          fi
+          python3 Scripts/verify_project.py
+
+      - name: Télécharger les dépendances Firebase avec Swift Package Manager
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/packages.log"
+
+      - name: Choisir un simulateur iPhone compatible avec le SDK
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import subprocess
+
+          sdk = subprocess.check_output(
+              ['xcodebuild', '-version', '-sdk', 'iphonesimulator', 'SDKVersion'],
+              text=True,
+          ).strip()
+          sdk_version = tuple(int(part) for part in sdk.split('.')[:2])
+          listing = json.loads(subprocess.check_output(
+              ['xcrun', 'simctl', 'list', '--json'], text=True,
+          ))
+          candidates = []
+          for runtime in listing['runtimes']:
+              if not runtime.get('isAvailable') or '.iOS-' not in runtime['identifier']:
+                  continue
+              version = tuple(int(part) for part in runtime['version'].split('.')[:2])
+              if version[0] != sdk_version[0] or version > sdk_version:
+                  continue
+              for device in listing['devices'].get(runtime['identifier'], []):
+                  if device.get('isAvailable') and device['name'].startswith('iPhone'):
+                      candidates.append((version, device['name'], device['udid']))
+          if not candidates:
+              raise SystemExit(f'Aucun simulateur iPhone disponible pour le SDK {sdk}.')
+          version, name, identifier = sorted(candidates, reverse=True)[0]
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as file:
+              file.write(f'SIMULATOR_ID={identifier}\n')
+          print(f'Simulateur choisi : {name}, iOS {version[0]}.{version[1]}, {identifier}')
+          PY
+
+      - name: Compiler l'application sans signature Apple
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -resultBundlePath "$CI_ROOT/build.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/build.log"
+
+      - name: Exécuter les tests unitaires du moteur et de l'application
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES \
+            -only-testing:CNSNNCoreTests \
+            -only-testing:CNSNNAppTests \
+            -resultBundlePath "$CI_ROOT/unit-tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/unit-tests.log"
+
+      - name: Exécuter les tests UI optionnels
+        if: ${{ inputs.run_ui_tests }}
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES \
+            -only-testing:CNSNNUITests \
+            -resultBundlePath "$CI_ROOT/ui-tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/ui-tests.log"
+
+      - name: Conserver les journaux et résultats de diagnostic pendant un jour
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/cnsnn-ci/logs/
+            ${{ runner.temp }}/cnsnn-ci/*.xcresult
+          if-no-files-found: warn
+          retention-days: 1
