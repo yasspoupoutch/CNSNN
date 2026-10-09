@@ -7,7 +7,7 @@ final class RepositoryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let alice = LocalRepository(scope: "alice", directoryOverride: directory)
         let bob = LocalRepository(scope: "bob", directoryOverride: directory)
-        var progress = Progress(); progress.username = "Alice"
+        var progress = CNSNNCore.Progress(); progress.username = "Alice"
         progress.attempts.append(Attempt(cardID: "card", mode: .classic, correct: true, timeMs: 1234, points: 90, date: Date()))
         try alice.save(progress)
         XCTAssertEqual(try alice.load().score, 90)

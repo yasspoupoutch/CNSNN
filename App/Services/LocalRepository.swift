@@ -2,8 +2,8 @@ import Foundation
 import CNSNNCore
 
 protocol ProgressRepository {
-    func load() throws -> Progress
-    func save(_ progress: Progress) throws
+    func load() throws -> CNSNNCore.Progress
+    func save(_ progress: CNSNNCore.Progress) throws
 }
 struct LocalRepository: ProgressRepository {
     var scope: String = "guest"
@@ -16,19 +16,19 @@ struct LocalRepository: ProgressRepository {
             return directory.appendingPathComponent("cnsnn-progress-v1-\(safeScope).json")
         }
     }
-    func load() throws -> Progress {
+    func load() throws -> CNSNNCore.Progress {
         let file = try url
-        guard FileManager.default.fileExists(atPath: file.path) else { return Progress() }
-        return try JSONDecoder().decode(Progress.self, from: Data(contentsOf: file))
+        guard FileManager.default.fileExists(atPath: file.path) else { return CNSNNCore.Progress() }
+        return try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(contentsOf: file))
     }
-    func save(_ progress: Progress) throws {
+    func save(_ progress: CNSNNCore.Progress) throws {
         try JSONEncoder().encode(progress).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }
 
 struct MemoryRepository: ProgressRepository {
-    func load() throws -> Progress { Progress() }
-    func save(_ progress: Progress) throws {}
+    func load() throws -> CNSNNCore.Progress { CNSNNCore.Progress() }
+    func save(_ progress: CNSNNCore.Progress) throws {}
 }
 
 enum RuntimeFlags {

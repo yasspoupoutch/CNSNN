@@ -95,7 +95,7 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
     }
     private func decode(_ id: String, _ d: [String:Any]) -> Card? {
         guard let word = d["wordFull"] as? String, let hint = d["hint"] as? String,
-        let category = Category(rawValue:d["category"] as? String ?? ""),
+        let category = CNSNNCore.Category(rawValue:d["category"] as? String ?? ""),
         let difficulty = Difficulty(rawValue:d["difficulty"] as? String ?? ""),
         let status = ReviewStatus(rawValue:d["status"] as? String ?? "") else { return nil }
         return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status)

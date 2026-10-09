@@ -51,7 +51,7 @@ struct GameCard: View {
     }
 }
 struct ClassicSetupView: View {
-    @State private var category: Category?
+    @State private var category: CNSNNCore.Category?
     @State private var difficulty: Difficulty?
     var body: some View {
         ScrollView {
@@ -60,8 +60,8 @@ struct ClassicSetupView: View {
                 Text("Choisis ton terrain, ou laisse-toi surprendre.").foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 20) {
                     Picker("Catégorie", selection: $category) {
-                        Text("Toutes").tag(nil as Category?)
-                        ForEach(Category.allCases) { Text($0.rawValue).tag(Optional($0)) }
+                        Text("Toutes").tag(nil as CNSNNCore.Category?)
+                        ForEach(CNSNNCore.Category.allCases) { Text($0.rawValue).tag(Optional($0)) }
                     }
                     Picker("Difficulté", selection: $difficulty) {
                         Text("Toutes").tag(nil as Difficulty?)

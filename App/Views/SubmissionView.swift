@@ -6,7 +6,7 @@ struct SubmissionView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var word = ""
     @State private var hint = ""
-    @State private var category = Category.general
+    @State private var category = CNSNNCore.Category.general
     @State private var difficulty = Difficulty.easy
     @State private var busy = false
     var body: some View {
@@ -14,7 +14,7 @@ struct SubmissionView: View {
             Section("Ta carte") {
                 TextField("Mot complet", text: $word).autocorrectionDisabled()
                 TextField("Indice", text: $hint, axis: .vertical).lineLimit(2...4)
-                Picker("Catégorie", selection: $category) { ForEach(Category.allCases) { Text($0.rawValue).tag($0) } }
+                Picker("Catégorie", selection: $category) { ForEach(CNSNNCore.Category.allCases) { Text($0.rawValue).tag($0) } }
                 Picker("Difficulté", selection: $difficulty) { ForEach(Difficulty.allCases) { Text($0.rawValue).tag($0) } }
             }
             Section("Aperçu") {

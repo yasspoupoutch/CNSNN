@@ -15,7 +15,7 @@ import CNSNNCore
     private var start = ContinuousClock.now
     private var elapsedBeforePause: Duration = .zero
     private var paused = false
-    func load(mode: GameMode, category: Category?, difficulty: Difficulty?, state: AppState) {
+    func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, state: AppState) {
         answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil
         if mode == .daily {

@@ -3,7 +3,7 @@ import Observation
 import CNSNNCore
 
 @MainActor @Observable final class AppState {
-    var progress = Progress()
+    var progress = CNSNNCore.Progress()
     var cards = SeedCards.all
     var error: String?
     var isBusy = false
@@ -63,7 +63,7 @@ import CNSNNCore
             let archive = LocalRepository(scope: profile.uid)
             let restored = try archive.load()
             if !restored.username.isEmpty { progress = restored }
-            else if !preservingGuest { progress = Progress() }
+            else if !preservingGuest { progress = CNSNNCore.Progress() }
             local = archive
         }
         uid = profile.uid; isAnonymous = profile.anonymous
@@ -73,7 +73,7 @@ import CNSNNCore
         // Keep the current per-UID archive for a future login on this device.
         persist()
         try cloud?.signOut()
-        uid = nil; isAnonymous = true; progress = Progress(); cards = SeedCards.all
+        uid = nil; isAnonymous = true; progress = CNSNNCore.Progress(); cards = SeedCards.all
         local = LocalRepository(); persist()
     }
     func rename(_ name: String) async {

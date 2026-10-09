@@ -11,7 +11,7 @@ struct GameView: View {
     @State private var reporting = false
     @State private var reportReason = ""
     let mode: GameMode
-    var category: Category? = nil
+    var category: CNSNNCore.Category? = nil
     var difficulty: Difficulty? = nil
     var body: some View {
         @Bindable var session = session
