@@ -1,0 +1,101 @@
+name: CNSNN - IPA iPhone non signe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iphone-ipa:
+    name: Compiler et verifier l'IPA iPhone
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Verifier Xcode et le projet
+        run: |
+          set -euo pipefail
+          printf 'IPA_ROOT=%s/cnsnn-ipa\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cnsnn-ipa/logs"
+          xcodebuild -version | tee "$RUNNER_TEMP/cnsnn-ipa/logs/xcode.log"
+          grep -Eq '^Xcode 27([.]|$)' "$RUNNER_TEMP/cnsnn-ipa/logs/xcode.log"
+          python3 Scripts/verify_project.py
+
+      - name: Telecharger Firebase
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project CNSNN.xcodeproj -scheme CNSNN \
+            -clonedSourcePackagesDirPath "$IPA_ROOT/SourcePackages" \
+            -derivedDataPath "$IPA_ROOT/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$IPA_ROOT/logs/packages.log"
+
+      - name: Compiler pour iPhone physique sans signature
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project CNSNN.xcodeproj -scheme CNSNN -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath "$IPA_ROOT/SourcePackages" \
+            -derivedDataPath "$IPA_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -resultBundlePath "$IPA_ROOT/build.xcresult" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$IPA_ROOT/logs/build.log"
+
+      - name: Creer et verifier le fichier IPA complet
+        run: |
+          set -euo pipefail
+          mkdir -p "$IPA_ROOT/staging/Payload" "$IPA_ROOT/download"
+          ditto "$IPA_ROOT/DerivedData/Build/Products/Release-iphoneos/CNSNN.app" \
+            "$IPA_ROOT/staging/Payload/CNSNN.app"
+          # Preserve the complete bundle, including embedded frameworks and resource bundles.
+          ditto -c -k --keepParent "$IPA_ROOT/staging/Payload" \
+            "$IPA_ROOT/download/CNSNN-unsigned.ipa"
+          python3 Scripts/verify_unsigned_ipa.py \
+            "$IPA_ROOT/download/CNSNN-unsigned.ipa" \
+            "$IPA_ROOT/staging/Payload/CNSNN.app" \
+            | tee "$IPA_ROOT/logs/ipa-verification.log"
+          shasum -a 256 "$IPA_ROOT/download/CNSNN-unsigned.ipa" \
+            > "$IPA_ROOT/download/CNSNN-unsigned.ipa.sha256"
+          echo 'IPA iPhone ARM64 non signé vérifié. À signer avec Sideloadly avant installation.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publier l'IPA telechargeable
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CNSNN-iPhone-unsigned-IPA
+          path: ${{ runner.temp }}/cnsnn-ipa/download/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Conserver les diagnostics
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CNSNN-IPA-diagnostics-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/cnsnn-ipa/logs/
+            ${{ runner.temp }}/cnsnn-ipa/build.xcresult/
+          if-no-files-found: warn
+          retention-days: 1
