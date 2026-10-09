@@ -57,6 +57,8 @@ jobs:
             -scheme CNSNN \
             -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
             -derivedDataPath "$CI_ROOT/DerivedData" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
@@ -111,6 +113,8 @@ jobs:
             -derivedDataPath "$CI_ROOT/DerivedData" \
             -disableAutomaticPackageResolution \
             -resultBundlePath "$CI_ROOT/build.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
@@ -135,6 +139,8 @@ jobs:
             -only-testing:CNSNNCoreTests \
             -only-testing:CNSNNAppTests \
             -resultBundlePath "$CI_ROOT/unit-tests.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
@@ -159,6 +165,8 @@ jobs:
             -test-timeouts-enabled YES \
             -only-testing:CNSNNUITests \
             -resultBundlePath "$CI_ROOT/ui-tests.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
