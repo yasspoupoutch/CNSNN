@@ -10,11 +10,14 @@ import CNSNNCore
     var cloud: FirebaseRepository?
     var uid: String?
     var isAnonymous = true
+    /// True while a returning player's profile is being fetched at launch: hide onboarding meanwhile.
+    var isRestoring = false
     private var local: any ProgressRepository
     private var savingAllowed = true
     init(local: any ProgressRepository = LocalRepository()) {
         if RuntimeFlags.isTesting { self.local = MemoryRepository() } else { self.local = local }
         do { progress = try self.local.load() } catch { savingAllowed = false; self.error = "La sauvegarde locale est illisible. Elle n’a pas été écrasée." }
+        isRestoring = !RuntimeFlags.isTesting && progress.username.isEmpty && FirebaseRepository.hasSignedInUser
     }
     func persist() {
         guard savingAllowed else { return }
@@ -37,6 +40,7 @@ import CNSNNCore
         await refreshCards()
     }
     func connectIfConfigured() async {
+        defer { isRestoring = false }
         guard !RuntimeFlags.isTesting, FirebaseRepository.isConfigured else { return }
         guard !isBusy else { return }
         isBusy = true

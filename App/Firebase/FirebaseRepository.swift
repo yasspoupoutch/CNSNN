@@ -7,6 +7,8 @@ struct CloudProfile { let uid: String; let anonymous: Bool; let username: String
 struct CardReport: Identifiable { let id: String; let cardID: String; let reason: String }
 @MainActor final class FirebaseRepository {
     static var isConfigured: Bool { FirebaseApp.app() != nil }
+    /// A Firebase account survives reinstalls (keychain), so a returning player can be restored.
+    static var hasSignedInUser: Bool { isConfigured && Auth.auth().currentUser != nil }
     static func configureIfPresent() {
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else { return }
         FirebaseApp.configure()
