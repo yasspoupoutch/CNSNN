@@ -1,55 +1,136 @@
 import SwiftUI
 import CNSNNCore
 
-struct SubmissionView: View {
+/// "Proposer un mot" tab: card proposal form and the player's submissions.
+struct ProposeView: View {
     @Environment(AppState.self) private var state
-    @Environment(\.dismiss) private var dismiss
     @State private var word = ""
     @State private var hint = ""
     @State private var category = CNSNNCore.Category.general
     @State private var difficulty = Difficulty.easy
     @State private var busy = false
+    @State private var sent = false
+    @FocusState private var focus: Field?
+    private enum Field { case word, hint }
+    private var trimmedHint: String { hint.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSend: Bool { !busy && WordEngine.validWord(word) && (5...160).contains(trimmedHint.count) }
+
     var body: some View {
-        Form {
-            Section("Ta carte") {
-                TextField("Mot complet", text: $word).autocorrectionDisabled()
-                TextField("Indice", text: $hint, axis: .vertical).lineLimit(2...4)
-                Picker("Catégorie", selection: $category) { ForEach(CNSNNCore.Category.allCases) { Text($0.rawValue).tag($0) } }
-                Picker("Difficulté", selection: $difficulty) { ForEach(Difficulty.allCases) { Text($0.rawValue).tag($0) } }
-            }
-            Section("Aperçu") {
-                Text(WordEngine.consonants(word).isEmpty ? "Les consonnes apparaîtront ici" : WordEngine.consonants(word)).font(.title2.monospaced().weight(.bold)).foregroundStyle(CNSNNTheme.accent)
-                Text("Y est considéré comme une voyelle. Les espaces, accents et apostrophes sont neutralisés.").font(.footnote)
-            }
-            Section {
-                Button(busy ? "Envoi…" : (state.cloud == nil ? "Enregistrer la proposition localement" : "Envoyer pour validation")) {
-                    busy = true
-                    Task {
-                        let card = Card(id: UUID().uuidString, wordFull: word.trimmingCharacters(in: .whitespacesAndNewlines), hint: hint.trimmingCharacters(in: .whitespacesAndNewlines), category: category, difficulty: difficulty, status: .pending)
-                        if await state.submit(card) { dismiss() }
-                        busy = false
-                    }
-                }.disabled(busy || !WordEngine.validWord(word) || !(5...160).contains(hint.trimmingCharacters(in: .whitespacesAndNewlines).count))
-                Text("Les propositions restent privées jusqu’à leur approbation. En mode local, elles ne sont pas transmises à un modérateur.").font(.footnote)
-            }
-        }.navigationTitle("Proposer une carte").navigationBarTitleDisplayMode(.inline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Proposer un mot").font(.system(size: 34, weight: .bold)).tracking(-0.6)
+                    .padding(.horizontal, 2).padding(.top, 6).accessibilityAddTraits(.isHeader)
+                Text("Les mots validés par l’équipe rejoignent le jeu.")
+                    .font(.system(size: 15)).foregroundStyle(Palette.secondary).padding(.horizontal, 2).padding(.bottom, 4)
+                preview
+                field("Votre mot", text: $word, field: .word)
+                    .font(.system(size: 18, weight: .semibold)).tracking(1)
+                ZStack(alignment: .topTrailing) {
+                    field("Votre indice", text: $hint, field: .hint, multiline: true)
+                        .font(.system(size: 16))
+                    Text("\(trimmedHint.count)/160").font(.system(size: 13)).monospacedDigit()
+                        .foregroundStyle((5...160).contains(trimmedHint.count) || trimmedHint.isEmpty ? Palette.tertiary : Palette.red)
+                        .padding(.top, 18).padding(.trailing, 16).accessibilityHidden(true)
+                }
+                chips(CNSNNCore.Category.allCases, selection: $category)
+                chips(Difficulty.allCases, selection: $difficulty)
+                Button(busy ? "Envoi…" : (state.cloud == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
+                    .buttonStyle(PrimaryPillStyle(height: 54)).disabled(!canSend).padding(.top, 2)
+                Text(sent ? "✓ Proposition enregistrée." : "Y compte comme une voyelle. Les propositions restent privées jusqu’à leur approbation. En mode local, elles ne sont pas transmises à un modérateur.")
+                    .font(.system(size: 12)).foregroundStyle(sent ? Palette.mint : Palette.tertiary).padding(.horizontal, 4)
+                Text("Mes propositions").font(.system(size: 15, weight: .semibold)).padding(.horizontal, 2).padding(.top, 12)
+                submissions
+            }.padding(.horizontal, 20).padding(.top, 8)
+        }
+        .tabBarInset().scrollIndicators(.hidden).scrollDismissesKeyboard(.interactively)
+        .task { await state.refreshSubmissions() }
     }
-}
-struct SubmissionsView: View {
-    @Environment(AppState.self) private var state
-    var body: some View {
-        List {
-            if state.progress.submissions.isEmpty { ContentUnavailableView("À toi d’inventer", systemImage: "plus.rectangle", description: Text("Tes propositions et leur statut apparaîtront ici.")) }
-            ForEach(state.progress.submissions) { submission in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(submission.card.wordFull).font(.headline)
-                    Text(submission.card.wordNoVowels).font(.subheadline.monospaced()).foregroundStyle(CNSNNTheme.accent)
-                    Label(status(submission.card.status), systemImage: submission.card.status == .approved ? "checkmark.circle" : "clock").font(.caption).foregroundStyle(.secondary)
-                }.padding(.vertical, 8)
+
+    private var preview: some View {
+        VStack(spacing: 0) {
+            SectionKicker(text: "Aperçu en jeu").frame(maxWidth: .infinity, alignment: .leading)
+            let consonants = WordEngine.consonants(word)
+            FlowLayout(spacing: 6) {
+                ForEach(Array((consonants.isEmpty ? "···" : consonants).enumerated()), id: \.offset) { _, letter in
+                    Text(String(letter)).font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(consonants.isEmpty ? Palette.tertiary : Palette.foreground)
+                        .frame(width: 42, height: 52)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.fill1))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.glassBorder, lineWidth: 1))
+                }
             }
-        }.navigationTitle("Mes propositions").task { await state.refreshSubmissions() }
+            .frame(minHeight: 52).padding(.top, 16).padding(.bottom, 12)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(consonants.isEmpty ? "Les consonnes apparaîtront ici" : "Consonnes : " + consonants.map(String.init).joined(separator: ", "))
+            Text(trimmedHint.isEmpty ? "Votre indice apparaîtra ici" : "« \(trimmedHint) »")
+                .font(Typo.serifItalic(19)).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).frame(minHeight: 24)
+        }.glassCard(radius: 30, padding: 20)
     }
-    private func status(_ value: ReviewStatus) -> String {
-        switch value { case .pending: "En attente"; case .approved: "Approuvée"; case .rejected: "Refusée" }
+
+    private func field(_ placeholder: String, text: Binding<String>, field: Field, multiline: Bool = false) -> some View {
+        TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Palette.tertiary), axis: multiline ? .vertical : .horizontal)
+            .lineLimit(multiline ? 1...4 : 1...1)
+            .foregroundStyle(Palette.foreground)
+            .autocorrectionDisabled(field == .word)
+            .textInputAutocapitalization(field == .word ? .characters : .sentences)
+            .focused($focus, equals: field)
+            .padding(.leading, 18).padding(.trailing, field == .hint ? 70 : 18).padding(.vertical, 16)
+            .frame(minHeight: 54)
+            .glassPanel(radius: 18, padding: 0)
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(focus == field ? Palette.accent : .clear, lineWidth: 1))
+            .accessibilityLabel(field == .word ? "Mot complet" : "Indice, 5 à 160 caractères")
+    }
+
+    private func chips<Item: RawRepresentable & Hashable & Identifiable>(_ items: [Item], selection: Binding<Item>) -> some View where Item.RawValue == String {
+        FlowLayout(spacing: 8) {
+            ForEach(items) { item in
+                Chip(title: item.rawValue, selected: selection.wrappedValue == item) { selection.wrappedValue = item }
+            }
+        }.frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder private var submissions: some View {
+        if state.progress.submissions.isEmpty {
+            Text("Vos propositions et leur statut apparaîtront ici.").font(.system(size: 14)).foregroundStyle(Palette.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 16)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(state.progress.submissions.reversed().enumerated()), id: \.element.id) { index, submission in
+                    if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(submission.card.wordFull.uppercased()).font(.system(size: 16, weight: .bold)).tracking(0.8)
+                            Text(submission.card.wordNoVowels + " · " + submission.card.hint).font(.system(size: 13)).foregroundStyle(Palette.tertiary).lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        status(submission.card.status)
+                    }.padding(.horizontal, 16).padding(.vertical, 14)
+                    .accessibilityElement(children: .combine)
+                }
+            }.glassPanel(radius: 24, padding: 0)
+        }
+    }
+
+    private func status(_ value: ReviewStatus) -> some View {
+        let (label, color, fill): (String, Color, Color) = switch value {
+        case .pending: ("En attente", Palette.accent, Palette.accentSoft)
+        case .approved: ("Validé", Palette.mint, Palette.mint.opacity(0.16))
+        case .rejected: ("Refusé", Palette.red, Palette.redSoft)
+        }
+        return Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(color)
+            .padding(.horizontal, 10).frame(height: 26).background(Capsule().fill(fill))
+    }
+
+    private func send() {
+        guard canSend else { return }
+        busy = true; sent = false; focus = nil
+        Task {
+            let card = Card(id: UUID().uuidString, wordFull: word.trimmingCharacters(in: .whitespacesAndNewlines), hint: trimmedHint, category: category, difficulty: difficulty, status: .pending)
+            if await state.submit(card) {
+                Haptics.success()
+                word = ""; hint = ""; sent = true
+            }
+            busy = false
+        }
     }
 }

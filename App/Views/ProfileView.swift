@@ -3,6 +3,7 @@ import CNSNNCore
 
 struct ProfileView: View {
     @Environment(AppState.self) private var state
+    @AppStorage(CNSNNTheme.avatarKey) private var avatar = 0
     @State private var editingName = false
     @State private var name = ""
     @State private var account = false
@@ -10,22 +11,32 @@ struct ProfileView: View {
     @State private var isAdmin = false
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(spacing: 16) {
-                    Image(systemName: "person.crop.circle.fill").font(.system(size: 72, weight: .light)).foregroundStyle(CNSNNTheme.accent).accessibilityHidden(true)
-                    Text(state.progress.username).font(.title.weight(.semibold))
-                    Text("Niveau \(state.progress.score / 1000 + 1) · \(state.progress.score) points locaux").foregroundStyle(.secondary)
-                    Button("Modifier le pseudo") { name = state.progress.username; editingName = true }.buttonStyle(.bordered).controlSize(.large)
-                }.frame(maxWidth: .infinity).cnsnnSurface()
-                NavigationLink { SubmissionView() } label: { profileRow("Proposer une carte", symbol: "plus.rectangle") }
-                NavigationLink { SubmissionsView() } label: { profileRow("Mes propositions", symbol: "tray") }
-                Button { account = true } label: { profileRow(state.isAnonymous ? "Sauvegarder mon compte" : "Mon compte", symbol: "person.crop.circle.badge.checkmark") }
-                if isAdmin { NavigationLink { ModerationView() } label: { profileRow("Modération", symbol: "checkmark.shield") } }
-                Text(state.cloud == nil ? "Mode local. Ton compte Firebase sera disponible après la connexion du projet." : "La conversion du compte invité conserve le même identifiant Firebase et les propositions associées.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }.padding(24)
-        }.background(CNSNNTheme.background).navigationTitle("Profil").navigationBarTitleDisplayMode(.inline)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Profil").font(.system(size: 34, weight: .bold)).tracking(-0.6)
+                    .padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4).accessibilityAddTraits(.isHeader)
+                VStack(spacing: 0) {
+                    AvatarView(name: state.progress.username, colorIndex: avatar, size: 96)
+                        .shadow(color: Palette.glassShadow, radius: 20, y: 16)
+                    Text(state.progress.username).font(.system(size: 28, weight: .bold)).tracking(-0.5).padding(.top, 16)
+                    Text("Niveau \(state.progress.score / 1000 + 1) · \(Format.number(state.progress.score)) points locaux")
+                        .font(.system(size: 15)).foregroundStyle(Palette.secondary).padding(.top, 4)
+                    AvatarPicker(selection: $avatar).padding(.top, 18)
+                    Button("Modifier le pseudo") { name = state.progress.username; editingName = true }
+                        .buttonStyle(GlassPillStyle(height: 48)).padding(.top, 18)
+                }.frame(maxWidth: .infinity).glassCard(radius: 34, padding: 22)
+                VStack(spacing: 0) {
+                    Button { account = true } label: { row(state.isAnonymous ? "Sauvegarder mon compte" : "Mon compte", symbol: "person.crop.circle.badge.checkmark") }
+                    if isAdmin {
+                        Rectangle().fill(Palette.line).frame(height: 1)
+                        Button { moderation = true } label: { row("Modération", symbol: "checkmark.shield") }
+                    }
+                }.glassPanel(radius: 24, padding: 0).buttonStyle(PressStyle(scale: 0.99))
+                Text(state.cloud == nil ? "Mode local. Votre compte Firebase sera disponible après la connexion du projet." : "La conversion du compte invité conserve le même identifiant Firebase et les propositions associées.")
+                    .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
+            }.padding(.horizontal, 20).padding(.top, 8)
+        }.tabBarInset().scrollIndicators(.hidden)
             .sheet(isPresented: $account) { AccountView() }
+            .sheet(isPresented: $moderation) { NavigationStack { ModerationView() } }
             .alert("Modifier le pseudo", isPresented: $editingName) {
                 TextField("Pseudo", text: $name)
                 Button("Enregistrer") { Task { await state.rename(name) } }
@@ -33,9 +44,13 @@ struct ProfileView: View {
             } message: { Text("Entre 2 et 20 caractères.") }
             .task { isAdmin = (try? await state.cloud?.isAdmin()) ?? false }
     }
-    private func profileRow(_ title: String, symbol: String) -> some View {
-        HStack { Label(title, systemImage: symbol); Spacer(); Image(systemName: "chevron.right").font(.caption) }
-            .font(.headline).padding(20).background(CNSNNTheme.surface, in: RoundedRectangle(cornerRadius: 22)).foregroundStyle(.white)
+    private func row(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.accent).frame(width: 24)
+            Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.foreground)
+            Spacer()
+            Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tertiary)
+        }.padding(.horizontal, 18).frame(height: 58).contentShape(Rectangle())
     }
 }
 struct AccountView: View {
