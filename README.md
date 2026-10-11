@@ -10,6 +10,10 @@ Le SDK iOS 26 est requis pour compiler les références aux APIs Liquid Glass, m
 
 **Aucune build iOS n’a été compilée dans l’environnement de création Linux.** Les tailles d’écran, animations, contrastes et performances doivent être vérifiés sur simulateur puis sur iPhone avant de considérer le design comme final.
 
+## Design
+
+L’interface reprend la maquette Claude Design « CNSNN — Liquid Glass » (thème sombre) : fond animé à halos colorés, cartes en verre dépoli, accent doré, barre d’onglets flottante (Jouer, Stats, Proposer, Profil), clavier AZERTY intégré avec voyelles dorées et feuille de résultat. Les jetons (couleurs, verre, boutons) sont dans `App/DesignSystem/Theme.swift`. La police Instrument Serif (SIL Open Font License, voir `App/Resources/Fonts/OFL.txt`) est embarquée pour les consonnes et les indices. Les animations respectent « Réduire les animations » et « Réduire la transparence ».
+
 ## Ce qui est implémenté dans les sources
 
 - Présentation courte et pseudo, sans formulaire email obligatoire.

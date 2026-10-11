@@ -9,6 +9,7 @@ import CNSNNCore
     var usedHint = false
     var result: Attempt?
     var wrongAnswers = 0
+    var wrongGuesses: [String] = []
     var resumedDaily = false
     private var dailyKey: String?
     private var dailyStart: Date?
@@ -16,7 +17,7 @@ import CNSNNCore
     private var elapsedBeforePause: Duration = .zero
     private var paused = false
     func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, state: AppState) {
-        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0
+        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil
         if mode == .daily {
             let key = DailySchedule.key(); dailyKey = key
@@ -47,7 +48,7 @@ import CNSNNCore
     func submit(mode: GameMode, state: AppState) {
         guard let card, result == nil, !WordEngine.normalize(answer).isEmpty else { return }
         guard WordEngine.matches(answer, word: card.wordFull) else {
-            wrongAnswers += 1; feedback = "Pas encore. Essaie une autre idée."; Haptics.retry(); return
+            wrongAnswers += 1; wrongGuesses.append(answer); feedback = "Pas encore. Essaie une autre idée."; Haptics.retry(); return
         }
         finish(correct: true, mode: mode, state: state)
     }
