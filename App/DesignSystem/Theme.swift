@@ -7,7 +7,9 @@ enum Palette {
     static let backgroundTop = Color(red: 0.071, green: 0.078, blue: 0.149)
     static let foreground = Color(red: 0.957, green: 0.961, blue: 0.973)
     static let secondary = foreground.opacity(0.64)
-    static let tertiary = foreground.opacity(0.42)
+    /// 0.56 keeps small text above a 4.5:1 contrast ratio on the dark background.
+    static let tertiary = foreground.opacity(0.56)
+    static let focusRing = foreground.opacity(0.6)
     static let fill1 = Color.white.opacity(0.08)
     static let fill2 = Color.white.opacity(0.14)
     static let glassTop = Color.white.opacity(0.14)
@@ -56,6 +58,44 @@ enum Typo {
         .custom("InstrumentSerif-Italic", size: size, relativeTo: style)
     }
     static let kicker = Font.system(size: 12, weight: .bold)
+    /// Fraunces Black (SIL OFL, soft and "wonky" cut), reserved for the game's name.
+    static func wordmark(_ size: CGFloat) -> Font { .custom("Fraunces-Black", fixedSize: size) }
+}
+
+/// System font at the prototype's point size that still follows the user's text size setting.
+struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+    init(size: CGFloat, weight: Font.Weight) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: Self.style(for: size))
+        self.weight = weight
+    }
+    func body(content: Content) -> some View { content.font(.system(size: size, weight: weight)) }
+    /// The text style whose default size is closest, so each size grows at the system's pace.
+    private static func style(for size: CGFloat) -> Font.TextStyle {
+        switch size {
+        case ..<11.5: .caption2
+        case ..<12.5: .caption
+        case ..<13.5: .footnote
+        case ..<15.5: .subheadline
+        case ..<16.5: .callout
+        case ..<19.5: .body
+        case ..<21: .title3
+        case ..<25: .title2
+        case ..<31: .title
+        default: .largeTitle
+        }
+    }
+}
+
+extension View {
+    func scaledFont(_ size: CGFloat, _ weight: Font.Weight = .regular) -> some View {
+        modifier(ScaledSystemFont(size: size, weight: weight))
+    }
+    /// Grows the tappable area to Apple's 44 pt minimum without changing how the control looks.
+    func hitTarget() -> some View {
+        frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+    }
 }
 
 enum Haptics {
@@ -171,9 +211,9 @@ struct PrimaryPillStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 17, weight: .semibold))
+            .scaledFont(17, .semibold)
             .foregroundStyle(Palette.onAccent)
-            .frame(maxWidth: .infinity).frame(height: height)
+            .frame(maxWidth: .infinity).frame(minHeight: height)
             .background(Capsule().fill(Palette.accent))
             .overlay(Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.6), .clear], startPoint: .top, endPoint: .center), lineWidth: 1))
             .shadow(color: Palette.accent.opacity(isEnabled ? 0.3 : 0), radius: 15, y: 10)
@@ -190,9 +230,9 @@ struct GlassPillStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold))
+            .scaledFont(16, .semibold)
             .foregroundStyle(Palette.foreground)
-            .frame(maxWidth: .infinity).frame(height: height)
+            .frame(maxWidth: .infinity).frame(minHeight: height)
             .glassCapsule()
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
@@ -221,11 +261,12 @@ struct Chip: View {
     var action: () -> Void
     var body: some View {
         Button { Haptics.selection(); action() } label: {
-            Text(title).font(.system(size: 14, weight: .medium))
+            Text(title).scaledFont(14, .medium)
                 .foregroundStyle(selected ? Palette.background : Palette.foreground)
-                .padding(.horizontal, 14).frame(height: 36)
+                .padding(.horizontal, 14).frame(minHeight: 36)
                 .background(Capsule().fill(selected ? Palette.foreground : Palette.fill1))
                 .overlay(Capsule().strokeBorder(selected ? .clear : Palette.glassBorder, lineWidth: 1))
+                .hitTarget()
         }.buttonStyle(PressStyle(scale: 0.95))
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -235,7 +276,7 @@ struct SectionKicker: View {
     var text: String
     var color: Color = Palette.tertiary
     var body: some View {
-        Text(text.uppercased()).font(.system(size: 11, weight: .bold)).tracking(1.8).foregroundStyle(color)
+        Text(text.uppercased()).scaledFont(12, .bold).tracking(1.8).foregroundStyle(color)
     }
 }
 
@@ -327,8 +368,8 @@ struct HighlightedWord: View {
 struct Toast: View {
     var text: String
     var body: some View {
-        Text(text).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.foreground)
-            .padding(.horizontal, 18).frame(height: 40)
+        Text(text).scaledFont(14, .semibold).foregroundStyle(Palette.foreground)
+            .padding(.horizontal, 18).frame(minHeight: 40)
             .background(Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(LinearGradient(colors: [Palette.sheetTop, Palette.sheetBottom], startPoint: .top, endPoint: .bottom))))
             .overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1))
             .shadow(color: Palette.glassShadow, radius: 15, y: 10)

@@ -12,14 +12,14 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Profil").font(.system(size: 34, weight: .bold)).tracking(-0.6)
+                Text("Profil").scaledFont(34, .bold).tracking(-0.6)
                     .padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4).accessibilityAddTraits(.isHeader)
                 VStack(spacing: 0) {
                     AvatarView(name: state.progress.username, colorIndex: avatar, size: 96)
                         .shadow(color: Palette.glassShadow, radius: 20, y: 16)
-                    Text(state.progress.username).font(.system(size: 28, weight: .bold)).tracking(-0.5).padding(.top, 16)
-                    Text("Niveau \(state.progress.score / 1000 + 1) · \(Format.number(state.progress.score)) points locaux")
-                        .font(.system(size: 15)).foregroundStyle(Palette.secondary).padding(.top, 4)
+                    Text(state.progress.username).scaledFont(28, .bold).tracking(-0.5).padding(.top, 16)
+                    Text("Niveau \(state.progress.score / 1000 + 1) · \(Format.number(state.progress.score)) points")
+                        .scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 4)
                     AvatarPicker(selection: $avatar).padding(.top, 18)
                     Button("Modifier le pseudo") { name = state.progress.username; editingName = true }
                         .buttonStyle(GlassPillStyle(height: 48)).padding(.top, 18)
@@ -46,11 +46,11 @@ struct ProfileView: View {
     }
     private func row(_ title: String, symbol: String) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.accent).frame(width: 24)
-            Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.foreground)
+            Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.secondary).frame(width: 24)
+            Text(title).scaledFont(16, .semibold).foregroundStyle(Palette.foreground)
             Spacer()
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tertiary)
-        }.padding(.horizontal, 18).frame(height: 58).contentShape(Rectangle())
+        }.padding(.horizontal, 18).frame(minHeight: 58).contentShape(Rectangle())
     }
 }
 struct AccountView: View {
@@ -65,10 +65,10 @@ struct AccountView: View {
         NavigationStack {
             Form {
                 if state.cloud == nil {
-                    Section { Text("Firebase n’est pas encore configuré. Ta progression reste enregistrée sur cet iPhone.") }
+                    Section { Text("Firebase n’est pas encore configuré. Votre progression reste enregistrée sur cet iPhone.") }
                 } else if state.isAnonymous {
                     Section {
-                        Text("Un compte conserve ton identifiant invité. Utilise une nouvelle adresse pour convertir ce compte.")
+                        Text("Un compte conserve votre identifiant invité. Utilisez une nouvelle adresse pour convertir ce compte.")
                         Toggle("J’ai déjà un compte", isOn: $login)
                         TextField("Email", text: $email).keyboardType(.emailAddress).textContentType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
                         SecureField("Mot de passe", text: $password).textContentType(login ? .password : .newPassword)
@@ -89,7 +89,7 @@ struct AccountView: View {
                     }
                 }
                 if let message { Section { Text(message) } }
-            }.navigationTitle("Ton compte").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
+            }.navigationTitle("Votre compte").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
         }
     }
     private func resetPassword() {
@@ -100,7 +100,7 @@ struct AccountView: View {
             do {
                 guard let cloud = state.cloud else { return }
                 try await cloud.resetPassword(email: email)
-                message = "Si cette adresse correspond à un compte, tu recevras un lien pour choisir un nouveau mot de passe."
+                message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
             } catch { message = error.localizedDescription }
         }
     }

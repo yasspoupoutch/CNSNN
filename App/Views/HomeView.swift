@@ -22,7 +22,7 @@ struct HomeView: View {
                 header
                 dailyCard
                 classicCard
-                Label(state.cloud == nil ? "Progression enregistrée sur cet iPhone" : "Connecté · scores locaux d’entraînement", systemImage: "checkmark.shield")
+                Label(state.cloud == nil ? "Progression enregistrée sur cet iPhone" : "Connecté · vos points restent sur cet iPhone", systemImage: "checkmark.shield")
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.top, 4)
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
@@ -31,16 +31,16 @@ struct HomeView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Bonjour,").font(.system(size: 15)).foregroundStyle(Palette.secondary)
-                Text(state.progress.username).font(.system(size: 30, weight: .bold)).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.6)
+                Text("Bonjour,").scaledFont(15).foregroundStyle(Palette.secondary)
+                Text(state.progress.username).scaledFont(30, .bold).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.6)
             }
             Spacer(minLength: 12)
             let streak = state.progress.streak()
             HStack(spacing: 8) {
-                Circle().fill(Palette.accent).frame(width: 8, height: 8).shadow(color: Palette.accent, radius: 5)
-                Text("\(streak) jour\(streak > 1 ? "s" : "")").font(.system(size: 14, weight: .semibold)).monospacedDigit()
+                Image(systemName: "flame.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.secondary)
+                Text("\(streak) jour\(streak > 1 ? "s" : "")").scaledFont(14, .semibold).monospacedDigit()
             }
-            .padding(.horizontal, 14).frame(height: 36).glassCapsule()
+            .padding(.horizontal, 14).frame(minHeight: 36).glassCapsule()
             .accessibilityElement(children: .combine).accessibilityLabel("Série quotidienne : \(streak) jours")
             AvatarView(name: state.progress.username, colorIndex: avatar, size: 40)
         }.padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4)
@@ -49,10 +49,10 @@ struct HomeView: View {
     private var dailyCard: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                SectionKicker(text: "Mot du jour", color: Palette.accent).accessibilityLabel("Mot du jour")
+                SectionKicker(text: "Mot du jour", color: Palette.foreground).accessibilityLabel("Mot du jour")
                 Spacer()
                 Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Locale(identifier: "fr_FR"))))
-                    .font(.system(size: 13)).foregroundStyle(Palette.tertiary)
+                    .scaledFont(13).foregroundStyle(Palette.tertiary)
             }
             if let attempt = todayAttempt {
                 dailyDone(attempt)
@@ -63,10 +63,10 @@ struct HomeView: View {
                     .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
                     .padding(.top, 26).padding(.bottom, 4)
                     .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
-                Rectangle().fill(Palette.accent).frame(width: 36, height: 1.5).padding(.vertical, 18)
+                Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.vertical, 18)
                 Text(consonants == nil ? "Un mot, un indice, un chrono. À vous de jouer." : "Votre chrono tourne. Reprenez la partie.")
                     .font(Typo.serifItalic(21)).multilineTextAlignment(.center)
-                Text("Un seul essai par jour, enregistré sur cet iPhone").font(.system(size: 13)).foregroundStyle(Palette.tertiary).padding(.top, 8)
+                Text("Une seule partie par jour, enregistrée sur cet iPhone").scaledFont(13).foregroundStyle(Palette.tertiary).padding(.top, 8)
                 Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
                     .buttonStyle(PrimaryPillStyle(height: 54)).padding(.top, 20)
             }
@@ -78,21 +78,21 @@ struct HomeView: View {
         HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: .system(size: 34, weight: .heavy)).tracking(2.7)
             .padding(.top, 22).padding(.bottom, 4)
         Text(attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté. Un nouveau mot arrive à minuit.")
-            .font(.system(size: 15)).foregroundStyle(Palette.secondary)
+            .scaledFont(15).foregroundStyle(Palette.secondary)
         HStack(spacing: 10) {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 VStack(spacing: 0) {
-                    Text("PROCHAIN MOT").font(.system(size: 11)).tracking(0.9).foregroundStyle(Palette.tertiary)
-                    Text(countdown(from: context.date)).font(.system(size: 18, weight: .semibold)).monospacedDigit()
+                    Text("PROCHAIN MOT").scaledFont(11).tracking(0.9).foregroundStyle(Palette.tertiary)
+                    Text(countdown(from: context.date)).scaledFont(18, .semibold).monospacedDigit()
                 }
-                .frame(maxWidth: .infinity).frame(height: 54)
+                .frame(maxWidth: .infinity).frame(minHeight: 54)
                 .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill1))
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
                 .accessibilityElement(children: .combine)
             }
             ShareLink(item: ShareText.daily(attempt, card: card)) {
-                Text("Partager").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.foreground)
-                    .frame(width: 120, height: 54)
+                Text("Partager").scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
+                    .frame(minWidth: 120, minHeight: 54)
                     .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill2))
                     .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.glassBorder, lineWidth: 1))
             }.buttonStyle(PressStyle())
@@ -104,14 +104,14 @@ struct HomeView: View {
             HStack(alignment: .firstTextBaseline) {
                 SectionKicker(text: "Classique", color: Palette.secondary)
                 Spacer()
-                Text("\(state.progress.correctAnswers) mots trouvés").font(.system(size: 13)).foregroundStyle(Palette.tertiary)
+                Text("\(state.progress.correctAnswers) mots trouvés").scaledFont(13).foregroundStyle(Palette.tertiary)
             }
-            Text("Jouez sans limite").font(.system(size: 22, weight: .bold)).tracking(-0.2).padding(.top, 10)
+            Text("Jouez sans limite").scaledFont(22, .bold).tracking(-0.2).padding(.top, 10)
             HStack {
                 Text("Niveau \(level.number)")
                 Spacer()
                 Text("\(1000 - level.into) pts avant le niveau \(level.number + 1)")
-            }.font(.system(size: 13)).foregroundStyle(Palette.secondary).padding(.top, 16)
+            }.scaledFont(13).foregroundStyle(Palette.secondary).padding(.top, 16)
             ProgressBar(value: Double(level.into) / 1000, color: Palette.foreground).padding(.top, 8)
             HStack(spacing: 8) {
                 FilterMenu(title: category?.rawValue ?? "Toutes catégories") {
@@ -145,10 +145,11 @@ struct FilterMenu<Content: View>: View {
                 Text(title).lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
             }
-            .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.foreground)
-            .padding(.horizontal, 12).frame(height: 32)
+            .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
+            .padding(.horizontal, 12).frame(minHeight: 32)
             .background(Capsule().fill(Palette.fill1))
             .overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1))
+            .hitTarget()
         }
     }
 }

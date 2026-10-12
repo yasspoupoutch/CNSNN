@@ -18,17 +18,17 @@ struct ProposeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Proposer un mot").font(.system(size: 34, weight: .bold)).tracking(-0.6)
+                Text("Proposer un mot").scaledFont(34, .bold).tracking(-0.6)
                     .padding(.horizontal, 2).padding(.top, 6).accessibilityAddTraits(.isHeader)
                 Text("Les mots validés par l’équipe rejoignent le jeu.")
-                    .font(.system(size: 15)).foregroundStyle(Palette.secondary).padding(.horizontal, 2).padding(.bottom, 4)
+                    .scaledFont(15).foregroundStyle(Palette.secondary).padding(.horizontal, 2).padding(.bottom, 4)
                 preview
                 field("Votre mot", text: $word, field: .word)
-                    .font(.system(size: 18, weight: .semibold)).tracking(1)
+                    .scaledFont(18, .semibold).tracking(1)
                 ZStack(alignment: .topTrailing) {
                     field("Votre indice", text: $hint, field: .hint, multiline: true)
-                        .font(.system(size: 16))
-                    Text("\(trimmedHint.count)/160").font(.system(size: 13)).monospacedDigit()
+                        .scaledFont(16)
+                    Text("\(trimmedHint.count)/160").scaledFont(13).monospacedDigit()
                         .foregroundStyle((5...160).contains(trimmedHint.count) || trimmedHint.isEmpty ? Palette.tertiary : Palette.red)
                         .padding(.top, 18).padding(.trailing, 16).accessibilityHidden(true)
                 }
@@ -37,8 +37,8 @@ struct ProposeView: View {
                 Button(busy ? "Envoi…" : (state.cloud == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
                     .buttonStyle(PrimaryPillStyle(height: 54)).disabled(!canSend).padding(.top, 2)
                 Text(sent ? "✓ Proposition enregistrée." : "Y compte comme une voyelle. Les propositions restent privées jusqu’à leur approbation. En mode local, elles ne sont pas transmises à un modérateur.")
-                    .font(.system(size: 12)).foregroundStyle(sent ? Palette.mint : Palette.tertiary).padding(.horizontal, 4)
-                Text("Mes propositions").font(.system(size: 15, weight: .semibold)).padding(.horizontal, 2).padding(.top, 12)
+                    .scaledFont(12).foregroundStyle(sent ? Palette.mint : Palette.tertiary).padding(.horizontal, 4)
+                Text("Mes propositions").scaledFont(15, .semibold).padding(.horizontal, 2).padding(.top, 12)
                 submissions
             }.padding(.horizontal, 20).padding(.top, 8)
         }
@@ -52,7 +52,7 @@ struct ProposeView: View {
             let consonants = WordEngine.consonants(word)
             FlowLayout(spacing: 6) {
                 ForEach(Array((consonants.isEmpty ? "···" : consonants).enumerated()), id: \.offset) { _, letter in
-                    Text(String(letter)).font(.system(size: 24, weight: .bold))
+                    Text(String(letter)).scaledFont(24, .bold)
                         .foregroundStyle(consonants.isEmpty ? Palette.tertiary : Palette.foreground)
                         .frame(width: 42, height: 52)
                         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.fill1))
@@ -77,7 +77,7 @@ struct ProposeView: View {
             .padding(.leading, 18).padding(.trailing, field == .hint ? 70 : 18).padding(.vertical, 16)
             .frame(minHeight: 54)
             .glassPanel(radius: 18, padding: 0)
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(focus == field ? Palette.accent : .clear, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(focus == field ? Palette.focusRing : .clear, lineWidth: 1))
             .accessibilityLabel(field == .word ? "Mot complet" : "Indice, 5 à 160 caractères")
     }
 
@@ -91,7 +91,7 @@ struct ProposeView: View {
 
     @ViewBuilder private var submissions: some View {
         if state.progress.submissions.isEmpty {
-            Text("Vos propositions et leur statut apparaîtront ici.").font(.system(size: 14)).foregroundStyle(Palette.tertiary)
+            Text("Vos propositions et leur statut apparaîtront ici.").scaledFont(14).foregroundStyle(Palette.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 16)
         } else {
             VStack(spacing: 0) {
@@ -99,8 +99,8 @@ struct ProposeView: View {
                     if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(submission.card.wordFull.uppercased()).font(.system(size: 16, weight: .bold)).tracking(0.8)
-                            Text(submission.card.wordNoVowels + " · " + submission.card.hint).font(.system(size: 13)).foregroundStyle(Palette.tertiary).lineLimit(1)
+                            Text(submission.card.wordFull.uppercased()).scaledFont(16, .bold).tracking(0.8)
+                            Text(submission.card.wordNoVowels + " · " + submission.card.hint).scaledFont(13).foregroundStyle(Palette.tertiary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
                         status(submission.card.status)
@@ -113,12 +113,12 @@ struct ProposeView: View {
 
     private func status(_ value: ReviewStatus) -> some View {
         let (label, color, fill): (String, Color, Color) = switch value {
-        case .pending: ("En attente", Palette.accent, Palette.accentSoft)
+        case .pending: ("En attente", Palette.secondary, Palette.fill2)
         case .approved: ("Validé", Palette.mint, Palette.mint.opacity(0.16))
         case .rejected: ("Refusé", Palette.red, Palette.redSoft)
         }
-        return Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(color)
-            .padding(.horizontal, 10).frame(height: 26).background(Capsule().fill(fill))
+        return Text(label).scaledFont(12, .semibold).foregroundStyle(color)
+            .padding(.horizontal, 10).frame(minHeight: 26).background(Capsule().fill(fill))
     }
 
     private func send() {

@@ -35,6 +35,8 @@ struct GameView: View {
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: session.result?.id)
+        // The board and keyboard share one screen, so the game caps text growth lower than the rest of the app.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .alert("Signaler la carte", isPresented: $reporting) {
             TextField("Pourquoi ? (5 à 300 caractères)", text: $reportReason)
             Button("Envoyer") {
@@ -63,26 +65,26 @@ struct GameView: View {
                 if state.cloud != nil, let card = session.card, !card.id.hasPrefix("seed-"), session.result == nil {
                     Button { reporting = true } label: {
                         Image(systemName: "flag").font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.secondary)
-                            .frame(width: 36, height: 36).glassCapsule()
+                            .frame(width: 36, height: 36).glassCapsule().hitTarget()
                     }.buttonStyle(PressStyle(scale: 0.92)).accessibilityLabel("Signaler cette carte")
                 }
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     Text(Format.clock(session.result?.timeMs ?? session.elapsedMs))
-                        .font(.system(size: 14, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
-                        .padding(.horizontal, 13).frame(height: 36).glassCapsule()
+                        .scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.foreground)
+                        .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
                         .accessibilityLabel("Chrono")
                 }
             }
         }
         .overlay {
             VStack(spacing: 1) {
-                Text(mode == .daily ? "Mot du jour" : "Classique").font(.system(size: 16, weight: .semibold))
+                Text(mode == .daily ? "Mot du jour" : "Classique").scaledFont(16, .semibold)
                 if let card = session.card {
-                    Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").font(.system(size: 12)).foregroundStyle(Palette.tertiary)
+                    Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary)
                 }
             }.lineLimit(1).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
         }
-        .frame(height: 48)
+        .frame(minHeight: 48)
     }
 
     // MARK: Board
@@ -94,7 +96,7 @@ struct GameView: View {
             .lineLimit(1).minimumScaleFactor(0.35)
             .padding(.top, 40)
             .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
-        Rectangle().fill(Palette.accent).frame(width: 36, height: 1.5).padding(.top, 22)
+        Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
         if session.usedHint {
             Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
                 .padding(.horizontal, 10).padding(.top, 22)
@@ -102,15 +104,15 @@ struct GameView: View {
         }
         FlowLayout(spacing: 6) {
             ForEach(Array(session.wrongGuesses.enumerated()), id: \.offset) { _, guess in
-                Text(WordEngine.normalize(guess)).font(.system(size: 12, weight: .semibold)).tracking(0.6)
+                Text(WordEngine.normalize(guess)).scaledFont(12, .semibold).tracking(0.6)
                     .strikethrough().foregroundStyle(Palette.red)
-                    .padding(.horizontal, 10).frame(height: 26)
+                    .padding(.horizontal, 10).frame(minHeight: 26)
                     .background(Capsule().fill(Palette.redSoft))
                     .accessibilityLabel("Essai incorrect : \(guess)")
             }
         }.frame(minHeight: 26).padding(.top, 16)
         if mode == .daily && session.result == nil {
-            Text("Les erreurs ne terminent pas la partie.").font(.system(size: 12)).foregroundStyle(Palette.tertiary).padding(.top, 6)
+            Text("Les erreurs ne terminent pas la partie.").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 6)
         }
         Spacer(minLength: 12)
         answerLine
@@ -120,14 +122,14 @@ struct GameView: View {
                 withAnimation(reduceMotion ? nil : CNSNNTheme.ease) { session.usedHint = true }
             } label: {
                 HStack(spacing: 8) {
-                    Text("Indice").fontWeight(.bold).foregroundStyle(Palette.accent)
+                    Text("Indice").fontWeight(.bold)
                     Text(session.usedHint ? "révélé" : "points ÷ 2")
-                }.font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.foreground)
-                    .padding(.horizontal, 16).frame(height: 36).glassCapsule()
+                }.scaledFont(13, .medium).foregroundStyle(Palette.foreground)
+                    .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil).opacity(session.usedHint ? 0.5 : 1)
             Button { confirmSkip = true } label: {
-                Text("Passer").font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.secondary)
-                    .padding(.horizontal, 16).frame(height: 36).glassCapsule()
+                Text("Passer").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
+                    .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.result != nil)
         }.padding(.vertical, 12)
         LetterKeyboard(press: press, delete: delete, submit: submit)
@@ -139,7 +141,7 @@ struct GameView: View {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
             ForEach(Array(session.answer.enumerated()), id: \.offset) { _, character in
-                Text(String(character)).font(.system(size: 30, weight: .medium)).tracking(2.4)
+                Text(String(character)).scaledFont(30, .medium).tracking(2.4)
                     .foregroundStyle(Vowels.contains(character) ? Palette.accent : Palette.foreground)
             }
             if session.result == nil { Caret() }
@@ -157,10 +159,10 @@ struct GameView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image(systemName: "square.stack").font(.system(size: 44, weight: .light)).foregroundStyle(Palette.accent)
-            Text("Aucune carte").font(.system(size: 22, weight: .bold))
+            Image(systemName: "square.stack").font(.system(size: 44, weight: .light)).foregroundStyle(Palette.secondary)
+            Text("Aucune carte").scaledFont(22, .bold)
             Text("Aucune carte disponible pour ces filtres. Revenez en arrière pour les modifier.")
-                .font(.system(size: 15)).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
+                .scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
             Button("Retour") { dismiss() }.buttonStyle(GlassPillStyle()).padding(.top, 8)
             Spacer()
         }.padding(.horizontal, 24)
@@ -214,7 +216,6 @@ private struct ResultSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Capsule().fill(Palette.tertiary).frame(width: 40, height: 5).padding(.top, -12).padding(.bottom, 18)
             Text(kicker).font(Typo.serifItalic(24)).foregroundStyle(result.correct ? Palette.mint : Palette.red)
             if let card {
                 let word = card.wordFull.uppercased()
@@ -232,16 +233,16 @@ private struct ResultSheet: View {
                 .font(.system(size: 42, weight: .heavy)).tracking(2.5).lineLimit(1).minimumScaleFactor(0.4)
                 .padding(.top, 10)
                 .accessibilityElement(children: .ignore).accessibilityLabel(card.wordFull)
-                Text("« \(card.hint) »").font(.system(size: 15)).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 6)
+                Text("« \(card.hint) »").scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 6)
             }
             HStack(spacing: 10) {
-                tile("+\(result.points)", "points", Palette.accent)
+                tile("+\(result.points)", "points", Palette.foreground)
                 tile(Format.clock(result.timeMs), "temps", Palette.foreground)
                 if mode == .daily { tile("\(state.progress.streak())", "jours de série", Palette.foreground) }
                 else { tile(Format.number(state.progress.score), "total", Palette.foreground) }
             }.padding(.top, 18)
             if result.correct, result.timeMs == state.progress.bestTimeMs {
-                Label("Votre meilleur temps", systemImage: "trophy").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.mint).padding(.top, 12)
+                Label("Votre meilleur temps", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint).padding(.top, 12)
             }
             HStack(spacing: 10) {
                 ShareLink(item: mode == .daily ? ShareText.daily(result, card: card) : ShareText.classic(result, card: card)) {
@@ -254,9 +255,9 @@ private struct ResultSheet: View {
                     .buttonStyle(PrimaryPillStyle(height: 54)).layoutPriority(1)
             }.padding(.top, 20)
             if mode == .classic {
-                Button("Retour à l’accueil", action: close).font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.secondary).padding(.top, 14)
+                Button("Retour à l’accueil", action: close).scaledFont(15, .medium).foregroundStyle(Palette.secondary).padding(.top, 14)
             } else {
-                Text("Votre défi du jour est enregistré. À demain !").font(.system(size: 13)).foregroundStyle(Palette.tertiary).padding(.top, 14)
+                Text("Votre défi du jour est enregistré. À demain !").scaledFont(13).foregroundStyle(Palette.tertiary).padding(.top, 14)
             }
         }
         .padding(.horizontal, 22).padding(.vertical, 26)
@@ -276,8 +277,8 @@ private struct ResultSheet: View {
 
     private func tile(_ value: String, _ label: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.system(size: 22, weight: .bold)).monospacedDigit().foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.system(size: 12)).foregroundStyle(Palette.tertiary).lineLimit(1).minimumScaleFactor(0.8)
+            Text(value).scaledFont(22, .bold).monospacedDigit().foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.6)
+            Text(label).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill1))
@@ -345,7 +346,7 @@ private struct Caret: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let visible = reduceMotion || Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
-            RoundedRectangle(cornerRadius: 2).fill(Palette.accent).frame(width: 2.5, height: 30).opacity(visible ? 1 : 0).padding(.leading, 2)
+            RoundedRectangle(cornerRadius: 2).fill(Palette.foreground).frame(width: 2.5, height: 30).opacity(visible ? 1 : 0).padding(.leading, 2)
         }
     }
 }
