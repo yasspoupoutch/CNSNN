@@ -61,6 +61,23 @@ struct DailySessionState {
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else { return }
         FirebaseApp.configure()
     }
+    #if DEBUG
+    /// Integration tests only: points the SDK at the local Firebase emulators (Firebase/firebase.json).
+    static func configureForEmulator(projectID: String) {
+        guard FirebaseApp.app() == nil else { return }
+        let options = FirebaseOptions(googleAppID: "1:123456789012:ios:0123456789abcdef", gcmSenderID: "123456789012")
+        options.projectID = projectID
+        options.apiKey = "emulator-api-key"
+        FirebaseApp.configure(options: options)
+        Auth.auth().useEmulator(withHost: "127.0.0.1", port: 9099)
+        let settings = Firestore.firestore().settings
+        settings.host = "127.0.0.1:8080"
+        settings.isSSLEnabled = false
+        settings.cacheSettings = MemoryCacheSettings()
+        Firestore.firestore().settings = settings
+    }
+    var currentUID: String? { auth.currentUser?.uid }
+    #endif
     private var auth: Auth { Auth.auth() }
     var hasCurrentUser: Bool { auth.currentUser != nil }
     var currentEmail: String? { auth.currentUser?.email }

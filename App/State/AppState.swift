@@ -243,6 +243,7 @@ import CNSNNCore
             var stored = card
             let word = WordEngine.normalize(card.wordFull)
             if (cards + DailyPool.all).contains(where: { WordEngine.normalize($0.wordFull) == word }) { throw CloudError.duplicateWord }
+            if cloud != nil && uid == nil { throw CloudError.offline }
             if let cloud, let uid { stored = try await cloud.submit(card: card, uid: uid) }
             else if progress.submissions.contains(where: { WordEngine.normalize($0.card.wordFull) == WordEngine.normalize(card.wordFull) }) {
                 throw CloudError.duplicateWord
