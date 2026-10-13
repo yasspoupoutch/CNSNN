@@ -212,6 +212,8 @@ struct GameView: View {
 
     private func press(_ letter: String) {
         guard session.result == nil, session.answer.count < 40 else { return }
+        // No leading or double spaces.
+        if letter == " ", session.answer.isEmpty || session.answer.hasSuffix(" ") { return }
         session.answer += letter
     }
     private func delete() {
@@ -394,8 +396,13 @@ struct LetterKeyboard: View {
                     }
                 }
             }.frame(height: 44 * 3 + 16)
-            Button("Valider") { Haptics.selection(); submit() }
-                .buttonStyle(PrimaryPillStyle(height: 48)).padding(.horizontal, 4).padding(.top, 2)
+            // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
+            HStack(spacing: 6) {
+                KeyCap(label: "espace", vowel: false, width: 110) { press(" ") }
+                    .accessibilityLabel("Espace")
+                Button("Valider") { Haptics.selection(); submit() }
+                    .buttonStyle(PrimaryPillStyle(height: 48))
+            }.padding(.horizontal, 4).padding(.top, 2)
         }
         .padding(.horizontal, 6).padding(.vertical, 10)
         .glassCard(radius: 30, padding: 0)
