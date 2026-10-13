@@ -208,12 +208,18 @@ import CNSNNCore
         try await emulator("PATCH", "\(docs)/dailySecrets/\(day)", body: #"{"fields":{"answer":{"stringValue":""# + WordEngine.normalize(card.wordFull) + #""}}}"#)
     }
     private func emulator(_ method: String, _ url: String, body: String? = nil) async throws {
-        var request = URLRequest(url: URL(string: url)!)
+        var request = URLRequest(url: URL(string: url)!, timeoutInterval: 20)
         request.httpMethod = method
         // "owner" bypasses the security rules on the Firestore emulator only.
         request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
         if let body { request.httpBody = Data(body.utf8); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
-        let (_, response) = try await URLSession.shared.data(for: request)
+        // The emulators can be slow to answer their first request on a busy CI runner: retry a timeout.
+        var attempt = 0
+        let response: URLResponse
+        while true {
+            do { response = try await URLSession.shared.data(for: request).1; break }
+            catch let error as URLError where error.code == .timedOut && attempt < 2 { attempt += 1 }
+        }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         XCTAssertTrue((200..<300).contains(status), "\(method) \(url) → \(status)")
     }
