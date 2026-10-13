@@ -6,10 +6,12 @@ struct RootView: View {
     var body: some View {
         ZStack {
             AmbientBackground()
-            if state.progress.username.isEmpty { OnboardingView().transition(.opacity) }
-            else { MainShell().transition(.opacity) }
+            if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
+            else if state.isRestoring { LaunchView().transition(.opacity) }
+            else { OnboardingView().transition(.opacity) }
         }
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
+        .animation(CNSNNTheme.ease, value: state.isRestoring)
         .alert("CNSNN", isPresented: Binding(get: { state.error != nil }, set: { if !$0 { state.error = nil } })) {
             Button("Compris", role: .cancel) { state.error = nil }
         } message: { Text(state.error ?? "") }
@@ -104,6 +106,16 @@ struct TabPill: View {
 /// Bottom padding so scrolling content clears the floating tab bar.
 extension View {
     func tabBarInset() -> some View { safeAreaPadding(.bottom, 96) }
+}
+
+/// Shown while a returning player's account is restored, instead of flashing the rules.
+struct LaunchView: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            VowelWord(word: "CONSONNE", font: .system(size: 50, weight: .heavy))
+            ProgressView().tint(Palette.secondary)
+        }.accessibilityElement(children: .combine).accessibilityLabel("Chargement de votre profil")
+    }
 }
 
 // MARK: - Onboarding
