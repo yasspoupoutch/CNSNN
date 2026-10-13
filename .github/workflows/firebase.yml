@@ -1,0 +1,90 @@
+name: CNSNN - Firebase
+
+# Rules tests run on every change to Firebase/. Deploying rules and indexes to the
+# production project, or granting the moderator role, only happens on a manual run from main.
+on:
+  pull_request:
+    paths: ['Firebase/**', '.github/workflows/firebase.yml']
+  push:
+    branches: [main]
+    paths: ['Firebase/**', '.github/workflows/firebase.yml']
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publier les règles et index Firestore sur cnsnn-9ctosy
+        type: boolean
+        default: false
+      admin_uid:
+        description: UID Firebase à nommer administrateur (facultatif)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-firebase-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rules-tests:
+    name: Tester les règles Firestore (émulateur)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Firebase
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci || npm install --no-audit --no-fund
+      - run: npm test
+
+  deploy:
+    name: Publier sur Firebase
+    needs: rules-tests
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Firebase
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier la clé du compte de service
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo '::error::Le secret FIREBASE_SERVICE_ACCOUNT est absent (voir Docs/FIREBASE.md).'
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          node -e "const k=require(process.argv[1]);if(k.project_id!=='cnsnn-9ctosy'){console.error('Clé pour un autre projet : '+k.project_id);process.exit(1)}" "$RUNNER_TEMP/sa.json"
+      - run: npm ci || npm install --no-audit --no-fund
+      - name: Publier les règles et index
+        if: ${{ inputs.deploy }}
+        run: npx firebase deploy --only firestore:rules,firestore:indexes --project cnsnn-9ctosy --non-interactive
+      - name: Nommer un administrateur
+        if: ${{ inputs.admin_uid != '' }}
+        env:
+          ADMIN_UID: ${{ inputs.admin_uid }}
+        run: node tools/grant-admin.mjs "$ADMIN_UID"
+      - name: Effacer la clé
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/sa.json"
