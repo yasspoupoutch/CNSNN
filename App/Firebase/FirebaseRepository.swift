@@ -330,8 +330,8 @@ struct DailySessionState {
     // MARK: Friends
 
     /// Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1).
-    static let friendCodeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
-    static func normalizedFriendCode(_ text: String) -> String {
+    nonisolated static let friendCodeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    nonisolated static func normalizedFriendCode(_ text: String) -> String {
         String(text.uppercased().filter { friendCodeAlphabet.contains($0) }.prefix(6))
     }
     /// The player's friend code, created on first use. The code is the document id, so it is unique.
