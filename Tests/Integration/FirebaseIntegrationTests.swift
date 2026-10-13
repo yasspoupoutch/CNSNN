@@ -214,11 +214,10 @@ import CNSNNCore
         request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
         if let body { request.httpBody = Data(body.utf8); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         // The emulators can be slow to answer their first request on a busy CI runner: retry a timeout.
-        var attempt = 0
-        let response: URLResponse
-        while true {
-            do { response = try await URLSession.shared.data(for: request).1; break }
-            catch let error as URLError where error.code == .timedOut && attempt < 2 { attempt += 1 }
+        var response: URLResponse?
+        for attempt in 0..<3 where response == nil {
+            do { response = try await URLSession.shared.data(for: request).1 }
+            catch let error as URLError where error.code == .timedOut && attempt < 2 { continue }
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         XCTAssertTrue((200..<300).contains(status), "\(method) \(url) → \(status)")
