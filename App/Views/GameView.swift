@@ -79,6 +79,7 @@ struct GameView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     Text(session.phase == .playing ? Format.clock(session.result?.timeMs ?? session.elapsedMs) : "0:00")
                         .scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.foreground)
+                        .contentTransition(.numericText())
                         .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
                         .accessibilityLabel("Chrono")
                 }
@@ -333,6 +334,7 @@ private struct ResultSheet: View {
     private func tile(_ value: String, _ label: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
             Text(value).scaledFont(22, .bold).monospacedDigit().foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
             Text(label).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -382,7 +384,7 @@ private struct KeyCap: View {
     var width: CGFloat
     var action: () -> Void
     var body: some View {
-        Button { UISelectionFeedbackGenerator().selectionChanged(); action() } label: {
+        Button { Haptics.key(); action() } label: {
             Text(label).font(.system(size: 19, weight: .medium))
                 .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
                 .frame(width: max(width, 0), height: 44)

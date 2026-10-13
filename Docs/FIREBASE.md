@@ -37,20 +37,31 @@ Auth anonyme et Firestore peuvent être utilisés dans les quotas Spark gratuits
 
 Cloud Functions exige généralement le plan Blaze. `Backend/functions/` est du code préparatoire **non déployé**, absent de la configuration de déploiement. Il faut prévenir l’utilisateur et obtenir son accord avant toute activation de facturation. Les limites d’instances réduisent le risque sans constituer un plafond financier. Un budget Firebase n’est pas un interrupteur automatique des dépenses.
 
-## Schéma
+## Publier les règles et nommer un administrateur
+
+Une seule fois : dans la console Firebase, **Paramètres du projet → Comptes de service → Générer une nouvelle clé privée**, puis sur GitHub **Settings → Secrets and variables → Actions → New repository secret** nommé `FIREBASE_SERVICE_ACCOUNT` avec tout le contenu du fichier JSON. Ne jamais publier cette clé ailleurs.
+
+Ensuite, depuis **Actions → CNSNN - Firebase → Run workflow** sur `main` :
+- `deploy` coché : relance les tests émulateur puis publie `firestore.rules` et `firestore.indexes.json` sur `cnsnn-9ctosy` ;
+- `admin_uid` : donne le rôle de modérateur à cet UID (claim `admin` et document `admins/{uid}`).
+
+Sans la clé, un document `admins/{uid}` créé à la main dans la console suffit aussi pour la modération.
+
+## Schéma (plan gratuit Spark, sans Cloud Functions)
 
 | Collection | Contenu | Écriture |
 |---|---|---|
-| users/{uid} | pseudo, dates, score/stats officiels | création à zéro et pseudo par propriétaire ; statistiques par serveur |
-| cards/{id} | mot, consonnes, réponse normalisée, indice, catégorie, difficulté, auteur, statut | proposition pending par auteur ; validation/retrait par claim admin |
-| attempts/{uid_day} | résultat officiel quotidien, points, temps | serveur uniquement |
-| dailyChallenges/{yyyy-MM-dd} | carte publique quotidienne sans réponse | outil éditorial de confiance |
-| dailySolutions/{yyyy-MM-dd} | réponse et indice privés | outil éditorial de confiance ; aucune lecture client |
-| gameSessions/{uid_day} | début serveur, indice révélé, statut | fonctions serveur uniquement |
-| dailyResults/{uid_day} | résultat unique | serveur uniquement ; lecture propriétaire/admin |
-| reports/{uid_card} | motif et statut | création propriétaire, résolution admin |
+| users/{uid} | pseudo, dates, quota de propositions | création à zéro, pseudo et quota par le propriétaire ; suppression par le propriétaire |
+| users/{uid}/private/progress | progression d’entraînement synchronisée (JSON) | propriétaire uniquement |
+| dailySessions/{uid_day} | carte du jour, début serveur, indice, fin serveur | création une fois le jour même ; indice puis fin une seule fois |
+| dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur, points recalculés | création unique, avec la mise à jour du classement dans le même lot |
+| leaderboard/{uid} | points, parties, victoires, séries, meilleur temps | n’avance que d’un nouveau résultat à la fois |
+| dailyChallenges/{day} | mot du jour publié par un modérateur (remplace le planning intégré) | modérateur, difficulté du jour imposée |
+| cards/{MOTNORMALISÉ} | proposition ou carte publiée ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
+| reports/{uid_card} | signalement unique par joueur et carte | création propriétaire, résolution modérateur |
+| admins/{uid} | rôle modérateur | console ou workflow uniquement |
 
-La région Functions proposée est europe-west1 ; vérifier la localisation Firestore réelle avant déploiement. Le fichier iOS ne donne pas les règles actuellement publiées : cette inspection nécessite un accès autorisé au projet.
+Index composites : `cards` (createdBy, createdAt desc), `dailyResults` (day, correct, timeMs) et (userId, day desc).
 
 ## Sécurité et limites
 

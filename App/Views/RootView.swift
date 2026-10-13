@@ -98,9 +98,23 @@ struct TabPill: View {
             }
         }
         .padding(6)
-        .background(Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(LinearGradient(colors: [Palette.glassTop, Palette.glassBottom], startPoint: .top, endPoint: .bottom))))
-        .overlay(Capsule().strokeBorder(LinearGradient(colors: [Palette.glassHighlight, Palette.glassBorder], startPoint: .top, endPoint: .bottom), lineWidth: 1))
-        .shadow(color: Palette.glassShadow, radius: 20, y: 16)
+        .modifier(TabBarGlass())
+    }
+}
+
+/// The floating bar uses the system's Liquid Glass on iOS 26 and later, the prototype's frosted capsule before.
+private struct TabBarGlass: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !reduceTransparency {
+            content.glassEffect(.regular.interactive(), in: Capsule())
+                .shadow(color: Palette.glassShadow, radius: 20, y: 16)
+        } else {
+            content
+                .background(Capsule().fill(reduceTransparency ? AnyShapeStyle(Palette.surface) : AnyShapeStyle(.ultraThinMaterial)).overlay(Capsule().fill(LinearGradient(colors: [Palette.glassTop, Palette.glassBottom], startPoint: .top, endPoint: .bottom))))
+                .overlay(Capsule().strokeBorder(LinearGradient(colors: [Palette.glassHighlight, Palette.glassBorder], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+                .shadow(color: Palette.glassShadow, radius: 20, y: 16)
+        }
     }
 }
 
@@ -113,7 +127,7 @@ extension View {
 struct LaunchView: View {
     var body: some View {
         VStack(spacing: 24) {
-            VowelWord(word: "CONSONNE", font: .system(size: 50, weight: .heavy))
+            VowelWord(word: "CONSONNE", font: Typo.wordmark(50))
             ProgressView().tint(Palette.secondary)
         }.accessibilityElement(children: .combine).accessibilityLabel("Chargement de votre profil")
     }

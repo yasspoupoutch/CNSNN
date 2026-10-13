@@ -38,6 +38,7 @@ struct HomeView: View {
             let streak = state.official?.currentStreak() ?? state.progress.streak()
             HStack(spacing: 8) {
                 Image(systemName: "flame.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.secondary)
+                    .symbolEffect(.bounce, value: streak)
                 Text("\(streak) jour\(streak > 1 ? "s" : "")").scaledFont(14, .semibold).monospacedDigit()
             }
             .padding(.horizontal, 14).frame(minHeight: 36).glassCapsule()
