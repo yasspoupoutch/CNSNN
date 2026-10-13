@@ -356,7 +356,7 @@ struct VowelWord: View {
             HStack(spacing: 0) {
                 ForEach(Array(word.enumerated()), id: \.offset) { index, character in
                     if Vowels.contains(character) {
-                        let start = time - delay - Double(index) * 0.12
+                        let start = time - delay - Double(index) * (once ? Self.introStagger : 0.12)
                         let progress = reduceMotion || RuntimeFlags.isTesting ? 1 : (once ? Self.intro(start) : Self.progress(start))
                         CollapseLayout(progress: progress) { Text(String(character)).foregroundStyle(Palette.accent) }
                             .opacity(progress).clipped()
@@ -369,15 +369,16 @@ struct VowelWord: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(word.capitalized)
     }
-    /// Opening screen: each vowel slides in over half a second and stays.
+    /// Opening screen: each vowel slides in quickly, one after the other, and stays.
+    static let introStagger = 0.07
     static func intro(_ time: Double) -> CGFloat {
-        let t = min(max((time - 0.35) / 0.55, 0), 1)
+        let t = min(max((time - 0.2) / 0.35, 0), 1)
         return CGFloat(t * t * (3 - 2 * t))
     }
     /// Opening screen length: the last vowel of `word` has settled, plus a short pause to read it.
     static func introDuration(_ word: String) -> Double {
         let last = Array(word).lastIndex(where: Vowels.contains) ?? 0
-        return 0.35 + Double(last) * 0.12 + 0.55 + 0.7
+        return 0.2 + Double(last) * introStagger + 0.35 + 0.45
     }
     /// Same keyframes as the prototype's `vowelIn` (5 s cycle).
     static func progress(_ time: Double) -> CGFloat {

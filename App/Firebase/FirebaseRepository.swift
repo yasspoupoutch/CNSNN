@@ -34,6 +34,8 @@ struct FriendStanding: Identifiable, Equatable {
     let points: Int
     let streak: Int
     let today: Attempt?
+    /// Wrong guesses on today's word, when the player has a result.
+    var todayWrong: Int? = nil
 
     static func == (a: FriendStanding, b: FriendStanding) -> Bool {
         a.uid == b.uid && a.username == b.username && a.points == b.points && a.streak == b.streak
@@ -59,6 +61,7 @@ struct DailyRank: Identifiable, Equatable {
     let timeMs: Int
     let points: Int
     let usedHint: Bool
+    var wrongAnswers = 0
 }
 
 /// Where a finished daily result stands among today's players.
@@ -339,7 +342,8 @@ struct DailySessionState {
             .order(by: "timeMs").limit(to: limit).getDocuments().documents.compactMap { doc in
                 let d = doc.data()
                 guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
-                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false)
+                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false,
+                                 wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
             }
     }
     /// "Plus rapide que 98 % des joueurs": players who were slower or did not find the word,
@@ -410,9 +414,10 @@ struct DailySessionState {
         var rows: [FriendStanding] = []
         for player in players {
             let entry = try await leaderboardEntry(uid: player.uid, source: .server)
-            let today = try await dailyResult(uid: player.uid, day: day)
+            let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
+            let today = data.flatMap { Self.attempt(day: day, $0) }
             rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
-                                       streak: entry?.currentStreak() ?? 0, today: today))
+                                       streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int))
         }
         return FriendStanding.ordered(rows)
     }

@@ -13,7 +13,7 @@ struct RootView: View {
             else if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
             else { OnboardingView().transition(.opacity) }
         }
-        .animation(.easeInOut(duration: 0.5), value: introDone)
+        .animation(.easeInOut(duration: 0.35), value: introDone)
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
         .animation(CNSNNTheme.ease, value: state.isRestoring)
         .task {

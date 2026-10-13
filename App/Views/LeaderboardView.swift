@@ -76,8 +76,15 @@ struct LeaderboardView: View {
                     Text(Format.ordinal(index + 1)).scaledFont(14, .bold).monospacedDigit()
                         .foregroundStyle(index < 3 ? Palette.foreground : Palette.tertiary).frame(minWidth: 34, alignment: .leading)
                     AvatarView(name: row.name, colorIndex: row.color, size: 32)
-                    Text(row.name).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
-                    if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 6) {
+                            Text(row.name).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
+                            if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
+                        }
+                        if let detail = row.detail {
+                            Text(detail).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
+                        }
+                    }
                     Spacer(minLength: 8)
                     Text(row.value).scaledFont(15, .semibold).monospacedDigit()
                 }
@@ -101,12 +108,14 @@ struct LeaderboardView: View {
         let id: String
         let name: String
         let value: String
+        var detail: String? = nil
         /// Stable across launches, unlike hashValue.
         var color: Int { id.unicodeScalars.reduce(0) { $0 + Int($1.value) } }
     }
     private var rows: [Row] {
         switch board {
-        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.timeMs) + ($0.usedHint ? " · indice" : "")) }
+        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.timeMs),
+                                     detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice" : "")) }
         case .points: players.map { Row(id: $0.uid, name: $0.username, value: Format.number($0.points) + " pts") }
         case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
         case .friends: []
@@ -208,7 +217,8 @@ struct FriendsBoard: View {
                                 Text(row.username).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
                                 if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
                             }
-                            Text(Format.number(row.points) + " pts" + (row.streak > 0 ? " · série \(row.streak)" : ""))
+                            Text(Format.number(row.points) + " pts" + (row.streak > 0 ? " · série \(row.streak)" : "")
+                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) : ""))
                                 .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
@@ -262,6 +272,17 @@ struct FriendsBoard: View {
         Task {
             do { try await cloud.removeFriend(uid: uid, friend: row.uid); rows.removeAll { $0.uid == row.uid } }
             catch { message = CloudError.message(error) }
+        }
+    }
+}
+
+/// "sans faute", "1 erreur", "3 erreurs": wrong guesses on the day's word.
+enum Mistakes {
+    static func text(_ count: Int) -> String {
+        switch count {
+        case ...0: "sans faute"
+        case 1: "1 erreur"
+        default: "\(count) erreurs"
         }
     }
 }

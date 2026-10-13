@@ -28,4 +28,10 @@ final class FriendsAndStandingTests: XCTestCase {
                                               row("fast", points: 10, today: (true, 3000)), row("miss", points: 100, today: (false, 2000))])
         XCTAssertEqual(ordered.map(\.uid), ["fast", "slow", "idle", "miss"])
     }
+
+    func testMistakesLine() {
+        XCTAssertEqual(Mistakes.text(0), "sans faute")
+        XCTAssertEqual(Mistakes.text(1), "1 erreur")
+        XCTAssertEqual(Mistakes.text(3), "3 erreurs")
+    }
 }
