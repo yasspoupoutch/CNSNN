@@ -158,13 +158,16 @@ service cloud.firestore {
    // Reading a missing id is allowed so the app can tell a free word from a duplicate.
    allow read: if signedIn() && (resource == null || resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
    allow create: if signedIn() && validCard(request.resource.data)
-    && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status'])
+    && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status','authorName'])
     && cardId == request.resource.data.normalizedAnswer
+    // The pseudo shown as "Proposé par" must be the author's own.
+    && (!('authorName' in request.resource.data) || request.resource.data.authorName == get(at('users/' + request.auth.uid)).data.username)
     && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending'
     && withinProposalQuota();
    // Moderators approve or reject, and may correct the hint, category or difficulty.
    allow update: if admin() && resource.data.status in ['pending','approved','rejected'] && validCard(request.resource.data)
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels','hint','category','difficulty'])
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels','hint','category','difficulty','authorName'])
+    && (!('authorName' in request.resource.data) || validName(request.resource.data.authorName))
     && request.resource.data.normalizedAnswer == resource.data.normalizedAnswer
     && request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
    // Authors may withdraw a proposal that is not live, and admins may remove anything.

@@ -184,6 +184,11 @@ test('proposal: id is the normalized word, so duplicates fail',async()=>{
  await assertSucceeds(propose());
  await assertFails(propose('bob','CHOCOLAT',card('pending','bob')));
 });
+test('proposal author pseudo must be the proposer own',async()=>{
+ await signUp();
+ await assertFails(propose('alice','CHOCOLAT',{...card('pending','alice'),authorName:'Admin'}));
+ await assertSucceeds(propose('alice','CHOCOLAT',{...card('pending','alice'),authorName:'Alice'}));
+});
 test('proposal needs the quota update and respects the cooldown',async()=>{
  await signUp();
  await assertFails(setDoc(doc(user(),'cards/CHOCOLAT'),card()));

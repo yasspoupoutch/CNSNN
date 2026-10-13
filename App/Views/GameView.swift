@@ -106,6 +106,9 @@ struct GameView: View {
             .padding(.top, 40)
             .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
         Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
+        if let author = card.author {
+            Text("Carte proposée par " + author).scaledFont(13, .medium).foregroundStyle(Palette.secondary).padding(.top, 14)
+        }
         if session.usedHint {
             Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
                 .padding(.horizontal, 10).padding(.top, 22)
@@ -269,6 +272,9 @@ private struct ResultSheet: View {
                 .padding(.top, 10)
                 .accessibilityElement(children: .ignore).accessibilityLabel(card.wordFull)
                 Text("« \(card.hint) »").scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 6)
+                if let author = card.author {
+                    Text("Proposée par " + author).scaledFont(13).foregroundStyle(Palette.tertiary).padding(.top, 4)
+                }
             }
             HStack(spacing: 10) {
                 tile("+\(result.points)", "points", Palette.foreground)
@@ -312,15 +318,15 @@ private struct ResultSheet: View {
     @ViewBuilder private var officialLine: some View {
         if pending {
             Label("Validation du temps officiel…", systemImage: "clock.arrow.circlepath").scaledFont(13, .semibold).foregroundStyle(Palette.secondary)
-        } else if let standing, result.correct, let percent = standing.beatenPercent {
+        } else if let standing, result.correct, let rank = standing.rank {
             VStack(spacing: 2) {
-                Text("Plus rapide que \(percent) % des joueurs").scaledFont(15, .semibold).foregroundStyle(Palette.mint)
-                if let rank = standing.rank {
-                    Text(Format.ordinal(rank) + " sur \(standing.players) aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
+                if rank == 1 {
+                    Label("Vous êtes le numéro 1 !", systemImage: "trophy.fill").scaledFont(17, .bold).foregroundStyle(Palette.mint)
+                } else if let top = standing.topPercent {
+                    Text("Top \(top) %").scaledFont(17, .bold).foregroundStyle(Palette.mint)
                 }
+                Text(Format.ordinal(rank) + " sur \(standing.players) aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
             }.accessibilityElement(children: .combine)
-        } else if let standing, result.correct, standing.players <= 1 {
-            Label("Premier joueur à trouver aujourd’hui", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint)
         } else if let standing, !result.correct, standing.players > 1 {
             Text("\(standing.players) joueurs ont tenté ce mot aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
         }

@@ -42,6 +42,13 @@ struct DailyStanding: Equatable {
     let players: Int
     /// Share of the other players this result beat (slower or not found). Nil when alone.
     let beatenPercent: Int?
+    /// "Top X %" badge: the share of today's players at or above this rank, rounded up to
+    /// 1, 5, 10, 25 or 50 %. Nil for the fastest player (shown as number 1) and the slower half.
+    var topPercent: Int? {
+        guard let rank, rank > 1, players > 1 else { return nil }
+        let share = Double(rank) * 100 / Double(players)
+        return [1, 5, 10, 25, 50].first { share <= Double($0) }
+    }
 }
 
 /// Server state of today's Mot du jour for the signed-in player.
@@ -321,11 +328,12 @@ struct DailySessionState {
         } else {
             quota["proposalWindowAt"] = FieldValue.serverTimestamp(); quota["proposalCount"] = 1
         }
+        let author = profile["username"] as? String ?? "Joueur"
         let batch = db.batch()
-        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending"], forDocument: ref)
+        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending","authorName":author], forDocument: ref)
         batch.updateData(quota, forDocument: userRef)
         try await batch.commit()
-        var stored = card; stored.id = id
+        var stored = card; stored.id = id; stored.author = author
         return stored
     }
     func submissions(uid: String) async throws -> [Submission] {
@@ -353,13 +361,25 @@ struct DailySessionState {
     }
     func pendingCards() async throws -> [Card] {
         let snap = try await db.collection("cards").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
-        return snap.documents.compactMap { decode($0.documentID,$0.data()) }
+        var cards: [Card] = []
+        for doc in snap.documents {
+            guard var card = decode(doc.documentID, doc.data()) else { continue }
+            // Proposals made before the author's pseudo was stored on the card.
+            if card.author == nil, let uid = doc.data()["createdBy"] as? String {
+                card.author = try? await db.collection("users").document(uid).getDocument().data()?["username"] as? String
+            }
+            cards.append(card)
+        }
+        return cards
     }
     /// Approves or refuses a proposal, optionally fixing its hint, category or difficulty.
     func review(card: Card, approved: Bool) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
-        try await db.collection("cards").document(card.id).updateData(["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),
-            "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue])
+        var fields: [String: Any] = ["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),
+            "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue]
+        // Older proposals carry no pseudo: the moderator's copy (read from the author's profile) fills it in.
+        if let author = card.author { fields["authorName"] = author }
+        try await db.collection("cards").document(card.id).updateData(fields)
     }
     func pendingReports() async throws -> [CardReport] {
         let snap = try await db.collection("reports").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
@@ -391,7 +411,7 @@ struct DailySessionState {
         let category = CNSNNCore.Category(rawValue:d["category"] as? String ?? ""),
         let difficulty = Difficulty(rawValue:d["difficulty"] as? String ?? ""),
         let status = ReviewStatus(rawValue:d["status"] as? String ?? "") else { return nil }
-        return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status)
+        return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status,author:d["authorName"] as? String)
     }
     private static func session(day: String, _ d: [String: Any]) -> DailySessionState? {
         guard let cardID = d["cardId"] as? String, let started = d["startedAt"] as? Timestamp else { return nil }

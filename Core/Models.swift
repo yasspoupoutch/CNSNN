@@ -18,9 +18,11 @@ public struct Card: Identifiable, Codable, Hashable, Sendable {
     public var category: Category
     public var difficulty: Difficulty
     public var status: ReviewStatus
+    /// Pseudo of the player who proposed a community card (nil for built-in cards).
+    public var author: String?
     public var wordNoVowels: String { WordEngine.consonants(wordFull) }
-    public init(id: String, wordFull: String, hint: String, category: Category, difficulty: Difficulty, status: ReviewStatus = .approved) {
-        self.id = id; self.wordFull = wordFull; self.hint = hint; self.category = category; self.difficulty = difficulty; self.status = status
+    public init(id: String, wordFull: String, hint: String, category: Category, difficulty: Difficulty, status: ReviewStatus = .approved, author: String? = nil) {
+        self.id = id; self.wordFull = wordFull; self.hint = hint; self.category = category; self.difficulty = difficulty; self.status = status; self.author = author
     }
 }
 public struct Attempt: Identifiable, Codable, Sendable {
