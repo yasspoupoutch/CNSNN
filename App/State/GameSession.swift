@@ -18,6 +18,12 @@ import CNSNNCore
     /// The finish is recorded on this iPhone and waits for the network to become official.
     var pendingOfficial = false
     var standing: DailyStanding?
+    /// The word is secret: the server checks each guess and reveals the word at the end.
+    var secret = false
+    /// A guess or the hint is on its way to the server.
+    var checking = false
+    /// Why the last check could not reach the server (network), shown under the board.
+    var notice: String?
     private var dailyKey: String?
     private var dailyStart: Date?
     private var start = ContinuousClock.now
@@ -27,7 +33,7 @@ import CNSNNCore
     func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, state: AppState) {
         answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil
-        ranked = false; pendingOfficial = false; standing = nil; phase = .playing
+        ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
         if mode == .daily {
             let key = DailySchedule.key(); dailyKey = key
             if state.cloud != nil {
@@ -65,7 +71,18 @@ import CNSNNCore
     private func loadRankedDaily(key: String, cloud: FirebaseRepository, uid: String, state: AppState) async {
         do {
             if let session = try await cloud.dailySession(uid: uid, day: key) {
+                secret = FirebaseRepository.secretDay(cardID: session.cardID) != nil
                 card = state.card(id: session.cardID)
+                if secret, session.finished, let revealed = try await cloud.dailySecret(day: key) {
+                    state.storeDailyWord(revealed, day: key); card = revealed
+                } else if secret, card == nil {
+                    card = try await cloud.dailyPuzzle(day: key)
+                    if let card { state.storeDailyWord(card, day: key) }
+                }
+                if secret, session.hintUsed, !session.finished, card?.hint.isEmpty == true, var masked = card {
+                    masked.hint = try await cloud.dailyHint(day: key) ?? ""
+                    card = masked; state.storeDailyWord(masked, day: key)
+                }
                 if session.finished {
                     if let official = try await cloud.publishDailyResult(uid: uid, day: key) {
                         state.recordOfficial(official); result = official
@@ -90,9 +107,11 @@ import CNSNNCore
                     result = local; card = state.card(id: local.cardID); ranked = false; phase = .playing
                     return
                 }
-                guard let daily = state.dailyCard(day: key) else { phase = .failed("Le mot du jour est indisponible."); return }
+                let puzzle = try await cloud.dailyPuzzle(day: key)
+                guard let daily = puzzle ?? state.dailyCard(day: key) else { phase = .failed("Le mot du jour est indisponible."); return }
                 let session = try await cloud.startDaily(uid: uid, day: key, cardID: daily.id)
-                card = daily; dailyStart = session.startedAt
+                card = daily; dailyStart = session.startedAt; secret = puzzle != nil
+                if secret { state.storeDailyWord(daily, day: key) }
             }
             if let card {
                 state.progress.dailyStarted[key] = card.id
@@ -110,9 +129,23 @@ import CNSNNCore
     }
 
     func revealHint(state: AppState) {
-        guard !usedHint, result == nil else { return }
-        usedHint = true
-        if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey { cloud.revealDailyHint(uid: uid, day: dailyKey) }
+        guard !usedHint, result == nil, !checking else { return }
+        guard ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey else { usedHint = true; return }
+        guard secret else { usedHint = true; cloud.revealDailyHint(uid: uid, day: dailyKey); return }
+        // The server opens the hint only once it has recorded its use.
+        checking = true; notice = nil
+        Task {
+            defer { checking = false }
+            do {
+                guard let hint = try await cloud.revealSecretHint(uid: uid, day: dailyKey), var revealed = card else {
+                    notice = CloudError.offline.errorDescription; return
+                }
+                revealed.hint = hint; card = revealed; usedHint = true
+                state.storeDailyWord(revealed, day: dailyKey)
+            } catch {
+                notice = CloudError.message(error)
+            }
+        }
     }
 
     func pause() {
@@ -125,15 +158,58 @@ import CNSNNCore
         let duration = elapsedBeforePause + (paused ? .zero : start.duration(to: .now))
         return max(0, Int(duration.components.seconds * 1000 + duration.components.attoseconds / 1_000_000_000_000_000))
     }
-    func submit(mode: GameMode, state: AppState) {
-        guard let card, result == nil, !WordEngine.normalize(answer).isEmpty else { return }
-        guard WordEngine.matches(answer, word: card.wordFull) else {
-            wrongAnswers += 1; wrongGuesses.append(answer); feedback = "Pas encore. Essayez une autre idée."; Haptics.retry(); return
+    func submit(mode: GameMode, state: AppState) async {
+        guard let card, result == nil, !checking, !WordEngine.normalize(answer).isEmpty else { return }
+        if secret {
+            await submitSecret(state: state)
+            return
         }
+        guard WordEngine.matches(answer, word: card.wordFull) else { missed(); return }
         finish(correct: true, mode: mode, state: state)
     }
-    func finish(correct: Bool, mode: GameMode, state: AppState) {
-        guard let card, result == nil else { return }
+    private func missed() {
+        wrongAnswers += 1; wrongGuesses.append(answer); feedback = "Pas encore. Essayez une autre idée."; Haptics.retry()
+    }
+    /// The guess goes to the server as the finish of the session: accepted only if it is the word.
+    private func submitSecret(state: AppState) async {
+        guard let cloud = state.cloud, let uid = state.uid, let dailyKey else { return }
+        let guess = WordEngine.normalize(answer)
+        checking = true; notice = nil
+        defer { checking = false }
+        do {
+            guard try await cloud.finishDaily(uid: uid, day: dailyKey, correct: true, wrongAnswers: wrongAnswers, answer: guess) else {
+                // Not confirmed in time. If it was right, the server keeps it and the next opening shows the result.
+                notice = "Connexion trop lente. Vérifiez le réseau puis réessayez."; return
+            }
+            await reveal(cloud: cloud, day: dailyKey, state: state)
+            finish(correct: true, mode: .daily, state: state, alreadyFinished: true)
+        } catch let error where CloudError.code(error) == .permissionDenied {
+            missed()
+        } catch {
+            notice = CloudError.message(error)
+        }
+    }
+    /// Swaps the masked card for the real word once the server has recorded the end of the game.
+    private func reveal(cloud: FirebaseRepository, day: String, state: AppState) async {
+        guard let revealed = try? await cloud.dailySecret(day: day) else { return }
+        card = revealed; state.storeDailyWord(revealed, day: day)
+    }
+    func finish(correct: Bool, mode: GameMode, state: AppState, alreadyFinished: Bool = false) {
+        guard result == nil, !checking || alreadyFinished else { return }
+        if secret, !correct, !alreadyFinished, let cloud = state.cloud, let uid = state.uid, let dailyKey {
+            // Giving up: the server records the loss first, then reveals the word.
+            checking = true; notice = nil
+            Task {
+                defer { checking = false }
+                guard (try? await cloud.finishDaily(uid: uid, day: dailyKey, correct: false, wrongAnswers: wrongAnswers)) == true else {
+                    notice = CloudError.offline.errorDescription; return
+                }
+                await reveal(cloud: cloud, day: dailyKey, state: state)
+                finish(correct: false, mode: mode, state: state, alreadyFinished: true)
+            }
+            return
+        }
+        guard let card else { return }
         let ms = elapsedMs
         let points = Scoring.points(difficulty: card.difficulty, timeMs: ms, usedHint: usedHint, correct: correct)
         let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: points, date: Date(), dailyKey: dailyKey)
@@ -141,14 +217,14 @@ import CNSNNCore
         if correct { Haptics.success() }
         if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey {
             pendingOfficial = true
-            Task { await makeOfficial(cloud: cloud, uid: uid, day: dailyKey, correct: correct, state: state) }
+            Task { await makeOfficial(cloud: cloud, uid: uid, day: dailyKey, correct: correct, state: state, finished: alreadyFinished) }
         }
     }
     /// Stamps the finish on the server, then shows the server's time and points instead of the local ones.
-    private func makeOfficial(cloud: FirebaseRepository, uid: String, day: String, correct: Bool, state: AppState) async {
+    private func makeOfficial(cloud: FirebaseRepository, uid: String, day: String, correct: Bool, state: AppState, finished: Bool = false) async {
         do {
-            guard try await cloud.finishDaily(uid: uid, day: day, correct: correct, wrongAnswers: wrongAnswers),
-                  let official = try await cloud.publishDailyResult(uid: uid, day: day) else { return }
+            if !finished { guard try await cloud.finishDaily(uid: uid, day: day, correct: correct, wrongAnswers: wrongAnswers) else { return } }
+            guard let official = try await cloud.publishDailyResult(uid: uid, day: day) else { return }
             state.recordOfficial(official)
             if let current = result { var shown = official; shown.id = current.id; result = shown }
             pendingOfficial = false

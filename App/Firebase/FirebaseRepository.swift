@@ -225,6 +225,29 @@ struct DailySessionState {
               let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
         return Card(id: id, wordFull: word, hint: hint, category: category, difficulty: difficulty)
     }
+    // Secret daily words: the server gives the consonants, the hint once revealed and the word
+    // once the game is over. A win is accepted only with the right answer (firestore.rules).
+    nonisolated static func secretCardID(day: String) -> String { "secret-" + day }
+    nonisolated static func secretDay(cardID: String) -> String? {
+        cardID.hasPrefix("secret-") ? String(cardID.dropFirst("secret-".count)) : nil
+    }
+    func dailyPuzzle(day: String) async throws -> Card? {
+        let doc = try await db.collection("dailyPuzzles").document(day).getDocument()
+        guard let d = doc.data(), let consonants = d["consonants"] as? String, !consonants.isEmpty,
+              let category = CNSNNCore.Category(rawValue: d["category"] as? String ?? ""),
+              let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
+        return Card(id: Self.secretCardID(day: day), wordFull: "", hint: "", category: category, difficulty: difficulty, masked: consonants)
+    }
+    func dailyHint(day: String) async throws -> String? {
+        try await db.collection("dailyHints").document(day).getDocument().data()?["hint"] as? String
+    }
+    func dailySecret(day: String) async throws -> Card? {
+        let doc = try await db.collection("dailySecrets").document(day).getDocument()
+        guard let d = doc.data(), let word = d["word"] as? String, let hint = d["hint"] as? String,
+              let category = CNSNNCore.Category(rawValue: d["category"] as? String ?? ""),
+              let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
+        return Card(id: Self.secretCardID(day: day), wordFull: word, hint: hint, category: category, difficulty: difficulty)
+    }
     func publishDailyChallenge(day: String, card: Card) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
         try await db.collection("dailyChallenges").document(day).setData(["cardId":card.id,"wordFull":card.wordFull,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"publishedBy":uid,"publishedAt":FieldValue.serverTimestamp()])
@@ -247,13 +270,21 @@ struct DailySessionState {
     func revealDailyHint(uid: String, day: String) {
         sessionRef(uid, day).updateData(["hintUsed": true])
     }
+    /// Records the hint on the server first, since the rules open the hint only after that.
+    func revealSecretHint(uid: String, day: String) async throws -> String? {
+        let ref = sessionRef(uid, day)
+        guard try await Self.awaitWrite({ done in ref.updateData(["hintUsed": true], completion: done) }) else { return nil }
+        return try await dailyHint(day: day)
+    }
     /// Stamps the finish with the server time. Returns false if the network did not confirm in time:
     /// the write stays queued and the official result is published on a later launch.
-    func finishDaily(uid: String, day: String, correct: Bool, wrongAnswers: Int) async throws -> Bool {
+    /// For a secret word, `answer` is the normalized guess: the server refuses a wrong one (permission denied).
+    func finishDaily(uid: String, day: String, correct: Bool, wrongAnswers: Int, answer: String? = nil) async throws -> Bool {
         let ref = sessionRef(uid, day)
-        return try await Self.awaitWrite { done in
-            ref.updateData(["finishedAt":FieldValue.serverTimestamp(),"correct":correct,"wrongAnswers":wrongAnswers], completion: done)
-        }
+        var data: [String: Any] = ["finishedAt":FieldValue.serverTimestamp(),"correct":correct,"wrongAnswers":wrongAnswers]
+        if let answer { data["answer"] = answer }
+        let payload = data
+        return try await Self.awaitWrite { done in ref.updateData(payload, completion: done) }
     }
     func dailyResult(uid: String, day: String) async throws -> Attempt? {
         let doc = try await resultRef(uid, day).getDocument(source: .server)

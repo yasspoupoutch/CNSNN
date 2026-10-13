@@ -70,6 +70,34 @@ import CNSNNCore
         XCTAssertEqual(rank.players, 2)
     }
 
+    func testSecretDailyWordIsCheckedByTheServer() async throws {
+        let day = DailySchedule.key()
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        try await emulator("PATCH", "\(docs)/dailyPuzzles/\(day)", body: #"{"fields":{"consonants":{"stringValue":"CHCLT"},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+        try await emulator("PATCH", "\(docs)/dailyHints/\(day)", body: #"{"fields":{"hint":{"stringValue":"Un carré gourmand."}}}"#)
+        try await emulator("PATCH", "\(docs)/dailySecrets/\(day)", body: #"{"fields":{"answer":{"stringValue":"CHOCOLAT"},"word":{"stringValue":"Chocolat"},"hint":{"stringValue":"Un carré gourmand."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+        let alice = try await repo.bootstrap(username: "Alice")
+        let puzzle = try await XCTUnwrapAsync(try await repo.dailyPuzzle(day: day))
+        XCTAssertEqual(puzzle.wordNoVowels, "CHCLT")
+        XCTAssertTrue(puzzle.wordFull.isEmpty)
+        // Before playing, neither the hint nor the word can be read.
+        await assertThrows { _ = try await self.repo.dailySecret(day: day) }
+        await assertThrows { _ = try await self.repo.dailyHint(day: day) }
+        _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: puzzle.id)
+        let hint = try await repo.revealSecretHint(uid: alice.uid, day: day)
+        XCTAssertEqual(hint, "Un carré gourmand.")
+        await assertThrows { _ = try await self.repo.dailySecret(day: day) }
+        // A wrong guess is refused by the server, the right one finishes the game.
+        await assertThrows(nil) { _ = try await self.repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0, answer: "CHOCOLATS") }
+        let accepted = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 1, answer: WordEngine.normalize("chocolat"))
+        XCTAssertTrue(accepted)
+        let secret = try await XCTUnwrapAsync(try await repo.dailySecret(day: day))
+        XCTAssertEqual(secret.wordFull, "Chocolat")
+        let official = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
+        XCTAssertTrue(official.correct)
+        XCTAssertEqual(official.cardID, FirebaseRepository.secretCardID(day: day))
+    }
+
     func testFriendsCodeAndBoard() async throws {
         let alice = try await repo.bootstrap(username: "Alice")
         let code = try await repo.friendCode(uid: alice.uid, username: "Alice")

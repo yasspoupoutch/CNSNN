@@ -59,7 +59,8 @@ jobs:
   deploy:
     name: Publier sur Firebase
     needs: rules-tests
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_public_key || inputs.daily_seed) }}
+    # Writes only from main. Printing the public key is harmless, so it also runs on a branch.
+    if: ${{ github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed)) || inputs.daily_public_key) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -86,10 +87,10 @@ jobs:
           node -e "const k=require(process.argv[1]);if(k.project_id!=='cnsnn-9ctosy'){console.error('Clé pour un autre projet : '+k.project_id);process.exit(1)}" "$RUNNER_TEMP/sa.json"
       - run: npm ci || npm install --no-audit --no-fund
       - name: Publier les règles et index
-        if: ${{ inputs.deploy }}
+        if: ${{ inputs.deploy && github.ref == 'refs/heads/main' }}
         run: node tools/deploy.mjs
       - name: Nommer un administrateur
-        if: ${{ inputs.admin_uid != '' }}
+        if: ${{ inputs.admin_uid != '' && github.ref == 'refs/heads/main' }}
         env:
           ADMIN_UID: ${{ inputs.admin_uid }}
         run: node tools/grant-admin.mjs "$ADMIN_UID"
@@ -97,7 +98,7 @@ jobs:
         if: ${{ inputs.daily_public_key }}
         run: node tools/daily.mjs public-key
       - name: Publier les mots du jour
-        if: ${{ inputs.daily_seed }}
+        if: ${{ inputs.daily_seed && github.ref == 'refs/heads/main' }}
         run: node tools/daily.mjs seed
       - name: Effacer la clé
         if: ${{ always() }}

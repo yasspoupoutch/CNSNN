@@ -4,7 +4,7 @@ Jeu de mots iPhone en SwiftUI : retrouver un mot à partir de ses seules consonn
 
 ## Fonctionnalités
 
-- **Mot du jour commun** : le même mot pour tout le monde, choisi dans une liste figée de 200 mots. La difficulté suit le jour : facile le lundi et le mardi, moyen du mercredi au vendredi, difficile le week-end. Le chrono part et s'arrête sur l'horloge du serveur. Les points sont recalculés par les règles Firestore, une partie par jour, et une partie interrompue reprend avec son chrono d'origine.
+- **Mot du jour commun et secret** : le même mot pour tout le monde. L'app ne reçoit que les consonnes, le serveur vérifie chaque réponse et ne révèle le mot qu'à la fin de la partie. La difficulté suit le jour : facile le lundi et le mardi, moyen du mercredi au vendredi, difficile le week-end. Le chrono part et s'arrête sur l'horloge du serveur. Les points sont recalculés par les règles Firestore, une partie par jour, et une partie interrompue reprend avec son chrono d'origine.
 - **Résultat** : « Vous êtes le numéro 1 ! », ou Top 1 %, 5 %, 10 %, 25 % ou 50 % du jour, avec le rang (« 3e sur 120 aujourd'hui »).
 - **Classements** : aujourd'hui (temps), points, records, et **amis** (ajout par code de 6 caractères, classés sur le mot du jour).
 - **Classique** : 134 cartes intégrées et les cartes de la communauté approuvées, six catégories et trois difficultés, sans répéter les cartes récentes.
@@ -32,7 +32,7 @@ TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne s
 - Nommer un administrateur : même workflow, champ `admin_uid` rempli avec l'UID du joueur.
 - Détails, schéma des collections et limites : `Docs/FIREBASE.md`.
 
-**Limite connue** : la liste des mots du jour est dans l'app et dans ce dépôt public. Un tricheur peut donc connaître le mot à l'avance. Il ne peut en revanche ni annoncer un temps plus court que celui du serveur, ni rejouer, ni gonfler ses points.
+**Mots du jour secrets** : la liste n'est dans ce dépôt public que chiffrée, et seul le compte de service Firebase peut la lire. Personne ne peut annoncer une victoire sans le bon mot, ni un temps plus court que celui du serveur, ni rejouer, ni gonfler ses points. Détails dans `Docs/FIREBASE.md`.
 
 ## Développer et tester
 

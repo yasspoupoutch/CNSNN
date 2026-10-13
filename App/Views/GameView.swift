@@ -70,7 +70,7 @@ struct GameView: View {
             CircleIconButton(symbol: "xmark", label: "Fermer") { dismiss() }
             Spacer()
             HStack(spacing: 8) {
-                if state.cloud != nil, let card = session.card, !card.id.hasPrefix("seed-"), !card.id.hasPrefix("daily-"), session.result == nil {
+                if state.cloud != nil, let card = session.card, !card.id.hasPrefix("seed-"), !card.id.hasPrefix("daily-"), !card.id.hasPrefix("secret-"), session.result == nil {
                     Button { reporting = true } label: {
                         Image(systemName: "flag").font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.secondary)
                             .frame(width: 36, height: 36).glassCapsule().hitTarget()
@@ -121,8 +121,16 @@ struct GameView: View {
             }
         }.frame(minHeight: 26).padding(.top, 16)
         if mode == .daily && session.result == nil {
-            Text(session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
-                .scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 6)
+            Group {
+                if session.checking {
+                    Text("Vérification…").foregroundStyle(Palette.secondary)
+                } else if let notice = session.notice {
+                    Text(notice).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
+                } else {
+                    Text(session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
+                        .foregroundStyle(Palette.tertiary)
+                }
+            }.scaledFont(12).padding(.top, 6)
         }
         Spacer(minLength: 12)
         answerLine
@@ -136,7 +144,7 @@ struct GameView: View {
                     Text(session.usedHint ? "révélé" : "points ÷ 2")
                 }.scaledFont(13, .medium).foregroundStyle(Palette.foreground)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
-            }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil).opacity(session.usedHint ? 0.5 : 1)
+            }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
             Button { confirmSkip = true } label: {
                 Text("Passer").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
@@ -211,16 +219,20 @@ struct GameView: View {
         session.answer.removeLast()
     }
     private func submit() {
-        guard session.result == nil else { return }
+        guard session.result == nil, !session.checking else { return }
         guard WordEngine.normalize(session.answer).count >= 1 else { shake(); return }
         let before = session.wrongAnswers
-        session.submit(mode: mode, state: state)
-        if session.result != nil {
-            finishedHere = true
-        } else if session.wrongAnswers > before {
-            shake()
-            session.answer = ""
-            if let feedback = session.feedback { AccessibilityNotification.Announcement(feedback).post() }
+        Task {
+            await session.submit(mode: mode, state: state)
+            if session.result != nil {
+                finishedHere = true
+            } else if session.wrongAnswers > before {
+                shake()
+                session.answer = ""
+                if let feedback = session.feedback { AccessibilityNotification.Announcement(feedback).post() }
+            } else if let notice = session.notice {
+                AccessibilityNotification.Announcement(notice).post()
+            }
         }
     }
     private func shake() {
