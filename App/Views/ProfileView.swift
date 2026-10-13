@@ -8,6 +8,16 @@ struct ProfileView: View {
     @State private var name = ""
     @State private var account = false
     @State private var moderation = false
+    /// Signature at the bottom of the profile.
+    private var credits: some View {
+        VStack(spacing: 6) {
+            HighlightedWord(word: "CONSONNE", font: Typo.wordmark(20))
+            Text("Une application créée par Poupoutch").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
+            Text("Version " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")).scaledFont(12).foregroundStyle(Palette.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -33,6 +43,7 @@ struct ProfileView: View {
                 ReminderSettings()
                 Text(state.uid == nil ? "Mode local : votre progression reste sur cet iPhone." : (state.isAnonymous ? "Compte invité sauvegardé en ligne. Créez un compte pour le retrouver sur un autre iPhone." : "Compte permanent : votre progression vous suit sur tous vos appareils."))
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
+                credits.padding(.top, 18)
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
             .sheet(isPresented: $account) { AccountView() }

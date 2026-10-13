@@ -18,7 +18,7 @@ struct GameView: View {
 
     var body: some View {
         ZStack {
-            AmbientBackground()
+            AmbientBackground(dimmed: session.result == nil)
             VStack(spacing: 0) {
                 topBar
                 switch session.phase {
@@ -250,6 +250,7 @@ private struct ResultSheet: View {
     @Environment(AppState.self) private var state
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var revealed = false
+    @State private var glow = false
     var result: Attempt
     var card: Card?
     var mode: GameMode
@@ -265,21 +266,14 @@ private struct ResultSheet: View {
         VStack(spacing: 0) {
             Text(kicker).font(Typo.serifItalic(24)).foregroundStyle(result.correct ? Palette.mint : Palette.red)
             if let card {
-                let word = card.wordFull.uppercased()
-                HStack(spacing: 0) {
-                    ForEach(Array(word.enumerated()), id: \.offset) { index, character in
-                        let vowel = Vowels.contains(character)
-                        Text(String(character))
-                            .foregroundStyle(vowel ? Palette.accent : Palette.foreground)
-                            .shadow(color: vowel ? Palette.accent.opacity(0.6) : .clear, radius: 12)
-                            .scaleEffect(vowel && !revealed ? 0.01 : 1)
-                            .opacity(vowel && !revealed ? 0 : 1)
-                            .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.5).delay(0.38 + Double(index) * 0.13), value: revealed)
+                VowelReveal(word: card.wordFull.uppercased(), correct: result.correct, revealed: revealed)
+                    .background {
+                        // A brief golden glow once the last vowel is in place.
+                        RadialGradient(colors: [Palette.accent.opacity(0.45), .clear], center: .center, startRadius: 0, endRadius: 140)
+                            .scaleEffect(x: 1.6, y: 0.8).opacity(glow ? 1 : 0).allowsHitTesting(false)
                     }
-                }
-                .font(.system(size: 42, weight: .heavy)).tracking(2.5).lineLimit(1).minimumScaleFactor(0.4)
-                .padding(.top, 10)
-                .accessibilityElement(children: .ignore).accessibilityLabel(card.wordFull)
+                    .padding(.top, 10)
+                    .accessibilityElement(children: .ignore).accessibilityLabel(card.wordFull)
                 Text("« \(card.hint) »").scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 6)
             }
             HStack(spacing: 10) {
@@ -294,7 +288,7 @@ private struct ResultSheet: View {
                 Label("Votre meilleur temps", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint).padding(.top, 12)
             }
             HStack(spacing: 10) {
-                ShareLink(item: mode == .daily ? ShareText.daily(result, card: card) : ShareText.classic(result, card: card)) {
+                ShareResultLink(attempt: result, card: card, mode: mode) {
                     Text("Partager")
                 }.buttonStyle(GlassPillStyle(height: 54))
                 Button(mode == .daily ? "Terminer" : "Mot suivant") {
@@ -317,7 +311,25 @@ private struct ResultSheet: View {
                 .overlay(shape.strokeBorder(LinearGradient(colors: [Palette.glassHighlight, Palette.glassBorder], startPoint: .top, endPoint: .bottom), lineWidth: 1))
                 .shadow(color: Palette.glassShadow, radius: 30, y: -20)
         }
-        .onAppear { revealed = true }
+        .onAppear { reveal(card?.wordFull.uppercased() ?? "") }
+    }
+
+    /// The signature moment: consonants stay, the vowels slide into the gaps one by one,
+    /// each with a light tap, then the word glows. Missed words get grey vowels, no fanfare.
+    private func reveal(_ word: String) {
+        revealed = true
+        let vowels = word.filter(Vowels.contains).count
+        guard result.correct, !reduceMotion, vowels > 0 else { return }
+        Task { @MainActor in
+            for index in 0..<vowels {
+                try? await Task.sleep(for: .seconds(index == 0 ? VowelReveal.firstDelay : VowelReveal.step))
+                Haptics.key()
+            }
+            try? await Task.sleep(for: .seconds(0.3))
+            withAnimation(.easeOut(duration: 0.35)) { glow = true }
+            try? await Task.sleep(for: .seconds(0.5))
+            withAnimation(.easeIn(duration: 0.9)) { glow = false }
+        }
     }
 
     /// Only real numbers: the percentile appears once the server has ranked the result.
@@ -461,5 +473,40 @@ struct FlowLayout: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
+    }
+}
+
+/// The word with its vowels sliding into the gaps between the consonants.
+struct VowelReveal: View {
+    static let firstDelay = 0.35
+    static let step = 0.16
+    var word: String
+    var correct: Bool
+    var revealed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        let letters = Array(word.enumerated())
+        HStack(spacing: 0) {
+            ForEach(letters, id: \.offset) { index, character in
+                if Vowels.contains(character) {
+                    let order = letters[..<index].filter { Vowels.contains($0.element) }.count
+                    CollapseLayout(progress: revealed ? 1 : 0) {
+                        Text(String(character))
+                            .foregroundStyle(correct ? Palette.accent : Palette.secondary)
+                            .shadow(color: correct ? Palette.accent.opacity(0.6) : .clear, radius: 12)
+                    }
+                    .opacity(revealed ? 1 : 0)
+                    .animation(animation(order), value: revealed)
+                } else {
+                    Text(String(character)).foregroundStyle(Palette.foreground)
+                }
+            }
+        }
+        .font(.system(size: 42, weight: .heavy)).tracking(2.5).lineLimit(1).minimumScaleFactor(0.4)
+    }
+    private func animation(_ order: Int) -> Animation? {
+        guard !reduceMotion else { return nil }
+        let delay = Self.firstDelay + Double(order) * Self.step
+        return correct ? .spring(response: 0.42, dampingFraction: 0.62).delay(delay) : .easeOut(duration: 0.5).delay(delay)
     }
 }

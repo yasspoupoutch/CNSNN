@@ -92,7 +92,7 @@ struct HomeView: View {
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
                 .accessibilityElement(children: .combine)
             }
-            ShareLink(item: ShareText.daily(attempt, card: card)) {
+            ShareResultLink(attempt: attempt, card: card, mode: .daily) {
                 Text("Partager").scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
                     .frame(minWidth: 120, minHeight: 54)
                     .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill2))
@@ -185,5 +185,58 @@ enum ShareText {
     static func classic(_ attempt: Attempt, card: Card?) -> String {
         let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "raté"
         return "CNSNN · Classique : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "")
+    }
+}
+
+/// Picture shared after a game: only the consonants (no spoiler), the result and the wordmark.
+struct ShareCard: View {
+    var title: String
+    var consonants: String
+    var outcome: String
+    var correct: Bool
+    var body: some View {
+        VStack(spacing: 0) {
+            HighlightedWord(word: "CONSONNE", font: Typo.wordmark(30))
+            Text(title.uppercased()).font(.system(size: 13, weight: .bold)).tracking(1.6).foregroundStyle(Palette.secondary).padding(.top, 10)
+            Spacer(minLength: 16)
+            Text(consonants).font(Typo.serif(72)).tracking(4).foregroundStyle(Palette.foreground).lineLimit(1).minimumScaleFactor(0.3)
+            Capsule().fill(Palette.accent).frame(width: 44, height: 4).padding(.top, 18)
+            Text(outcome).font(.system(size: 21, weight: .semibold)).foregroundStyle(correct ? Palette.mint : Palette.secondary)
+                .multilineTextAlignment(.center).padding(.top, 18)
+            Spacer(minLength: 16)
+            Text("Trouverez-vous les voyelles ?").font(Typo.serifItalic(21)).foregroundStyle(Palette.accent)
+        }
+        .padding(34).frame(width: 360, height: 450)
+        .background(LinearGradient(colors: [Palette.backgroundTop, Palette.background], startPoint: .top, endPoint: .bottom))
+        .environment(\.colorScheme, .dark)
+    }
+
+    @MainActor static func image(_ attempt: Attempt, card: Card?, mode: GameMode) -> Image? {
+        guard let card else { return nil }
+        let title = mode == .daily ? "Mot du jour · " + (attempt.dailyKey ?? DailySchedule.key(attempt.date)) : "Classique"
+        let outcome = attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois"
+        let renderer = ImageRenderer(content: ShareCard(title: title, consonants: card.wordNoVowels, outcome: outcome, correct: attempt.correct))
+        renderer.scale = 3
+        return renderer.uiImage.map { Image(uiImage: $0) }
+    }
+}
+
+/// Shares the result as a picture with its text, or as text alone if the picture cannot be drawn.
+struct ShareResultLink<Label: View>: View {
+    var attempt: Attempt
+    var card: Card?
+    var mode: GameMode
+    @ViewBuilder var label: () -> Label
+    @State private var image: Image?
+    private var text: String { mode == .daily ? ShareText.daily(attempt, card: card) : ShareText.classic(attempt, card: card) }
+    var body: some View {
+        Group {
+            if let image {
+                ShareLink(item: image, message: Text(text), preview: SharePreview("CNSNN", image: image), label: label)
+            } else {
+                ShareLink(item: text, label: label)
+            }
+        }
+        .task(id: attempt.id + (card?.wordNoVowels ?? "")) { image = ShareCard.image(attempt, card: card, mode: mode) }
     }
 }
