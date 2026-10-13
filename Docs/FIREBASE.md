@@ -53,11 +53,13 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 |---|---|---|
 | users/{uid} | pseudo, dates, quota de propositions | création à zéro, pseudo et quota par le propriétaire ; suppression par le propriétaire |
 | users/{uid}/private/progress | progression d’entraînement synchronisée (JSON) | propriétaire uniquement |
+| users/{uid}/friends/{amiUid} | amis ajoutés par code (pseudo, date) | propriétaire uniquement |
+| friendCodes/{CODE} | code ami de 6 caractères → uid, pseudo | création par le propriétaire ; lecture d’un code par tout joueur, liste de ses seuls codes |
 | dailySessions/{uid_day} | carte du jour, début serveur, indice, fin serveur | création une fois le jour même ; indice puis fin une seule fois |
 | dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur, points recalculés | création unique, avec la mise à jour du classement dans le même lot |
 | leaderboard/{uid} | points, parties, victoires, séries, meilleur temps | n’avance que d’un nouveau résultat à la fois |
 | dailyChallenges/{day} | mot du jour publié par un modérateur (remplace le planning intégré) | modérateur, difficulté du jour imposée |
-| cards/{MOTNORMALISÉ} | proposition ou carte publiée ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
+| cards/{MOTNORMALISÉ} | proposition ou carte publiée (avec le pseudo de l’auteur) ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
 | reports/{uid_card} | signalement unique par joueur et carte | création propriétaire, résolution modérateur |
 | admins/{uid} | rôle modérateur | console ou workflow uniquement |
 

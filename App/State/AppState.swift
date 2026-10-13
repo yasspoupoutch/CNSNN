@@ -34,6 +34,11 @@ import CNSNNCore
         guard savingAllowed else { return }
         do { try local.save(progress) } catch { self.error = "La progression n’a pas pu être enregistrée. Réessayez avant de quitter." }
         scheduleCloudSave()
+        refreshGlance()
+    }
+    /// Home screen widget and daily reminders.
+    func refreshGlance(force: Bool = false) {
+        Reminders.update(progress: progress, streak: official?.currentStreak() ?? progress.streak(), force: force)
     }
     private func scheduleCloudSave() {
         guard let cloud, let uid else { return }
@@ -210,7 +215,7 @@ import CNSNNCore
     }
     func refreshOfficial() async {
         guard let cloud, let uid else { return }
-        if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry }
+        if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry; refreshGlance() }
     }
 
     // MARK: Results

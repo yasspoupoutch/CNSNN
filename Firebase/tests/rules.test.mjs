@@ -170,6 +170,34 @@ test('ranking and percentile queries are public to players',async()=>{
  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(),'leaderboard')));
 });
 
+// ---------- Friends
+
+test('friend codes: create own, look up any, list only own',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const alice=user('alice'),bob=user('bob');
+ await assertFails(setDoc(doc(alice,'friendCodes/ABC2Z9'),{uid:'bob',username:'Bob',createdAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(alice,'friendCodes/abc0O1'),{uid:'alice',username:'Alice',createdAt:serverTimestamp()}));
+ await assertSucceeds(setDoc(doc(alice,'friendCodes/ABC2Z9'),{uid:'alice',username:'Alice',createdAt:serverTimestamp()}));
+ // Taken: a second write is an update, refused.
+ await assertFails(setDoc(doc(bob,'friendCodes/ABC2Z9'),{uid:'bob',username:'Bob',createdAt:serverTimestamp()}));
+ const found=await assertSucceeds(getDoc(doc(bob,'friendCodes/ABC2Z9')));
+ assert.equal(found.data().uid,'alice');
+ await assertSucceeds(getDoc(doc(bob,'friendCodes/ZZZZZZ')));
+ await assertSucceeds(getDocs(query(collection(alice,'friendCodes'),where('uid','==','alice'))));
+ await assertFails(getDocs(collection(bob,'friendCodes')));
+ await assertFails(deleteDoc(doc(bob,'friendCodes/ABC2Z9')));
+ await assertSucceeds(deleteDoc(doc(alice,'friendCodes/ABC2Z9')));
+});
+test('friends list is private to its owner',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ await assertSucceeds(setDoc(doc(user('alice'),'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(user('alice'),'users/alice/friends/alice'),{username:'Alice',addedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(user('bob'),'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));
+ await assertFails(getDocs(collection(user('bob'),'users/alice/friends')));
+ await assertSucceeds(getDocs(collection(user('alice'),'users/alice/friends')));
+ await assertSucceeds(deleteDoc(doc(user('alice'),'users/alice/friends/bob')));
+});
+
 // ---------- Cards and moderation
 
 async function propose(uid='alice',id='CHOCOLAT',data=card('pending',uid),quota){

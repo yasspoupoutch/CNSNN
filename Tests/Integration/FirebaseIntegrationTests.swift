@@ -70,6 +70,34 @@ import CNSNNCore
         XCTAssertEqual(rank.players, 2)
     }
 
+    func testFriendsCodeAndBoard() async throws {
+        let alice = try await repo.bootstrap(username: "Alice")
+        let code = try await repo.friendCode(uid: alice.uid, username: "Alice")
+        XCTAssertEqual(code.count, 6)
+        let same = try await repo.friendCode(uid: alice.uid, username: "Alice")
+        XCTAssertEqual(same, code)
+        await assertThrows(CloudError.friendIsYou) { _ = try await self.repo.addFriend(code: code, uid: alice.uid) }
+        // Alice finds today's word.
+        let day = DailySchedule.key()
+        let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
+        _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: card.id)
+        _ = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0)
+        _ = try await repo.publishDailyResult(uid: alice.uid, day: day)
+
+        try repo.signOut()
+        let bob = try await repo.bootstrap(username: "Bob")
+        await assertThrows(CloudError.friendNotFound) { _ = try await self.repo.addFriend(code: "ZZZZZZ", uid: bob.uid) }
+        let name = try await repo.addFriend(code: code.lowercased(), uid: bob.uid)
+        XCTAssertEqual(name, "Alice")
+        let board = try await repo.friendsBoard(uid: bob.uid, username: "Bob", day: day)
+        XCTAssertEqual(board.map(\.username), ["Alice", "Bob"])
+        XCTAssertEqual(board.first?.today?.correct, true)
+        XCTAssertNil(board.last?.today)
+        try await repo.removeFriend(uid: bob.uid, friend: alice.uid)
+        let alone = try await repo.friendsBoard(uid: bob.uid, username: "Bob", day: day)
+        XCTAssertEqual(alone.map(\.uid), [bob.uid])
+    }
+
     func testProgressSyncRenameAndDeletion() async throws {
         let player = try await repo.bootstrap(username: "Camille")
         var progress = CNSNNCore.Progress(); progress.username = "Camille"

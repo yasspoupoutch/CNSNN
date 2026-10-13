@@ -26,6 +26,31 @@ struct LeaderboardEntry: Identifiable, Equatable {
     var successRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
 }
 
+/// One line of the friends ranking: the player's totals and today's Mot du jour, when played.
+struct FriendStanding: Identifiable, Equatable {
+    var id: String { uid }
+    let uid: String
+    let username: String
+    let points: Int
+    let streak: Int
+    let today: Attempt?
+
+    static func == (a: FriendStanding, b: FriendStanding) -> Bool {
+        a.uid == b.uid && a.username == b.username && a.points == b.points && a.streak == b.streak
+            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct
+    }
+    /// Found today first (fastest first), then the others by points.
+    static func ordered(_ rows: [FriendStanding]) -> [FriendStanding] {
+        rows.sorted { a, b in
+            let fa = a.today?.correct == true, fb = b.today?.correct == true
+            if fa != fb { return fa }
+            if fa, let ta = a.today?.timeMs, let tb = b.today?.timeMs, ta != tb { return ta < tb }
+            if a.points != b.points { return a.points > b.points }
+            return a.username.localizedCaseInsensitiveCompare(b.username) == .orderedAscending
+        }
+    }
+}
+
 /// One line of the day's ranking.
 struct DailyRank: Identifiable, Equatable {
     var id: String { uid }
@@ -149,6 +174,8 @@ struct DailySessionState {
             db.collection("users").document(uid).collection("private").document("progress"),
             db.collection("leaderboard").document(uid),
         ]
+        refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
+        refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         }
@@ -298,6 +325,65 @@ struct DailySessionState {
     }
     private static func count(_ query: Query) async throws -> Int {
         try await query.count.getAggregation(source: .server).count.intValue
+    }
+
+    // MARK: Friends
+
+    /// Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1).
+    static let friendCodeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    static func normalizedFriendCode(_ text: String) -> String {
+        String(text.uppercased().filter { friendCodeAlphabet.contains($0) }.prefix(6))
+    }
+    /// The player's friend code, created on first use. The code is the document id, so it is unique.
+    func friendCode(uid: String, username: String) async throws -> String {
+        let mine = try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).limit(to: 1).getDocuments(source: .server)
+        if let existing = mine.documents.first { return existing.documentID }
+        for _ in 0..<5 {
+            let code = String((0..<6).map { _ in Self.friendCodeAlphabet.randomElement()! })
+            let ref = db.collection("friendCodes").document(code)
+            do {
+                let saved = try await Self.awaitWrite { done in
+                    ref.setData(["uid": uid, "username": username, "createdAt": FieldValue.serverTimestamp()], completion: done)
+                }
+                guard saved else { throw CloudError.offline }
+                return code
+            } catch where CloudError.code(error) == .permissionDenied {
+                continue // Taken by someone else: draw another code.
+            }
+        }
+        throw CloudError.offline
+    }
+    /// Adds the owner of a friend code to the player's friends. Returns the friend's pseudo.
+    func addFriend(code: String, uid: String) async throws -> String {
+        let code = Self.normalizedFriendCode(code)
+        guard code.count == 6 else { throw CloudError.friendNotFound }
+        let doc = try await db.collection("friendCodes").document(code).getDocument(source: .server)
+        guard let data = doc.data(), let friend = data["uid"] as? String else { throw CloudError.friendNotFound }
+        guard friend != uid else { throw CloudError.friendIsYou }
+        let name = try await leaderboardEntry(uid: friend, source: .server)?.username ?? data["username"] as? String ?? "Joueur"
+        let ref = db.collection("users").document(uid).collection("friends").document(friend)
+        let saved = try await Self.awaitWrite { done in
+            ref.setData(["username": name, "addedAt": FieldValue.serverTimestamp()], completion: done)
+        }
+        guard saved else { throw CloudError.offline }
+        return name
+    }
+    func removeFriend(uid: String, friend: String) async throws {
+        try await db.collection("users").document(uid).collection("friends").document(friend).delete()
+    }
+    /// The player and their friends, with today's Mot du jour result for each.
+    func friendsBoard(uid: String, username: String, day: String) async throws -> [FriendStanding] {
+        let friends = try await db.collection("users").document(uid).collection("friends").limit(to: 100).getDocuments(source: .server).documents
+        var players: [(uid: String, name: String)] = friends.map { (uid: $0.documentID, name: $0.data()["username"] as? String ?? "Joueur") }
+        players.insert((uid: uid, name: username), at: 0)
+        var rows: [FriendStanding] = []
+        for player in players {
+            let entry = try await leaderboardEntry(uid: player.uid, source: .server)
+            let today = try await dailyResult(uid: player.uid, day: day)
+            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
+                                       streak: entry?.currentStreak() ?? 0, today: today))
+        }
+        return FriendStanding.ordered(rows)
     }
 
     // MARK: Cards
@@ -474,6 +560,8 @@ enum CloudError: LocalizedError {
     case proposalTooSoon
     case proposalQuota
     case alreadyReported
+    case friendNotFound
+    case friendIsYou
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -517,6 +605,8 @@ enum CloudError: LocalizedError {
         case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
         case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
         case .alreadyReported: "Vous avez déjà signalé cette carte. Merci !"
+        case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
+        case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
         }
     }
 }

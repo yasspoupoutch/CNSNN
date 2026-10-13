@@ -2,6 +2,7 @@ import SwiftUI
 
 @main struct CNSNNApp: App {
     @State private var state: AppState
+    @Environment(\.scenePhase) private var scenePhase
     init() {
         // Configure Firebase first so AppState can see a signed-in user on the very first frame.
         if !RuntimeFlags.isTesting { FirebaseRepository.configureIfPresent() }
@@ -13,6 +14,10 @@ import SwiftUI
                 // Above this size the glass cards stop fitting on a phone screen.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .tint(CNSNNTheme.accent).task { await state.connectIfConfigured() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // A new day may have started: refresh the widget and the next reminders.
+            if phase == .active { state.refreshGlance(force: true) }
         }
     }
 }
