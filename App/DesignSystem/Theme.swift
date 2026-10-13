@@ -384,4 +384,7 @@ enum Format {
     static func number(_ value: Int) -> String {
         value.formatted(.number.locale(Locale(identifier: "fr_FR")))
     }
+    /// 1er, 2e, 3e…
+    static func ordinal(_ value: Int) -> String { value == 1 ? "1er" : "\(number(value))e" }
+    static func seconds(_ ms: Int?) -> String { ms.map { String(format: "%.1f s", Double($0) / 1000) } ?? "—" }
 }

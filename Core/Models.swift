@@ -68,3 +68,29 @@ public struct Progress: Codable, Sendable {
         return count
     }
 }
+
+extension Progress {
+    /// Combines two copies of the same player's progress (this device and the cloud, or two devices).
+    /// History only grows: attempts are united by id, and a day keeps a single daily result.
+    public func merged(with other: Progress) -> Progress {
+        var result = self
+        if result.username.isEmpty { result.username = other.username }
+        var ids = Set(result.attempts.map(\.id))
+        var days = Set(result.attempts.compactMap(\.dailyKey))
+        for attempt in other.attempts where !ids.contains(attempt.id) {
+            if let day = attempt.dailyKey {
+                guard !days.contains(day) else { continue }
+                days.insert(day)
+            }
+            ids.insert(attempt.id)
+            result.attempts.append(attempt)
+        }
+        result.attempts.sort { $0.date < $1.date }
+        result.dailyStarted.merge(other.dailyStarted) { mine, _ in mine }
+        result.dailyStartedAt.merge(other.dailyStartedAt) { mine, _ in mine }
+        let submissionIDs = Set(result.submissions.map(\.id))
+        result.submissions += other.submissions.filter { !submissionIDs.contains($0.id) }
+        if result.recentCards.isEmpty { result.recentCards = other.recentCards }
+        return result
+    }
+}

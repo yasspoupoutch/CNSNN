@@ -28,17 +28,17 @@ struct ModerationView: View {
                 if reports.isEmpty { Text("Aucun signalement en attente.") }
                 ForEach(reports) { report in
                     VStack(alignment:.leading,spacing:12) {
-                        Text(report.cardID).font(.caption.monospaced()); Text(report.reason)
+                        Text(report.word ?? report.cardID).font(.headline); Text(report.reason)
                         Button("Retirer la carte", role: .destructive) {
                             Task {
                                 do { try await state.cloud?.withdraw(report: report); await refresh() }
-                                catch { message = error.localizedDescription }
+                                catch { message = CloudError.message(error) }
                             }
                         }.buttonStyle(.bordered)
                         Button("Marquer comme traité") {
                             Task {
                                 do { try await state.cloud?.resolve(report:report); await refresh() }
-                                catch { message = error.localizedDescription }
+                                catch { message = CloudError.message(error) }
                             }
                         }.buttonStyle(.bordered)
                     }
@@ -51,14 +51,14 @@ struct ModerationView: View {
             guard let cloud = state.cloud else { return }
             guard try await cloud.isAdmin() else { message = "Accès administrateur requis."; return }
             cards = try await cloud.pendingCards(); reports = try await cloud.pendingReports()
-        } catch { message = error.localizedDescription }
+        } catch { message = CloudError.message(error) }
     }
     private func review(_ card: Card, _ approved: Bool) {
         busy = true
         Task {
             defer { busy = false }
             do { try await state.cloud?.review(card:card,approved:approved); await refresh() }
-            catch { message = error.localizedDescription }
+            catch { message = CloudError.message(error) }
         }
     }
 }

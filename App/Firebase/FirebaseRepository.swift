@@ -3,8 +3,56 @@ import FirebaseCore
 import FirebaseAuth
 import FirebaseFirestore
 import CNSNNCore
-struct CloudProfile { let uid: String; let anonymous: Bool; let username: String }
-struct CardReport: Identifiable { let id: String; let cardID: String; let reason: String }
+
+struct CloudProfile { let uid: String; let anonymous: Bool; let username: String; var email: String? = nil }
+struct CardReport: Identifiable { let id: String; let cardID: String; let reason: String; var word: String? }
+
+/// Official totals of one player (`leaderboard/{uid}`), only ever moved by the security rules' checks.
+struct LeaderboardEntry: Identifiable, Equatable {
+    var id: String { uid }
+    let uid: String
+    let username: String
+    let points: Int
+    let played: Int
+    let wins: Int
+    let streak: Int
+    let bestStreak: Int
+    let bestTimeMs: Int?
+    let lastWinDay: String
+    /// The stored streak only counts while the last win is today or yesterday.
+    func currentStreak(at date: Date = Date()) -> Int {
+        lastWinDay == DailySchedule.key(date) || lastWinDay == DailySchedule.key(DailySchedule.previousDay(date)) ? streak : 0
+    }
+    var successRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
+}
+
+/// One line of the day's ranking.
+struct DailyRank: Identifiable, Equatable {
+    var id: String { uid }
+    let uid: String
+    let username: String
+    let timeMs: Int
+    let points: Int
+    let usedHint: Bool
+}
+
+/// Where a finished daily result stands among today's players.
+struct DailyStanding: Equatable {
+    let rank: Int?
+    let players: Int
+    /// Share of the other players this result beat (slower or not found). Nil when alone.
+    let beatenPercent: Int?
+}
+
+/// Server state of today's Mot du jour for the signed-in player.
+struct DailySessionState {
+    let day: String
+    let cardID: String
+    let startedAt: Date
+    let hintUsed: Bool
+    let finished: Bool
+}
+
 @MainActor final class FirebaseRepository {
     static var isConfigured: Bool { FirebaseApp.app() != nil }
     /// A Firebase account survives reinstalls (keychain), so a returning player can be restored.
@@ -15,42 +63,253 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
     }
     private var auth: Auth { Auth.auth() }
     var hasCurrentUser: Bool { auth.currentUser != nil }
+    var currentEmail: String? { auth.currentUser?.email }
     private var db: Firestore { Firestore.firestore() }
+
+    // MARK: Profile
+
     func bootstrap(username: String) async throws -> CloudProfile {
         let user: User
         if let current = auth.currentUser { user = current }
         else { user = try await auth.signInAnonymously().user }
         let ref = db.collection("users").document(user.uid)
-        let doc = try await ref.getDocument(source: .server)
+        // Falls back to the cached profile offline, so a returning player keeps their identity.
+        let doc = try await ref.getDocument()
         if !doc.exists {
+            guard !doc.metadata.isFromCache else { throw CloudError.offline }
             try await ref.setData(["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0])
         }
-        return CloudProfile(uid:user.uid,anonymous:user.isAnonymous,username:doc.data()?["username"] as? String ?? username)
+        return CloudProfile(uid:user.uid,anonymous:user.isAnonymous,username:doc.data()?["username"] as? String ?? username,email:user.email)
     }
+    /// Renames the profile and, in the same batch, the public leaderboard line.
     func rename(uid: String, username: String) async throws {
-        try await db.collection("users").document(uid).updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()])
+        let batch = db.batch()
+        batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("users").document(uid))
+        if try await leaderboardEntry(uid: uid) != nil {
+            batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("leaderboard").document(uid))
+        }
+        try await batch.commit()
     }
-    func authenticate(email: String, password: String, login: Bool) async throws -> CloudProfile {
-        let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        if login { _ = try await auth.signIn(withEmail:email,password:password) }
-        else if let current = auth.currentUser, current.isAnonymous {
-            // Linking preserves UID and ownership; never replace the anonymous user.
-            _ = try await current.link(with:EmailAuthProvider.credential(withEmail:email,password:password))
-        } else if auth.currentUser == nil {
-            _ = try await auth.createUser(withEmail:email,password:password)
-        } else { throw CloudError.permanentAccountAlreadyConnected }
-        return try await bootstrap(username:"Joueur")
+
+    // MARK: Accounts
+
+    /// Turns the guest into a permanent account. Linking keeps the UID, so nothing is lost.
+    func createPermanentAccount(email: String, password: String) async throws -> CloudProfile {
+        let credential = EmailAuthProvider.credential(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
+        if let current = auth.currentUser {
+            guard current.isAnonymous else { throw CloudError.permanentAccountAlreadyConnected }
+            _ = try await current.link(with: credential)
+        } else {
+            _ = try await auth.createUser(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
+        }
+        return try await bootstrap(username: "Joueur")
+    }
+    func signIn(email: String, password: String) async throws -> CloudProfile {
+        _ = try await auth.signIn(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
+        return try await bootstrap(username: "Joueur")
     }
     func resetPassword(email: String) async throws {
         try await auth.sendPasswordReset(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines))
     }
     func signOut() throws { try auth.signOut() }
+
+    /// Deletes every document the player owns, then the Firebase account itself.
+    /// Permanent accounts must confirm their password first (Firebase requires a recent login).
+    func deleteAccount(uid: String, password: String?) async throws {
+        guard let user = auth.currentUser, user.uid == uid else { throw CloudError.authentication }
+        if let password, let email = user.email {
+            _ = try await user.reauthenticate(with: EmailAuthProvider.credential(withEmail: email, password: password))
+        }
+        var refs: [DocumentReference] = [
+            db.collection("users").document(uid),
+            db.collection("users").document(uid).collection("private").document("progress"),
+            db.collection("leaderboard").document(uid),
+        ]
+        for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId")] {
+            refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
+        }
+        // Approved cards stay in the game; the author's other proposals go.
+        refs += try await db.collection("cards").whereField("createdBy", isEqualTo: uid).getDocuments(source: .server).documents
+            .filter { $0.data()["status"] as? String != "approved" }.map(\.reference)
+        // The profile goes first: the rules only let the daily history go once it is gone.
+        for start in stride(from: 0, to: refs.count, by: 400) {
+            let batch = db.batch()
+            for ref in refs[start..<min(start + 400, refs.count)] { batch.deleteDocument(ref) }
+            try await batch.commit()
+        }
+        do { try await user.delete() }
+        catch where CloudError.code(error) == .requiresRecentLogin && user.isAnonymous {
+            // A guest cannot sign in again: its data is already gone, so simply leave the account.
+            try auth.signOut()
+        }
+    }
+
+    // MARK: Synced progress (practice, not official)
+
+    private func progressRef(_ uid: String) -> DocumentReference {
+        db.collection("users").document(uid).collection("private").document("progress")
+    }
+    func cloudProgress(uid: String) async throws -> CNSNNCore.Progress? {
+        let snapshot = try await progressRef(uid).getDocument()
+        guard let json = snapshot.data()?["json"] as? String else { return nil }
+        return try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(json.utf8))
+    }
+    /// Queued by Firestore when offline and sent once the network is back.
+    func saveCloudProgress(_ progress: CNSNNCore.Progress, uid: String) throws {
+        let data = try JSONEncoder().encode(progress)
+        guard data.count <= 900_000 else { throw CloudError.progressTooLarge }
+        progressRef(uid).setData(["json": String(decoding: data, as: UTF8.self), "schema": 1, "updatedAt": FieldValue.serverTimestamp()])
+    }
+
+    // MARK: Mot du jour
+
+    private func sessionRef(_ uid: String, _ day: String) -> DocumentReference { db.collection("dailySessions").document(uid + "_" + day) }
+    private func resultRef(_ uid: String, _ day: String) -> DocumentReference { db.collection("dailyResults").document(uid + "_" + day) }
+
+    /// A word published by a moderator for that day, which replaces the built-in schedule.
+    func dailyChallenge(day: String) async throws -> Card? {
+        let doc = try await db.collection("dailyChallenges").document(day).getDocument()
+        guard let d = doc.data(), let id = d["cardId"] as? String, let word = d["wordFull"] as? String, let hint = d["hint"] as? String,
+              let category = CNSNNCore.Category(rawValue: d["category"] as? String ?? ""),
+              let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
+        return Card(id: id, wordFull: word, hint: hint, category: category, difficulty: difficulty)
+    }
+    func publishDailyChallenge(day: String, card: Card) async throws {
+        guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
+        try await db.collection("dailyChallenges").document(day).setData(["cardId":card.id,"wordFull":card.wordFull,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"publishedBy":uid,"publishedAt":FieldValue.serverTimestamp()])
+    }
+
+    func dailySession(uid: String, day: String) async throws -> DailySessionState? {
+        let doc = try await sessionRef(uid, day).getDocument(source: .server)
+        return doc.data().flatMap { Self.session(day: day, $0) }
+    }
+    /// Starts today's clock on the server. Only returns once the server has recorded the start,
+    /// so the consonants are never shown before the official timer runs.
+    func startDaily(uid: String, day: String, cardID: String) async throws -> DailySessionState {
+        let ref = sessionRef(uid, day)
+        let acknowledged = try await Self.awaitWrite { done in
+            ref.setData(["userId":uid,"day":day,"cardId":cardID,"startedAt":FieldValue.serverTimestamp(),"hintUsed":false], completion: done)
+        }
+        guard acknowledged, let session = try await dailySession(uid: uid, day: day) else { throw CloudError.offline }
+        return session
+    }
+    func revealDailyHint(uid: String, day: String) {
+        sessionRef(uid, day).updateData(["hintUsed": true])
+    }
+    /// Stamps the finish with the server time. Returns false if the network did not confirm in time:
+    /// the write stays queued and the official result is published on a later launch.
+    func finishDaily(uid: String, day: String, correct: Bool, wrongAnswers: Int) async throws -> Bool {
+        let ref = sessionRef(uid, day)
+        return try await Self.awaitWrite { done in
+            ref.updateData(["finishedAt":FieldValue.serverTimestamp(),"correct":correct,"wrongAnswers":wrongAnswers], completion: done)
+        }
+    }
+    func dailyResult(uid: String, day: String) async throws -> Attempt? {
+        let doc = try await resultRef(uid, day).getDocument(source: .server)
+        return doc.data().flatMap { Self.attempt(day: day, $0) }
+    }
+    /// Publishes the official result of a finished session together with the leaderboard tally,
+    /// exactly as the security rules recompute them. Returns the existing result if already published.
+    func publishDailyResult(uid: String, day: String) async throws -> Attempt? {
+        if let existing = try await dailyResult(uid: uid, day: day) { return existing }
+        let sessionDoc = try await sessionRef(uid, day).getDocument(source: .server)
+        guard let s = sessionDoc.data(), let started = s["startedAt"] as? Timestamp, let finished = s["finishedAt"] as? Timestamp,
+              let cardID = s["cardId"] as? String else { return nil }
+        let correct = s["correct"] as? Bool ?? false, usedHint = s["hintUsed"] as? Bool ?? false, wrong = s["wrongAnswers"] as? Int ?? 0
+        let timeMs = Self.millis(finished) - Self.millis(started)
+        guard let difficulty = DailySchedule.difficulty(forKey: day) else { return nil }
+        let points = Scoring.points(difficulty: difficulty, timeMs: timeMs, usedHint: usedHint, correct: correct)
+        let profile = try await db.collection("users").document(uid).getDocument(source: .server)
+        let username = profile.data()?["username"] as? String ?? "Joueur"
+        let old = try await leaderboardEntry(uid: uid, source: .server)
+        let tally = Self.tally(old: old, uid: uid, username: username, day: day, correct: correct, timeMs: timeMs, points: points)
+        let result: [String: Any] = ["userId":uid,"username":username,"day":day,"cardId":cardID,"correct":correct,"usedHint":usedHint,
+                                     "wrongAnswers":wrong,"timeMs":timeMs,"points":points,"startedAt":started,"finishedAt":finished]
+        let batch = db.batch()
+        batch.setData(result, forDocument: resultRef(uid, day))
+        batch.setData(tally, forDocument: db.collection("leaderboard").document(uid))
+        _ = try await Self.awaitWrite { done in batch.commit(completion: done) }
+        return Attempt(cardID: cardID, mode: .daily, correct: correct, timeMs: timeMs, points: points, date: finished.dateValue(), dailyKey: day)
+    }
+
+    // MARK: Leaderboard
+
+    func leaderboardEntry(uid: String, source: FirestoreSource = .default) async throws -> LeaderboardEntry? {
+        let doc = try await db.collection("leaderboard").document(uid).getDocument(source: source)
+        return doc.data().flatMap { Self.entry(uid: uid, $0) }
+    }
+    func topPlayers(limit: Int = 50) async throws -> [LeaderboardEntry] {
+        try await db.collection("leaderboard").order(by: "points", descending: true).limit(to: limit).getDocuments()
+            .documents.compactMap { Self.entry(uid: $0.documentID, $0.data()) }
+    }
+    func fastestPlayers(limit: Int = 50) async throws -> [LeaderboardEntry] {
+        try await db.collection("leaderboard").whereField("bestTimeMs", isGreaterThan: 0).order(by: "bestTimeMs").limit(to: limit).getDocuments()
+            .documents.compactMap { Self.entry(uid: $0.documentID, $0.data()) }
+    }
+    /// Rank by official points among every player.
+    func rank(points: Int) async throws -> (rank: Int, players: Int) {
+        let board = db.collection("leaderboard")
+        let ahead = try await Self.count(board.whereField("points", isGreaterThan: points))
+        return (ahead + 1, try await Self.count(board))
+    }
+    func dailyRanking(day: String, limit: Int = 50) async throws -> [DailyRank] {
+        try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
+            .order(by: "timeMs").limit(to: limit).getDocuments().documents.compactMap { doc in
+                let d = doc.data()
+                guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
+                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false)
+            }
+    }
+    /// "Plus rapide que 98 % des joueurs": players who were slower or did not find the word,
+    /// among everyone else who played today.
+    func standing(day: String, timeMs: Int, correct: Bool) async throws -> DailyStanding {
+        let today = db.collection("dailyResults").whereField("day", isEqualTo: day)
+        let players = try await Self.count(today)
+        guard correct else { return DailyStanding(rank: nil, players: players, beatenPercent: nil) }
+        let missed = try await Self.count(today.whereField("correct", isEqualTo: false))
+        let slower = try await Self.count(today.whereField("correct", isEqualTo: true).whereField("timeMs", isGreaterThan: timeMs))
+        let faster = try await Self.count(today.whereField("correct", isEqualTo: true).whereField("timeMs", isLessThan: timeMs))
+        let others = players - 1
+        return DailyStanding(rank: faster + 1, players: players, beatenPercent: others > 0 ? min(100, (slower + missed) * 100 / others) : nil)
+    }
+    private static func count(_ query: Query) async throws -> Int {
+        try await query.count.getAggregation(source: .server).count.intValue
+    }
+
+    // MARK: Cards
+
     func cards() async throws -> [Card] {
-        let snap = try await db.collection("cards").whereField("status",isEqualTo:"approved").limit(to:100).getDocuments()
+        let snap = try await db.collection("cards").whereField("status",isEqualTo:"approved").limit(to:500).getDocuments()
         return snap.documents.compactMap { decode($0.documentID,$0.data()) }
     }
-    func submit(card: Card, uid: String) async throws {
-        try await db.collection("cards").document(card.id).setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":WordEngine.normalize(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending"])
+    /// Proposes a card under its normalized word, which makes duplicates impossible,
+    /// and consumes the anti-spam quota (30 s apart, 10 per 24 h) in the same batch.
+    func submit(card: Card, uid: String) async throws -> Card {
+        let id = WordEngine.normalize(card.wordFull)
+        let ref = db.collection("cards").document(id)
+        do {
+            if try await ref.getDocument(source: .server).exists { throw CloudError.duplicateWord }
+        } catch where CloudError.code(error) == .permissionDenied {
+            // Someone else's pending or refused proposal: it exists but is private.
+            throw CloudError.duplicateWord
+        }
+        let userRef = db.collection("users").document(uid)
+        let profile = try await userRef.getDocument(source: .server).data() ?? [:]
+        var quota: [String: Any] = ["updatedAt": FieldValue.serverTimestamp(), "lastProposalAt": FieldValue.serverTimestamp()]
+        if let last = (profile["lastProposalAt"] as? Timestamp)?.dateValue(), Date().timeIntervalSince(last) < 31 { throw CloudError.proposalTooSoon }
+        if let window = profile["proposalWindowAt"] as? Timestamp, Date().timeIntervalSince(window.dateValue()) < 24 * 3600 - 60 {
+            let count = (profile["proposalCount"] as? Int ?? 0) + 1
+            guard count <= 10 else { throw CloudError.proposalQuota }
+            quota["proposalWindowAt"] = window; quota["proposalCount"] = count
+        } else {
+            quota["proposalWindowAt"] = FieldValue.serverTimestamp(); quota["proposalCount"] = 1
+        }
+        let batch = db.batch()
+        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending"], forDocument: ref)
+        batch.updateData(quota, forDocument: userRef)
+        try await batch.commit()
+        var stored = card; stored.id = id
+        return stored
     }
     func submissions(uid: String) async throws -> [Submission] {
         let snap = try await db.collection("cards").whereField("createdBy",isEqualTo:uid).order(by:"createdAt",descending:true).limit(to:100).getDocuments()
@@ -63,26 +322,38 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
     }
     func report(cardID: String, reason: String) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
-        try await db.collection("reports").document(uid+"_"+cardID).setData(["userId":uid,"cardId":cardID,"reason":reason,"createdAt":FieldValue.serverTimestamp(),"status":"pending"])
+        do {
+            try await db.collection("reports").document(uid+"_"+cardID).setData(["userId":uid,"cardId":cardID,"reason":reason,"createdAt":FieldValue.serverTimestamp(),"status":"pending"])
+        } catch where CloudError.code(error) == .permissionDenied { throw CloudError.alreadyReported }
     }
+
+    // MARK: Moderation
+
     func isAdmin() async throws -> Bool {
         guard let user = auth.currentUser else { return false }
-        return try await user.getIDTokenResult(forcingRefresh:true).claims["admin"] as? Bool == true
+        if try await user.getIDTokenResult(forcingRefresh:true).claims["admin"] as? Bool == true { return true }
+        return try await db.collection("admins").document(user.uid).getDocument(source: .server).exists
     }
     func pendingCards() async throws -> [Card] {
-        let snap = try await db.collection("cards").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments()
+        let snap = try await db.collection("cards").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
         return snap.documents.compactMap { decode($0.documentID,$0.data()) }
     }
+    /// Approves or refuses a proposal, optionally fixing its hint, category or difficulty.
     func review(card: Card, approved: Bool) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
-        try await db.collection("cards").document(card.id).updateData(["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),"normalizedAnswer":WordEngine.normalize(card.wordFull),"wordNoVowels":WordEngine.consonants(card.wordFull)])
+        try await db.collection("cards").document(card.id).updateData(["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),
+            "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue])
     }
     func pendingReports() async throws -> [CardReport] {
-        let snap = try await db.collection("reports").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments()
-        return snap.documents.compactMap { doc in
+        let snap = try await db.collection("reports").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
+        var reports: [CardReport] = snap.documents.compactMap { doc in
             guard let cardID = doc.data()["cardId"] as? String, let reason = doc.data()["reason"] as? String else { return nil }
             return CardReport(id:doc.documentID,cardID:cardID,reason:reason)
         }
+        for index in reports.indices {
+            reports[index].word = try? await db.collection("cards").document(reports[index].cardID).getDocument().data()?["wordFull"] as? String
+        }
+        return reports
     }
     func withdraw(report: CardReport) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
@@ -95,6 +366,9 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
         try await db.collection("reports").document(report.id).updateData(["status":"resolved","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp()])
     }
+
+    // MARK: Decoding
+
     private func decode(_ id: String, _ d: [String:Any]) -> Card? {
         guard let word = d["wordFull"] as? String, let hint = d["hint"] as? String,
         let category = CNSNNCore.Category(rawValue:d["category"] as? String ?? ""),
@@ -102,14 +376,110 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
         let status = ReviewStatus(rawValue:d["status"] as? String ?? "") else { return nil }
         return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status)
     }
+    private static func session(day: String, _ d: [String: Any]) -> DailySessionState? {
+        guard let cardID = d["cardId"] as? String, let started = d["startedAt"] as? Timestamp else { return nil }
+        return DailySessionState(day: day, cardID: cardID, startedAt: started.dateValue(), hintUsed: d["hintUsed"] as? Bool ?? false, finished: d["finishedAt"] != nil)
+    }
+    private static func attempt(day: String, _ d: [String: Any]) -> Attempt? {
+        guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int, let points = d["points"] as? Int else { return nil }
+        let date = (d["finishedAt"] as? Timestamp)?.dateValue() ?? Date()
+        return Attempt(cardID: cardID, mode: .daily, correct: d["correct"] as? Bool ?? false, timeMs: timeMs, points: points, date: date, dailyKey: day)
+    }
+    private static func entry(uid: String, _ d: [String: Any]) -> LeaderboardEntry? {
+        guard let points = d["points"] as? Int else { return nil }
+        return LeaderboardEntry(uid: uid, username: d["username"] as? String ?? "Joueur", points: points, played: d["played"] as? Int ?? 0,
+                                wins: d["wins"] as? Int ?? 0, streak: d["streak"] as? Int ?? 0, bestStreak: d["bestStreak"] as? Int ?? 0,
+                                bestTimeMs: d["bestTimeMs"] as? Int, lastWinDay: d["lastWinDay"] as? String ?? "")
+    }
+    /// Same arithmetic as the `tallies` rule in Firebase/firestore.rules.
+    static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, points: Int) -> [String: Any] {
+        let lastWin = old?.lastWinDay ?? "", oldStreak = old?.streak ?? 0
+        let laterWin = correct && day > lastWin
+        let previous = DailySchedule.dayNumber(forKey: day).map { $0 - 1 } == DailySchedule.dayNumber(forKey: lastWin)
+        let streak = laterWin ? (previous ? oldStreak + 1 : 1) : (!correct && day > lastWin ? 0 : oldStreak)
+        let best: Any = correct ? (min(old?.bestTimeMs ?? timeMs, timeMs) as Any) : (old?.bestTimeMs.map { $0 as Any } ?? NSNull())
+        return ["uid":uid,"username":username,"points":(old?.points ?? 0) + points,"played":(old?.played ?? 0) + 1,
+                "wins":(old?.wins ?? 0) + (correct ? 1 : 0),"streak":streak,"bestStreak":max(old?.bestStreak ?? 0, streak),
+                "bestTimeMs":best,"lastWinDay":laterWin ? day : lastWin,"lastResult":day,"updatedAt":FieldValue.serverTimestamp()]
+    }
+    /// Milliseconds exactly as the rules' `timestamp.toMillis()`.
+    static func millis(_ t: Timestamp) -> Int { Int(t.seconds) * 1000 + Int(t.nanoseconds) / 1_000_000 }
+
+    /// Waits for the server to confirm a write, up to `timeout`. Firestore keeps unconfirmed writes
+    /// queued and sends them later, so a timeout is not a failure, only "not confirmed yet".
+    static func awaitWrite(timeout: TimeInterval = 10, _ start: (@escaping (Error?) -> Void) -> Void) async throws -> Bool {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            let gate = OnceGate()
+            start { error in
+                gate.run { if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: true) } }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { gate.run { continuation.resume(returning: false) } }
+        }
+    }
 }
+
+private final class OnceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func run(_ body: () -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        guard !done else { return }
+        done = true; body()
+    }
+}
+
 enum CloudError: LocalizedError {
     case authentication
     case permanentAccountAlreadyConnected
+    case offline
+    case progressTooLarge
+    case duplicateWord
+    case proposalTooSoon
+    case proposalQuota
+    case alreadyReported
+
+    /// The few Firebase error codes the app reacts to.
+    enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
+    static func code(_ error: Error) -> Code {
+        let error = error as NSError
+        switch (error.domain, error.code) {
+        case ("FIRAuthErrorDomain", 17007), ("FIRAuthErrorDomain", 17025), ("FIRAuthErrorDomain", 17012): return .emailInUse
+        case ("FIRAuthErrorDomain", 17004), ("FIRAuthErrorDomain", 17009), ("FIRAuthErrorDomain", 17011): return .wrongCredentials
+        case ("FIRAuthErrorDomain", 17026): return .weakPassword
+        case ("FIRAuthErrorDomain", 17008): return .invalidEmail
+        case ("FIRAuthErrorDomain", 17014): return .requiresRecentLogin
+        case ("FIRAuthErrorDomain", 17020): return .network
+        case ("FIRAuthErrorDomain", 17010): return .tooManyRequests
+        case ("FIRFirestoreErrorDomain", 7): return .permissionDenied
+        case ("FIRFirestoreErrorDomain", 14), ("FIRFirestoreErrorDomain", 4): return .unavailable
+        default: return .other
+        }
+    }
+    /// A short French explanation for any error shown to the player.
+    static func message(_ error: Error) -> String {
+        if let error = error as? CloudError { return error.errorDescription ?? "" }
+        switch code(error) {
+        case .emailInUse: return "Cette adresse a déjà un compte CNSNN. Activez « J’ai déjà un compte » pour vous y connecter."
+        case .wrongCredentials: return "Adresse ou mot de passe incorrect."
+        case .weakPassword: return "Choisissez un mot de passe d’au moins 8 caractères."
+        case .invalidEmail: return "Cette adresse email n’est pas valide."
+        case .requiresRecentLogin: return "Pour votre sécurité, saisissez à nouveau votre mot de passe."
+        case .network, .unavailable: return CloudError.offline.errorDescription ?? ""
+        case .tooManyRequests: return "Trop de tentatives. Réessayez dans quelques minutes."
+        case .permissionDenied: return "Action refusée par le serveur. Mettez l’application à jour puis réessayez."
+        case .other: return error.localizedDescription
+        }
+    }
     var errorDescription: String? {
         switch self {
-        case .authentication: "Connecte-toi avant cette action."
-        case .permanentAccountAlreadyConnected: "Un compte permanent est déjà connecté. Ferme cette fenêtre pour retrouver ton profil."
+        case .authentication: "Connectez-vous avant cette action."
+        case .permanentAccountAlreadyConnected: "Un compte permanent est déjà connecté. Fermez cette fenêtre pour retrouver votre profil."
+        case .offline: "Pas de connexion au serveur. Vérifiez le réseau puis réessayez."
+        case .progressTooLarge: "Votre historique est trop volumineux pour être synchronisé."
+        case .duplicateWord: "Ce mot a déjà été proposé. Essayez-en un autre."
+        case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
+        case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
+        case .alreadyReported: "Vous avez déjà signalé cette carte. Merci !"
         }
     }
 }

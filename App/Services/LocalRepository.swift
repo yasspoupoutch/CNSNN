@@ -24,6 +24,11 @@ struct LocalRepository: ProgressRepository {
     func save(_ progress: CNSNNCore.Progress) throws {
         try JSONEncoder().encode(progress).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
+    /// Removes this scope's file (account deletion).
+    func erase() {
+        guard let file = try? url else { return }
+        try? FileManager.default.removeItem(at: file)
+    }
 }
 
 struct MemoryRepository: ProgressRepository {

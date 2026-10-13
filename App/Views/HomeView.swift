@@ -12,7 +12,7 @@ struct HomeView: View {
     private var todayAttempt: Attempt? { state.progress.attempts.first { $0.dailyKey == todayKey } }
     /// Only reveal the consonants once the daily card is locked, so the clock is already running.
     private var startedDailyCard: Card? {
-        state.progress.dailyStarted[todayKey].flatMap { id in SeedCards.all.first { $0.id == id } }
+        state.progress.dailyStarted[todayKey].flatMap { state.card(id: $0) }
     }
     private var level: (number: Int, into: Int) { (state.progress.score / 1000 + 1, state.progress.score % 1000) }
 
@@ -22,7 +22,7 @@ struct HomeView: View {
                 header
                 dailyCard
                 classicCard
-                Label(state.cloud == nil ? "Progression enregistrée sur cet iPhone" : "Connecté · vos points restent sur cet iPhone", systemImage: "checkmark.shield")
+                Label(syncLabel, systemImage: state.uid == nil ? "iphone" : "checkmark.icloud")
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.top, 4)
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
@@ -35,7 +35,7 @@ struct HomeView: View {
                 Text(state.progress.username).scaledFont(30, .bold).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.6)
             }
             Spacer(minLength: 12)
-            let streak = state.progress.streak()
+            let streak = state.official?.currentStreak() ?? state.progress.streak()
             HStack(spacing: 8) {
                 Image(systemName: "flame.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.secondary)
                 Text("\(streak) jour\(streak > 1 ? "s" : "")").scaledFont(14, .semibold).monospacedDigit()
@@ -66,7 +66,8 @@ struct HomeView: View {
                 Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.vertical, 18)
                 Text(consonants == nil ? "Un mot, un indice, un chrono. À vous de jouer." : "Votre chrono tourne. Reprenez la partie.")
                     .font(Typo.serifItalic(21)).multilineTextAlignment(.center)
-                Text("Une seule partie par jour, enregistrée sur cet iPhone").scaledFont(13).foregroundStyle(Palette.tertiary).padding(.top, 8)
+                Text(state.uid == nil ? "Une seule partie par jour, enregistrée sur cet iPhone" : "Le même mot pour tous, une seule partie classée par jour")
+                    .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 8)
                 Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
                     .buttonStyle(PrimaryPillStyle(height: 54)).padding(.top, 20)
             }
@@ -74,7 +75,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder private func dailyDone(_ attempt: Attempt) -> some View {
-        let card = SeedCards.all.first { $0.id == attempt.cardID }
+        let card = state.card(id: attempt.cardID)
         HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: .system(size: 34, weight: .heavy)).tracking(2.7)
             .padding(.top, 22).padding(.bottom, 4)
         Text(attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté. Un nouveau mot arrive à minuit.")
@@ -126,6 +127,12 @@ struct HomeView: View {
             Button("Lancer une partie") { Haptics.selection(); play(GameRoute(mode: .classic, category: category, difficulty: difficulty)) }
                 .buttonStyle(GlassPillStyle()).padding(.top, 14)
         }.glassCard(radius: 34, padding: 20)
+    }
+
+    private var syncLabel: String {
+        if state.uid == nil { return state.cloud == nil ? "Progression enregistrée sur cet iPhone" : "Hors connexion · progression gardée sur cet iPhone" }
+        if state.isAnonymous { return "Sauvegardé en ligne · compte invité" }
+        return "Sauvegardé en ligne · " + (state.email ?? "compte permanent")
     }
 
     private func countdown(from date: Date) -> String {
