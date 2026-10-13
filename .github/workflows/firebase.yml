@@ -79,7 +79,7 @@ jobs:
       - run: npm ci || npm install --no-audit --no-fund
       - name: Publier les règles et index
         if: ${{ inputs.deploy }}
-        run: npx firebase deploy --only firestore:rules,firestore:indexes --project cnsnn-9ctosy --non-interactive
+        run: node tools/deploy.mjs
       - name: Nommer un administrateur
         if: ${{ inputs.admin_uid != '' }}
         env:
