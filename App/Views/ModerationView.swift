@@ -7,6 +7,8 @@ struct ModerationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var cards: [Card] = []
     @State private var reports: [CardReport] = []
+    @State private var playerReports: [PlayerReport] = []
+    @State private var suspended: [SuspendedPlayer] = []
     @State private var busy = false
     @State private var loaded = false
     @State private var message: String?
@@ -41,7 +43,7 @@ struct ModerationView: View {
                     }.padding(.vertical, 6)
                 }
             } header: { Text("Cartes en attente") } footer: { Text("Vous pouvez corriger l’indice, la catégorie et la difficulté avant d’approuver. Le mot ne change pas.") }
-            Section("Signalements") {
+            Section("Cartes signalées") {
                 if reports.isEmpty { Text(loaded ? "Aucun signalement en attente." : "Chargement…").foregroundStyle(.secondary) }
                 ForEach(reports) { report in
                     VStack(alignment: .leading, spacing: 10) {
@@ -56,6 +58,37 @@ struct ModerationView: View {
                     }.padding(.vertical, 6)
                 }
             }
+            Section {
+                if playerReports.isEmpty { Text(loaded ? "Aucun pseudo signalé." : "Chargement…").foregroundStyle(.secondary) }
+                ForEach(playerReports) { report in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(report.username).font(.headline)
+                        Text(report.reason).foregroundStyle(.secondary)
+                        HStack {
+                            Button("Suspendre", role: .destructive) {
+                                act {
+                                    try await state.cloud?.suspend(player: report.playerID, username: report.username, reason: report.reason)
+                                    try await state.cloud?.resolve(playerReport: report)
+                                }
+                            }.buttonStyle(.bordered)
+                            Button("Ignorer") { act { try await state.cloud?.resolve(playerReport: report) } }.buttonStyle(.bordered)
+                        }.disabled(busy)
+                    }.padding(.vertical, 6)
+                }
+            } header: { Text("Pseudos signalés") } footer: { Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler.") }
+            Section("Joueurs suspendus") {
+                if suspended.isEmpty { Text(loaded ? "Aucun joueur suspendu." : "Chargement…").foregroundStyle(.secondary) }
+                ForEach(suspended) { player in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(player.username)
+                            if !player.reason.isEmpty { Text(player.reason).font(.footnote).foregroundStyle(.secondary) }
+                        }
+                        Spacer()
+                        Button("Rétablir") { act { try await state.cloud?.unsuspend(player: player.id) } }.buttonStyle(.bordered).disabled(busy)
+                    }
+                }
+            }
         }
         .navigationTitle("Modération")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
@@ -67,6 +100,7 @@ struct ModerationView: View {
             guard let cloud = state.cloud else { message = "Le serveur n’est pas configuré."; return }
             guard try await cloud.isAdmin() else { message = "Accès administrateur requis."; return }
             cards = try await cloud.pendingCards(); reports = try await cloud.pendingReports()
+            playerReports = try await cloud.pendingPlayerReports(); suspended = try await cloud.suspendedPlayers()
             loaded = true
         } catch { message = CloudError.message(error) }
     }

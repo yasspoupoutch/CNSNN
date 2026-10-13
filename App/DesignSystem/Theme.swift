@@ -356,7 +356,7 @@ struct VowelWord: View {
             HStack(spacing: 0) {
                 ForEach(Array(word.enumerated()), id: \.offset) { index, character in
                     if Vowels.contains(character) {
-                        let start = time - delay - Double(index) * 0.12
+                        let start = time - delay - Double(index) * (once ? Self.introStagger : 0.12)
                         let progress = reduceMotion || RuntimeFlags.isTesting ? 1 : (once ? Self.intro(start) : Self.progress(start))
                         CollapseLayout(progress: progress) { Text(String(character)).foregroundStyle(Palette.accent) }
                             .opacity(progress).clipped()
@@ -369,15 +369,16 @@ struct VowelWord: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(word.capitalized)
     }
-    /// Opening screen: each vowel slides in over half a second and stays.
+    /// Opening screen: each vowel slides in quickly, one after the other, and stays.
+    static let introStagger = 0.07
     static func intro(_ time: Double) -> CGFloat {
-        let t = min(max((time - 0.35) / 0.55, 0), 1)
+        let t = min(max((time - 0.2) / 0.35, 0), 1)
         return CGFloat(t * t * (3 - 2 * t))
     }
     /// Opening screen length: the last vowel of `word` has settled, plus a short pause to read it.
     static func introDuration(_ word: String) -> Double {
         let last = Array(word).lastIndex(where: Vowels.contains) ?? 0
-        return 0.35 + Double(last) * 0.12 + 0.55 + 0.7
+        return 0.2 + Double(last) * introStagger + 0.35 + 0.45
     }
     /// Same keyframes as the prototype's `vowelIn` (5 s cycle).
     static func progress(_ time: Double) -> CGFloat {
@@ -392,20 +393,20 @@ struct VowelWord: View {
     }
 }
 
-/// A word with vowels highlighted in gold.
+/// A word with vowels highlighted in gold. One single Text, so when it shrinks to fit,
+/// every letter shrinks by the same amount.
 struct HighlightedWord: View {
     var word: String
     var font: Font
-    var glow = false
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(word.enumerated()), id: \.offset) { _, character in
-                let vowel = Vowels.contains(character)
-                Text(String(character)).foregroundStyle(vowel ? Palette.accent : Palette.foreground)
-                    .shadow(color: vowel && glow ? Palette.accent.opacity(0.6) : .clear, radius: 12)
-            }
-        }.font(font).lineLimit(1).minimumScaleFactor(0.5)
-            .accessibilityElement(children: .ignore).accessibilityLabel(word)
+        var styled = AttributedString()
+        for character in word {
+            var letter = AttributedString(String(character))
+            letter.foregroundColor = Vowels.contains(character) ? Palette.accent : Palette.foreground
+            styled += letter
+        }
+        return Text(styled).font(font).lineLimit(1).minimumScaleFactor(0.5)
+            .accessibilityLabel(word)
     }
 }
 

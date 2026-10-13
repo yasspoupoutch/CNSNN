@@ -28,7 +28,8 @@ import CNSNNCore
         await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: day, cardID: card.id) }
         repo.revealDailyHint(uid: alice.uid, day: day)
         try await Task.sleep(for: .milliseconds(1200))
-        let confirmed = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 2)
+        try await seedSecret(day: day, card: card)
+        let confirmed = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 2, answer: WordEngine.normalize(card.wordFull))
         XCTAssertTrue(confirmed)
         let official = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
         XCTAssertGreaterThanOrEqual(official.timeMs, 1000)
@@ -51,7 +52,7 @@ import CNSNNCore
         let bob = try await repo.bootstrap(username: "Bob")
         _ = try await repo.startDaily(uid: bob.uid, day: day, cardID: card.id)
         try await Task.sleep(for: .milliseconds(Double(official.timeMs) + 800))
-        _ = try await repo.finishDaily(uid: bob.uid, day: day, correct: true, wrongAnswers: 0)
+        _ = try await repo.finishDaily(uid: bob.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
         let bobResult = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: bob.uid, day: day))
         XCTAssertGreaterThan(bobResult.timeMs, official.timeMs)
         let bobStanding = try await repo.standing(day: day, timeMs: bobResult.timeMs, correct: true)
@@ -109,7 +110,8 @@ import CNSNNCore
         let day = DailySchedule.key()
         let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
         _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: card.id)
-        _ = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0)
+        try await seedSecret(day: day, card: card)
+        _ = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
         _ = try await repo.publishDailyResult(uid: alice.uid, day: day)
 
         try repo.signOut()
@@ -200,13 +202,23 @@ import CNSNNCore
 
     // MARK: Helpers
 
+    /// Every day has a secret word on the server, and a win must name it.
+    private func seedSecret(day: String, card: Card) async throws {
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        try await emulator("PATCH", "\(docs)/dailySecrets/\(day)", body: #"{"fields":{"answer":{"stringValue":""# + WordEngine.normalize(card.wordFull) + #""}}}"#)
+    }
     private func emulator(_ method: String, _ url: String, body: String? = nil) async throws {
-        var request = URLRequest(url: URL(string: url)!)
+        var request = URLRequest(url: URL(string: url)!, timeoutInterval: 20)
         request.httpMethod = method
         // "owner" bypasses the security rules on the Firestore emulator only.
         request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
         if let body { request.httpBody = Data(body.utf8); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
-        let (_, response) = try await URLSession.shared.data(for: request)
+        // The emulators can be slow to answer their first request on a busy CI runner: retry a timeout.
+        var response: URLResponse?
+        for attempt in 0..<3 where response == nil {
+            do { response = try await URLSession.shared.data(for: request).1 }
+            catch let error as URLError where error.code == .timedOut && attempt < 2 { continue }
+        }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         XCTAssertTrue((200..<300).contains(status), "\(method) \(url) → \(status)")
     }

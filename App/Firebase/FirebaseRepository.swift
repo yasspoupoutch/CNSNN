@@ -6,6 +6,10 @@ import CNSNNCore
 
 struct CloudProfile { let uid: String; let anonymous: Bool; let username: String; var email: String? = nil }
 struct CardReport: Identifiable { let id: String; let cardID: String; let reason: String; var word: String? }
+/// A pseudo reported from the leaderboard.
+struct PlayerReport: Identifiable { let id: String; let playerID: String; let username: String; let reason: String }
+/// A player a moderator suspended.
+struct SuspendedPlayer: Identifiable { let id: String; let username: String; let reason: String }
 
 /// Official totals of one player (`leaderboard/{uid}`), only ever moved by the security rules' checks.
 struct LeaderboardEntry: Identifiable, Equatable {
@@ -34,6 +38,8 @@ struct FriendStanding: Identifiable, Equatable {
     let points: Int
     let streak: Int
     let today: Attempt?
+    /// Wrong guesses on today's word, when the player has a result.
+    var todayWrong: Int? = nil
 
     static func == (a: FriendStanding, b: FriendStanding) -> Bool {
         a.uid == b.uid && a.username == b.username && a.points == b.points && a.streak == b.streak
@@ -59,6 +65,7 @@ struct DailyRank: Identifiable, Equatable {
     let timeMs: Int
     let points: Int
     let usedHint: Bool
+    var wrongAnswers = 0
 }
 
 /// Where a finished daily result stands among today's players.
@@ -176,16 +183,22 @@ struct DailySessionState {
         ]
         refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
-        for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId")] {
+        for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         }
-        // Approved cards stay in the game; the author's other proposals go.
-        refs += try await db.collection("cards").whereField("createdBy", isEqualTo: uid).getDocuments(source: .server).documents
-            .filter { $0.data()["status"] as? String != "approved" }.map(\.reference)
+        // Approved cards stay in the game without the author's name or id; the other proposals go.
+        let authored = try await db.collection("cards").whereField("createdBy", isEqualTo: uid).getDocuments(source: .server).documents
+        refs += authored.filter { $0.data()["status"] as? String != "approved" }.map(\.reference)
+        let live = authored.filter { $0.data()["status"] as? String == "approved" }.map(\.reference)
         // The profile goes first: the rules only let the daily history go once it is gone.
+        // The first batch also leaves the tombstone that lets friends drop this account.
         for start in stride(from: 0, to: refs.count, by: 400) {
             let batch = db.batch()
             for ref in refs[start..<min(start + 400, refs.count)] { batch.deleteDocument(ref) }
+            if start == 0 {
+                batch.setData(["deletedAt": FieldValue.serverTimestamp()], forDocument: db.collection("deletedUsers").document(uid))
+                for ref in live.prefix(80) { batch.updateData(["createdBy": "deleted", "authorName": FieldValue.delete()], forDocument: ref) }
+            }
             try await batch.commit()
         }
         do { try await user.delete() }
@@ -339,7 +352,8 @@ struct DailySessionState {
             .order(by: "timeMs").limit(to: limit).getDocuments().documents.compactMap { doc in
                 let d = doc.data()
                 guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
-                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false)
+                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false,
+                                 wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
             }
     }
     /// "Plus rapide que 98 % des joueurs": players who were slower or did not find the word,
@@ -409,10 +423,16 @@ struct DailySessionState {
         players.insert((uid: uid, name: username), at: 0)
         var rows: [FriendStanding] = []
         for player in players {
+            // A friend who deleted their account leaves the list for good.
+            if player.uid != uid, try await db.collection("deletedUsers").document(player.uid).getDocument(source: .server).exists {
+                try? await removeFriend(uid: uid, friend: player.uid)
+                continue
+            }
             let entry = try await leaderboardEntry(uid: player.uid, source: .server)
-            let today = try await dailyResult(uid: player.uid, day: day)
+            let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
+            let today = data.flatMap { Self.attempt(day: day, $0) }
             rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
-                                       streak: entry?.currentStreak() ?? 0, today: today))
+                                       streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int))
         }
         return FriendStanding.ordered(rows)
     }
@@ -469,7 +489,49 @@ struct DailySessionState {
         } catch where CloudError.code(error) == .permissionDenied { throw CloudError.alreadyReported }
     }
 
+    /// Reports an offensive pseudo seen on the leaderboard.
+    func report(player: String, username: String) async throws {
+        guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
+        do {
+            try await db.collection("playerReports").document(uid + "_" + player).setData(["userId": uid, "playerId": player, "username": username,
+                "reason": "Pseudo inapproprié", "createdAt": FieldValue.serverTimestamp(), "status": "pending"])
+        } catch where CloudError.code(error) == .permissionDenied { throw CloudError.alreadyReported }
+    }
+
     // MARK: Moderation
+
+    func isSuspended(uid: String) async throws -> Bool {
+        try await db.collection("banned").document(uid).getDocument(source: .server).exists
+    }
+    /// Suspends a player and takes them off the leaderboards; their games stay recorded.
+    func suspend(player: String, username: String, reason: String) async throws {
+        guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
+        let results = try await db.collection("dailyResults").whereField("userId", isEqualTo: player).getDocuments(source: .server).documents
+        let batch = db.batch()
+        batch.setData(["username": username, "reason": reason, "bannedAt": FieldValue.serverTimestamp(), "bannedBy": uid], forDocument: db.collection("banned").document(player))
+        batch.deleteDocument(db.collection("leaderboard").document(player))
+        for doc in results.prefix(400) { batch.deleteDocument(doc.reference) }
+        try await batch.commit()
+    }
+    func unsuspend(player: String) async throws {
+        try await db.collection("banned").document(player).delete()
+    }
+    func suspendedPlayers() async throws -> [SuspendedPlayer] {
+        try await db.collection("banned").limit(to: 100).getDocuments(source: .server).documents.map {
+            SuspendedPlayer(id: $0.documentID, username: $0.data()["username"] as? String ?? "Joueur", reason: $0.data()["reason"] as? String ?? "")
+        }
+    }
+    func pendingPlayerReports() async throws -> [PlayerReport] {
+        try await db.collection("playerReports").whereField("status", isEqualTo: "pending").limit(to: 50).getDocuments(source: .server).documents.compactMap { doc in
+            let d = doc.data()
+            guard let player = d["playerId"] as? String, let name = d["username"] as? String else { return nil }
+            return PlayerReport(id: doc.documentID, playerID: player, username: name, reason: d["reason"] as? String ?? "")
+        }
+    }
+    func resolve(playerReport: PlayerReport) async throws {
+        guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
+        try await db.collection("playerReports").document(playerReport.id).updateData(["status": "resolved", "reviewedBy": uid, "reviewedAt": FieldValue.serverTimestamp()])
+    }
 
     func isAdmin() async throws -> Bool {
         guard let user = auth.currentUser else { return false }
@@ -635,7 +697,7 @@ enum CloudError: LocalizedError {
         case .duplicateWord: "Ce mot a déjà été proposé. Essayez-en un autre."
         case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
         case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
-        case .alreadyReported: "Vous avez déjà signalé cette carte. Merci !"
+        case .alreadyReported: "Votre signalement est déjà envoyé. Merci !"
         case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
         case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
         }

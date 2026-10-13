@@ -42,6 +42,7 @@ import CNSNNCore
                 Task {
                     if state.uid == nil { await state.connectIfConfigured() }
                     guard let cloud = state.cloud, let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
+                    if state.isSuspended, (try? await cloud.dailySession(uid: uid, day: key)) == nil { phase = .failed(AppState.suspendedText); return }
                     await loadRankedDaily(key: key, cloud: cloud, uid: uid, state: state)
                 }
             } else {

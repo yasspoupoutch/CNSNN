@@ -12,6 +12,8 @@ import CNSNNCore
     var isAnonymous = true
     var email: String?
     var isAdmin = false
+    /// A moderator suspended this account: no ranked daily, proposals or reports.
+    var isSuspended = false
     /// Official totals from the leaderboard, when signed in.
     var official: LeaderboardEntry?
     /// Today's word when a moderator published one, replacing the built-in schedule.
@@ -68,6 +70,7 @@ import CNSNNCore
         guard !isBusy else { return }
         let name = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (2...20).contains(name.count) else { error = "Choisissez un pseudo de 2 à 20 caractères."; return }
+        guard NameFilter.isAllowed(name) else { error = AppState.refusedName; return }
         isBusy = true
         defer { isBusy = false }
         if let cloud {
@@ -106,7 +109,11 @@ import CNSNNCore
         await finishPendingDaily()
         await refreshOfficial()
         isAdmin = (try? await cloud?.isAdmin()) ?? false
+        if let cloud, let uid { isSuspended = (try? await cloud.isSuspended(uid: uid)) ?? isSuspended }
     }
+    static let refusedName = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
+    static let suspendedText = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
+
     func activate(_ profile: CloudProfile, preservingGuest: Bool) throws {
         if uid != profile.uid {
             let archive = LocalRepository(scope: profile.uid)
@@ -126,7 +133,7 @@ import CNSNNCore
         resetToGuest()
     }
     private func resetToGuest() {
-        uid = nil; isAnonymous = true; email = nil; isAdmin = false; official = nil
+        uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil
         progress = CNSNNCore.Progress(); cards = SeedCards.all
         local = LocalRepository(); persist()
     }
@@ -171,6 +178,7 @@ import CNSNNCore
     func rename(_ name: String) async {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (2...20).contains(name.count) else { error = "Le pseudo doit contenir 2 à 20 caractères."; return }
+        guard NameFilter.isAllowed(name) else { error = AppState.refusedName; return }
         do {
             if let cloud, let uid { try await cloud.rename(uid: uid, username: name) }
             progress.username = name

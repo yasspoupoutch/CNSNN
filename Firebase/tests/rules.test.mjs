@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
  doc, setDoc, updateDoc, getDoc, getDocs, deleteDoc, collection, query, where, orderBy, serverTimestamp,
- writeBatch, getCountFromServer, Timestamp,
+ writeBatch, getCountFromServer, Timestamp, deleteField,
 } from 'firebase/firestore';
 
 let env;
@@ -31,8 +31,10 @@ async function signUp(uid='alice',username='Alice'){ await assertSucceeds(setDoc
 async function startDaily(uid='alice',day=parisKey()){
  await assertSucceeds(setDoc(doc(user(uid),`dailySessions/${uid}_${day}`),{userId:uid,day,cardId:'daily-e-001',startedAt:serverTimestamp(),hintUsed:false}));
 }
+// Every day has a secret word since 2026-10-14, and a win must name it.
 async function finishDaily(uid='alice',day=parisKey(),correct=true){
- await assertSucceeds(updateDoc(doc(user(uid),`dailySessions/${uid}_${day}`),{finishedAt:serverTimestamp(),correct,wrongAnswers:1}));
+ if(correct) await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT'});
+ await assertSucceeds(updateDoc(doc(user(uid),`dailySessions/${uid}_${day}`),{finishedAt:serverTimestamp(),correct,wrongAnswers:1,...(correct?{answer:'CHOCOLAT'}:{})}));
 }
 // Builds the result exactly as the app does: everything comes from the finished session.
 async function resultFor(uid,day,overrides={}){
@@ -355,4 +357,58 @@ test('account deletion removes every player document, and only then the daily hi
  // Nobody else can delete a profile.
  await signUp('bob','Bob');
  await assertFails(deleteDoc(doc(user('alice'),'users/bob')));
+});
+test('account deletion leaves a tombstone and anonymizes live cards',async()=>{
+ await signUp(); await seed('cards/CHOCOLAT',{...card('approved'),authorName:'Alice'});
+ const db=user(),b=writeBatch(db);
+ b.update(doc(db,'cards/CHOCOLAT'),{createdBy:'deleted',authorName:deleteField()});
+ b.set(doc(db,'deletedUsers/alice'),{deletedAt:serverTimestamp()});
+ b.delete(doc(db,'users/alice'));
+ await assertSucceeds(b.commit());
+ const c=await read('cards/CHOCOLAT'); assert.equal(c.createdBy,'deleted'); assert.equal(c.authorName,undefined);
+ await assertSucceeds(getDoc(doc(user('bob'),'deletedUsers/alice')));
+ // Nobody can mark someone else deleted, or rewrite another author's card.
+ await assertFails(setDoc(doc(user('bob'),'deletedUsers/carol'),{deletedAt:serverTimestamp()}));
+ await seed('cards/CROISSANT',{...card('approved','carol'),normalizedAnswer:'CROISSANT'});
+ await assertFails(updateDoc(doc(user('bob'),'cards/CROISSANT'),{createdBy:'deleted'}));
+});
+
+// ---------- Pseudos, suspensions and player reports
+
+test('offensive pseudos are refused, ordinary ones pass',async()=>{
+ for(const name of ['Connard','gros c0nnard','Bâtard 93','pute','P.U.T.A.I.N']) await assertFails(setDoc(doc(user(),'users/alice'),profile('alice',name)));
+ for(const [uid,name] of [['m','Monique'],['c','Computer'],['n','Nazim']]) await signUp(uid,name);
+ await signUp();
+ await assertFails(updateDoc(doc(user(),'users/alice'),{username:'Salope',updatedAt:serverTimestamp()}));
+});
+test('a suspended player keeps reading but can no longer play ranked, propose, report or rename',async()=>{
+ await signUp(); await seed('cards/CHOCOLAT',card('approved','bob'));
+ await assertFails(setDoc(doc(user('bob'),'banned/alice'),{username:'Alice',reason:'Pseudo',bannedAt:serverTimestamp(),bannedBy:'bob'}));
+ await assertSucceeds(setDoc(doc(user('mod',{admin:true}),'banned/alice'),{username:'Alice',reason:'Pseudo',bannedAt:serverTimestamp(),bannedBy:'mod'}));
+ await assertSucceeds(getDoc(doc(user(),'banned/alice')));
+ await assertFails(getDoc(doc(user('bob'),'banned/alice')));
+ await assertFails(setDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{userId:'alice',day:parisKey(),cardId:'x',startedAt:serverTimestamp(),hintUsed:false}));
+ await assertFails(propose());
+ await assertFails(setDoc(doc(user(),'reports/alice_CHOCOLAT'),{userId:'alice',cardId:'CHOCOLAT',reason:'Indice incorrect.',createdAt:serverTimestamp(),status:'pending'}));
+ await assertFails(updateDoc(doc(user(),'users/alice'),{username:'Alicia',updatedAt:serverTimestamp()}));
+ await assertSucceeds(getDoc(doc(user(),'cards/CHOCOLAT')));
+ // Lifting the suspension gives everything back.
+ await assertSucceeds(deleteDoc(doc(user('mod',{admin:true}),'banned/alice')));
+ await startDaily();
+});
+test('player reports: one per reporter and player, name checked, admin resolves',async()=>{
+ await seed('leaderboard/bob',{uid:'bob',username:'Bob',points:10});
+ const r={userId:'alice',playerId:'bob',username:'Bob',reason:'Pseudo inapproprié',createdAt:serverTimestamp(),status:'pending'};
+ await assertFails(setDoc(doc(user(),'playerReports/alice_bob'),{...r,username:'Autre'}));
+ await assertFails(setDoc(doc(user(),'playerReports/whatever'),r));
+ await assertFails(setDoc(doc(user('bob'),'playerReports/bob_bob'),{...r,userId:'bob'}));
+ await assertSucceeds(setDoc(doc(user(),'playerReports/alice_bob'),r));
+ await assertFails(getDocs(query(collection(user('bob'),'playerReports'),where('status','==','pending'))));
+ await assertSucceeds(getDocs(query(collection(user('mod',{admin:true}),'playerReports'),where('status','==','pending'))));
+ await assertSucceeds(updateDoc(doc(user('mod',{admin:true}),'playerReports/alice_bob'),{status:'resolved',reviewedBy:'mod',reviewedAt:serverTimestamp()}));
+});
+test('a day without a secret word never gives a free win',async()=>{
+ await signUp(); await startDaily();
+ await assertFails(updateDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'NIMPORTE'}));
+ await assertSucceeds(updateDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0}));
 });
