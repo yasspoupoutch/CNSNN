@@ -33,12 +33,12 @@ final class RepositoryTests: XCTestCase {
         XCTAssertEqual(state.progress.attempts.count, 1)
         XCTAssertEqual(state.progress.score, 95)
     }
-    @MainActor func testDailySessionResumesExistingResult() {
+    @MainActor func testDailySessionResumesExistingResult() async {
         let state = AppState(local: MemoryRepository())
         let session = GameSession()
         session.load(mode: .daily, category: nil, difficulty: nil, state: state)
         session.answer = session.card!.wordFull
-        session.submit(mode: .daily, state: state)
+        await session.submit(mode: .daily, state: state)
         let original = session.result!.id
         let next = GameSession()
         next.load(mode: .daily, category: nil, difficulty: nil, state: state)

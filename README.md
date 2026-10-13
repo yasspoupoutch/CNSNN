@@ -1,62 +1,54 @@
-# CNSNN — iPhone / SwiftUI
+# CNSNN
 
-Projet natif iOS créé dans ce dépôt. SwiftUI reste la seule technologie d’interface. Aucun service Firebase existant n’a été modifié et aucun service payant n’a été activé.
+Jeu de mots iPhone en SwiftUI : retrouver un mot à partir de ses seules consonnes. Firebase gère les comptes, la synchronisation et les classements. L'app reste entièrement sur l'offre gratuite Spark : pas de Cloud Functions, aucun service payant.
 
-## Ouvrir l’application
+## Fonctionnalités
 
-Sur un **Mac avec Xcode 26 ou plus récent**, ouvrir `CNSNN.xcodeproj`, puis sélectionner le schéma **CNSNN**. Le projet cible iPhone, portrait, iOS 17 minimum. Xcode résoudra les dépendances Firebase par Swift Package Manager. Sans `GoogleService-Info.plist`, l’application utilise automatiquement son mode local.
+- **Mot du jour commun et secret** : le même mot pour tout le monde. L'app ne reçoit que les consonnes, le serveur vérifie chaque réponse et ne révèle le mot qu'à la fin de la partie. La difficulté suit le jour : facile le lundi et le mardi, moyen du mercredi au vendredi, difficile le week-end. Le chrono part et s'arrête sur l'horloge du serveur. Les points sont recalculés par les règles Firestore, une partie par jour, et une partie interrompue reprend avec son chrono d'origine.
+- **Résultat** : « Vous êtes le numéro 1 ! », ou Top 1 %, 5 %, 10 %, 25 % ou 50 % du jour, avec le rang (« 3e sur 120 aujourd'hui »).
+- **Classements** : aujourd'hui (temps), points, records, et **amis** (ajout par code de 6 caractères, classés sur le mot du jour).
+- **Classique** : 134 cartes intégrées et les cartes de la communauté approuvées, six catégories et trois difficultés, sans répéter les cartes récentes.
+- **Comptes** : invité automatique, puis compte e-mail sans perte de données. Connexion, mot de passe oublié, suppression du compte et de toutes ses données. Progression synchronisée entre appareils et conservée après réinstallation.
+- **Propositions de cartes** : doublons impossibles (l'identifiant est le mot normalisé), 30 s entre deux propositions, 10 par 24 h, statuts en attente, approuvée ou refusée, signalements.
+- **Modération** (administrateurs) : approuver ou refuser une carte, corriger son indice, sa catégorie ou sa difficulté, voir son auteur, traiter les signalements.
+- **Rappel quotidien** : notification locale à l'heure choisie dans Profil, plus un rappel le soir si la série est en jeu.
+- **Widget** écran d'accueil (petit et moyen) : mot du jour à jouer, trouvé ou raté, série et temps avant le prochain mot.
+- **Design** Liquid Glass : effets natifs sur iOS 26, matériaux système sur iOS 17 à 25. Retours haptiques, Dynamic Type, cibles de 44 pt. Les réglages « Réduire les animations » et « Réduire la transparence » sont respectés.
 
-Le SDK iOS 26 est requis pour compiler les références aux APIs Liquid Glass, même lorsque l’app sera installée sur iOS 17. Sur iOS 26, les contrôles utilisent `glassEffect`, `GlassEffectContainer` et la barre d’onglets système. Sur iOS 17–25, ils utilisent des matériaux système. Les transitions de navigation contextuelles utilisent les APIs iOS 18 lorsque disponibles.
+## Installer sur iPhone (sans compte Apple payant)
 
-**Aucune build iOS n’a été compilée dans l’environnement de création Linux.** Les tailles d’écran, animations, contrastes et performances doivent être vérifiés sur simulateur puis sur iPhone avant de considérer le design comme final.
+1. Dans l'onglet **Actions** du dépôt, lancer **CNSNN - IPA iPhone non signe** sur `main`.
+2. Télécharger l'artefact **CNSNN-iPhone-unsigned-IPA** (disponible 24 h) et le décompresser.
+3. Installer `CNSNN-unsigned.ipa` avec [Sideloadly](https://sideloadly.io) et un identifiant Apple gratuit. Si Sideloadly refuse le partage de données du widget, installer `CNSNN-sans-widget-partage.ipa` à la place : le widget n'affichera alors que la difficulté du jour.
+4. Avec un compte gratuit, l'app expire au bout de 7 jours. Il suffit de la réinstaller, rien n'est perdu.
 
-## Design
+TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne sont pas utilisés.
 
-L’interface reprend la maquette Claude Design « CNSNN — Liquid Glass » (thème sombre) : fond animé à halos colorés, cartes en verre dépoli, accent doré, barre d’onglets flottante (Jouer, Stats, Proposer, Profil), clavier AZERTY intégré avec voyelles dorées et feuille de résultat. Les jetons (couleurs, verre, boutons) sont dans `App/DesignSystem/Theme.swift`. La police Instrument Serif (SIL Open Font License, voir `App/Resources/Fonts/OFL.txt`) est embarquée pour les consonnes et les indices. Les animations respectent « Réduire les animations » et « Réduire la transparence ».
+## Firebase
 
-## Ce qui est implémenté dans les sources
+- Projet `cnsnn-9ctosy`, bundle `com.mycompany.cnsnn`, connexions Anonyme et E-mail/mot de passe.
+- La sécurité repose sur `Firebase/firestore.rules`. Pour publier les règles, lancer le workflow **CNSNN - Firebase** sur `main` avec `deploy` coché. Il utilise le secret `FIREBASE_SERVICE_ACCOUNT` et `Firebase/tools/deploy.mjs`.
+- Index composites : voir `Firebase/firestore.indexes.json`. La clé du compte de service ne peut pas les créer : ils se créent dans la console Firebase.
+- Nommer un administrateur : même workflow, champ `admin_uid` rempli avec l'UID du joueur.
+- Détails, schéma des collections et limites : `Docs/FIREBASE.md`.
 
-- Présentation courte et pseudo, sans formulaire email obligatoire.
-- Home / Stats / Profil et navigation native conservant les pages.
-- Classique : 30 cartes françaises, six catégories, trois difficultés, indice, validation, abandon, score, sélection évitant les répétitions récentes.
-- Mot du jour local identique pour un même calendrier éditorial : date Europe/Paris, carte verrouillée au démarrage, résultat unique sauvegardé, reprise conservant le début du chronomètre.
-- Statistiques locales, série quotidienne, graphique sobre et progression par paliers.
-- Sauvegarde locale atomique protégée, conservée entre les lancements.
-- Pseudo modifiable, formulaire de proposition, aperçu des consonnes, historique des propositions.
-- Adaptateurs Firebase : compte anonyme, conversion email/mot de passe par `link`, connexion, déconnexion, catalogue approuvé, propositions privées, signalements, modération par custom claim administrateur.
-- Règles Firestore et index. Les scores officiels sont exclusivement écrits par serveur.
-- Backend optionnel pour un Mot du jour classé : sessions serveur, réponses privées, temps serveur, validation, attribution transactionnelle et idempotente. Il n’est ni déployé, ni branché à l’interface actuelle.
-- Icône originale, manifeste de confidentialité initial, tests XCTest, test UI et tests de règles Firebase.
+**Mots du jour secrets** : la liste n'est dans ce dépôt public que chiffrée, et seul le compte de service Firebase peut la lire. Personne ne peut annoncer une victoire sans le bon mot, ni un temps plus court que celui du serveur, ni rejouer, ni gonfler ses points. Détails dans `Docs/FIREBASE.md`.
 
-## Limites précises de cette livraison
+## Développer et tester
 
-Ce dépôt constitue une première implémentation, pas une version certifiée prête pour l’App Store.
+- Ouvrir `CNSNN.xcodeproj` avec Xcode 26 ou plus récent (SDK iOS 26), schéma **CNSNN**. iOS 17 minimum, iPhone, portrait.
+- Le projet est généré par `python3 Scripts/generate_project.py`, puis vérifié par `python3 Scripts/verify_project.py`.
+- **Tests des règles** (Node 22 et Java 21) : `cd Firebase && npm install && npm test`. Ils couvrent les profils, la synchro, le mot du jour, le classement, les amis, les cartes, la modération et la suppression.
+- **Tests iOS** : workflow **CNSNN - iOS Simulator**. Il compile l'app et lance les tests unitaires, les tests de bout en bout contre les émulateurs Firebase avec les vraies règles (`Tests/Integration`) et, en option, les tests d'interface.
 
-La configuration iOS du projet existant `cnsnn-9ctosy` est rattachée aux ressources Xcode, avec le bundle `com.mycompany.cnsnn`. La connexion effective à Auth et Firestore reste à vérifier sur iOS. Le catalogue et le Mot du jour actuels fonctionnent localement ; les scores affichés sont des **points d’entraînement locaux**, pas un classement sécurisé. La progression n’est pas synchronisée entre appareils. La conversion anonyme conserve l’UID et la progression locale sur le même iPhone ; les propositions Firestore restent attachées au même UID. Une connexion à un autre compte ne fusionne pas les historiques locaux. La déconnexion conserve une archive locale par UID, restaurée lors d’une reconnexion sur le même appareil. Voir `Docs/ARCHITECTURE.md`.
+## Organisation
 
-Le classement communautaire, les percentiles, la synchronisation de progression, la suppression complète du compte, Sign in with Apple et le cycle TestFlight ne sont pas livrés comme fonctions opérationnelles. Le backend classé requiert intégration, tests émulateur et une décision préalable sur le coût. Aucun faux percentile n’est affiché.
-
-## Vérifications
-
-Exécutées ici : vérifications structurelles des sources/configurations/projet Xcode ; six tests de logique JavaScript du backend optionnel. Ce résultat ne vérifie pas l’implémentation Swift équivalente.
-
-Non exécutées ici : compilation Swift, XCTest, tests UI, tests des règles Firestore, tests d’intégration Firebase et profiling iOS. Aucun compilateur Swift/Xcode n’est installé ; l’accès au proxy réseau a échoué lors de l’installation des outils.
-
-Commandes prévues sur les environnements adéquats :
-
-```sh
-python3 Scripts/verify_project.py
-node --test --test-isolation=none Backend/functions/tests/domain.test.mjs
-swift test
-cd Firebase
-npm install
-npm test
-```
-
-Pour tester l’app avec Xcode : **Product → Test**. Le test UI utilise `--uitesting`, isole ses données en mémoire et n’initialise jamais Firebase.
-
-## Prochaine étape utilisateur
-
-Les fournisseurs **Anonyme** et **Email/mot de passe** sont activés et les règles CNSNN sont publiées, selon les confirmations utilisateur du 6 octobre 2026. Prochaine étape : créer l’index composite du catalogue de propositions (`cards`, `createdBy` croissant, `createdAt` décroissant, portée Collection). La connexion réelle depuis l’app reste à vérifier avec Xcode.
-
-Les guides de reprise sont dans `Docs/`. Le code est organisé en `Core/`, `App/`, `Firebase/`, `Backend/` et `Tests/`.
+| Dossier | Contenu |
+|---|---|
+| `Core/` | moteur du jeu, cartes, planning du mot du jour, modèles (bibliothèque partagée avec le widget) |
+| `App/` | application SwiftUI : vues, état, accès Firebase, design system |
+| `Widget/` | widget WidgetKit |
+| `Firebase/` | règles, index, tests des règles, outils de publication |
+| `Tests/` | tests unitaires, d'intégration Firebase et d'interface |
+| `Docs/` | architecture, Firebase, Mac/iPhone, recette |
+| `Backend/` | fonctions serveur optionnelles (offre Blaze payante), non déployées |

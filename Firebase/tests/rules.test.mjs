@@ -107,6 +107,55 @@ test('hint cannot be hidden and finish happens once',async()=>{
  await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0}));
  await assertFails(updateDoc(ref,{startedAt:serverTimestamp()}));
 });
+test('secret daily word: consonants today, hint and answer only when earned',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const day=parisKey(),old=shiftKey(day,-3),next=shiftKey(day,2);
+ for(const d of [day,old,next]){
+  await seed(`dailyPuzzles/${d}`,{consonants:'CHCLT',category:'Général',difficulty:'Facile'});
+  await seed(`dailyHints/${d}`,{hint:'Un carré gourmand.'});
+  await seed(`dailySecrets/${d}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un carré gourmand.',category:'Général',difficulty:'Facile'});
+ }
+ const db=user();
+ await assertSucceeds(getDoc(doc(db,`dailyPuzzles/${day}`)));
+ await assertSucceeds(getDoc(doc(db,`dailyPuzzles/${old}`)));
+ await assertFails(getDoc(doc(db,`dailyPuzzles/${next}`)));
+ await assertFails(getDocs(collection(db,'dailyPuzzles')));
+ await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),`dailyPuzzles/${day}`)));
+ await assertFails(setDoc(doc(db,`dailyPuzzles/${day}`),{consonants:'X'}));
+ // Before starting: neither hint nor answer.
+ await assertFails(getDoc(doc(db,`dailyHints/${day}`)));
+ await assertFails(getDoc(doc(db,`dailySecrets/${day}`)));
+ await assertFails(getDocs(collection(db,'dailySecrets')));
+ await assertFails(getDoc(doc(db,`dailySecrets/${next}`)));
+ // Past days are open, so the history can show yesterday's word.
+ await assertSucceeds(getDoc(doc(db,`dailySecrets/${old}`)));
+ await startDaily();
+ await assertFails(getDoc(doc(db,`dailyHints/${day}`)));
+ await assertFails(getDoc(doc(db,`dailySecrets/${day}`)));
+ const ref=doc(db,`dailySessions/alice_${day}`);
+ await assertSucceeds(updateDoc(ref,{hintUsed:true}));
+ await assertSucceeds(getDoc(doc(db,`dailyHints/${day}`)));
+ await assertFails(getDoc(doc(db,`dailySecrets/${day}`)));
+ // Another player's revealed hint does not open it for Bob.
+ await assertFails(getDoc(doc(user('bob'),`dailyHints/${day}`)));
+ // A win without the right answer is refused, so a wrong guess cannot finish the game.
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0}));
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLA'}));
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'chocolat'}));
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0,answer:'X'.repeat(81)}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:2,answer:'CHOCOLAT'}));
+ await assertSucceeds(getDoc(doc(db,`dailySecrets/${day}`)));
+ await assertFails(getDoc(doc(user('bob'),`dailySecrets/${day}`)));
+ // The official result still publishes from the finished session.
+ await assertSucceeds(publish('alice',await resultFor('alice',day)));
+});
+test('giving up on a secret daily word needs no answer',async()=>{
+ await signUp(); const day=parisKey();
+ await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un carré gourmand.',category:'Général',difficulty:'Facile'});
+ await startDaily(); await finishDaily('alice',day,false);
+ await assertSucceeds(getDoc(doc(user(),`dailySecrets/${day}`)));
+ await assertSucceeds(getDoc(doc(user(),`dailyHints/${day}`)));
+});
 test('official result: server time and recomputed points, once',async()=>{
  await signUp(); await startDaily(); await finishDaily();
  const day=parisKey(),r=await resultFor('alice',day);
@@ -170,6 +219,34 @@ test('ranking and percentile queries are public to players',async()=>{
  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(),'leaderboard')));
 });
 
+// ---------- Friends
+
+test('friend codes: create own, look up any, list only own',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const alice=user('alice'),bob=user('bob');
+ await assertFails(setDoc(doc(alice,'friendCodes/ABC2Z9'),{uid:'bob',username:'Bob',createdAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(alice,'friendCodes/abc0O1'),{uid:'alice',username:'Alice',createdAt:serverTimestamp()}));
+ await assertSucceeds(setDoc(doc(alice,'friendCodes/ABC2Z9'),{uid:'alice',username:'Alice',createdAt:serverTimestamp()}));
+ // Taken: a second write is an update, refused.
+ await assertFails(setDoc(doc(bob,'friendCodes/ABC2Z9'),{uid:'bob',username:'Bob',createdAt:serverTimestamp()}));
+ const found=await assertSucceeds(getDoc(doc(bob,'friendCodes/ABC2Z9')));
+ assert.equal(found.data().uid,'alice');
+ await assertSucceeds(getDoc(doc(bob,'friendCodes/ZZZZZZ')));
+ await assertSucceeds(getDocs(query(collection(alice,'friendCodes'),where('uid','==','alice'))));
+ await assertFails(getDocs(collection(bob,'friendCodes')));
+ await assertFails(deleteDoc(doc(bob,'friendCodes/ABC2Z9')));
+ await assertSucceeds(deleteDoc(doc(alice,'friendCodes/ABC2Z9')));
+});
+test('friends list is private to its owner',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ await assertSucceeds(setDoc(doc(user('alice'),'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(user('alice'),'users/alice/friends/alice'),{username:'Alice',addedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(user('bob'),'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));
+ await assertFails(getDocs(collection(user('bob'),'users/alice/friends')));
+ await assertSucceeds(getDocs(collection(user('alice'),'users/alice/friends')));
+ await assertSucceeds(deleteDoc(doc(user('alice'),'users/alice/friends/bob')));
+});
+
 // ---------- Cards and moderation
 
 async function propose(uid='alice',id='CHOCOLAT',data=card('pending',uid),quota){
@@ -183,6 +260,11 @@ test('proposal: id is the normalized word, so duplicates fail',async()=>{
  await assertFails(propose('alice','random-id'));
  await assertSucceeds(propose());
  await assertFails(propose('bob','CHOCOLAT',card('pending','bob')));
+});
+test('proposal author pseudo must be the proposer own',async()=>{
+ await signUp();
+ await assertFails(propose('alice','CHOCOLAT',{...card('pending','alice'),authorName:'Admin'}));
+ await assertSucceeds(propose('alice','CHOCOLAT',{...card('pending','alice'),authorName:'Alice'}));
 });
 test('proposal needs the quota update and respects the cooldown',async()=>{
  await signUp();

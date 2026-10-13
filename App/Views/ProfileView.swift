@@ -30,6 +30,7 @@ struct ProfileView: View {
                         Button { moderation = true } label: { row("Modération", symbol: "checkmark.shield") }
                     }
                 }.glassPanel(radius: 24, padding: 0).buttonStyle(PressStyle(scale: 0.99))
+                ReminderSettings()
                 Text(state.uid == nil ? "Mode local : votre progression reste sur cet iPhone." : (state.isAnonymous ? "Compte invité sauvegardé en ligne. Créez un compte pour le retrouver sur un autre iPhone." : "Compte permanent : votre progression vous suit sur tous vos appareils."))
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
             }.padding(.horizontal, 20).padding(.top, 8)
@@ -52,6 +53,55 @@ struct ProfileView: View {
         }.padding(.horizontal, 18).frame(minHeight: 58).contentShape(Rectangle())
     }
 }
+/// Daily Mot du jour reminder: a local notification at the chosen time, nothing sent by a server.
+struct ReminderSettings: View {
+    @Environment(AppState.self) private var state
+    @State private var enabled = Reminders.isEnabled
+    @State private var time = ReminderSettings.date(minutes: Reminders.minutes)
+    @State private var refused = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Toggle(isOn: $enabled) {
+                HStack(spacing: 14) {
+                    Image(systemName: "bell.badge").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.secondary).frame(width: 24)
+                    Text("Rappel du mot du jour").scaledFont(16, .semibold).foregroundStyle(Palette.foreground)
+                }
+            }
+            .tint(Palette.mint).padding(.horizontal, 18).frame(minHeight: 58)
+            if enabled {
+                Rectangle().fill(Palette.line).frame(height: 1)
+                DatePicker("Heure", selection: $time, displayedComponents: .hourAndMinute)
+                    .scaledFont(15).foregroundStyle(Palette.secondary).padding(.horizontal, 18).frame(minHeight: 52)
+            }
+            if refused {
+                Text("Les notifications sont désactivées pour CNSNN. Autorisez-les dans Réglages > Notifications.")
+                    .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 18).padding(.bottom, 14)
+            }
+        }
+        .glassPanel(radius: 24, padding: 0)
+        .onChange(of: enabled) { _, on in
+            Task {
+                if on {
+                    let allowed = await Reminders.enable()
+                    refused = !allowed
+                    if !allowed { enabled = false }
+                } else {
+                    Reminders.disable()
+                }
+                state.refreshGlance(force: true)
+            }
+        }
+        .onChange(of: time) { _, value in
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: value)
+            Reminders.minutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0)
+            state.refreshGlance(force: true)
+        }
+    }
+    private static func date(minutes: Int) -> Date {
+        Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date()
+    }
+}
+
 struct AccountView: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss

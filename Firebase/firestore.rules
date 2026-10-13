@@ -76,6 +76,24 @@ service cloud.firestore {
      && request.resource.data.json is string && request.resource.data.json.size() <= 900000
      && request.resource.data.schema is int && request.resource.data.updatedAt == request.time;
    }
+   // Friends the player added with a friend code: private to the player. Their results are public anyway.
+   match /friends/{friendId} {
+    allow read, delete: if owner(uid);
+    allow create, update: if owner(uid) && friendId != uid
+     && request.resource.data.keys().hasOnly(['username','addedAt'])
+     && validName(request.resource.data.username) && request.resource.data.addedAt == request.time;
+   }
+  }
+  // Friend codes: 6 unambiguous characters naming one player. Anyone signed in may look up a code,
+  // but only list their own, so codes cannot be enumerated.
+  match /friendCodes/{code} {
+   allow get: if signedIn();
+   allow list: if signedIn() && resource.data.uid == request.auth.uid;
+   allow create: if signedIn() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
+    && request.resource.data.keys().hasOnly(['uid','username','createdAt'])
+    && request.resource.data.uid == request.auth.uid && validName(request.resource.data.username)
+    && request.resource.data.createdAt == request.time;
+   allow delete: if signedIn() && resource.data.uid == request.auth.uid;
   }
   match /admins/{uid} {
    allow read: if owner(uid);
@@ -97,12 +115,39 @@ service cloud.firestore {
    allow update: if owner(resource.data.userId) && !('finishedAt' in resource.data) && (
      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hintUsed'])
       && request.resource.data.hintUsed == true)
-     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers'])
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers','answer'])
       && request.resource.data.finishedAt == request.time && request.resource.data.correct is bool
-      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000)
+      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000
+      && provesAnswer(resource.data.day, request.resource.data))
    );
    // Only while deleting the whole account.
    allow delete: if owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid));
+  }
+
+  // A win on a secret daily word must carry the right answer: a wrong guess is simply refused.
+  function provesAnswer(day, s) {
+   return (!('answer' in s) || (s.answer is string && s.answer.size() <= 80))
+    && (!s.correct || !exists(at('dailySecrets/' + day)) || s.get('answer', '') == get(at('dailySecrets/' + day)).data.answer);
+  }
+  function mySession(day) { return at('dailySessions/' + request.auth.uid + '_' + day); }
+  function finishedMine(day) { return exists(mySession(day)) && ('finishedAt' in get(mySession(day)).data); }
+  function dayOver(day) { return validDayKey(day) && request.time > dayDate(day) + duration.value(26, 'h'); }
+
+  // ---- Secret daily words, written only by the publishing tool (Admin SDK).
+  // Consonants: today and past days. Hint: once the player revealed it or finished.
+  // Answer: once the player finished, or after the day is over.
+  match /dailyPuzzles/{day} {
+   allow get: if signedIn() && (isToday(day) || dayOver(day));
+   allow list, write: if false;
+  }
+  match /dailyHints/{day} {
+   allow get: if signedIn() && (dayOver(day) || admin() || (exists(mySession(day))
+    && (get(mySession(day)).data.hintUsed == true || ('finishedAt' in get(mySession(day)).data))));
+   allow list, write: if false;
+  }
+  match /dailySecrets/{day} {
+   allow get: if signedIn() && (dayOver(day) || admin() || finishedMine(day));
+   allow list, write: if false;
   }
 
   // Public official results: everything is copied from the finished session and recomputed.
@@ -158,13 +203,16 @@ service cloud.firestore {
    // Reading a missing id is allowed so the app can tell a free word from a duplicate.
    allow read: if signedIn() && (resource == null || resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
    allow create: if signedIn() && validCard(request.resource.data)
-    && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status'])
+    && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status','authorName'])
     && cardId == request.resource.data.normalizedAnswer
+    // The pseudo shown as "Proposé par" must be the author's own.
+    && (!('authorName' in request.resource.data) || request.resource.data.authorName == get(at('users/' + request.auth.uid)).data.username)
     && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending'
     && withinProposalQuota();
    // Moderators approve or reject, and may correct the hint, category or difficulty.
    allow update: if admin() && resource.data.status in ['pending','approved','rejected'] && validCard(request.resource.data)
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels','hint','category','difficulty'])
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels','hint','category','difficulty','authorName'])
+    && (!('authorName' in request.resource.data) || validName(request.resource.data.authorName))
     && request.resource.data.normalizedAnswer == resource.data.normalizedAnswer
     && request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
    // Authors may withdraw a proposal that is not live, and admins may remove anything.

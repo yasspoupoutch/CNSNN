@@ -26,6 +26,31 @@ struct LeaderboardEntry: Identifiable, Equatable {
     var successRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
 }
 
+/// One line of the friends ranking: the player's totals and today's Mot du jour, when played.
+struct FriendStanding: Identifiable, Equatable {
+    var id: String { uid }
+    let uid: String
+    let username: String
+    let points: Int
+    let streak: Int
+    let today: Attempt?
+
+    static func == (a: FriendStanding, b: FriendStanding) -> Bool {
+        a.uid == b.uid && a.username == b.username && a.points == b.points && a.streak == b.streak
+            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct
+    }
+    /// Found today first (fastest first), then the others by points.
+    static func ordered(_ rows: [FriendStanding]) -> [FriendStanding] {
+        rows.sorted { a, b in
+            let fa = a.today?.correct == true, fb = b.today?.correct == true
+            if fa != fb { return fa }
+            if fa, let ta = a.today?.timeMs, let tb = b.today?.timeMs, ta != tb { return ta < tb }
+            if a.points != b.points { return a.points > b.points }
+            return a.username.localizedCaseInsensitiveCompare(b.username) == .orderedAscending
+        }
+    }
+}
+
 /// One line of the day's ranking.
 struct DailyRank: Identifiable, Equatable {
     var id: String { uid }
@@ -42,6 +67,13 @@ struct DailyStanding: Equatable {
     let players: Int
     /// Share of the other players this result beat (slower or not found). Nil when alone.
     let beatenPercent: Int?
+    /// "Top X %" badge: the share of today's players at or above this rank, rounded up to
+    /// 1, 5, 10, 25 or 50 %. Nil for the fastest player (shown as number 1) and the slower half.
+    var topPercent: Int? {
+        guard let rank, rank > 1, players > 1 else { return nil }
+        let share = Double(rank) * 100 / Double(players)
+        return [1, 5, 10, 25, 50].first { share <= Double($0) }
+    }
 }
 
 /// Server state of today's Mot du jour for the signed-in player.
@@ -142,6 +174,8 @@ struct DailySessionState {
             db.collection("users").document(uid).collection("private").document("progress"),
             db.collection("leaderboard").document(uid),
         ]
+        refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
+        refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         }
@@ -191,6 +225,29 @@ struct DailySessionState {
               let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
         return Card(id: id, wordFull: word, hint: hint, category: category, difficulty: difficulty)
     }
+    // Secret daily words: the server gives the consonants, the hint once revealed and the word
+    // once the game is over. A win is accepted only with the right answer (firestore.rules).
+    nonisolated static func secretCardID(day: String) -> String { "secret-" + day }
+    nonisolated static func secretDay(cardID: String) -> String? {
+        cardID.hasPrefix("secret-") ? String(cardID.dropFirst("secret-".count)) : nil
+    }
+    func dailyPuzzle(day: String) async throws -> Card? {
+        let doc = try await db.collection("dailyPuzzles").document(day).getDocument()
+        guard let d = doc.data(), let consonants = d["consonants"] as? String, !consonants.isEmpty,
+              let category = CNSNNCore.Category(rawValue: d["category"] as? String ?? ""),
+              let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
+        return Card(id: Self.secretCardID(day: day), wordFull: "", hint: "", category: category, difficulty: difficulty, masked: consonants)
+    }
+    func dailyHint(day: String) async throws -> String? {
+        try await db.collection("dailyHints").document(day).getDocument().data()?["hint"] as? String
+    }
+    func dailySecret(day: String) async throws -> Card? {
+        let doc = try await db.collection("dailySecrets").document(day).getDocument()
+        guard let d = doc.data(), let word = d["word"] as? String, let hint = d["hint"] as? String,
+              let category = CNSNNCore.Category(rawValue: d["category"] as? String ?? ""),
+              let difficulty = Difficulty(rawValue: d["difficulty"] as? String ?? "") else { return nil }
+        return Card(id: Self.secretCardID(day: day), wordFull: word, hint: hint, category: category, difficulty: difficulty)
+    }
     func publishDailyChallenge(day: String, card: Card) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
         try await db.collection("dailyChallenges").document(day).setData(["cardId":card.id,"wordFull":card.wordFull,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"publishedBy":uid,"publishedAt":FieldValue.serverTimestamp()])
@@ -213,13 +270,21 @@ struct DailySessionState {
     func revealDailyHint(uid: String, day: String) {
         sessionRef(uid, day).updateData(["hintUsed": true])
     }
+    /// Records the hint on the server first, since the rules open the hint only after that.
+    func revealSecretHint(uid: String, day: String) async throws -> String? {
+        let ref = sessionRef(uid, day)
+        guard try await Self.awaitWrite({ done in ref.updateData(["hintUsed": true], completion: done) }) else { return nil }
+        return try await dailyHint(day: day)
+    }
     /// Stamps the finish with the server time. Returns false if the network did not confirm in time:
     /// the write stays queued and the official result is published on a later launch.
-    func finishDaily(uid: String, day: String, correct: Bool, wrongAnswers: Int) async throws -> Bool {
+    /// For a secret word, `answer` is the normalized guess: the server refuses a wrong one (permission denied).
+    func finishDaily(uid: String, day: String, correct: Bool, wrongAnswers: Int, answer: String? = nil) async throws -> Bool {
         let ref = sessionRef(uid, day)
-        return try await Self.awaitWrite { done in
-            ref.updateData(["finishedAt":FieldValue.serverTimestamp(),"correct":correct,"wrongAnswers":wrongAnswers], completion: done)
-        }
+        var data: [String: Any] = ["finishedAt":FieldValue.serverTimestamp(),"correct":correct,"wrongAnswers":wrongAnswers]
+        if let answer { data["answer"] = answer }
+        let payload = data
+        return try await Self.awaitWrite { done in ref.updateData(payload, completion: done) }
     }
     func dailyResult(uid: String, day: String) async throws -> Attempt? {
         let doc = try await resultRef(uid, day).getDocument(source: .server)
@@ -293,6 +358,65 @@ struct DailySessionState {
         try await query.count.getAggregation(source: .server).count.intValue
     }
 
+    // MARK: Friends
+
+    /// Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1).
+    nonisolated static let friendCodeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    nonisolated static func normalizedFriendCode(_ text: String) -> String {
+        String(text.uppercased().filter { friendCodeAlphabet.contains($0) }.prefix(6))
+    }
+    /// The player's friend code, created on first use. The code is the document id, so it is unique.
+    func friendCode(uid: String, username: String) async throws -> String {
+        let mine = try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).limit(to: 1).getDocuments(source: .server)
+        if let existing = mine.documents.first { return existing.documentID }
+        for _ in 0..<5 {
+            let code = String((0..<6).map { _ in Self.friendCodeAlphabet.randomElement()! })
+            let ref = db.collection("friendCodes").document(code)
+            do {
+                let saved = try await Self.awaitWrite { done in
+                    ref.setData(["uid": uid, "username": username, "createdAt": FieldValue.serverTimestamp()], completion: done)
+                }
+                guard saved else { throw CloudError.offline }
+                return code
+            } catch where CloudError.code(error) == .permissionDenied {
+                continue // Taken by someone else: draw another code.
+            }
+        }
+        throw CloudError.offline
+    }
+    /// Adds the owner of a friend code to the player's friends. Returns the friend's pseudo.
+    func addFriend(code: String, uid: String) async throws -> String {
+        let code = Self.normalizedFriendCode(code)
+        guard code.count == 6 else { throw CloudError.friendNotFound }
+        let doc = try await db.collection("friendCodes").document(code).getDocument(source: .server)
+        guard let data = doc.data(), let friend = data["uid"] as? String else { throw CloudError.friendNotFound }
+        guard friend != uid else { throw CloudError.friendIsYou }
+        let name = try await leaderboardEntry(uid: friend, source: .server)?.username ?? data["username"] as? String ?? "Joueur"
+        let ref = db.collection("users").document(uid).collection("friends").document(friend)
+        let saved = try await Self.awaitWrite { done in
+            ref.setData(["username": name, "addedAt": FieldValue.serverTimestamp()], completion: done)
+        }
+        guard saved else { throw CloudError.offline }
+        return name
+    }
+    func removeFriend(uid: String, friend: String) async throws {
+        try await db.collection("users").document(uid).collection("friends").document(friend).delete()
+    }
+    /// The player and their friends, with today's Mot du jour result for each.
+    func friendsBoard(uid: String, username: String, day: String) async throws -> [FriendStanding] {
+        let friends = try await db.collection("users").document(uid).collection("friends").limit(to: 100).getDocuments(source: .server).documents
+        var players: [(uid: String, name: String)] = friends.map { (uid: $0.documentID, name: $0.data()["username"] as? String ?? "Joueur") }
+        players.insert((uid: uid, name: username), at: 0)
+        var rows: [FriendStanding] = []
+        for player in players {
+            let entry = try await leaderboardEntry(uid: player.uid, source: .server)
+            let today = try await dailyResult(uid: player.uid, day: day)
+            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
+                                       streak: entry?.currentStreak() ?? 0, today: today))
+        }
+        return FriendStanding.ordered(rows)
+    }
+
     // MARK: Cards
 
     func cards() async throws -> [Card] {
@@ -321,11 +445,12 @@ struct DailySessionState {
         } else {
             quota["proposalWindowAt"] = FieldValue.serverTimestamp(); quota["proposalCount"] = 1
         }
+        let author = profile["username"] as? String ?? "Joueur"
         let batch = db.batch()
-        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending"], forDocument: ref)
+        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending","authorName":author], forDocument: ref)
         batch.updateData(quota, forDocument: userRef)
         try await batch.commit()
-        var stored = card; stored.id = id
+        var stored = card; stored.id = id; stored.author = author
         return stored
     }
     func submissions(uid: String) async throws -> [Submission] {
@@ -353,13 +478,25 @@ struct DailySessionState {
     }
     func pendingCards() async throws -> [Card] {
         let snap = try await db.collection("cards").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
-        return snap.documents.compactMap { decode($0.documentID,$0.data()) }
+        var cards: [Card] = []
+        for doc in snap.documents {
+            guard var card = decode(doc.documentID, doc.data()) else { continue }
+            // Proposals made before the author's pseudo was stored on the card.
+            if card.author == nil, let uid = doc.data()["createdBy"] as? String {
+                card.author = try? await db.collection("users").document(uid).getDocument().data()?["username"] as? String
+            }
+            cards.append(card)
+        }
+        return cards
     }
     /// Approves or refuses a proposal, optionally fixing its hint, category or difficulty.
     func review(card: Card, approved: Bool) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
-        try await db.collection("cards").document(card.id).updateData(["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),
-            "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue])
+        var fields: [String: Any] = ["status":approved ? "approved":"rejected","reviewedBy":uid,"reviewedAt":FieldValue.serverTimestamp(),
+            "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue]
+        // Older proposals carry no pseudo: the moderator's copy (read from the author's profile) fills it in.
+        if let author = card.author { fields["authorName"] = author }
+        try await db.collection("cards").document(card.id).updateData(fields)
     }
     func pendingReports() async throws -> [CardReport] {
         let snap = try await db.collection("reports").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
@@ -391,7 +528,7 @@ struct DailySessionState {
         let category = CNSNNCore.Category(rawValue:d["category"] as? String ?? ""),
         let difficulty = Difficulty(rawValue:d["difficulty"] as? String ?? ""),
         let status = ReviewStatus(rawValue:d["status"] as? String ?? "") else { return nil }
-        return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status)
+        return Card(id:id,wordFull:word,hint:hint,category:category,difficulty:difficulty,status:status,author:d["authorName"] as? String)
     }
     private static func session(day: String, _ d: [String: Any]) -> DailySessionState? {
         guard let cardID = d["cardId"] as? String, let started = d["startedAt"] as? Timestamp else { return nil }
@@ -454,6 +591,8 @@ enum CloudError: LocalizedError {
     case proposalTooSoon
     case proposalQuota
     case alreadyReported
+    case friendNotFound
+    case friendIsYou
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -497,6 +636,8 @@ enum CloudError: LocalizedError {
         case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
         case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
         case .alreadyReported: "Vous avez déjà signalé cette carte. Merci !"
+        case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
+        case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
         }
     }
 }

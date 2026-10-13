@@ -50,6 +50,7 @@ jobs:
           python3 Scripts/verify_project.py
 
       - name: Télécharger les dépendances Firebase avec Swift Package Manager
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           xcodebuild -resolvePackageDependencies \

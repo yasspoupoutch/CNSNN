@@ -18,9 +18,13 @@ public struct Card: Identifiable, Codable, Hashable, Sendable {
     public var category: Category
     public var difficulty: Difficulty
     public var status: ReviewStatus
-    public var wordNoVowels: String { WordEngine.consonants(wordFull) }
-    public init(id: String, wordFull: String, hint: String, category: Category, difficulty: Difficulty, status: ReviewStatus = .approved) {
-        self.id = id; self.wordFull = wordFull; self.hint = hint; self.category = category; self.difficulty = difficulty; self.status = status
+    /// Pseudo of the player who proposed a community card (nil for built-in cards).
+    public var author: String?
+    /// Consonants given by the server for a secret Mot du jour, whose word stays unknown until the end.
+    public var masked: String?
+    public var wordNoVowels: String { masked ?? WordEngine.consonants(wordFull) }
+    public init(id: String, wordFull: String, hint: String, category: Category, difficulty: Difficulty, status: ReviewStatus = .approved, author: String? = nil, masked: String? = nil) {
+        self.id = id; self.wordFull = wordFull; self.hint = hint; self.category = category; self.difficulty = difficulty; self.status = status; self.author = author; self.masked = masked
     }
 }
 public struct Attempt: Identifiable, Codable, Sendable {
@@ -49,6 +53,8 @@ public struct Progress: Codable, Sendable {
     public var submissions: [Submission] = []
     public var dailyStarted: [String: String] = [:]
     public var dailyStartedAt: [String: Date] = [:]
+    /// Secret Mot du jour words, revealed by the server once the day's game is over (by day key).
+    public var dailyWords: [String: Card]?
     public init() {}
     public var score: Int { attempts.reduce(0) { $0 + $1.points } }
     public var correctAnswers: Int { attempts.filter(\.correct).count }
@@ -88,6 +94,7 @@ extension Progress {
         result.attempts.sort { $0.date < $1.date }
         result.dailyStarted.merge(other.dailyStarted) { mine, _ in mine }
         result.dailyStartedAt.merge(other.dailyStartedAt) { mine, _ in mine }
+        if let words = other.dailyWords { result.dailyWords = (result.dailyWords ?? [:]).merging(words) { mine, theirs in mine.wordFull.isEmpty ? theirs : mine } }
         let submissionIDs = Set(result.submissions.map(\.id))
         result.submissions += other.submissions.filter { !submissionIDs.contains($0.id) }
         if result.recentCards.isEmpty { result.recentCards = other.recentCards }

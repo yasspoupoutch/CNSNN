@@ -53,15 +53,29 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 |---|---|---|
 | users/{uid} | pseudo, dates, quota de propositions | création à zéro, pseudo et quota par le propriétaire ; suppression par le propriétaire |
 | users/{uid}/private/progress | progression d’entraînement synchronisée (JSON) | propriétaire uniquement |
+| users/{uid}/friends/{amiUid} | amis ajoutés par code (pseudo, date) | propriétaire uniquement |
+| friendCodes/{CODE} | code ami de 6 caractères → uid, pseudo | création par le propriétaire ; lecture d’un code par tout joueur, liste de ses seuls codes |
 | dailySessions/{uid_day} | carte du jour, début serveur, indice, fin serveur | création une fois le jour même ; indice puis fin une seule fois |
 | dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur, points recalculés | création unique, avec la mise à jour du classement dans le même lot |
 | leaderboard/{uid} | points, parties, victoires, séries, meilleur temps | n’avance que d’un nouveau résultat à la fois |
+| dailyPuzzles/{day} | mot du jour secret : consonnes, catégorie, difficulté | outil `tools/daily.mjs` (Admin SDK) ; lecture le jour même et les jours passés |
+| dailyHints/{day} | indice du mot secret | lecture après l’avoir révélé (indice noté dans la session) ou la partie finie |
+| dailySecrets/{day} | réponse normalisée, mot, indice | lecture une fois sa partie finie, ou le jour passé ; une victoire doit porter cette réponse |
 | dailyChallenges/{day} | mot du jour publié par un modérateur (remplace le planning intégré) | modérateur, difficulté du jour imposée |
-| cards/{MOTNORMALISÉ} | proposition ou carte publiée ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
+| cards/{MOTNORMALISÉ} | proposition ou carte publiée (avec le pseudo de l’auteur) ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
 | reports/{uid_card} | signalement unique par joueur et carte | création propriétaire, résolution modérateur |
 | admins/{uid} | rôle modérateur | console ou workflow uniquement |
 
 Index composites : `cards` (createdBy, createdAt desc), `dailyResults` (day, correct, timeMs) et (userId, day desc).
+
+## Mot du jour secret
+
+La liste des mots du jour n’est dans le dépôt que chiffrée (`Firebase/daily/words.enc.json`, AES-256-GCM avec une clé chiffrée par la clé publique du compte de service). Seul le secret `FIREBASE_SERVICE_ACCOUNT` peut la déchiffrer.
+
+- Publier ou prolonger les jours : workflow **CNSNN - Firebase** sur `main`, case `daily_seed`. Le jour même et les jours passés ne sont jamais réécrits.
+- Changer la liste : `node tools/daily.mjs encrypt mots.tsv` (une ligne par mot : `F|M|D`, catégorie, mot, indice, séparés par des tabulations), puis committer seulement le fichier chiffré. La clé publique est dans `Firebase/daily/public.pem` (workflow, case `daily_public_key`, pour la régénérer).
+- L’app envoie chaque proposition comme fin de partie avec la réponse normalisée : les règles refusent une mauvaise réponse, donc personne ne peut annoncer une victoire sans connaître le mot. Le mot n’est révélé qu’après la fin de sa propre partie.
+- Sans mot secret publié pour un jour, l’app revient à l’ancienne liste intégrée (publique).
 
 ## Sécurité et limites
 

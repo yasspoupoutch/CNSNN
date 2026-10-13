@@ -34,6 +34,11 @@ import CNSNNCore
         guard savingAllowed else { return }
         do { try local.save(progress) } catch { self.error = "La progression n’a pas pu être enregistrée. Réessayez avant de quitter." }
         scheduleCloudSave()
+        refreshGlance()
+    }
+    /// Home screen widget and daily reminders.
+    func refreshGlance(force: Bool = false) {
+        Reminders.update(progress: progress, streak: official?.currentStreak() ?? progress.streak(), force: force)
     }
     private func scheduleCloudSave() {
         guard let cloud, let uid else { return }
@@ -183,6 +188,7 @@ import CNSNNCore
         } catch { /* Offline: the built-in cards remain. */ }
     }
     func card(id: String) -> Card? {
+        if let day = FirebaseRepository.secretDay(cardID: id) { return progress.dailyWords?[day] }
         if let published = publishedDaily, published.card.id == id { return published.card }
         return DailyPool.card(id: id) ?? cards.first(where: { $0.id == id }) ?? SeedCards.all.first(where: { $0.id == id })
     }
@@ -192,6 +198,14 @@ import CNSNNCore
     func dailyCard(day: String) -> Card? {
         if let published = publishedDaily, published.day == day { return published.card }
         return DailySchedule.dailyCard(forKey: day)
+    }
+    /// Keeps a secret daily word on this iPhone: masked while playing, revealed once the game is over.
+    func storeDailyWord(_ card: Card, day: String) {
+        if let known = progress.dailyWords?[day], !known.wordFull.isEmpty, card.wordFull.isEmpty { return }
+        var words = progress.dailyWords ?? [:]
+        words[day] = card
+        progress.dailyWords = words.filter { $0.key >= DailySchedule.key(Date().addingTimeInterval(-400 * 86_400)) }
+        persist()
     }
     func refreshDailyChallenge() async {
         let day = DailySchedule.key()
@@ -210,7 +224,7 @@ import CNSNNCore
     }
     func refreshOfficial() async {
         guard let cloud, let uid else { return }
-        if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry }
+        if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry; refreshGlance() }
     }
 
     // MARK: Results

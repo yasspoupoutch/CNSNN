@@ -5,7 +5,7 @@ import CNSNNCore
 struct LeaderboardView: View {
     @Environment(AppState.self) private var state
     enum Board: String, CaseIterable, Identifiable {
-        case today = "Aujourd’hui", points = "Points", fastest = "Records"
+        case today = "Aujourd’hui", friends = "Amis", points = "Points", fastest = "Records"
         var id: String { rawValue }
     }
     /// Bumped by the Stats page's pull to refresh.
@@ -25,10 +25,12 @@ struct LeaderboardView: View {
                     .scaledFont(15).foregroundStyle(Palette.secondary).frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
             } else {
                 summary
-                HStack(spacing: 8) {
-                    ForEach(Board.allCases) { item in Chip(title: item.rawValue, selected: board == item) { board = item } }
-                }
-                list
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(Board.allCases) { item in Chip(title: item.rawValue, selected: board == item) { board = item } }
+                    }
+                }.scrollIndicators(.hidden)
+                if board == .friends { FriendsBoard(refreshToken: refreshToken) } else { list }
             }
         }
         .task(id: refreshKey) { await refresh() }
@@ -91,7 +93,7 @@ struct LeaderboardView: View {
     private var emptyText: String {
         switch board {
         case .today: "Personne n’a encore trouvé le mot du jour."
-        case .points, .fastest: "Aucun résultat pour le moment."
+        case .points, .fastest, .friends: "Aucun résultat pour le moment."
         }
     }
 
@@ -107,6 +109,7 @@ struct LeaderboardView: View {
         case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.timeMs) + ($0.usedHint ? " · indice" : "")) }
         case .points: players.map { Row(id: $0.uid, name: $0.username, value: Format.number($0.points) + " pts") }
         case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
+        case .friends: []
         }
     }
 
@@ -121,5 +124,144 @@ struct LeaderboardView: View {
             fastest = try await cloud.fastestPlayers()
             if let entry = state.official { myRank = try await cloud.rank(points: entry.points) }
         } catch { failed = true }
+    }
+}
+
+/// The player and the friends they added with a 6-character code, ranked on today's Mot du jour.
+struct FriendsBoard: View {
+    @Environment(AppState.self) private var state
+    var refreshToken = 0
+    @State private var code: String?
+    @State private var rows: [FriendStanding] = []
+    @State private var friendCode = ""
+    @State private var loading = false
+    @State private var busy = false
+    @State private var message: String?
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            codeCard
+            addCard
+            board
+        }
+        .task(id: (state.uid ?? "") + "-" + String(refreshToken)) { await refresh() }
+    }
+
+    private var codeCard: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Votre code ami").scaledFont(13).foregroundStyle(Palette.secondary)
+                Text(code ?? "······").scaledFont(26, .bold).monospaced().tracking(3)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 8)
+            if let code {
+                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code) {
+                    Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
+                }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var addCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                TextField("Code d’un ami", text: $friendCode)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .scaledFont(17, .semibold).monospaced()
+                    .padding(.horizontal, 14).frame(minHeight: 48)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Palette.fill1))
+                    .onChange(of: friendCode) { _, value in
+                        let clean = FirebaseRepository.normalizedFriendCode(value)
+                        if clean != value { friendCode = clean }
+                    }
+                    .submitLabel(.done).onSubmit(add)
+                Button("Ajouter", action: add).buttonStyle(PrimaryPillStyle(height: 48)).frame(width: 112)
+                    .disabled(friendCode.count != 6 || busy)
+            }
+            if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary) }
+        }.glassPanel(radius: 24, padding: 14)
+    }
+
+    @ViewBuilder private var board: some View {
+        VStack(spacing: 0) {
+            if rows.count <= 1 {
+                HStack {
+                    if loading { ProgressView().tint(Palette.secondary) }
+                    Text(loading ? "Chargement…" : (failed ? "Classement indisponible hors connexion." : "Ajoutez un ami avec son code pour comparer vos temps chaque jour."))
+                        .scaledFont(14).foregroundStyle(Palette.tertiary)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            }
+            if rows.count > 1 {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    let mine = row.uid == state.uid
+                    if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
+                    HStack(spacing: 12) {
+                        Text(Format.ordinal(index + 1)).scaledFont(14, .bold).monospacedDigit()
+                            .foregroundStyle(index < 3 ? Palette.foreground : Palette.tertiary).frame(minWidth: 34, alignment: .leading)
+                        AvatarView(name: row.username, colorIndex: row.uid.unicodeScalars.reduce(0) { $0 + Int($1.value) }, size: 32)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 6) {
+                                Text(row.username).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
+                                if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
+                            }
+                            Text(Format.number(row.points) + " pts" + (row.streak > 0 ? " · série \(row.streak)" : ""))
+                                .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        Text(todayText(row)).scaledFont(15, .semibold).monospacedDigit()
+                            .foregroundStyle(row.today?.correct == true ? Palette.foreground : Palette.tertiary)
+                    }
+                    .padding(.horizontal, 16).frame(minHeight: 58)
+                    .background(mine ? Palette.fill1 : .clear)
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        if !mine {
+                            Button(role: .destructive) { remove(row) } label: { Label("Retirer de mes amis", systemImage: "person.badge.minus") }
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }.glassPanel(radius: 24, padding: 0)
+    }
+
+    private func todayText(_ row: FriendStanding) -> String {
+        guard let today = row.today else { return "pas joué" }
+        return today.correct ? Format.clock(today.timeMs) : "raté"
+    }
+
+    private func refresh() async {
+        guard let cloud = state.cloud, let uid = state.uid else { return }
+        loading = true; failed = false
+        defer { loading = false }
+        let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
+        do {
+            if code == nil { code = try await cloud.friendCode(uid: uid, username: name) }
+            rows = try await cloud.friendsBoard(uid: uid, username: name, day: DailySchedule.key())
+        } catch { failed = true }
+    }
+    private func add() {
+        guard let cloud = state.cloud, let uid = state.uid, friendCode.count == 6, !busy else { return }
+        busy = true; message = nil
+        Task {
+            defer { busy = false }
+            do {
+                let name = try await cloud.addFriend(code: friendCode, uid: uid)
+                friendCode = ""; message = name + " fait partie de vos amis."
+                Haptics.success()
+                await refresh()
+            } catch { message = CloudError.message(error); Haptics.retry() }
+        }
+    }
+    private func remove(_ row: FriendStanding) {
+        guard let cloud = state.cloud, let uid = state.uid else { return }
+        Task {
+            do { try await cloud.removeFriend(uid: uid, friend: row.uid); rows.removeAll { $0.uid == row.uid } }
+            catch { message = CloudError.message(error) }
+        }
     }
 }

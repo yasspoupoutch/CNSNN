@@ -66,9 +66,22 @@ jobs:
       - name: Creer et verifier le fichier IPA complet
         run: |
           set -euo pipefail
-          mkdir -p "$IPA_ROOT/staging/Payload" "$IPA_ROOT/download"
-          ditto "$IPA_ROOT/DerivedData/Build/Products/Release-iphoneos/CNSNN.app" \
-            "$IPA_ROOT/staging/Payload/CNSNN.app"
+          mkdir -p "$IPA_ROOT/staging/Payload" "$IPA_ROOT/plain/Payload" "$IPA_ROOT/download"
+          built="$IPA_ROOT/DerivedData/Build/Products/Release-iphoneos/CNSNN.app"
+          test -d "$built/PlugIns/CNSNNWidget.appex" || { echo '::error::Widget absent du bundle.'; exit 1; }
+          # Fallback without any entitlement, exactly as built.
+          ditto "$built" "$IPA_ROOT/plain/Payload/CNSNN.app"
+          ditto -c -k --keepParent "$IPA_ROOT/plain/Payload" "$IPA_ROOT/download/CNSNN-sans-widget-partage.ipa"
+          # Main IPA: ad hoc signature that only carries the App Group entitlement, so Sideloadly
+          # registers the group the widget reads (Core/Glance.swift). Sideloadly re-signs everything.
+          ditto "$built" "$IPA_ROOT/staging/Payload/CNSNN.app"
+          app="$IPA_ROOT/staging/Payload/CNSNN.app"
+          if [ -d "$app/Frameworks" ]; then
+            find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -exec codesign --force --sign - --timestamp=none {} \;
+          fi
+          codesign --force --sign - --timestamp=none --entitlements Widget/CNSNNWidget.entitlements "$app/PlugIns/CNSNNWidget.appex"
+          codesign --force --sign - --timestamp=none --entitlements App/CNSNN.entitlements "$app"
+          codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.mycompany.cnsnn'
           # Preserve the complete bundle, including embedded frameworks and resource bundles.
           ditto -c -k --keepParent "$IPA_ROOT/staging/Payload" \
             "$IPA_ROOT/download/CNSNN-unsigned.ipa"
@@ -76,8 +89,7 @@ jobs:
             "$IPA_ROOT/download/CNSNN-unsigned.ipa" \
             "$IPA_ROOT/staging/Payload/CNSNN.app" \
             | tee "$IPA_ROOT/logs/ipa-verification.log"
-          shasum -a 256 "$IPA_ROOT/download/CNSNN-unsigned.ipa" \
-            > "$IPA_ROOT/download/CNSNN-unsigned.ipa.sha256"
+          shasum -a 256 "$IPA_ROOT/download/"*.ipa > "$IPA_ROOT/download/SHA256.txt"
           echo 'IPA iPhone ARM64 non signé vérifié. À signer avec Sideloadly avant installation.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publier l'IPA telechargeable

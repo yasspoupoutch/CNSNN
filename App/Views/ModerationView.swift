@@ -22,6 +22,7 @@ struct ModerationView: View {
                             Spacer()
                             Text(card.wordNoVowels).font(.body.monospaced()).foregroundStyle(.secondary)
                         }
+                        Text("Proposée par " + (card.author ?? "un joueur inconnu")).font(.subheadline).foregroundStyle(.secondary)
                         TextField("Indice", text: $card.hint, axis: .vertical).lineLimit(1...3)
                             .textFieldStyle(.roundedBorder)
                         HStack {
