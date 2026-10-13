@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists-1.0.dtd">
+<!-- Simulator only: Firebase Auth keeps its session in the keychain, which an unsigned
+     test host cannot open (FIRAuthErrorDomain 17995). Used by Scripts/ci_integration_tests.sh. -->
+<plist version="1.0">
+<dict>
+	<key>application-identifier</key>
+	<string>com.mycompany.cnsnn</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>com.mycompany.cnsnn</string>
+	</array>
+</dict>
+</plist>

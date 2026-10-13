@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs CNSNNIntegrationTests in the simulator against the Firebase Auth and Firestore
 # emulators, which enforce Firebase/firestore.rules. Used by the iOS workflow.
+# Signed ad hoc with simulator entitlements so Firebase Auth can use the keychain.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root/Firebase"
@@ -13,4 +14,5 @@ npx firebase emulators:exec --only auth,firestore --project demo-cnsnn "cd '$roo
   -clonedSourcePackagesDirPath '$CI_ROOT/SourcePackages' -derivedDataPath '$CI_ROOT/DerivedData' \
   -disableAutomaticPackageResolution -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -only-testing:CNSNNIntegrationTests -resultBundlePath '$CI_ROOT/integration-tests.xcresult' \
-  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM=''"
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM='' \
+  CODE_SIGN_ENTITLEMENTS='$root/Tests/Integration/Simulator.entitlements'"

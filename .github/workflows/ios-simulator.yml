@@ -157,6 +157,7 @@ jobs:
           node-version: 22
 
       - name: Tester Firebase de bout en bout (émulateurs et vraies règles)
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           Scripts/ci_integration_tests.sh 2>&1 | tee "$CI_ROOT/logs/integration-tests.log"
