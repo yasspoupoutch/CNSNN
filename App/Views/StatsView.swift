@@ -8,7 +8,7 @@ struct StatsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Statistiques").font(.system(size: 34, weight: .bold)).tracking(-0.6)
+                Text("Statistiques").scaledFont(34, .bold).tracking(-0.6)
                     .padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4)
                     .accessibilityAddTraits(.isHeader)
                 pointsCard
@@ -22,7 +22,7 @@ struct StatsView: View {
                 }
                 weekCard
                 if progress.attempts.isEmpty {
-                    Text("Votre première partie lance l’histoire.").font(.system(size: 15)).foregroundStyle(Palette.secondary).padding(.horizontal, 2)
+                    Text("Votre première partie lance l’histoire.").scaledFont(15).foregroundStyle(Palette.secondary).padding(.horizontal, 2)
                 }
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
@@ -31,15 +31,15 @@ struct StatsView: View {
     private var pointsCard: some View {
         let level = progress.score / 1000 + 1, into = progress.score % 1000
         return VStack(alignment: .leading, spacing: 0) {
-            Text("Points d’entraînement").font(.system(size: 13)).foregroundStyle(Palette.secondary)
+            Text("Vos points").scaledFont(13).foregroundStyle(Palette.secondary)
             Text(Format.number(progress.score)).font(.system(size: 54, weight: .heavy)).tracking(-1.6).monospacedDigit()
-                .foregroundStyle(Palette.accent).lineLimit(1).minimumScaleFactor(0.5)
+                .foregroundStyle(Palette.foreground).lineLimit(1).minimumScaleFactor(0.5)
             HStack {
                 Text("Niveau \(level)")
                 Spacer()
                 Text("\(1000 - into) pts avant le niveau \(level + 1)")
-            }.font(.system(size: 13)).foregroundStyle(Palette.secondary).padding(.top, 12)
-            ProgressBar(value: Double(into) / 1000, color: Palette.accent).padding(.top, 8)
+            }.scaledFont(13).foregroundStyle(Palette.secondary).padding(.top, 12)
+            ProgressBar(value: Double(into) / 1000, color: Palette.foreground).padding(.top, 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(radius: 32, padding: 22)
@@ -48,8 +48,8 @@ struct StatsView: View {
 
     private func tile(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 28, weight: .bold)).tracking(-0.5).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.system(size: 13)).foregroundStyle(Palette.secondary).lineLimit(2)
+            Text(value).scaledFont(28, .bold).tracking(-0.5).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+            Text(label).scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(2)
         }
         .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
         .glassPanel(radius: 24, padding: 16)
@@ -58,14 +58,20 @@ struct StatsView: View {
 
     private var weekCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Mots du jour · 7 derniers jours").font(.system(size: 15, weight: .semibold))
+            Text("Mots du jour · 7 derniers jours").scaledFont(15, .semibold)
             HStack {
                 ForEach(week, id: \.key) { day in
                     VStack(spacing: 8) {
                         RoundedRectangle(cornerRadius: 12, style: .continuous).fill(day.color)
                             .frame(width: 36, height: 36)
                             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
-                        Text(day.letter).font(.system(size: 12)).foregroundStyle(Palette.tertiary)
+                            .overlay {
+                                // A symbol as well as the colour, so the result reads without colour vision.
+                                if let symbol = day.symbol {
+                                    Image(systemName: symbol).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.ink)
+                                }
+                            }
+                        Text(day.letter).scaledFont(12).foregroundStyle(Palette.tertiary)
                     }
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .ignore)
@@ -79,7 +85,7 @@ struct StatsView: View {
 
     private func time(_ value: Int?) -> String { value.map { String(format: "%.1f s", Double($0) / 1000) } ?? "—" }
 
-    private var week: [(key: String, letter: String, color: Color, status: String)] {
+    private var week: [(key: String, letter: String, color: Color, symbol: String?, status: String)] {
         let calendar = DailySchedule.calendar
         let letters = ["D", "L", "M", "M", "J", "V", "S"]
         return (0..<7).reversed().map { offset in
@@ -88,9 +94,9 @@ struct StatsView: View {
             let attempt = progress.attempts.first { $0.dailyKey == key }
             let letter = letters[calendar.component(.weekday, from: day) - 1]
             switch attempt?.correct {
-            case true?: return (key, letter, Palette.accent, "trouvé")
-            case false?: return (key, letter, Palette.red, "raté")
-            case nil: return (key, letter, Palette.fill1, "non joué")
+            case true?: return (key, letter, Palette.mint, "checkmark", "trouvé")
+            case false?: return (key, letter, Palette.red, "xmark", "raté")
+            case nil: return (key, letter, Palette.fill1, nil, "non joué")
             }
         }
     }

@@ -84,7 +84,7 @@ struct TabPill: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: item.symbol).font(.system(size: 17, weight: .bold)).frame(height: 20)
-                        Text(item.rawValue).font(.system(size: 10.5, weight: .semibold))
+                        Text(item.rawValue).font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundStyle(selected ? Palette.foreground : Palette.tertiary)
                     .frame(width: 80, height: 56)
@@ -94,6 +94,7 @@ struct TabPill: View {
                 .buttonStyle(PressStyle(scale: 0.94))
                 .accessibilityLabel(item.rawValue)
                 .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityShowsLargeContentViewer()
             }
         }
         .padding(6)
@@ -139,7 +140,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 0) {
-                    VowelWord(word: "CONSONNE", font: .system(size: 50, weight: .heavy))
+                    VowelWord(word: "CONSONNE", font: Typo.wordmark(52))
                         .padding(.top, 50)
                     Text("Retrouvez le mot. Sans ses voyelles.")
                         .font(Typo.serifItalic(22)).foregroundStyle(Palette.secondary)
@@ -147,7 +148,7 @@ struct OnboardingView: View {
                     VStack(spacing: 0) {
                         SectionKicker(text: "Exemple").frame(maxWidth: .infinity, alignment: .leading)
                         Text("SRR").font(Typo.serif(64)).tracking(3).padding(.top, 12)
-                        Text("Indice : « On le voit sur mon visage. »").font(.system(size: 15)).foregroundStyle(Palette.secondary)
+                        Text("Indice : « On le voit sur mon visage. »").scaledFont(15).foregroundStyle(Palette.secondary)
                             .multilineTextAlignment(.center).padding(.top, 14)
                         Rectangle().fill(Palette.line).frame(height: 1).padding(.vertical, 18)
                         VowelWord(word: "SOURIRE", font: .system(size: 30, weight: .heavy), delay: 0.6).tracking(2.4)
@@ -167,8 +168,8 @@ struct OnboardingView: View {
 
     private func bullet(_ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 14) {
-            Circle().fill(Palette.accent).frame(width: 6, height: 6).alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
-            Text(text).font(.system(size: 15)).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+            Circle().fill(Palette.tertiary).frame(width: 6, height: 6).alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            Text(text).scaledFont(15).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -177,24 +178,24 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     CircleIconButton(symbol: "chevron.left", label: "Retour") { fieldFocused = false; step = 0 }
-                    Text("Choisissez un pseudo").font(.system(size: 34, weight: .bold)).tracking(-0.6).padding(.top, 22)
+                    Text("Choisissez un pseudo").scaledFont(34, .bold).tracking(-0.6).padding(.top, 22)
                     Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.")
-                        .font(.system(size: 16)).foregroundStyle(Palette.secondary).padding(.top, 8)
+                        .scaledFont(16).foregroundStyle(Palette.secondary).padding(.top, 8)
                     AvatarView(name: trimmed.isEmpty ? "?" : trimmed, colorIndex: avatar, size: 104)
                         .shadow(color: Palette.glassShadow, radius: 20, y: 16)
                         .frame(maxWidth: .infinity).padding(.top, 34)
                     AvatarPicker(selection: $avatar).frame(maxWidth: .infinity).padding(.top, 20)
                     TextField("", text: $username, prompt: Text("ex. voyelle_hunter").foregroundStyle(Palette.tertiary))
-                        .font(.system(size: 19, weight: .medium)).foregroundStyle(Palette.foreground)
+                        .scaledFont(19, .medium).foregroundStyle(Palette.foreground)
                         .textContentType(.nickname).autocorrectionDisabled().textInputAutocapitalization(.never)
                         .submitLabel(.go).onSubmit(start)
                         .focused($fieldFocused)
-                        .padding(.horizontal, 20).frame(height: 58)
+                        .padding(.horizontal, 20).frame(minHeight: 58)
                         .glassPanel(radius: 20, padding: 0)
-                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(fieldFocused ? Palette.accent : .clear, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(fieldFocused ? Palette.focusRing : .clear, lineWidth: 1))
                         .padding(.top, 30)
                         .accessibilityLabel("Pseudo, entre 2 et 20 caractères")
-                    Text(message.text).font(.system(size: 13)).foregroundStyle(message.color)
+                    Text(message.text).scaledFont(13).foregroundStyle(message.color)
                         .frame(minHeight: 20).padding(.horizontal, 4).padding(.top, 10)
                 }.padding(.horizontal, 26).padding(.top, 10)
             }.scrollDismissesKeyboard(.interactively).scrollBounceBehavior(.basedOnSize)
@@ -202,7 +203,7 @@ struct OnboardingView: View {
                 Button(state.isBusy ? "Un instant…" : "C’est parti", action: start)
                     .buttonStyle(PrimaryPillStyle())
                     .disabled(state.isBusy || !valid)
-                Text("Modifiable à tout moment depuis votre profil.").font(.system(size: 12)).foregroundStyle(Palette.tertiary)
+                Text("Modifiable à tout moment depuis votre profil.").scaledFont(12).foregroundStyle(Palette.tertiary)
             }.padding(.horizontal, 26).padding(.bottom, 12)
         }
     }
@@ -223,11 +224,12 @@ struct OnboardingView: View {
 struct AvatarPicker: View {
     @Binding var selection: Int
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
             ForEach(Palette.avatars.indices, id: \.self) { index in
                 Button { Haptics.selection(); selection = index } label: {
                     Circle().fill(Palette.avatars[index]).frame(width: 32, height: 32)
                         .overlay(Circle().strokeBorder(Palette.foreground, lineWidth: selection == index ? 3 : 0).padding(-4))
+                        .hitTarget()
                 }
                 .buttonStyle(PressStyle(scale: 0.9))
                 .accessibilityLabel("Couleur \(index + 1)")
