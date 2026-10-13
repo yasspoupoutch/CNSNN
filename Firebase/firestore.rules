@@ -1,18 +1,57 @@
 rules_version = '2';
+// CNSNN security rules for the free Spark plan: no Cloud Functions, so every
+// official value (daily time, points, leaderboard totals) is recomputed or
+// cross-checked here from server timestamps and documents the client cannot rewrite.
 service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn() { return request.auth != null; }
   function owner(uid) { return signedIn() && request.auth.uid == uid; }
-  function admin() { return signedIn() && request.auth.token.admin == true; }
+  function at(p) { return path('/databases/' + database + '/documents/' + p); }
+  // Admins: a signed Firebase Auth claim, or an admins/{uid} document created from the console.
+  function admin() {
+   return signedIn() && (request.auth.token.get('admin', false) == true || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+  }
   function validName(n) { return n is string && n.size() >= 2 && n.size() <= 20; }
+  function categories() { return ['Général','Football','Cinéma','Géographie','Animaux','Objets']; }
+  function difficulties() { return ['Facile','Moyen','Difficile']; }
   function validCard(c) {
    return c.wordFull is string && c.wordFull.size() >= 3 && c.wordFull.size() <= 80
     && c.wordNoVowels is string && c.wordNoVowels.size() >= 1 && c.wordNoVowels.size() <= 40
     && c.normalizedAnswer is string && c.normalizedAnswer.size() >= 3 && c.normalizedAnswer.size() <= 40
+    && c.normalizedAnswer.matches('^[A-Z]+$')
     && c.hint is string && c.hint.size() >= 5 && c.hint.size() <= 160
-    && c.category in ['Général','Football','Cinéma','Géographie','Animaux','Objets']
-    && c.difficulty in ['Facile','Moyen','Difficile'];
+    && c.category in categories() && c.difficulty in difficulties();
   }
+
+  // ---- Calendar helpers. Daily keys are yyyy-MM-dd in Europe/Paris (UTC+1 or UTC+2).
+  function validDayKey(day) { return day is string && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+  function dayDate(day) {
+   let p = day.split('-');
+   return timestamp.date(int(p[0]), int(p[1]), int(p[2]));
+  }
+  function sameDate(t, day) { let d = dayDate(day); return t.year() == d.year() && t.month() == d.month() && t.day() == d.day(); }
+  // Accepts the Paris date for both offsets, so the hour around midnight tolerates either day.
+  function isToday(day) {
+   return validDayKey(day) && (sameDate(request.time + duration.value(1, 'h'), day) || sameDate(request.time + duration.value(2, 'h'), day));
+  }
+  function isPreviousDay(previous, day) {
+   return validDayKey(previous) && sameDate(dayDate(day) - duration.value(1, 'd'), previous);
+  }
+  // Daily difficulty follows the weekday: Monday-Tuesday easy, Wednesday-Friday medium, weekend hard.
+  function dailyBase(day) {
+   let w = dayDate(day).dayOfWeek();
+   return w <= 2 ? 50 : (w <= 5 ? 100 : 150);
+  }
+  function atLeastZero(n) { return n > 0 ? n : 0; }
+  function larger(a, b) { return a > b ? a : b; }
+  function smaller(a, b) { return a < b ? a : b; }
+  // Same formula as Core/GameRules.swift Scoring.points.
+  function dailyPoints(day, timeMs, usedHint, correct) {
+   let raw = dailyBase(day) + atLeastZero(50 - math.floor(timeMs / 1000));
+   return !correct ? 0 : (usedHint ? math.floor(raw / 2) : raw);
+  }
+
+  // ---- Profiles
   match /users/{uid} {
    allow read: if owner(uid) || admin();
    allow create: if owner(uid)
@@ -21,42 +60,151 @@ service cloud.firestore {
     && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
     && request.resource.data.score == 0 && request.resource.data.gamesPlayed == 0
     && request.resource.data.correctAnswers == 0 && request.resource.data.bestTimeMs == null && request.resource.data.currentStreak == 0;
-   allow update: if owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt'])
-    && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time;
-   allow delete: if false;
+   // Rename, or consume the card proposal quota (see cards).
+   allow update: if owner(uid)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt','lastProposalAt','proposalWindowAt','proposalCount'])
+    && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastProposalAt','proposalWindowAt','proposalCount'])
+     || consumesProposalQuota(resource.data, request.resource.data));
+   allow delete: if owner(uid);
+
+   // Synced practice progress (Classic points, history, local stats): owner only, not official.
+   match /private/{docId} {
+    allow read, delete: if owner(uid);
+    allow create, update: if owner(uid) && docId == 'progress'
+     && request.resource.data.keys().hasOnly(['json','schema','updatedAt'])
+     && request.resource.data.json is string && request.resource.data.json.size() <= 900000
+     && request.resource.data.schema is int && request.resource.data.updatedAt == request.time;
+   }
   }
+  match /admins/{uid} {
+   allow read: if owner(uid);
+   allow write: if false;
+  }
+
+  // ---- Daily word: one session per player and day, timed by the server.
+  match /dailySessions/{id} {
+   allow read: if owner(resource.data.userId) || admin();
+   allow create: if signedIn()
+    && request.resource.data.keys().hasOnly(['userId','day','cardId','startedAt','hintUsed'])
+    && request.resource.data.userId == request.auth.uid
+    && id == request.auth.uid + '_' + request.resource.data.day
+    && isToday(request.resource.data.day)
+    && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
+    && request.resource.data.startedAt == request.time && request.resource.data.hintUsed == false
+    && exists(at('users/' + request.auth.uid));
+   // Reveal the hint once, or finish once. Nothing can be rewound.
+   allow update: if owner(resource.data.userId) && !('finishedAt' in resource.data) && (
+     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hintUsed'])
+      && request.resource.data.hintUsed == true)
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers'])
+      && request.resource.data.finishedAt == request.time && request.resource.data.correct is bool
+      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000)
+   );
+   // Only while deleting the whole account.
+   allow delete: if owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid));
+  }
+
+  // Public official results: everything is copied from the finished session and recomputed.
+  match /dailyResults/{id} {
+   allow read: if signedIn();
+   allow create: if signedIn() && createsResult(id, request.resource.data, get(at('dailySessions/' + id)).data);
+   allow update: if false;
+   allow delete: if (owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid))) || admin();
+  }
+  function createsResult(id, r, s) {
+   return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','wrongAnswers','timeMs','points','startedAt','finishedAt'])
+    && r.userId == request.auth.uid && id == request.auth.uid + '_' + r.day
+    && s.userId == r.userId && s.day == r.day && s.cardId == r.cardId && ('finishedAt' in s)
+    && r.startedAt == s.startedAt && r.finishedAt == s.finishedAt
+    && r.correct == s.correct && r.usedHint == s.hintUsed && r.wrongAnswers == s.wrongAnswers
+    && r.timeMs == s.finishedAt.toMillis() - s.startedAt.toMillis()
+    && r.points == dailyPoints(r.day, r.timeMs, r.usedHint, r.correct)
+    && r.username == get(at('users/' + request.auth.uid)).data.username
+    // Must be tallied in the same batch, so totals and results never diverge.
+    && getAfter(at('leaderboard/' + request.auth.uid)).data.lastResult == r.day;
+  }
+
+  // ---- Leaderboard totals: they can only move by exactly one new result.
+  match /leaderboard/{uid} {
+   allow read: if signedIn();
+   allow create: if owner(uid) && tallies(uid, {'points':0,'played':0,'wins':0,'streak':0,'bestStreak':0,'bestTimeMs':null,'lastWinDay':''}, request.resource.data);
+   allow update: if owner(uid) && (
+     tallies(uid, resource.data, request.resource.data)
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt'])
+      && request.resource.data.username == getAfter(at('users/' + uid)).data.username && request.resource.data.updatedAt == request.time)
+   );
+   allow delete: if owner(uid) || admin();
+  }
+  function tallies(uid, old, n) {
+   let day = n.lastResult;
+   let path = at('dailyResults/' + uid + '_' + validDayKeyOr(day));
+   let r = getAfter(path).data;
+   let laterWin = r.correct && day > old.lastWinDay;
+   let streak = laterWin ? (isPreviousDay(old.lastWinDay, day) ? old.streak + 1 : 1) : (!r.correct && day > old.lastWinDay ? 0 : old.streak);
+   return n.keys().hasOnly(['uid','username','points','played','wins','streak','bestStreak','bestTimeMs','lastWinDay','lastResult','updatedAt'])
+    && validDayKey(day) && !exists(path) && existsAfter(path)
+    && n.uid == uid && n.username == r.username && n.updatedAt == request.time
+    && n.points == old.points + r.points && n.played == old.played + 1
+    && n.wins == old.wins + (r.correct ? 1 : 0)
+    && n.streak == streak && n.bestStreak == larger(old.bestStreak, streak)
+    && n.bestTimeMs == (r.correct ? (old.bestTimeMs == null ? r.timeMs : smaller(old.bestTimeMs, r.timeMs)) : old.bestTimeMs)
+    && n.lastWinDay == (laterWin ? day : old.lastWinDay);
+  }
+  function validDayKeyOr(day) { return validDayKey(day) ? day : 'invalid'; }
+
+  // ---- Community cards. The document id is the normalized answer, so a word exists only once.
   match /cards/{cardId} {
    allow read: if signedIn() && (resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
    allow create: if signedIn() && validCard(request.resource.data)
     && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status'])
-    && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending';
+    && cardId == request.resource.data.normalizedAnswer
+    && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending'
+    && withinProposalQuota();
+   // Moderators approve or reject, and may correct the hint, category or difficulty.
    allow update: if admin() && resource.data.status in ['pending','approved','rejected'] && validCard(request.resource.data)
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels'])
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','normalizedAnswer','wordNoVowels','hint','category','difficulty'])
+    && request.resource.data.normalizedAnswer == resource.data.normalizedAnswer
     && request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
-   allow delete: if false;
+   // Authors may withdraw a proposal that is not live, and admins may remove anything.
+   allow delete: if (signedIn() && resource.data.createdBy == request.auth.uid && resource.data.status != 'approved') || admin();
   }
-  match /attempts/{id} {
-   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
-   allow write: if false;
+  // Anti-spam: 30 s between proposals and at most 10 per rolling 24 h. The profile carries the
+  // counters and they can only move forward, so a proposal must be paired with a quota update.
+  function consumesProposalQuota(before, after) {
+   let fresh = !('proposalWindowAt' in before) || request.time > before.proposalWindowAt + duration.value(24, 'h');
+   return after.lastProposalAt == request.time
+    && (!('lastProposalAt' in before) || request.time > before.lastProposalAt + duration.value(30, 's'))
+    && (fresh
+      ? (after.proposalWindowAt == request.time && after.proposalCount == 1)
+      : (after.proposalWindowAt == before.proposalWindowAt && after.proposalCount == before.proposalCount + 1 && after.proposalCount <= 10));
   }
-  match /dailyChallenges/{day} { allow read: if signedIn(); allow write: if false; }
-  match /dailyResults/{id} {
-   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
-   allow write: if false;
+  function withinProposalQuota() {
+   return getAfter(at('users/' + request.auth.uid)).data.get('lastProposalAt', null) == request.time;
   }
+
+  // ---- Reports: one per player and card.
   match /reports/{id} {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
    allow create: if signedIn()
     && request.resource.data.keys().hasOnly(['userId','cardId','reason','createdAt','status'])
     && request.resource.data.userId == request.auth.uid && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
     && id == request.auth.uid + '_' + request.resource.data.cardId
-    && get(/databases/$(database)/documents/cards/$(request.resource.data.cardId)).data.status == 'approved'
+    && get(at('cards/' + request.resource.data.cardId)).data.status == 'approved'
     && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 300
     && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt'])
     && request.resource.data.status == 'resolved' && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
-   allow delete: if false;
+   allow delete: if (signedIn() && resource.data.userId == request.auth.uid) || admin();
   }
+
+  // ---- Server-only legacy collections (optional Blaze backend).
+  match /attempts/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   allow write: if false;
+  }
+  match /dailyChallenges/{day} { allow read: if signedIn(); allow write: if false; }
+
   match /{document=**} { allow read, write: if false; }
  }
 }
