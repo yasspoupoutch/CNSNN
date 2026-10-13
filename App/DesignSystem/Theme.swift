@@ -98,10 +98,18 @@ extension View {
     }
 }
 
-enum Haptics {
-    static func selection() { UISelectionFeedbackGenerator().selectionChanged() }
-    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-    static func retry() { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
+/// Generators are kept and prepared, so every tap answers without the first-use delay.
+@MainActor enum Haptics {
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+    private static let softGenerator = UIImpactFeedbackGenerator(style: .soft)
+    private static let keyGenerator = UIImpactFeedbackGenerator(style: .light)
+    static func selection() { selectionGenerator.selectionChanged(); selectionGenerator.prepare() }
+    static func success() { notificationGenerator.notificationOccurred(.success); notificationGenerator.prepare() }
+    static func failure() { notificationGenerator.notificationOccurred(.warning); notificationGenerator.prepare() }
+    static func retry() { softGenerator.impactOccurred(); softGenerator.prepare() }
+    /// Letter keys: a very light tap, like the system keyboard.
+    static func key() { keyGenerator.impactOccurred(intensity: 0.55); keyGenerator.prepare() }
 }
 
 enum Vowels {
@@ -134,9 +142,11 @@ struct AmbientBackground: View {
                 RadialGradient(colors: [Palette.backgroundTop, Palette.background], center: UnitPoint(x: 0.5, y: 0), startRadius: 0, endRadius: geo.size.height * 0.7)
                 ForEach(blobs.indices, id: \.self) { index in
                     let blob = blobs[index]
-                    Circle().fill(blob.color)
-                        .frame(width: blob.size * scale, height: blob.size * scale)
-                        .blur(radius: 70)
+                    // A radial fade looks like the blurred disc of the prototype without a live blur pass every frame.
+                    Circle().fill(RadialGradient(colors: [blob.color, blob.color.opacity(0.55), blob.color.opacity(0)], center: .center,
+                                                 startRadius: 0, endRadius: (blob.size / 2 + 70) * scale))
+                        .frame(width: (blob.size + 140) * scale, height: (blob.size + 140) * scale)
+                        .padding(-70 * scale)
                         .opacity(0.6)
                         .scaleEffect(drift ? blob.to : blob.from)
                         .offset(x: (blob.x + (drift ? blob.dx : 0)) * scale, y: (blob.y + (drift ? blob.dy : 0)) * scale)
@@ -147,7 +157,7 @@ struct AmbientBackground: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onAppear { if !reduceMotion { drift = true } }
+        .onAppear { if !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled { drift = true } }
     }
 }
 
@@ -185,10 +195,23 @@ extension View {
     func glassPanel(radius: CGFloat = 26, padding: CGFloat = 18) -> some View {
         modifier(GlassSurface(radius: radius, padding: padding, prominent: false))
     }
-    /// Small glass capsule (pills, chips, icon buttons).
-    func glassCapsule() -> some View {
-        background(Capsule().fill(.ultraThinMaterial.opacity(0.6)).overlay(Capsule().fill(Palette.fill2)))
-            .overlay(Capsule().strokeBorder(LinearGradient(colors: [Palette.glassHighlight, Palette.glassBorder], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+    /// Small glass capsule (pills, chips, icon buttons). Native Liquid Glass on iOS 26 and later.
+    func glassCapsule(interactive: Bool = false) -> some View {
+        modifier(CapsuleGlass(interactive: interactive))
+    }
+}
+
+struct CapsuleGlass: ViewModifier {
+    var interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !reduceTransparency {
+            content.glassEffect(interactive ? .regular.interactive() : .regular, in: Capsule())
+        } else {
+            content
+                .background(Capsule().fill(reduceTransparency ? AnyShapeStyle(Palette.surface) : AnyShapeStyle(.ultraThinMaterial.opacity(0.6))).overlay(Capsule().fill(Palette.fill2)))
+                .overlay(Capsule().strokeBorder(LinearGradient(colors: [Palette.glassHighlight, Palette.glassBorder], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+        }
     }
 }
 
@@ -384,4 +407,7 @@ enum Format {
     static func number(_ value: Int) -> String {
         value.formatted(.number.locale(Locale(identifier: "fr_FR")))
     }
+    /// 1er, 2e, 3e…
+    static func ordinal(_ value: Int) -> String { value == 1 ? "1er" : "\(number(value))e" }
+    static func seconds(_ ms: Int?) -> String { ms.map { String(format: "%.1f s", Double($0) / 1000) } ?? "—" }
 }

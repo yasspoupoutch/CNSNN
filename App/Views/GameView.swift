@@ -21,15 +21,21 @@ struct GameView: View {
             AmbientBackground()
             VStack(spacing: 0) {
                 topBar
-                if let card = session.card { board(card) }
-                else if session.result == nil { emptyState }
+                switch session.phase {
+                case .loading: loadingState
+                case .failed(let message): failedState(message)
+                case .playing:
+                    if let card = session.card { board(card) }
+                    else if session.result == nil { emptyState }
+                }
             }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
             if let result = session.result {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
                 VStack {
                     Spacer()
                     ResultSheet(result: result, card: session.card, mode: mode, firstTry: finishedHere && session.wrongAnswers == 0 && !session.usedHint,
-                                usedHint: session.usedHint, next: nextCard, close: { dismiss() })
+                                usedHint: session.usedHint, standing: session.standing, pending: session.pendingOfficial, ranked: session.ranked,
+                                next: nextCard, close: { dismiss() })
                         .padding(.horizontal, 8)
                 }.transition(.move(edge: .bottom))
             }
@@ -42,8 +48,10 @@ struct GameView: View {
             Button("Envoyer") {
                 guard let card = session.card else { return }
                 Task {
-                    do { try await state.cloud?.report(cardID: card.id, reason: reportReason); reportReason = "" }
-                    catch { state.error = error.localizedDescription }
+                    do {
+                        try await state.cloud?.report(cardID: card.id, reason: reportReason); reportReason = ""
+                        Haptics.success(); AccessibilityNotification.Announcement("Signalement envoyé").post()
+                    } catch { state.error = CloudError.message(error) }
                 }
             }.disabled(!(5...300).contains(reportReason.count))
             Button("Annuler", role: .cancel) {}
@@ -62,15 +70,16 @@ struct GameView: View {
             CircleIconButton(symbol: "xmark", label: "Fermer") { dismiss() }
             Spacer()
             HStack(spacing: 8) {
-                if state.cloud != nil, let card = session.card, !card.id.hasPrefix("seed-"), session.result == nil {
+                if state.cloud != nil, let card = session.card, !card.id.hasPrefix("seed-"), !card.id.hasPrefix("daily-"), session.result == nil {
                     Button { reporting = true } label: {
                         Image(systemName: "flag").font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.secondary)
                             .frame(width: 36, height: 36).glassCapsule().hitTarget()
                     }.buttonStyle(PressStyle(scale: 0.92)).accessibilityLabel("Signaler cette carte")
                 }
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
-                    Text(Format.clock(session.result?.timeMs ?? session.elapsedMs))
+                    Text(session.phase == .playing ? Format.clock(session.result?.timeMs ?? session.elapsedMs) : "0:00")
                         .scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.foreground)
+                        .contentTransition(.numericText())
                         .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
                         .accessibilityLabel("Chrono")
                 }
@@ -112,14 +121,15 @@ struct GameView: View {
             }
         }.frame(minHeight: 26).padding(.top, 16)
         if mode == .daily && session.result == nil {
-            Text("Les erreurs ne terminent pas la partie.").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 6)
+            Text(session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
+                .scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 6)
         }
         Spacer(minLength: 12)
         answerLine
         HStack(spacing: 8) {
             Button {
                 Haptics.selection()
-                withAnimation(reduceMotion ? nil : CNSNNTheme.ease) { session.usedHint = true }
+                withAnimation(reduceMotion ? nil : CNSNNTheme.ease) { session.revealHint(state: state) }
             } label: {
                 HStack(spacing: 8) {
                     Text("Indice").fontWeight(.bold)
@@ -154,6 +164,28 @@ struct GameView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Votre réponse")
         .accessibilityValue(session.answer.isEmpty ? "vide" : session.answer)
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            ProgressView().tint(Palette.secondary).controlSize(.large)
+            Text("Lancement du chrono officiel…").scaledFont(15).foregroundStyle(Palette.secondary)
+            Spacer()
+        }.frame(maxWidth: .infinity).accessibilityElement(children: .combine)
+    }
+
+    private func failedState(_ message: String) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "wifi.exclamationmark").font(.system(size: 44, weight: .light)).foregroundStyle(Palette.secondary)
+            Text("Mot du jour indisponible").scaledFont(22, .bold)
+            Text(message + " Le mot reste caché tant que le chrono officiel n’a pas démarré.")
+                .scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
+            Button("Réessayer") { Haptics.selection(); session.retry(state: state) }.buttonStyle(PrimaryPillStyle(height: 54)).padding(.top, 8)
+            Button("Retour") { dismiss() }.buttonStyle(GlassPillStyle())
+            Spacer()
+        }.padding(.horizontal, 24)
     }
 
     private var emptyState: some View {
@@ -211,6 +243,9 @@ private struct ResultSheet: View {
     var mode: GameMode
     var firstTry: Bool
     var usedHint: Bool
+    var standing: DailyStanding?
+    var pending: Bool
+    var ranked: Bool
     var next: () -> Void
     var close: () -> Void
 
@@ -238,10 +273,12 @@ private struct ResultSheet: View {
             HStack(spacing: 10) {
                 tile("+\(result.points)", "points", Palette.foreground)
                 tile(Format.clock(result.timeMs), "temps", Palette.foreground)
-                if mode == .daily { tile("\(state.progress.streak())", "jours de série", Palette.foreground) }
+                if mode == .daily { tile("\(state.official?.currentStreak() ?? state.progress.streak())", "jours de série", Palette.foreground) }
                 else { tile(Format.number(state.progress.score), "total", Palette.foreground) }
             }.padding(.top, 18)
-            if result.correct, result.timeMs == state.progress.bestTimeMs {
+            if mode == .daily && ranked {
+                officialLine.padding(.top, 12)
+            } else if result.correct, result.timeMs == state.progress.bestTimeMs {
                 Label("Votre meilleur temps", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint).padding(.top, 12)
             }
             HStack(spacing: 10) {
@@ -257,7 +294,8 @@ private struct ResultSheet: View {
             if mode == .classic {
                 Button("Retour à l’accueil", action: close).scaledFont(15, .medium).foregroundStyle(Palette.secondary).padding(.top, 14)
             } else {
-                Text("Votre défi du jour est enregistré. À demain !").scaledFont(13).foregroundStyle(Palette.tertiary).padding(.top, 14)
+                Text(pending ? "Votre partie est gardée sur cet iPhone et sera validée au retour du réseau." : "Votre défi du jour est enregistré. À demain !")
+                    .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 14)
             }
         }
         .padding(.horizontal, 22).padding(.vertical, 26)
@@ -270,6 +308,24 @@ private struct ResultSheet: View {
         .onAppear { revealed = true }
     }
 
+    /// Only real numbers: the percentile appears once the server has ranked the result.
+    @ViewBuilder private var officialLine: some View {
+        if pending {
+            Label("Validation du temps officiel…", systemImage: "clock.arrow.circlepath").scaledFont(13, .semibold).foregroundStyle(Palette.secondary)
+        } else if let standing, result.correct, let percent = standing.beatenPercent {
+            VStack(spacing: 2) {
+                Text("Plus rapide que \(percent) % des joueurs").scaledFont(15, .semibold).foregroundStyle(Palette.mint)
+                if let rank = standing.rank {
+                    Text(Format.ordinal(rank) + " sur \(standing.players) aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
+                }
+            }.accessibilityElement(children: .combine)
+        } else if let standing, result.correct, standing.players <= 1 {
+            Label("Premier joueur à trouver aujourd’hui", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint)
+        } else if let standing, !result.correct, standing.players > 1 {
+            Text("\(standing.players) joueurs ont tenté ce mot aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
+        }
+    }
+
     private var kicker: String {
         guard result.correct else { return "Pas cette fois…" }
         return firstTry ? "Du premier coup, sans indice." : "Trouvé en \(Format.clock(result.timeMs))."
@@ -278,6 +334,7 @@ private struct ResultSheet: View {
     private func tile(_ value: String, _ label: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
             Text(value).scaledFont(22, .bold).monospacedDigit().foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
             Text(label).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -327,7 +384,7 @@ private struct KeyCap: View {
     var width: CGFloat
     var action: () -> Void
     var body: some View {
-        Button { UISelectionFeedbackGenerator().selectionChanged(); action() } label: {
+        Button { Haptics.key(); action() } label: {
             Text(label).font(.system(size: 19, weight: .medium))
                 .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
                 .frame(width: max(width, 0), height: 44)

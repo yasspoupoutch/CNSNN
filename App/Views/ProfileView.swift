@@ -8,7 +8,6 @@ struct ProfileView: View {
     @State private var name = ""
     @State private var account = false
     @State private var moderation = false
-    @State private var isAdmin = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -26,12 +25,12 @@ struct ProfileView: View {
                 }.frame(maxWidth: .infinity).glassCard(radius: 34, padding: 22)
                 VStack(spacing: 0) {
                     Button { account = true } label: { row(state.isAnonymous ? "Sauvegarder mon compte" : "Mon compte", symbol: "person.crop.circle.badge.checkmark") }
-                    if isAdmin {
+                    if state.isAdmin {
                         Rectangle().fill(Palette.line).frame(height: 1)
                         Button { moderation = true } label: { row("Modération", symbol: "checkmark.shield") }
                     }
                 }.glassPanel(radius: 24, padding: 0).buttonStyle(PressStyle(scale: 0.99))
-                Text(state.cloud == nil ? "Mode local. Votre compte Firebase sera disponible après la connexion du projet." : "La conversion du compte invité conserve le même identifiant Firebase et les propositions associées.")
+                Text(state.uid == nil ? "Mode local : votre progression reste sur cet iPhone." : (state.isAnonymous ? "Compte invité sauvegardé en ligne. Créez un compte pour le retrouver sur un autre iPhone." : "Compte permanent : votre progression vous suit sur tous vos appareils."))
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
@@ -42,7 +41,7 @@ struct ProfileView: View {
                 Button("Enregistrer") { Task { await state.rename(name) } }
                 Button("Annuler", role: .cancel) {}
             } message: { Text("Entre 2 et 20 caractères.") }
-            .task { isAdmin = (try? await state.cloud?.isAdmin()) ?? false }
+            .task { state.isAdmin = (try? await state.cloud?.isAdmin()) ?? state.isAdmin }
     }
     private func row(_ title: String, symbol: String) -> some View {
         HStack(spacing: 14) {
@@ -61,61 +60,99 @@ struct AccountView: View {
     @State private var busy = false
     @State private var message: String?
     @State private var login = false
+    @State private var confirmDelete = false
+    @State private var deletePassword = ""
+    private var trimmedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
     var body: some View {
         NavigationStack {
             Form {
                 if state.cloud == nil {
-                    Section { Text("Firebase n’est pas encore configuré. Votre progression reste enregistrée sur cet iPhone.") }
+                    Section { Text("Le serveur n’est pas configuré. Votre progression reste enregistrée sur cet iPhone.") }
+                } else if state.uid == nil {
+                    Section { Text("Le serveur est injoignable pour le moment. Réessayez une fois connecté à Internet.") }
                 } else if state.isAnonymous {
                     Section {
-                        Text("Un compte conserve votre identifiant invité. Utilisez une nouvelle adresse pour convertir ce compte.")
-                        Toggle("J’ai déjà un compte", isOn: $login)
+                        Picker("Compte", selection: $login) {
+                            Text("Créer un compte").tag(false)
+                            Text("J’ai déjà un compte").tag(true)
+                        }.pickerStyle(.segmented)
                         TextField("Email", text: $email).keyboardType(.emailAddress).textContentType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        SecureField("Mot de passe", text: $password).textContentType(login ? .password : .newPassword)
-                        Button(login ? "Se connecter" : "Créer mon compte") { authenticate() }.disabled(busy || state.isBusy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (login ? password.isEmpty : password.count < 8))
+                        SecureField(login ? "Mot de passe" : "Mot de passe (8 caractères minimum)", text: $password).textContentType(login ? .password : .newPassword)
+                        Button(login ? "Se connecter" : "Créer mon compte") { authenticate() }
+                            .disabled(busy || state.isBusy || trimmedEmail.isEmpty || (login ? password.isEmpty : password.count < 8))
                         if login {
-                            Button("Mot de passe oublié ?") { resetPassword() }
-                                .disabled(busy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            Button("Mot de passe oublié ?") { resetPassword() }.disabled(busy || trimmedEmail.isEmpty)
                         }
-                        if login { Text("La connexion change de compte. La progression locale n’est pas fusionnée automatiquement.").font(.footnote) }
+                    } footer: {
+                        Text(login
+                             ? "Vos parties d’entraînement de cet iPhone rejoignent ce compte. Les Mots du jour joués en invité restent sur le profil invité."
+                             : "Votre compte invité devient permanent : même profil, mêmes points, mêmes propositions. Vous pourrez le retrouver sur un autre iPhone ou après une réinstallation.")
                     }
                 } else {
                     Section {
-                        Label("Compte permanent connecté", systemImage: "checkmark.shield")
-                        Button("Se déconnecter", role: .destructive) {
+                        Label(state.email ?? "Compte permanent", systemImage: "checkmark.icloud")
+                        Text("Votre progression est sauvegardée en ligne et suit votre compte sur tous vos appareils.").font(.footnote).foregroundStyle(.secondary)
+                        Button("Se déconnecter") {
                             do { try state.signOut(); dismiss() }
-                            catch { message = error.localizedDescription }
+                            catch { message = CloudError.message(error) }
                         }
                     }
                 }
                 if let message { Section { Text(message) } }
-            }.navigationTitle("Votre compte").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
+                if state.uid != nil {
+                    Section {
+                        Button(state.isAnonymous ? "Supprimer mes données" : "Supprimer mon compte", role: .destructive) { confirmDelete = true }.disabled(busy)
+                    } footer: {
+                        Text("Supprime votre profil, vos résultats, votre place au classement, vos signalements et vos propositions non publiées. Cette action est définitive.")
+                    }
+                }
+            }
+            .navigationTitle("Votre compte")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
+            .overlay { if busy { ProgressView().controlSize(.large) } }
+            .alert(state.isAnonymous ? "Supprimer vos données ?" : "Supprimer votre compte ?", isPresented: $confirmDelete) {
+                if !state.isAnonymous { SecureField("Mot de passe", text: $deletePassword) }
+                Button("Supprimer", role: .destructive) { deleteAccount() }
+                Button("Annuler", role: .cancel) { deletePassword = "" }
+            } message: {
+                Text(state.isAnonymous ? "Toutes vos parties et propositions seront effacées." : "Saisissez votre mot de passe pour confirmer. Toutes vos données seront effacées.")
+            }
         }
     }
     private func resetPassword() {
-        guard !busy else { return }
-        busy = true
-        Task {
-            defer { busy = false }
-            do {
-                guard let cloud = state.cloud else { return }
-                try await cloud.resetPassword(email: email)
-                message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
-            } catch { message = error.localizedDescription }
+        run {
+            try await state.cloud?.resetPassword(email: trimmedEmail)
+            message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
         }
     }
     private func authenticate() {
+        run {
+            do {
+                if login { try await state.signIn(email: trimmedEmail, password: password) }
+                else { try await state.createAccount(email: trimmedEmail, password: password) }
+                Haptics.success()
+                dismiss()
+            } catch where CloudError.code(error) == .emailInUse {
+                // The address already has an account: offer to sign in to it instead.
+                login = true
+                throw error
+            }
+        }
+    }
+    private func deleteAccount() {
+        let password = state.isAnonymous ? nil : deletePassword
+        deletePassword = ""
+        run {
+            try await state.deleteAccount(password: password)
+            dismiss()
+        }
+    }
+    private func run(_ work: @escaping () async throws -> Void) {
         guard !busy else { return }
-        busy = true
+        busy = true; message = nil
         Task {
             defer { busy = false }
-            do {
-                guard let cloud = state.cloud else { return }
-                let profile = try await cloud.authenticate(email: email, password: password, login: login)
-                try state.activate(profile, preservingGuest: !login)
-                await state.refreshCards()
-                dismiss()
-            } catch { message = error.localizedDescription }
+            do { try await work() } catch { message = CloudError.message(error) }
         }
     }
 }

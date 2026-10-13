@@ -22,7 +22,7 @@ jobs:
   build-and-test:
     name: Compiler et tester CNSNN
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -146,6 +146,21 @@ jobs:
             CODE_SIGN_IDENTITY='' \
             DEVELOPMENT_TEAM='' \
             2>&1 | tee "$CI_ROOT/logs/unit-tests.log"
+
+      - name: Installer Java et Node pour les émulateurs Firebase
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tester Firebase de bout en bout (émulateurs et vraies règles)
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          Scripts/ci_integration_tests.sh 2>&1 | tee "$CI_ROOT/logs/integration-tests.log"
 
       - name: Exécuter les tests UI optionnels
         if: ${{ inputs.run_ui_tests }}

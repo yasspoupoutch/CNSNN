@@ -34,9 +34,9 @@ struct ProposeView: View {
                 }
                 chips(CNSNNCore.Category.allCases, selection: $category)
                 chips(Difficulty.allCases, selection: $difficulty)
-                Button(busy ? "Envoi…" : (state.cloud == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
+                Button(busy ? "Envoi…" : (state.uid == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
                     .buttonStyle(PrimaryPillStyle(height: 54)).disabled(!canSend).padding(.top, 2)
-                Text(sent ? "✓ Proposition enregistrée." : "Y compte comme une voyelle. Les propositions restent privées jusqu’à leur approbation. En mode local, elles ne sont pas transmises à un modérateur.")
+                Text(sent ? (state.uid == nil ? "✓ Proposition enregistrée sur cet iPhone." : "✓ Proposition envoyée. Vous verrez son statut ci-dessous.") : (state.uid == nil ? "Y compte comme une voyelle. Sans serveur, les propositions restent sur cet iPhone." : "Y compte comme une voyelle. Chaque mot n’existe qu’une fois dans le jeu. Jusqu’à 10 propositions par jour, privées jusqu’à leur validation."))
                     .scaledFont(12).foregroundStyle(sent ? Palette.mint : Palette.tertiary).padding(.horizontal, 4)
                 Text("Mes propositions").scaledFont(15, .semibold).padding(.horizontal, 2).padding(.top, 12)
                 submissions
