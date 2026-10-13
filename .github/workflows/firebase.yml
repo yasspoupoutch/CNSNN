@@ -18,6 +18,14 @@ on:
         description: UID Firebase à nommer administrateur (facultatif)
         type: string
         default: ''
+      daily_public_key:
+        description: Afficher la clé publique qui chiffre la liste des mots du jour
+        type: boolean
+        default: false
+      daily_seed:
+        description: Publier les mots du jour secrets (Firebase/daily/words.enc.json)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,7 +59,7 @@ jobs:
   deploy:
     name: Publier sur Firebase
     needs: rules-tests
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_public_key || inputs.daily_seed) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -85,6 +93,12 @@ jobs:
         env:
           ADMIN_UID: ${{ inputs.admin_uid }}
         run: node tools/grant-admin.mjs "$ADMIN_UID"
+      - name: Clé publique des mots du jour
+        if: ${{ inputs.daily_public_key }}
+        run: node tools/daily.mjs public-key
+      - name: Publier les mots du jour
+        if: ${{ inputs.daily_seed }}
+        run: node tools/daily.mjs seed
       - name: Effacer la clé
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/sa.json"

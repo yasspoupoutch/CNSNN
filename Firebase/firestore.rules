@@ -115,12 +115,39 @@ service cloud.firestore {
    allow update: if owner(resource.data.userId) && !('finishedAt' in resource.data) && (
      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hintUsed'])
       && request.resource.data.hintUsed == true)
-     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers'])
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers','answer'])
       && request.resource.data.finishedAt == request.time && request.resource.data.correct is bool
-      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000)
+      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000
+      && provesAnswer(resource.data.day, request.resource.data))
    );
    // Only while deleting the whole account.
    allow delete: if owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid));
+  }
+
+  // A win on a secret daily word must carry the right answer: a wrong guess is simply refused.
+  function provesAnswer(day, s) {
+   return (!('answer' in s) || (s.answer is string && s.answer.size() <= 80))
+    && (!s.correct || !exists(at('dailySecrets/' + day)) || s.get('answer', '') == get(at('dailySecrets/' + day)).data.answer);
+  }
+  function mySession(day) { return at('dailySessions/' + request.auth.uid + '_' + day); }
+  function finishedMine(day) { return exists(mySession(day)) && ('finishedAt' in get(mySession(day)).data); }
+  function dayOver(day) { return validDayKey(day) && request.time > dayDate(day) + duration.value(26, 'h'); }
+
+  // ---- Secret daily words, written only by the publishing tool (Admin SDK).
+  // Consonants: today and past days. Hint: once the player revealed it or finished.
+  // Answer: once the player finished, or after the day is over.
+  match /dailyPuzzles/{day} {
+   allow get: if signedIn() && (isToday(day) || dayOver(day));
+   allow list, write: if false;
+  }
+  match /dailyHints/{day} {
+   allow get: if signedIn() && (dayOver(day) || admin() || (exists(mySession(day))
+    && (get(mySession(day)).data.hintUsed == true || ('finishedAt' in get(mySession(day)).data))));
+   allow list, write: if false;
+  }
+  match /dailySecrets/{day} {
+   allow get: if signedIn() && (dayOver(day) || admin() || finishedMine(day));
+   allow list, write: if false;
   }
 
   // Public official results: everything is copied from the finished session and recomputed.
