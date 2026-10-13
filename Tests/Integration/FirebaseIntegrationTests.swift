@@ -163,6 +163,7 @@ import CNSNNCore
         }
     }
     private func XCTUnwrapAsync<T>(_ value: @autoclosure () async throws -> T?, file: StaticString = #filePath, line: UInt = #line) async throws -> T {
-        try XCTUnwrap(try await value(), file: file, line: line)
+        let unwrapped = try await value()
+        return try XCTUnwrap(unwrapped, file: file, line: line)
     }
 }
