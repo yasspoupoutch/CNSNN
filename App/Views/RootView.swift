@@ -3,15 +3,24 @@ import CNSNNCore
 
 struct RootView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The opening wordmark stays until its vowels have slid in, then gives way to the app.
+    @State private var introDone = RuntimeFlags.isTesting
     var body: some View {
         ZStack {
             AmbientBackground()
-            if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
-            else if state.isRestoring { LaunchView().transition(.opacity) }
+            if !introDone || state.isRestoring { LaunchView(loading: introDone).transition(.opacity) }
+            else if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
             else { OnboardingView().transition(.opacity) }
         }
+        .animation(.easeInOut(duration: 0.5), value: introDone)
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
         .animation(CNSNNTheme.ease, value: state.isRestoring)
+        .task {
+            guard !introDone else { return }
+            try? await Task.sleep(for: .seconds(reduceMotion ? 0.8 : VowelWord.introDuration(LaunchView.word)))
+            introDone = true
+        }
         .alert("CNSNN", isPresented: Binding(get: { state.error != nil }, set: { if !$0 { state.error = nil } })) {
             Button("Compris", role: .cancel) { state.error = nil }
         } message: { Text(state.error ?? "") }
@@ -123,13 +132,16 @@ extension View {
     func tabBarInset() -> some View { safeAreaPadding(.bottom, 96) }
 }
 
-/// Shown while a returning player's account is restored, instead of flashing the rules.
+/// Opening screen: the vowels of CONSONNE slide in once. It stays while a returning
+/// player's account is restored, instead of flashing the rules.
 struct LaunchView: View {
+    static let word = "CONSONNE"
+    var loading: Bool
     var body: some View {
         VStack(spacing: 24) {
-            VowelWord(word: "CONSONNE", font: Typo.wordmark(50))
-            ProgressView().tint(Palette.secondary)
-        }.accessibilityElement(children: .combine).accessibilityLabel("Chargement de votre profil")
+            VowelWord(word: Self.word, font: Typo.wordmark(50), once: true)
+            ProgressView().tint(Palette.secondary).opacity(loading ? 1 : 0)
+        }.accessibilityElement(children: .combine).accessibilityLabel(loading ? "Chargement de votre profil" : "CNSNN")
     }
 }
 

@@ -129,12 +129,13 @@ struct AmbientBackground: View {
         var color: Color, x: CGFloat, y: CGFloat, size: CGFloat
         var dx: CGFloat, dy: CGFloat, from: CGFloat, to: CGFloat, duration: Double
     }
+    /// Two cool tones only: gold belongs to the vowels.
     private let blobs = [
         Blob(color: Color(red: 0.349, green: 0.244, blue: 0.779), x: -80, y: -60, size: 360, dx: 90, dy: 140, from: 1, to: 1.25, duration: 16),
-        Blob(color: Color(red: 0.0, green: 0.492, blue: 0.526), x: 170, y: 330, size: 340, dx: -110, dy: -90, from: 1.1, to: 0.9, duration: 19),
-        Blob(color: Color(red: 0.606, green: 0.167, blue: 0.416), x: -60, y: 600, size: 300, dx: 60, dy: -160, from: 1, to: 1.2, duration: 22),
-        Blob(color: Color(red: 0.753, green: 0.521, blue: 0.121), x: 230, y: 40, size: 180, dx: -110, dy: -90, from: 1.1, to: 0.9, duration: 14),
+        Blob(color: Color(red: 0.0, green: 0.492, blue: 0.526), x: 170, y: 420, size: 360, dx: -110, dy: -120, from: 1.1, to: 0.9, duration: 19),
     ]
+    /// Dimmer behind the game board, so the consonants are what the eye finds.
+    var dimmed = false
     var body: some View {
         GeometryReader { geo in
             let scale = geo.size.width / 390
@@ -147,7 +148,7 @@ struct AmbientBackground: View {
                                                  startRadius: 0, endRadius: (blob.size / 2 + 70) * scale))
                         .frame(width: (blob.size + 140) * scale, height: (blob.size + 140) * scale)
                         .padding(-70 * scale)
-                        .opacity(0.6)
+                        .opacity(dimmed ? 0.28 : 0.5)
                         .scaleEffect(drift ? blob.to : blob.from)
                         .offset(x: (blob.x + (drift ? blob.dx : 0)) * scale, y: (blob.y + (drift ? blob.dy : 0)) * scale)
                         .animation(reduceMotion ? nil : .easeInOut(duration: blob.duration).repeatForever(autoreverses: true), value: drift)
@@ -157,7 +158,8 @@ struct AmbientBackground: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onAppear { if !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled { drift = true } }
+        .animation(CNSNNTheme.ease, value: dimmed)
+        .onAppear { if !reduceMotion && !RuntimeFlags.isTesting && !ProcessInfo.processInfo.isLowPowerModeEnabled { drift = true } }
     }
 }
 
@@ -321,8 +323,12 @@ struct AvatarView: View {
 // MARK: - Animated word (vowels slide in and out)
 
 /// Sizes its single child to a fraction of its ideal width so a letter can collapse to nothing.
-private struct CollapseLayout: Layout {
+struct CollapseLayout: Layout {
     var progress: CGFloat
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let child = subviews.first else { return .zero }
         let size = child.sizeThatFits(.unspecified)
@@ -335,18 +341,23 @@ private struct CollapseLayout: Layout {
 }
 
 /// The prototype's wordmark: consonants stay, vowels appear in gold then vanish again.
+/// The cycle starts when the word appears, so the vowels always arrive in view.
+/// `once`: the vowels slide in a single time and stay (opening screen).
 struct VowelWord: View {
     var word: String
     var font: Font
     var delay: Double = 0
+    var once = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = Date()
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || RuntimeFlags.isTesting)) { context in
+            let time = context.date.timeIntervalSince(appeared)
             HStack(spacing: 0) {
                 ForEach(Array(word.enumerated()), id: \.offset) { index, character in
                     if Vowels.contains(character) {
-                        let progress = reduceMotion ? 1 : Self.progress(time - delay - Double(index) * 0.12)
+                        let start = time - delay - Double(index) * 0.12
+                        let progress = reduceMotion || RuntimeFlags.isTesting ? 1 : (once ? Self.intro(start) : Self.progress(start))
                         CollapseLayout(progress: progress) { Text(String(character)).foregroundStyle(Palette.accent) }
                             .opacity(progress).clipped()
                     } else {
@@ -357,6 +368,16 @@ struct VowelWord: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(word.capitalized)
+    }
+    /// Opening screen: each vowel slides in over half a second and stays.
+    static func intro(_ time: Double) -> CGFloat {
+        let t = min(max((time - 0.35) / 0.55, 0), 1)
+        return CGFloat(t * t * (3 - 2 * t))
+    }
+    /// Opening screen length: the last vowel of `word` has settled, plus a short pause to read it.
+    static func introDuration(_ word: String) -> Double {
+        let last = word.enumerated().last { Vowels.contains($0.element) }?.offset ?? 0
+        return 0.35 + Double(last) * 0.12 + 0.55 + 0.7
     }
     /// Same keyframes as the prototype's `vowelIn` (5 s cycle).
     static func progress(_ time: Double) -> CGFloat {
