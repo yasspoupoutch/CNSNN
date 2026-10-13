@@ -11,7 +11,16 @@ service cloud.firestore {
   function admin() {
    return signedIn() && (request.auth.token.get('admin', false) == true || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
   }
-  function validName(n) { return n is string && n.size() >= 2 && n.size() <= 20; }
+  function validName(n) { return n is string && n.size() >= 2 && n.size() <= 20 && cleanName(n); }
+  // Same lists as Core/NameFilter.swift: offensive words anywhere, ambiguous ones only as the whole pseudo.
+  function cleanName(n) {
+   let k = n.lower().replace('0', 'o').replace('1', 'i').replace('3', 'e').replace('4', 'a').replace('5', 's').replace('7', 't')
+    .replace('@', 'a').replace('[$]', 's').replace('[^a-zàâäçéèêëîïôöùûüÿ]', '');
+   return !k.matches('.*(putain|salope|salaud|encul|niquer|niquetamere|niktamer|connard|connasse|conasse|b[aâ]tard|merde|couille|p[eé]do|hitler|n[eèé]gre|bougnoul|youpin|bicot|tapette|tafiole|gouine|porno|sexe|fuck|shit|bitch|cunt|nigg|whore|slut|enfoir|filsdepute|fdp|daech).*')
+    && !k.matches('(pute|lapute|con|lecon|nazi|bite|pd|ntm|nique|p[eé]d[eé]|viol|suce|sucemoi)');
+  }
+  // Suspended players keep reading, but can no longer play ranked, propose, report or rename.
+  function active() { return signedIn() && !exists(at('banned/' + request.auth.uid)); }
   function categories() { return ['Général','Football','Cinéma','Géographie','Animaux','Objets']; }
   function difficulties() { return ['Facile','Moyen','Difficile']; }
   function validCard(c) {
@@ -61,7 +70,7 @@ service cloud.firestore {
     && request.resource.data.score == 0 && request.resource.data.gamesPlayed == 0
     && request.resource.data.correctAnswers == 0 && request.resource.data.bestTimeMs == null && request.resource.data.currentStreak == 0;
    // Rename, or consume the card proposal quota (see cards).
-   allow update: if owner(uid)
+   allow update: if owner(uid) && active()
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt','lastProposalAt','proposalWindowAt','proposalCount'])
     && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time
     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastProposalAt','proposalWindowAt','proposalCount'])
@@ -89,11 +98,27 @@ service cloud.firestore {
   match /friendCodes/{code} {
    allow get: if signedIn();
    allow list: if signedIn() && resource.data.uid == request.auth.uid;
-   allow create: if signedIn() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
+   allow create: if active() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
     && request.resource.data.keys().hasOnly(['uid','username','createdAt'])
     && request.resource.data.uid == request.auth.uid && validName(request.resource.data.username)
     && request.resource.data.createdAt == request.time;
    allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+  }
+  // Suspensions, decided by moderators from the leaderboard or a report.
+  match /banned/{uid} {
+   allow get: if owner(uid) || admin();
+   allow list: if admin();
+   allow create, update: if admin() && request.resource.data.keys().hasOnly(['username','reason','bannedAt','bannedBy'])
+    && request.resource.data.username is string && request.resource.data.username.size() <= 40
+    && request.resource.data.reason is string && request.resource.data.reason.size() <= 300
+    && request.resource.data.bannedBy == request.auth.uid && request.resource.data.bannedAt == request.time;
+   allow delete: if admin();
+  }
+  // Left by a deleted account (no personal data), so friends can drop it from their list.
+  match /deletedUsers/{uid} {
+   allow get: if signedIn();
+   allow create: if owner(uid) && request.resource.data.keys().hasOnly(['deletedAt']) && request.resource.data.deletedAt == request.time;
+   allow list, update, delete: if false;
   }
   match /admins/{uid} {
    allow read: if owner(uid);
@@ -103,7 +128,7 @@ service cloud.firestore {
   // ---- Daily word: one session per player and day, timed by the server.
   match /dailySessions/{id} {
    allow read: if owner(resource.data.userId) || admin();
-   allow create: if signedIn()
+   allow create: if active()
     && request.resource.data.keys().hasOnly(['userId','day','cardId','startedAt','hintUsed'])
     && request.resource.data.userId == request.auth.uid
     && id == request.auth.uid + '_' + request.resource.data.day
@@ -127,7 +152,8 @@ service cloud.firestore {
   // A win on a secret daily word must carry the right answer: a wrong guess is simply refused.
   function provesAnswer(day, s) {
    return (!('answer' in s) || (s.answer is string && s.answer.size() <= 80))
-    && (!s.correct || !exists(at('dailySecrets/' + day)) || s.get('answer', '') == get(at('dailySecrets/' + day)).data.answer);
+    // Every day from the first secret one has a secret: a missing one never makes a free win.
+    && (!s.correct || (exists(at('dailySecrets/' + day)) ? s.get('answer', '') == get(at('dailySecrets/' + day)).data.answer : day < '2026-10-14'));
   }
   function mySession(day) { return at('dailySessions/' + request.auth.uid + '_' + day); }
   function finishedMine(day) { return exists(mySession(day)) && ('finishedAt' in get(mySession(day)).data); }
@@ -153,7 +179,7 @@ service cloud.firestore {
   // Public official results: everything is copied from the finished session and recomputed.
   match /dailyResults/{id} {
    allow read: if signedIn();
-   allow create: if signedIn() && createsResult(id, request.resource.data, get(at('dailySessions/' + id)).data);
+   allow create: if active() && createsResult(id, request.resource.data, get(at('dailySessions/' + id)).data);
    allow update: if false;
    allow delete: if (owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid))) || admin();
   }
@@ -202,7 +228,7 @@ service cloud.firestore {
   match /cards/{cardId} {
    // Reading a missing id is allowed so the app can tell a free word from a duplicate.
    allow read: if signedIn() && (resource == null || resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
-   allow create: if signedIn() && validCard(request.resource.data)
+   allow create: if active() && validCard(request.resource.data)
     && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status','authorName'])
     && cardId == request.resource.data.normalizedAnswer
     // The pseudo shown as "Proposé par" must be the author's own.
@@ -215,6 +241,10 @@ service cloud.firestore {
     && (!('authorName' in request.resource.data) || validName(request.resource.data.authorName))
     && request.resource.data.normalizedAnswer == resource.data.normalizedAnswer
     && request.resource.data.status in ['approved','rejected'] && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+   // An author deleting their account takes their name and id off the cards that stay in the game.
+   allow update: if signedIn() && resource.data.createdBy == request.auth.uid && resource.data.status == 'approved'
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['createdBy','authorName'])
+    && request.resource.data.createdBy == 'deleted' && !('authorName' in request.resource.data);
    // Authors may withdraw a proposal that is not live, and admins may remove anything.
    allow delete: if (signedIn() && resource.data.createdBy == request.auth.uid && resource.data.status != 'approved') || admin();
   }
@@ -235,11 +265,26 @@ service cloud.firestore {
   // ---- Reports: one per player and card.
   match /reports/{id} {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
-   allow create: if signedIn()
+   allow create: if active()
     && request.resource.data.keys().hasOnly(['userId','cardId','reason','createdAt','status'])
     && request.resource.data.userId == request.auth.uid && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
     && id == request.auth.uid + '_' + request.resource.data.cardId
     && get(at('cards/' + request.resource.data.cardId)).data.status == 'approved'
+    && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 300
+    && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt'])
+    && request.resource.data.status == 'resolved' && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
+   allow delete: if (signedIn() && resource.data.userId == request.auth.uid) || admin();
+  }
+
+  // ---- Player reports (offensive pseudo): one per reporter and player, on a ranked player only.
+  match /playerReports/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   allow create: if active()
+    && request.resource.data.keys().hasOnly(['userId','playerId','username','reason','createdAt','status'])
+    && request.resource.data.userId == request.auth.uid && request.resource.data.playerId is string
+    && request.resource.data.playerId != request.auth.uid && id == request.auth.uid + '_' + request.resource.data.playerId
+    && request.resource.data.username == get(at('leaderboard/' + request.resource.data.playerId)).data.username
     && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 300
     && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt'])

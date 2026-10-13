@@ -17,6 +17,11 @@ struct LeaderboardView: View {
     @State private var myRank: (rank: Int, players: Int)?
     @State private var loading = false
     @State private var failed = false
+    @State private var message: String?
+    @State private var suspending: Row?
+    /// Players this iPhone chose to hide, as comma-separated ids.
+    @AppStorage("hiddenPlayers") private var hiddenPlayers = ""
+    private var hidden: Set<String> { Set(hiddenPlayers.split(separator: ",").map(String.init)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -30,10 +35,22 @@ struct LeaderboardView: View {
                         ForEach(Board.allCases) { item in Chip(title: item.rawValue, selected: board == item) { board = item } }
                     }
                 }.scrollIndicators(.hidden)
-                if board == .friends { FriendsBoard(refreshToken: refreshToken) } else { list }
+                if board == .friends { FriendsBoard(refreshToken: refreshToken) } else {
+                    if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
+                    list
+                    if !hidden.isEmpty {
+                        Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
+                            .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.horizontal, 4)
+                    }
+                }
             }
         }
         .task(id: refreshKey) { await refresh() }
+        .confirmationDialog("Suspendre " + (suspending?.name ?? "") + " ?", isPresented: Binding(get: { suspending != nil }, set: { if !$0 { suspending = nil } }), titleVisibility: .visible) {
+            Button("Suspendre", role: .destructive) { if let row = suspending { suspend(row) } }
+        } message: {
+            Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Vous pourrez lever la suspension dans Modération.")
+        }
     }
 
     @ViewBuilder private var summary: some View {
@@ -90,6 +107,16 @@ struct LeaderboardView: View {
                 }
                 .padding(.horizontal, 16).frame(minHeight: 52)
                 .background(mine ? Palette.fill1 : .clear)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    if !mine {
+                        Button { report(row) } label: { Label("Signaler ce pseudo", systemImage: "flag") }
+                        Button { hiddenPlayers = (hidden.union([row.id])).sorted().joined(separator: ",") } label: { Label("Masquer ce joueur", systemImage: "eye.slash") }
+                        if state.isAdmin {
+                            Button(role: .destructive) { suspending = row } label: { Label("Suspendre ce joueur", systemImage: "hand.raised") }
+                        }
+                    }
+                }
                 .accessibilityElement(children: .combine)
             }
         }.glassPanel(radius: 24, padding: 0)
@@ -112,13 +139,29 @@ struct LeaderboardView: View {
         /// Stable across launches, unlike hashValue.
         var color: Int { id.unicodeScalars.reduce(0) { $0 + Int($1.value) } }
     }
-    private var rows: [Row] {
+    private var rows: [Row] { allRows.filter { !hidden.contains($0.id) } }
+    private var allRows: [Row] {
         switch board {
         case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.timeMs),
                                      detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice" : "")) }
         case .points: players.map { Row(id: $0.uid, name: $0.username, value: Format.number($0.points) + " pts") }
         case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
         case .friends: []
+        }
+    }
+
+    private func report(_ row: Row) {
+        guard let cloud = state.cloud else { return }
+        Task {
+            do { try await cloud.report(player: row.id, username: row.name); message = "Merci, la modération va vérifier le pseudo de " + row.name + "."; Haptics.success() }
+            catch { message = CloudError.message(error) }
+        }
+    }
+    private func suspend(_ row: Row) {
+        guard let cloud = state.cloud else { return }
+        Task {
+            do { try await cloud.suspend(player: row.id, username: row.name, reason: "Depuis le classement"); message = row.name + " est suspendu."; await refresh() }
+            catch { message = CloudError.message(error) }
         }
     }
 
