@@ -392,20 +392,20 @@ struct VowelWord: View {
     }
 }
 
-/// A word with vowels highlighted in gold.
+/// A word with vowels highlighted in gold. One single Text, so when it shrinks to fit,
+/// every letter shrinks by the same amount.
 struct HighlightedWord: View {
     var word: String
     var font: Font
-    var glow = false
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(word.enumerated()), id: \.offset) { _, character in
-                let vowel = Vowels.contains(character)
-                Text(String(character)).foregroundStyle(vowel ? Palette.accent : Palette.foreground)
-                    .shadow(color: vowel && glow ? Palette.accent.opacity(0.6) : .clear, radius: 12)
-            }
-        }.font(font).lineLimit(1).minimumScaleFactor(0.5)
-            .accessibilityElement(children: .ignore).accessibilityLabel(word)
+        var styled = AttributedString()
+        for character in word {
+            var letter = AttributedString(String(character))
+            letter.foregroundColor = Vowels.contains(character) ? Palette.accent : Palette.foreground
+            styled += letter
+        }
+        return Text(styled).font(font).lineLimit(1).minimumScaleFactor(0.5)
+            .accessibilityLabel(word)
     }
 }
 

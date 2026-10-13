@@ -491,9 +491,16 @@ struct VowelReveal: View {
     var correct: Bool
     var revealed: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Letters are separate views here (the vowels slide in), so the size is chosen for the
+    /// whole word from its length, instead of each letter shrinking on its own. It does not
+    /// change while the vowels slide in.
     var body: some View {
+        let size = min(42, 318 / (CGFloat(max(word.count, 1)) * 0.8))
+        letters.font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
+    }
+    private var letters: some View {
         let letters = Array(word.enumerated())
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             ForEach(letters, id: \.offset) { index, character in
                 if Vowels.contains(character) {
                     let order = letters[..<index].filter { Vowels.contains($0.element) }.count
@@ -509,7 +516,6 @@ struct VowelReveal: View {
                 }
             }
         }
-        .font(.system(size: 42, weight: .heavy)).tracking(2.5).lineLimit(1).minimumScaleFactor(0.4)
     }
     private func animation(_ order: Int) -> Animation? {
         guard !reduceMotion else { return nil }
