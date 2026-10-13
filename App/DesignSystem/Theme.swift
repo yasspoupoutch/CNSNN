@@ -376,7 +376,7 @@ struct VowelWord: View {
     }
     /// Opening screen length: the last vowel of `word` has settled, plus a short pause to read it.
     static func introDuration(_ word: String) -> Double {
-        let last = word.enumerated().last { Vowels.contains($0.element) }?.offset ?? 0
+        let last = Array(word).lastIndex(where: Vowels.contains) ?? 0
         return 0.35 + Double(last) * 0.12 + 0.55 + 0.7
     }
     /// Same keyframes as the prototype's `vowelIn` (5 s cycle).
