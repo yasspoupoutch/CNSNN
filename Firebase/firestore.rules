@@ -155,7 +155,8 @@ service cloud.firestore {
 
   // ---- Community cards. The document id is the normalized answer, so a word exists only once.
   match /cards/{cardId} {
-   allow read: if signedIn() && (resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
+   // Reading a missing id is allowed so the app can tell a free word from a duplicate.
+   allow read: if signedIn() && (resource == null || resource.data.status == 'approved' || resource.data.createdBy == request.auth.uid || admin());
    allow create: if signedIn() && validCard(request.resource.data)
     && request.resource.data.keys().hasOnly(['wordFull','wordNoVowels','normalizedAnswer','hint','category','difficulty','createdBy','createdAt','status'])
     && cardId == request.resource.data.normalizedAnswer
@@ -203,7 +204,19 @@ service cloud.firestore {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
    allow write: if false;
   }
-  match /dailyChallenges/{day} { allow read: if signedIn(); allow write: if false; }
+  // Daily words published by a moderator override the app's built-in schedule for that day.
+  match /dailyChallenges/{day} {
+   allow read: if signedIn();
+   allow create, update: if admin() && validDayKey(day)
+    && request.resource.data.keys().hasOnly(['cardId','wordFull','hint','category','difficulty','publishedBy','publishedAt'])
+    && request.resource.data.cardId is string && request.resource.data.cardId.size() >= 1 && request.resource.data.cardId.size() <= 80
+    && request.resource.data.wordFull is string && request.resource.data.wordFull.size() >= 3 && request.resource.data.wordFull.size() <= 80
+    && request.resource.data.hint is string && request.resource.data.hint.size() >= 5 && request.resource.data.hint.size() <= 160
+    && request.resource.data.category in categories()
+    && request.resource.data.difficulty == ['Facile','Moyen','Difficile'][dailyBase(day) / 50 - 1]
+    && request.resource.data.publishedBy == request.auth.uid && request.resource.data.publishedAt == request.time;
+   allow delete: if admin();
+  }
 
   match /{document=**} { allow read, write: if false; }
  }

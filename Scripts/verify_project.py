@@ -62,5 +62,5 @@ for path in list((root/'App').rglob('*.swift'))+list((root/'Core').rglob('*.swif
  count+=1
 rules=(root/'Firebase/firestore.rules').read_text()
 assert 'allow read, write: if true' not in rules
-assert 'request.auth.token.admin' in rules
+assert "request.auth.token.get('admin', false) == true" in rules
 print(f'PASS: {count} source/config files checked; {len(objects)} Xcode objects resolve. Compilation still requires Xcode.')

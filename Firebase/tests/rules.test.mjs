@@ -228,6 +228,20 @@ test('approved query permitted, global enumeration denied',async()=>{
 test('client cannot forge legacy attempts or schedule',async()=>{
  for(const path of ['attempts/fake','dailyChallenges/2026-10-06']) await assertFails(setDoc(doc(user(),path),{userId:'alice',score:100}));
 });
+test('moderators publish daily words with the weekday difficulty',async()=>{
+ const challenge=(difficulty)=>({cardId:'custom-1',wordFull:'Montgolfière',hint:'Un ballon à air chaud.',category:'Objets',difficulty,publishedBy:'mod',publishedAt:serverTimestamp()});
+ const mod=user('mod',{admin:true});
+ // 2026-10-17 is a Saturday: hard.
+ await assertFails(setDoc(doc(mod,'dailyChallenges/2026-10-17'),challenge('Facile')));
+ await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-17'),challenge('Difficile')));
+ await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-13'),challenge('Facile')));
+ await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-14'),challenge('Moyen')));
+ await assertFails(setDoc(doc(user(),'dailyChallenges/2026-10-18'),{...challenge('Difficile'),publishedBy:'alice'}));
+ await assertSucceeds(getDoc(doc(user(),'dailyChallenges/2026-10-17')));
+});
+test('a missing card id can be checked before proposing',async()=>{
+ await assertSucceeds(getDoc(doc(user(),'cards/INCONNU')));
+});
 test('report deduplication and admin resolution',async()=>{
  await seed('cards/CHOCOLAT',card('approved'));
  const report={userId:'alice',cardId:'CHOCOLAT',reason:'Indice incorrect.',createdAt:serverTimestamp(),status:'pending'};
