@@ -21,6 +21,10 @@ struct RootView: View {
             try? await Task.sleep(for: .seconds(reduceMotion ? 0.8 : VowelWord.introDuration(LaunchView.word)))
             introDone = true
         }
+        // Players from before the community rules accept them once (and again when they change).
+        .sheet(isPresented: Binding(get: { introDone && !state.isRestoring && state.needsRulesAcceptance }, set: { _ in })) {
+            CommunityRulesView(accepting: true)
+        }
         .alert("CNSNN", isPresented: Binding(get: { state.error != nil }, set: { if !$0 { state.error = nil } })) {
             Button("Compris", role: .cancel) { state.error = nil }
         } message: { Text(state.error ?? "") }
@@ -152,6 +156,7 @@ struct OnboardingView: View {
     @AppStorage(CNSNNTheme.avatarKey) private var avatar = 0
     @State private var step = 0
     @State private var username = ""
+    @State private var accepted = false
     @FocusState private var fieldFocused: Bool
     private var trimmed: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var valid: Bool { (2...20).contains(trimmed.count) }
@@ -226,11 +231,30 @@ struct OnboardingView: View {
                 }.padding(.horizontal, 26).padding(.top, 10)
             }.scrollDismissesKeyboard(.interactively).scrollBounceBehavior(.basedOnSize)
             VStack(spacing: 12) {
+                acceptance
                 Button(state.isBusy ? "Un instant…" : "C’est parti", action: start)
                     .buttonStyle(PrimaryPillStyle())
-                    .disabled(state.isBusy || !valid)
+                    .disabled(state.isBusy || !valid || !accepted)
                 Text("Modifiable à tout moment depuis votre profil.").scaledFont(12).foregroundStyle(Palette.tertiary)
             }.padding(.horizontal, 26).padding(.bottom, 12)
+        }
+    }
+
+    /// Community rules and privacy policy, accepted before the first game.
+    private var acceptance: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Button { Haptics.selection(); accepted.toggle() } label: {
+                Image(systemName: accepted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(accepted ? Palette.mint : Palette.tertiary)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityIdentifier("accept-rules")
+            .accessibilityLabel("J’accepte les règles de la communauté et la politique de confidentialité")
+            .accessibilityAddTraits(accepted ? .isSelected : [])
+            Text("J’accepte les [règles de la communauté](\(Site.rules.absoluteString)) et la [politique de confidentialité](\(Site.privacy.absoluteString)).")
+                .scaledFont(14).foregroundStyle(Palette.secondary).tint(Palette.foreground)
+                .fixedSize(horizontal: false, vertical: true).padding(.top, 11)
         }
     }
 
@@ -240,9 +264,10 @@ struct OnboardingView: View {
     }
 
     private func start() {
-        guard valid, !state.isBusy else { return }
+        guard valid, accepted, !state.isBusy else { return }
         fieldFocused = false
         Haptics.success()
+        state.progress.rulesVersion = CommunityRules.version
         Task { await state.start(username: username) }
     }
 }

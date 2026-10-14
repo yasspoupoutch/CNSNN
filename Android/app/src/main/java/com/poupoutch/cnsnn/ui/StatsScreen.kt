@@ -67,6 +67,7 @@ import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Mistakes
+import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.DailyRank
 import com.poupoutch.cnsnn.state.AppViewModel
@@ -240,7 +241,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     Text("Appui long sur un joueur pour le signaler ou le masquer.", fontSize = 12.sp, color = Palette.tertiary)
     suspending?.let { row ->
         AlertDialog({ suspending = null }, title = { Text("Suspendre ${row.name} ?") },
-            text = { Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Vous pourrez lever la suspension dans Modération.") },
+            text = { Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses points sont conservés : en levant la suspension dans Modération, il retrouve tout.") },
             confirmButton = { TextButton({
                 suspending = null
                 scope.launch {
@@ -321,7 +322,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
             code?.let { c ->
                 IconButton({
                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
-                        .putExtra(Intent.EXTRA_TEXT, "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est $c"), null))
+                        .putExtra(Intent.EXTRA_TEXT, Site.friendInvite(c)), null))
                 }) { Icon(Icons.Filled.Share, "Partager mon code") }
             }
         }

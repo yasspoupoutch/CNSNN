@@ -1,6 +1,7 @@
 package com.poupoutch.cnsnn
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -23,9 +24,15 @@ class AppFlowTest {
         if (rule.onAllNodes(hasText("Continuer")).fetchSemanticsNodes().isNotEmpty()) {
             rule.onNodeWithText("Continuer").performClick()
             rule.onNodeWithText("Pseudo").performTextInput("Testeur")
+            // The start button waits for the community rules to be accepted.
+            rule.onNodeWithText("C’est parti").assertIsNotEnabled()
+            rule.onNodeWithText("J’accepte les règles de la communauté", substring = true).performScrollTo().performClick()
             rule.onNodeWithText("C’est parti").performClick()
         }
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
+        // A player from before the rules accepts them once.
+        if (rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isNotEmpty()) rule.onNodeWithText("J’accepte").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithText("Lancer une partie").performScrollTo().performClick()
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("votre réponse")).fetchSemanticsNodes().isNotEmpty() }
         // A wrong answer stays in the game and is shown crossed out.

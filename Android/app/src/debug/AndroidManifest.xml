@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug builds only: lets the tests reach the local Firebase emulators over plain HTTP. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/emulator_network" />
+    <application android:networkSecurityConfig="@xml/emulator_network">
+        <!-- Debug and test builds send no crash reports to the real project. -->
+        <meta-data android:name="firebase_crashlytics_collection_enabled" android:value="false" />
+    </application>
 </manifest>

@@ -2,7 +2,10 @@ name: CNSNN - Firebase
 
 # Rules tests run on every change to Firebase/. Deploying rules and indexes to the
 # production project, or granting the moderator role, only happens on a manual run from main.
+# Every month, the secret daily words are published for the next 364 days, so they never run out.
 on:
+  schedule:
+    - cron: '17 3 1 * *'
   pull_request:
     paths: ['Firebase/**', '.github/workflows/firebase.yml']
   push:
@@ -30,9 +33,14 @@ on:
         description: Enregistrer l'application Android et afficher son google-services.json
         type: boolean
         default: false
+      site:
+        description: Publier le site public (confidentialité, règles, suppression de compte, APK Android)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: cnsnn-firebase-${{ github.ref }}
@@ -64,7 +72,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key is harmless, so it also runs on a branch.
-    if: ${{ github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed || inputs.android_app)) || inputs.daily_public_key) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -102,11 +110,26 @@ jobs:
         if: ${{ inputs.daily_public_key }}
         run: node tools/daily.mjs public-key
       - name: Publier les mots du jour
-        if: ${{ inputs.daily_seed && github.ref == 'refs/heads/main' }}
+        if: ${{ github.event_name == 'schedule' || (inputs.daily_seed && github.ref == 'refs/heads/main') }}
         run: node tools/daily.mjs seed
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
+      - name: Récupérer le dernier APK Android
+        if: ${{ inputs.site && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow android.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -n "$run" ] && gh run download "$run" -R "$GITHUB_REPOSITORY" -n CNSNN-Android-APK -D "$RUNNER_TEMP/apk"; then
+            echo "APK=$(find "$RUNNER_TEMP/apk" -name '*.apk' | head -1)" >> "$GITHUB_ENV"
+          else
+            echo '::warning::Aucun APK récent (les artefacts expirent après 7 jours) : le site est publié sans le téléchargement Android.'
+          fi
+      - name: Publier le site
+        if: ${{ inputs.site && github.ref == 'refs/heads/main' }}
+        run: node tools/hosting.mjs ${APK:-}
       - name: Effacer la clé
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/sa.json"

@@ -28,13 +28,25 @@ function base(key){const w=new Date(`${key}T12:00:00Z`).getUTCDay();const iso=w=
 function points(key,timeMs,usedHint,correct){if(!correct)return 0;const raw=base(key)+Math.max(0,50-Math.floor(timeMs/1000));return usedHint?Math.floor(raw/2):raw;}
 
 async function signUp(uid='alice',username='Alice'){ await assertSucceeds(setDoc(doc(user(uid),`users/${uid}`),profile(uid,username))); }
-async function startDaily(uid='alice',day=parisKey()){
+const patch=async(path,data)=>env.withSecurityRulesDisabled(async c=>{await updateDoc(doc(c.firestore(),path),data);});
+// Starts the clock, then moves the start 10 s back: a win needs at least 2 s of play.
+async function startDaily(uid='alice',day=parisKey(),{backdate=true}={}){
  await assertSucceeds(setDoc(doc(user(uid),`dailySessions/${uid}_${day}`),{userId:uid,day,cardId:'daily-e-001',startedAt:serverTimestamp(),hintUsed:false}));
+ if(backdate) await patch(`dailySessions/${uid}_${day}`,{startedAt:Timestamp.fromMillis(Date.now()-10000)});
 }
-// Every day has a secret word since 2026-10-14, and a win must name it.
+// Registers a guess on the server as the app does, then moves its time back so the next one is allowed.
+function guessData(s,word){return {guesses:(s.guesses??0)+1,guess:word,guessAt:serverTimestamp()};}
+async function guess(uid='alice',day=parisKey(),word='CHOCOLAT',{backdate=true}={}){
+ const path=`dailySessions/${uid}_${day}`;
+ await assertSucceeds(updateDoc(doc(user(uid),path),guessData(await read(path),word)));
+ if(backdate) await patch(path,{guessAt:Timestamp.fromMillis(Date.now()-5000)});
+}
+// Every day has a secret word since 2026-10-14, and a win must name the last registered guess.
 async function finishDaily(uid='alice',day=parisKey(),correct=true){
- if(correct) await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT'});
- await assertSucceeds(updateDoc(doc(user(uid),`dailySessions/${uid}_${day}`),{finishedAt:serverTimestamp(),correct,wrongAnswers:1,...(correct?{answer:'CHOCOLAT'}:{})}));
+ const path=`dailySessions/${uid}_${day}`;
+ if(correct){ await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT'}); await guess(uid,day,'CHOCOLA'); await guess(uid,day,'CHOCOLAT'); }
+ const guesses=(await read(path)).guesses??0;
+ await assertSucceeds(updateDoc(doc(user(uid),path),{finishedAt:serverTimestamp(),correct,wrongAnswers:correct?guesses-1:guesses,...(correct?{answer:'CHOCOLAT'}:{})}));
 }
 // Builds the result exactly as the app does: everything comes from the finished session.
 async function resultFor(uid,day,overrides={}){
@@ -145,7 +157,12 @@ test('secret daily word: consonants today, hint and answer only when earned',asy
  await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLA'}));
  await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'chocolat'}));
  await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0,answer:'X'.repeat(81)}));
- await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:2,answer:'CHOCOLAT'}));
+ // A registered wrong guess is still refused, and counts as an error.
+ await guess('alice',day,'CHOCOLA');
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLA'}));
+ await guess('alice',day,'CHOCOLAT');
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLAT'}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:1,answer:'CHOCOLAT'}));
  await assertSucceeds(getDoc(doc(db,`dailySecrets/${day}`)));
  await assertFails(getDoc(doc(user('bob'),`dailySecrets/${day}`)));
  // The official result still publishes from the finished session.
@@ -408,7 +425,114 @@ test('player reports: one per reporter and player, name checked, admin resolves'
  await assertSucceeds(updateDoc(doc(user('mod',{admin:true}),'playerReports/alice_bob'),{status:'resolved',reviewedBy:'mod',reviewedAt:serverTimestamp()}));
 });
 test('a day without a secret word never gives a free win',async()=>{
- await signUp(); await startDaily();
+ await signUp(); await startDaily(); await guess('alice',parisKey(),'NIMPORTE');
  await assertFails(updateDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'NIMPORTE'}));
- await assertSucceeds(updateDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0}));
+ await assertSucceeds(updateDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{finishedAt:serverTimestamp(),correct:false,wrongAnswers:1}));
+});
+
+// ---------- Guesses: counted on the server, so a script cannot try every answer
+
+test('guesses: counted one by one, one per second, at most twenty',async()=>{
+ await signUp(); await startDaily();
+ const day=parisKey(),path=`dailySessions/alice_${day}`,ref=doc(user(),path);
+ await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT'});
+ // The count cannot jump, go back or be skipped.
+ await assertFails(updateDoc(ref,{guesses:2,guess:'A',guessAt:serverTimestamp()}));
+ await assertFails(updateDoc(ref,{guesses:1,guess:'A',guessAt:Timestamp.fromMillis(Date.now()-5000)}));
+ await assertFails(updateDoc(ref,{guess:'A',guessAt:serverTimestamp()}));
+ await assertFails(updateDoc(ref,{guesses:1,guess:'',guessAt:serverTimestamp()}));
+ await guess('alice',day,'A',{backdate:false});
+ // A second guess within a second is refused.
+ await assertFails(updateDoc(ref,guessData(await read(path),'B')));
+ await patch(path,{guessAt:Timestamp.fromMillis(Date.now()-5000)});
+ await assertFails(updateDoc(ref,{guesses:1,guess:'B',guessAt:serverTimestamp()}));
+ for(let i=2;i<=20;i++) await guess('alice',day,'X'+i);
+ // The twenty-first guess is refused, even the right one.
+ await assertFails(updateDoc(ref,guessData(await read(path),'CHOCOLAT')));
+ // Only a loss with the twenty errors can end the game.
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:3}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:20}));
+});
+test('a win names the last registered guess, after two seconds at least',async()=>{
+ await signUp(); const day=parisKey(),path=`dailySessions/alice_${day}`;
+ await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT'});
+ await startDaily('alice',day,{backdate:false});
+ const ref=doc(user(),path);
+ await guess('alice',day,'CHOCOLAT');
+ // Too fast to be a person reading the consonants.
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLAT'}));
+ await patch(path,{startedAt:Timestamp.fromMillis(Date.now()-10000)});
+ await guess('alice',day,'CHOCOLA');
+ // The right word, but not the last guess sent.
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:1,answer:'CHOCOLAT'}));
+ await guess('alice',day,'CHOCOLAT');
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLAT'}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:2,answer:'CHOCOLAT'}));
+ // Finished: no more guesses.
+ await assertFails(updateDoc(ref,guessData(await read(path),'X')));
+});
+
+// ---------- Suspensions keep the progress
+
+test('a suspension hides results and totals without deleting them, and is reversible',async()=>{
+ await signUp(); await startDaily(); await finishDaily();
+ const day=parisKey(); await assertSucceeds(publish('alice',await resultFor('alice',day)));
+ const mod=user('mod',{admin:true}),b=writeBatch(mod);
+ b.set(doc(mod,'banned/alice'),{username:'Alice',reason:'Triche',bannedAt:serverTimestamp(),bannedBy:'mod'});
+ b.update(doc(mod,'leaderboard/alice'),{suspended:true});
+ b.update(doc(mod,`dailyResults/alice_${day}`),{suspended:true});
+ await assertSucceeds(b.commit());
+ // Only the flag can change, and only by a moderator.
+ await assertFails(updateDoc(doc(mod,'leaderboard/alice'),{points:0}));
+ await assertFails(updateDoc(doc(mod,`dailyResults/alice_${day}`),{timeMs:1}));
+ await assertFails(updateDoc(doc(user(),'leaderboard/alice'),{suspended:deleteField()}));
+ await assertFails(updateDoc(doc(user(),`dailyResults/alice_${day}`),{suspended:deleteField()}));
+ await assertFails(updateDoc(doc(user('bob'),'leaderboard/alice'),{suspended:true}));
+ assert.equal((await read('leaderboard/alice')).wins,1);
+ const r=writeBatch(mod);
+ r.delete(doc(mod,'banned/alice'));
+ r.update(doc(mod,'leaderboard/alice'),{suspended:deleteField()});
+ r.update(doc(mod,`dailyResults/alice_${day}`),{suspended:deleteField()});
+ await assertSucceeds(r.commit());
+ const board=await read('leaderboard/alice');
+ assert.equal(board.suspended,undefined); assert.equal(board.wins,1);
+});
+
+// ---------- Community rules, card catalogue version
+
+test('community rules are accepted at sign-up or later, with the server time',async()=>{
+ await assertFails(setDoc(doc(user(),'users/alice'),{...profile(),rulesVersion:1,rulesAcceptedAt:Timestamp.fromMillis(0)}));
+ await assertSucceeds(setDoc(doc(user(),'users/alice'),{...profile(),rulesVersion:1,rulesAcceptedAt:serverTimestamp()}));
+ await signUp('bob','Bob');
+ await assertSucceeds(updateDoc(doc(user('bob'),'users/bob'),{rulesVersion:1,rulesAcceptedAt:serverTimestamp()}));
+ await assertFails(updateDoc(doc(user('bob'),'users/bob'),{rulesVersion:'1',rulesAcceptedAt:serverTimestamp()}));
+ await assertFails(updateDoc(doc(user('alice'),'users/bob'),{rulesVersion:2,rulesAcceptedAt:serverTimestamp()}));
+ // Still possible while suspended.
+ await seed('banned/bob',{username:'Bob',reason:'x',bannedAt:Timestamp.now(),bannedBy:'mod'});
+ await assertSucceeds(updateDoc(doc(user('bob'),'users/bob'),{rulesVersion:2,rulesAcceptedAt:serverTimestamp()}));
+});
+test('card catalogue version: read by players, moved by moderators',async()=>{
+ await assertFails(setDoc(doc(user(),'meta/cards'),{updatedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(user('mod',{admin:true}),'meta/cards'),{updatedAt:Timestamp.fromMillis(0)}));
+ await assertSucceeds(setDoc(doc(user('mod',{admin:true}),'meta/cards'),{updatedAt:serverTimestamp()}));
+ await assertSucceeds(getDoc(doc(user(),'meta/cards')));
+ await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),'meta/cards')));
+});
+
+// ---------- Deletion of everything that names the player
+
+test('a deleted account takes its suspension record and the reports naming it',async()=>{
+ await signUp();
+ await seed('banned/alice',{username:'Alice',reason:'x',bannedAt:Timestamp.now(),bannedBy:'mod'});
+ await seed('playerReports/bob_alice',{userId:'bob',playerId:'alice',username:'Alice',reason:'Pseudo inapproprié',createdAt:Timestamp.now(),status:'pending'});
+ const db=user();
+ // While the profile exists, a suspended player can neither lift it nor see who reported them.
+ await assertFails(deleteDoc(doc(db,'banned/alice')));
+ await assertFails(getDocs(query(collection(db,'playerReports'),where('playerId','==','alice'))));
+ const b=writeBatch(db);
+ b.delete(doc(db,'users/alice')); b.delete(doc(db,'banned/alice'));
+ await assertSucceeds(b.commit());
+ const about=await assertSucceeds(getDocs(query(collection(db,'playerReports'),where('playerId','==','alice'))));
+ assert.equal(about.size,1);
+ await assertSucceeds(deleteDoc(doc(db,'playerReports/bob_alice')));
 });

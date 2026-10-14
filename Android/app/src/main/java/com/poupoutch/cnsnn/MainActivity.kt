@@ -26,5 +26,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // The day may have changed while away: refresh the widget and the next reminder.
         state.refreshGlance(force = true)
+        // Progress saved while offline, or played on another device, is synced again.
+        state.onForeground()
     }
 }

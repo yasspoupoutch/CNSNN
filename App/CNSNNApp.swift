@@ -17,7 +17,8 @@ import SwiftUI
         }
         .onChange(of: scenePhase) { _, phase in
             // A new day may have started: refresh the widget and the next reminders.
-            if phase == .active { state.refreshGlance(force: true) }
+            // Another device may have saved games meanwhile: merge them in.
+            if phase == .active { state.refreshGlance(force: true); Task { await state.syncProgress() } }
         }
     }
 }

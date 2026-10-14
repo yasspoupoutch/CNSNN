@@ -222,8 +222,13 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             Text(when {
                 game.checking -> "Vérification…"
                 game.notice != null -> game.notice!!
+                game.ranked -> "Chrono officiel. Jusqu’à 20 essais pour trouver le mot."
                 else -> "Chrono officiel. Les erreurs ne terminent pas la partie."
             }, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+            AnimatedVisibility(game.remainingText != null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
+                Text(game.remainingText ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
+            }
         }
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -237,11 +242,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))
         }
     }
-    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = {
-        val before = game.wrongAnswers
-        game.submit(state)
-        if (game.wrongAnswers > before) haptics.retry()
-    }, enabled = game.result == null && !game.checking)
+    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = { game.submit(state) }, enabled = game.result == null && !game.checking)
+    // Wrong guesses may be answered by the server a moment later: the buzz follows the shake.
+    LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(game.result?.id) { if (game.result?.correct == true) haptics.success() }
 }
 

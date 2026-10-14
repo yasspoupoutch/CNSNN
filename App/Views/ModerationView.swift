@@ -9,6 +9,7 @@ struct ModerationView: View {
     @State private var reports: [CardReport] = []
     @State private var playerReports: [PlayerReport] = []
     @State private var suspended: [SuspendedPlayer] = []
+    @State private var suspicious: [DailyRank] = []
     @State private var busy = false
     @State private var loaded = false
     @State private var message: String?
@@ -75,8 +76,24 @@ struct ModerationView: View {
                         }.disabled(busy)
                     }.padding(.vertical, 6)
                 }
-            } header: { Text("Pseudos signalés") } footer: { Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler.") }
-            Section("Joueurs suspendus") {
+            } header: { Text("Pseudos signalés") } footer: { Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats sont conservés.") }
+            Section {
+                if suspicious.isEmpty { Text(loaded ? "Aucun temps suspect aujourd’hui." : "Chargement…").foregroundStyle(.secondary) }
+                ForEach(suspicious) { row in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.username)
+                            Text(Format.clock(row.timeMs) + (row.wrongAnswers == 0 ? " · sans faute" : " · \(row.wrongAnswers) erreur\(row.wrongAnswers > 1 ? "s" : "")"))
+                                .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Suspendre", role: .destructive) {
+                            act { try await state.cloud?.suspend(player: row.uid, username: row.username, reason: "Temps suspect") }
+                        }.buttonStyle(.bordered).disabled(busy)
+                    }
+                }
+            } header: { Text("Temps suspects") } footer: { Text("Mots du jour trouvés en moins de 5 secondes aujourd’hui, trop vite pour être lus et tapés à la main.") }
+            Section {
                 if suspended.isEmpty { Text(loaded ? "Aucun joueur suspendu." : "Chargement…").foregroundStyle(.secondary) }
                 ForEach(suspended) { player in
                     HStack {
@@ -88,7 +105,7 @@ struct ModerationView: View {
                         Button("Rétablir") { act { try await state.cloud?.unsuspend(player: player.id) } }.buttonStyle(.bordered).disabled(busy)
                     }
                 }
-            }
+            } header: { Text("Joueurs suspendus") } footer: { Text("Rétablir un joueur lui rend ses résultats et sa place dans les classements.") }
         }
         .navigationTitle("Modération")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
@@ -101,6 +118,7 @@ struct ModerationView: View {
             guard try await cloud.isAdmin() else { message = "Accès administrateur requis."; return }
             cards = try await cloud.pendingCards(); reports = try await cloud.pendingReports()
             playerReports = try await cloud.pendingPlayerReports(); suspended = try await cloud.suspendedPlayers()
+            suspicious = try await cloud.suspiciousResults(day: DailySchedule.key())
             loaded = true
         } catch { message = CloudError.message(error) }
     }

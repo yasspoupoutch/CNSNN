@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.DailyPool
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.GameMode
@@ -55,11 +56,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var scope: String? = local.activeScope
     private var savingAllowed = true
     private var cloudSave: Job? = null
+    private var lastSync = 0L
 
     init {
         val saved = local.load(scope)
         if (saved == null) { savingAllowed = false; error = "La sauvegarde locale est illisible. Elle n’a pas été écrasée." }
         else progress = saved
+        local.cachedCards?.let { cards = withCommunity(it) }
         isRestoring = progress.username.isEmpty() && cloud.hasCurrentUser
         viewModelScope.launch { connect() }
     }
@@ -89,25 +92,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         cloudSave?.cancel()
         cloudSave = viewModelScope.launch {
             delay(1500)
-            if (uid == user) runCatching { cloud.saveCloudProgress(progress, user) }
+            if (uid == user) runCatching { saveOnline(user) }
+        }
+    }
+    /**
+     * Merges this phone's copy into the online one (a transaction: another device's games are never
+     * overwritten), then takes back what the other devices added. Offline it fails and changes nothing.
+     */
+    private suspend fun saveOnline(user: String) {
+        val saved = cloud.saveCloudProgress(progress, user)
+        if (uid != user) return
+        val merged = progress.merged(saved)
+        if (merged != progress) {
+            progress = merged
+            if (savingAllowed) local.save(progress, scope)
+            refreshGlance()
         }
     }
     /** Brings the online copy and this phone together, so a reinstall or a second device finds everything. */
     private suspend fun syncProgress() {
         val user = uid ?: return
+        lastSync = System.currentTimeMillis()
         try {
             cloud.cloudProgress(user)?.let { remote ->
                 val merged = progress.merged(remote)
                 progress = merged.copy(username = progress.username.ifEmpty { remote.username })
+                if (savingAllowed) local.save(progress, scope)
+                refreshGlance()
             }
-            persist()
-        } catch (_: Exception) { /* Offline: the next change or launch syncs again. */ }
+            cloudSave?.cancel()
+            saveOnline(user)
+        } catch (_: Exception) { /* Offline: the next change, launch or return to the app syncs again. */ }
+    }
+    /** Back in the app: anything saved while offline, or played on another device, is synced again. */
+    fun onForeground() {
+        if (uid == null || System.currentTimeMillis() - lastSync < 30_000) return
+        viewModelScope.launch { syncProgress() }
     }
 
     // ---- Session
 
     fun chooseAvatar(index: Int) { avatar = index; local.avatar = index }
 
+    /** First pseudo: the player accepted the community rules on the same screen. */
     fun start(username: String) = viewModelScope.launch {
         if (isBusy) return@launch
         val name = username.trim()
@@ -115,7 +142,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!NameFilter.isAllowed(name)) { error = REFUSED_NAME; return@launch }
         isBusy = true
         try {
-            activate(cloud.bootstrap(name), preservingGuest = true)
+            progress = progress.copy(rulesVersion = maxOf(progress.rulesVersion ?: 0, CommunityRules.VERSION))
+            activate(cloud.bootstrap(name, CommunityRules.VERSION), preservingGuest = true)
         } catch (e: Exception) {
             error = "Connexion impossible : " + CloudError.message(e); return@launch
         } finally { isBusy = false }
@@ -158,8 +186,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             scope = profile.uid; local.activeScope = profile.uid
         }
         uid = profile.uid; isAnonymous = profile.anonymous; email = profile.email
-        progress = progress.copy(username = profile.username)
+        val accepted = listOfNotNull(progress.rulesVersion, profile.rulesVersion).maxOrNull()
+        progress = progress.copy(username = profile.username, rulesVersion = accepted)
         persist()
+        // Accepted on this phone (offline, or before the profile kept it): record it on the profile too.
+        if (accepted != null && (profile.rulesVersion ?: 0) < accepted) {
+            viewModelScope.launch { runCatching { cloud.acceptRules(profile.uid, accepted) } }
+        }
+    }
+
+    /** The player accepted the current community rules (existing players, after an update). */
+    fun acceptRules() {
+        update { it.copy(rulesVersion = CommunityRules.VERSION) }
+        val user = uid ?: return
+        viewModelScope.launch { runCatching { cloud.acceptRules(user, CommunityRules.VERSION) } }
     }
     fun signOut() {
         persist(); cloudSave?.cancel()
@@ -212,14 +252,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             refreshOfficial()
         } catch (e: Exception) { error = CloudError.message(e) }
     }
-    /** Classique plays the built-in cards plus every approved community card. */
+    /**
+     * Classique plays the built-in cards plus every approved community card. The catalogue is
+     * downloaded again only when its version (`meta/cards`) moved: one read instead of up to 500.
+     */
     suspend fun refreshCards() {
         if (uid == null) return
         try {
-            val community = cloud.cards()
-            val known = (SeedCards.all + DailyPool.all).map { WordEngine.normalize(it.wordFull) }.toSet()
-            cards = SeedCards.all + community.filter { WordEngine.normalize(it.wordFull) !in known }
-        } catch (_: Exception) { /* Offline: the built-in cards remain. */ }
+            val version = cloud.cardsVersion()
+            val cached = local.cachedCards
+            val now = System.currentTimeMillis()
+            val stale = when {
+                cached == null -> true
+                // No version on the server yet: download at most once a day.
+                version == null -> local.cardsVersion != 0L || now - local.cardsFetchedAt > 24 * 3600 * 1000L
+                else -> version != local.cardsVersion
+            }
+            val community = if (stale || cached == null) cloud.cards().also { local.storeCards(it, version ?: 0L, now) } else cached
+            cards = withCommunity(community)
+        } catch (_: Exception) { /* Offline: the built-in and cached cards remain. */ }
+    }
+    private fun withCommunity(community: List<Card>): List<Card> {
+        val known = (SeedCards.all + DailyPool.all).map { WordEngine.normalize(it.wordFull) }.toSet()
+        return SeedCards.all + community.filter { WordEngine.normalize(it.wordFull) !in known }
     }
     fun card(id: String): Card? {
         SecretDaily.day(id)?.let { return progress.dailyWords?.get(it) }

@@ -49,7 +49,7 @@ struct LeaderboardView: View {
         .confirmationDialog("Suspendre " + (suspending?.name ?? "") + " ?", isPresented: Binding(get: { suspending != nil }, set: { if !$0 { suspending = nil } }), titleVisibility: .visible) {
             Button("Suspendre", role: .destructive) { if let row = suspending { suspend(row) } }
         } message: {
-            Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Vous pourrez lever la suspension dans Modération.")
+            Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats sont conservés : vous pourrez lever la suspension dans Modération.")
         }
     }
 
@@ -209,7 +209,7 @@ struct FriendsBoard: View {
             }
             Spacer(minLength: 8)
             if let code {
-                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code) {
+                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.home.absoluteString) {
                     Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
                 }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
             }

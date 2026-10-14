@@ -7,9 +7,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
+import com.google.firebase.firestore.WriteBatch
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
@@ -19,6 +22,7 @@ import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.GameMode
+import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
@@ -30,7 +34,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 
-data class CloudProfile(val uid: String, val anonymous: Boolean, val username: String, val email: String? = null)
+data class CloudProfile(val uid: String, val anonymous: Boolean, val username: String, val email: String? = null,
+                        /** Community rules version recorded on the profile, null when never accepted there. */
+                        val rulesVersion: Int? = null)
 data class CardReport(val id: String, val cardId: String, val reason: String, val word: String? = null)
 /** A pseudo reported from the leaderboard. */
 data class PlayerReport(val id: String, val playerId: String, val username: String, val reason: String)
@@ -39,7 +45,9 @@ data class SuspendedPlayer(val id: String, val username: String, val reason: Str
 /** One line of the day's ranking. */
 data class DailyRank(val uid: String, val username: String, val timeMs: Int, val points: Int, val usedHint: Boolean, val wrongAnswers: Int)
 /** Server state of today's Mot du jour for the signed-in player. */
-data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean)
+data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean,
+                        /** Guesses the server has counted, and the last one (normalized). */
+                        val guesses: Int = 0, val guess: String? = null)
 
 /**
  * Everything the app reads and writes on Firebase. The documents and fields are exactly those of
@@ -55,17 +63,26 @@ class CloudRepository(
 
     // ---- Profile
 
-    suspend fun bootstrap(username: String): CloudProfile {
+    /** Signs in (as a guest if needed) and creates the profile once. `rulesVersion`: community rules accepted at creation. */
+    suspend fun bootstrap(username: String, rulesVersion: Int? = null): CloudProfile {
         val user = auth.currentUser ?: auth.signInAnonymously().await().user ?: throw CloudError(CloudError.Kind.AUTHENTICATION)
         val ref = db.collection("users").document(user.uid)
         // Falls back to the cached profile offline, so a returning player keeps their identity.
         val doc = ref.get().await()
         if (!doc.exists()) {
             if (doc.metadata.isFromCache) throw CloudError(CloudError.Kind.OFFLINE)
-            ref.set(mapOf("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
-                "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)).await()
+            val data = mutableMapOf<String, Any?>("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
+                "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)
+            if (rulesVersion != null) { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
+            ref.set(data).await()
+            return CloudProfile(user.uid, user.isAnonymous, username, user.email, rulesVersion)
         }
-        return CloudProfile(user.uid, user.isAnonymous, doc.getString("username") ?: username, user.email)
+        return CloudProfile(user.uid, user.isAnonymous, doc.getString("username") ?: username, user.email, doc.getLong("rulesVersion")?.toInt())
+    }
+
+    /** Records on the profile that the player accepted the community rules (allowed even while suspended). */
+    suspend fun acceptRules(uid: String, version: Int) {
+        db.collection("users").document(uid).update(mapOf("rulesVersion" to version, "rulesAcceptedAt" to FieldValue.serverTimestamp())).await()
     }
 
     /** Renames the profile and, in the same batch, the public leaderboard line. */
@@ -104,12 +121,9 @@ class CloudRepository(
         val user = auth.currentUser?.takeIf { it.uid == uid } ?: throw CloudError(CloudError.Kind.AUTHENTICATION)
         val email = user.email
         if (password != null && email != null) user.reauthenticate(EmailAuthProvider.getCredential(email, password)).await()
-        val refs = mutableListOf<DocumentReference>(
-            db.collection("users").document(uid),
-            db.collection("users").document(uid).collection("private").document("progress"),
-            db.collection("leaderboard").document(uid),
-        )
-        refs += db.collection("users").document(uid).collection("friends").get(Source.SERVER).await().documents.map { it.reference }
+        val users = db.collection("users").document(uid)
+        val refs = mutableListOf<DocumentReference>(users.collection("private").document("progress"), db.collection("leaderboard").document(uid))
+        refs += users.collection("friends").get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }
@@ -117,18 +131,18 @@ class CloudRepository(
         // Approved cards stay in the game without the author's name or id; the other proposals go.
         val authored = db.collection("cards").whereEqualTo("createdBy", uid).get(Source.SERVER).await().documents
         refs += authored.filter { it.getString("status") != "approved" }.map { it.reference }
-        val live = authored.filter { it.getString("status") == "approved" }.map { it.reference }
-        // The profile goes first: the rules only let the daily history go once it is gone.
-        // The first batch also leaves the tombstone that lets friends drop this account.
-        refs.chunked(400).forEachIndexed { index, chunk ->
-            val batch = db.batch()
-            chunk.forEach { batch.delete(it) }
-            if (index == 0) {
-                batch.set(db.collection("deletedUsers").document(uid), mapOf("deletedAt" to FieldValue.serverTimestamp()))
-                live.take(80).forEach { batch.update(it, mapOf("createdBy" to "deleted", "authorName" to FieldValue.delete())) }
-            }
-            batch.commit().await()
+        val writes = refs.map { deleting(it) }.toMutableList()
+        authored.filter { it.getString("status") == "approved" }.forEach { card ->
+            writes.add { it.update(card.reference, mapOf("createdBy" to "deleted", "authorName" to FieldValue.delete())) }
         }
+        // The profile goes first, with the tombstone that lets friends drop this account and any
+        // suspension: the rules only let the daily history and the reports go once the profile is gone.
+        val tombstone: (WriteBatch) -> Unit = { it.set(db.collection("deletedUsers").document(uid), mapOf("deletedAt" to FieldValue.serverTimestamp())) }
+        val first = listOf(deleting(users), tombstone, deleting(db.collection("banned").document(uid)))
+        commitInBatches(first + writes)
+        // Reports naming this player can only be read once the profile is gone.
+        val aboutMe = db.collection("playerReports").whereEqualTo("playerId", uid).get(Source.SERVER).await().documents
+        commitInBatches(aboutMe.map { deleting(it.reference) })
         try {
             user.delete().await()
         } catch (error: Exception) {
@@ -142,11 +156,21 @@ class CloudRepository(
     private fun progressRef(uid: String) = db.collection("users").document(uid).collection("private").document("progress")
     suspend fun cloudProgress(uid: String): Progress? =
         progressRef(uid).get().await().getString("json")?.let { Progress.fromJson(it) }
-    /** Queued by Firestore when offline and sent once the network is back. */
-    fun saveCloudProgress(progress: Progress, uid: String) {
-        val json = progress.toJson()
-        if (json.length > 900_000) throw CloudError(CloudError.Kind.PROGRESS_TOO_LARGE)
-        progressRef(uid).set(mapOf("json" to json, "schema" to 1, "updatedAt" to FieldValue.serverTimestamp()))
+    /**
+     * Merges this copy into the online one in a transaction, so two devices saving at once never lose
+     * a game. Returns what was saved. Needs the network: offline it fails and overwrites nothing.
+     */
+    suspend fun saveCloudProgress(progress: Progress, uid: String): Progress {
+        val ref = progressRef(uid)
+        return db.runTransaction { transaction ->
+            val json = transaction.get(ref).getString("json")
+            // An online copy this version cannot read is never overwritten.
+            val merged = if (json == null) progress else progress.merged(Progress.fromJson(json))
+            val encoded = merged.toJson()
+            if (encoded.length > 900_000) throw CloudError(CloudError.Kind.PROGRESS_TOO_LARGE)
+            transaction.set(ref, mapOf("json" to encoded, "schema" to 1, "updatedAt" to FieldValue.serverTimestamp()))
+            merged
+        }.await()
     }
 
     // ---- Mot du jour (secret word: consonants first, hint once used, word once finished)
@@ -174,7 +198,8 @@ class CloudRepository(
         val d = sessionRef(uid, day).get(Source.SERVER).await()
         val cardId = d.getString("cardId") ?: return null
         val started = d.getTimestamp("startedAt") ?: return null
-        return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"))
+        return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"),
+            (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"))
     }
     /** Starts today's clock on the server. Returns only once the server has recorded the start. */
     suspend fun startDaily(uid: String, day: String, cardId: String): DailySession {
@@ -188,8 +213,40 @@ class CloudRepository(
         return dailyHint(day)
     }
     /**
+     * Counts one more guess on the server before it can be checked (at most 20 a day, one per second),
+     * in a transaction. Returns the number of guesses so far, this one included.
+     */
+    suspend fun registerGuess(uid: String, day: String, guess: String): Int {
+        val ref = sessionRef(uid, day)
+        val count = try {
+            withTimeoutOrNull(15_000) {
+                db.runTransaction { transaction ->
+                    val session = transaction.get(ref)
+                    if (!session.exists() || session.contains("finishedAt")) -1L
+                    else {
+                        val next = (session.getLong("guesses") ?: 0L) + 1
+                        if (next > Guesses.MAX) 0L
+                        else {
+                            transaction.update(ref, mapOf("guesses" to next, "guess" to guess, "guessAt" to FieldValue.serverTimestamp()))
+                            next
+                        }
+                    }
+                }.await()
+            } ?: throw CloudError(CloudError.Kind.OFFLINE)
+        } catch (error: FirebaseFirestoreException) {
+            // The rules refuse a guess less than a second after the previous one.
+            throw CloudError(if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) CloudError.Kind.GUESS_TOO_SOON else CloudError.Kind.OFFLINE)
+        }
+        return when (count) {
+            -1L -> throw CloudError(CloudError.Kind.DAILY_FINISHED)
+            0L -> throw CloudError(CloudError.Kind.GUESS_LIMIT)
+            else -> count.toInt()
+        }
+    }
+    /**
      * Stamps the finish with the server time. False if the network did not confirm in time: the write
-     * stays queued. For a secret word, `answer` is the normalized guess: a wrong one is refused.
+     * stays queued. A win names the last registered guess (`answer`, normalized) with
+     * `wrongAnswers` = guesses - 1; a loss has no answer and `wrongAnswers` = guesses. Anything else is refused.
      */
     suspend fun finishDaily(uid: String, day: String, correct: Boolean, wrongAnswers: Int, answer: String? = null): Boolean {
         val data = mutableMapOf<String, Any>("finishedAt" to FieldValue.serverTimestamp(), "correct" to correct, "wrongAnswers" to wrongAnswers)
@@ -232,21 +289,25 @@ class CloudRepository(
 
     suspend fun leaderboardEntry(uid: String, source: Source = Source.DEFAULT): LeaderboardEntry? =
         db.collection("leaderboard").document(uid).get(source).await().data?.let { entry(uid, it) }
-    suspend fun topPlayers(limit: Long = 50): List<LeaderboardEntry> =
-        db.collection("leaderboard").orderBy("points", Query.Direction.DESCENDING).limit(limit).get().await().documents.mapNotNull { d -> d.data?.let { entry(d.id, it) } }
-    suspend fun fastestPlayers(limit: Long = 50): List<LeaderboardEntry> =
-        db.collection("leaderboard").whereGreaterThan("bestTimeMs", 0).orderBy("bestTimeMs").limit(limit).get().await().documents.mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    suspend fun topPlayers(limit: Int = 25): List<LeaderboardEntry> =
+        visible(db.collection("leaderboard").orderBy("points", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    suspend fun fastestPlayers(limit: Int = 25): List<LeaderboardEntry> =
+        visible(db.collection("leaderboard").whereGreaterThan("bestTimeMs", 0).orderBy("bestTimeMs"), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    /** A few more than needed, so the list stays full once suspended players are left out. */
+    private suspend fun visible(query: Query, limit: Int): List<DocumentSnapshot> =
+        query.limit(limit + 10L).get().await().documents.filter { it.getBoolean("suspended") != true }.take(limit)
     /** Rank by official points among every player. */
     suspend fun rank(points: Int): Pair<Int, Int> {
         val board = db.collection("leaderboard")
         return (count(board.whereGreaterThan("points", points)) + 1) to count(board)
     }
-    suspend fun dailyRanking(day: String, limit: Long = 50): List<DailyRank> =
-        db.collection("dailyResults").whereEqualTo("day", day).whereEqualTo("correct", true).orderBy("timeMs").limit(limit).get().await().documents.mapNotNull { d ->
-            val uid = d.getString("userId") ?: return@mapNotNull null
-            val timeMs = d.getLong("timeMs")?.toInt() ?: return@mapNotNull null
-            DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, (d.getLong("points") ?: 0).toInt(), d.getBoolean("usedHint") ?: false, (d.getLong("wrongAnswers") ?: 0).toInt())
-        }
+    suspend fun dailyRanking(day: String, limit: Int = 25): List<DailyRank> =
+        visible(db.collection("dailyResults").whereEqualTo("day", day).whereEqualTo("correct", true).orderBy("timeMs"), limit).mapNotNull { dailyRank(it) }
+    private fun dailyRank(d: DocumentSnapshot): DailyRank? {
+        val uid = d.getString("userId") ?: return null
+        val timeMs = d.getLong("timeMs")?.toInt() ?: return null
+        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, (d.getLong("points") ?: 0).toInt(), d.getBoolean("usedHint") ?: false, (d.getLong("wrongAnswers") ?: 0).toInt())
+    }
     /** Players who were slower or did not find the word, among everyone else who played today. */
     suspend fun standing(day: String, timeMs: Int, correct: Boolean): DailyStanding {
         val today = db.collection("dailyResults").whereEqualTo("day", day)
@@ -300,12 +361,17 @@ class CloudRepository(
         val players = listOf(uid to username) + friends.map { it.id to (it.getString("username") ?: "Joueur") }
         val rows = mutableListOf<FriendStanding>()
         for ((player, name) in players) {
-            // A friend who deleted their account leaves the list for good.
-            if (player != uid && db.collection("deletedUsers").document(player).get(Source.SERVER).await().exists()) {
-                runCatching { removeFriend(uid, player) }
-                continue
+            val board = db.collection("leaderboard").document(player).get(Source.SERVER).await()
+            val entry = board.data?.let { entry(player, it) }
+            if (player != uid) {
+                // A suspended friend is hidden like on the public rankings.
+                if (board.getBoolean("suspended") == true) continue
+                // A friend who deleted their account leaves the list for good (no totals left, so check only then).
+                if (entry == null && db.collection("deletedUsers").document(player).get(Source.SERVER).await().exists()) {
+                    runCatching { removeFriend(uid, player) }
+                    continue
+                }
             }
-            val entry = leaderboardEntry(player, Source.SERVER)
             val result = resultRef(player, day).get(Source.SERVER).await()
             val today = result.data?.let { attempt(day, it) }
             rows += FriendStanding(player, entry?.username ?: name, entry?.points ?: 0, entry?.currentStreak() ?: 0, today, result.getLong("wrongAnswers")?.toInt())
@@ -315,6 +381,15 @@ class CloudRepository(
 
     // ---- Community cards
 
+    /**
+     * Version of the approved catalogue (`meta/cards`, moved by moderators), in milliseconds: one read
+     * instead of the whole catalogue. Null while the document does not exist yet.
+     */
+    suspend fun cardsVersion(): Long? =
+        db.collection("meta").document("cards").get().await().getTimestamp("updatedAt")?.let { millis(it) }
+    private fun bumpCards(batch: WriteBatch) {
+        batch.set(db.collection("meta").document("cards"), mapOf("updatedAt" to FieldValue.serverTimestamp()))
+    }
     suspend fun cards(): List<Card> =
         db.collection("cards").whereEqualTo("status", "approved").limit(500).get().await().documents.mapNotNull { d -> d.data?.let { decode(d.id, it) } }
 
@@ -387,17 +462,32 @@ class CloudRepository(
         return db.collection("admins").document(user.uid).get(Source.SERVER).await().exists()
     }
     suspend fun isSuspended(uid: String): Boolean = db.collection("banned").document(uid).get(Source.SERVER).await().exists()
-    /** Suspends a player and takes them off the leaderboards; their games stay recorded. */
+    /** Suspends a player and hides them from the rankings. Results and totals are kept, so lifting it gives everything back. */
     suspend fun suspend(player: String, username: String, reason: String) {
         val uid = currentUid ?: throw CloudError(CloudError.Kind.AUTHENTICATION)
-        val results = db.collection("dailyResults").whereEqualTo("userId", player).get(Source.SERVER).await().documents
-        val batch = db.batch()
-        batch.set(db.collection("banned").document(player), mapOf("username" to username, "reason" to reason, "bannedAt" to FieldValue.serverTimestamp(), "bannedBy" to uid))
-        batch.delete(db.collection("leaderboard").document(player))
-        results.take(400).forEach { batch.delete(it.reference) }
-        batch.commit().await()
+        val ban = db.collection("banned").document(player)
+        val record: (WriteBatch) -> Unit = {
+            it.set(ban, mapOf("username" to username.take(40), "reason" to reason.take(300), "bannedAt" to FieldValue.serverTimestamp(), "bannedBy" to uid))
+        }
+        commitInBatches(listOf(record) + markSuspended(player, true))
     }
-    suspend fun unsuspend(player: String) { db.collection("banned").document(player).delete().await() }
+    suspend fun unsuspend(player: String) {
+        val ban = db.collection("banned").document(player)
+        commitInBatches(listOf(deleting(ban)) + markSuspended(player, false))
+    }
+    /** The `suspended` flag on the player's leaderboard line (when there is one) and on every daily result. */
+    private suspend fun markSuspended(player: String, suspended: Boolean): List<(WriteBatch) -> Unit> {
+        val value: Any = if (suspended) true else FieldValue.delete()
+        val refs = mutableListOf<DocumentReference>()
+        val board = db.collection("leaderboard").document(player)
+        if (board.get(Source.SERVER).await().exists()) refs += board
+        refs += db.collection("dailyResults").whereEqualTo("userId", player).get(Source.SERVER).await().documents.map { it.reference }
+        return refs.map { ref -> updating(ref, value) }
+    }
+    /** Today's wins under 5 seconds, fastest first, for a moderator to check. Suspended players are left out. */
+    suspend fun suspiciousTimes(day: String): List<DailyRank> =
+        db.collection("dailyResults").whereEqualTo("day", day).whereEqualTo("correct", true).whereLessThan("timeMs", 5000).orderBy("timeMs").limit(20)
+            .get(Source.SERVER).await().documents.filter { it.getBoolean("suspended") != true }.mapNotNull { dailyRank(it) }
     suspend fun suspendedPlayers(): List<SuspendedPlayer> =
         db.collection("banned").limit(100).get(Source.SERVER).await().documents.map { SuspendedPlayer(it.id, it.getString("username") ?: "Joueur", it.getString("reason") ?: "") }
     suspend fun pendingCards(): List<Card> {
@@ -413,7 +503,10 @@ class CloudRepository(
         val fields = mutableMapOf<String, Any>("status" to if (approved) "approved" else "rejected", "reviewedAt" to FieldValue.serverTimestamp(), "reviewedBy" to uid,
             "hint" to card.hint, "category" to card.category.label, "difficulty" to card.difficulty.label)
         card.author?.let { fields["authorName"] = it }
-        db.collection("cards").document(card.id).update(fields).await()
+        val batch = db.batch()
+        batch.update(db.collection("cards").document(card.id), fields)
+        bumpCards(batch)
+        batch.commit().await()
     }
     suspend fun pendingReports(): List<CardReport> =
         db.collection("reports").whereEqualTo("status", "pending").limit(50).get(Source.SERVER).await().documents.mapNotNull { d ->
@@ -426,6 +519,7 @@ class CloudRepository(
         val batch = db.batch()
         batch.update(db.collection("cards").document(report.cardId), mapOf("status" to "rejected", "reviewedBy" to uid, "reviewedAt" to FieldValue.serverTimestamp()))
         batch.update(db.collection("reports").document(report.id), mapOf("status" to "resolved", "reviewedBy" to uid, "reviewedAt" to FieldValue.serverTimestamp()))
+        bumpCards(batch)
         batch.commit().await()
     }
     suspend fun resolve(report: CardReport) = resolve("reports", report.id)
@@ -439,6 +533,17 @@ class CloudRepository(
             val player = d.getString("playerId") ?: return@mapNotNull null
             PlayerReport(d.id, player, d.getString("username") ?: return@mapNotNull null, d.getString("reason") ?: "")
         }
+
+    private fun deleting(ref: DocumentReference): (WriteBatch) -> Unit = { it.delete(ref) }
+    private fun updating(ref: DocumentReference, suspended: Any): (WriteBatch) -> Unit = { it.update(ref, "suspended", suspended) }
+    /** Commits the writes in order, at most 400 per batch (Firestore allows 500). */
+    private suspend fun commitInBatches(writes: List<(WriteBatch) -> Unit>) {
+        for (chunk in writes.chunked(400)) {
+            val batch = db.batch()
+            chunk.forEach { it(batch) }
+            batch.commit().await()
+        }
+    }
 
     // ---- Decoding
 

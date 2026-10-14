@@ -183,6 +183,13 @@ jobs:
           set -euo pipefail
           Scripts/ci_integration_tests.sh 2>&1 | tee "$CI_ROOT/logs/integration-tests.log"
 
+      - name: Afficher les rapports de plantage de l'app
+        if: failure()
+        run: |
+          for f in $(ls -t ~/Library/Logs/DiagnosticReports/CNSNN*.ips 2>/dev/null | head -2); do
+            echo "== $f"; head -c 12000 "$f"; echo
+          done
+
       - name: Exécuter les tests UI optionnels
         if: ${{ inputs.run_ui_tests }}
         run: |

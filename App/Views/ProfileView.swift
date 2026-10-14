@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var account = false
     @State private var moderation = false
     @State private var privacy = false
+    @State private var rules = false
     /// Signature at the bottom of the profile.
     private var credits: some View {
         VStack(spacing: 6) {
@@ -49,6 +50,8 @@ struct ProfileView: View {
                     Link(destination: Support.mail) { row("Contacter le support", symbol: "envelope") }
                     Rectangle().fill(Palette.line).frame(height: 1)
                     Button { privacy = true } label: { row("Confidentialité", symbol: "hand.raised") }
+                    Rectangle().fill(Palette.line).frame(height: 1)
+                    Button { rules = true } label: { row("Règles de la communauté", symbol: "person.2") }
                 }.glassPanel(radius: 24, padding: 0).buttonStyle(PressStyle(scale: 0.99))
                 Text(state.uid == nil ? "Mode local : votre progression reste sur cet iPhone." : (state.isAnonymous ? "Compte invité sauvegardé en ligne. Créez un compte pour le retrouver sur un autre iPhone." : "Compte permanent : votre progression vous suit sur tous vos appareils."))
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
@@ -58,6 +61,7 @@ struct ProfileView: View {
             .sheet(isPresented: $account) { AccountView() }
             .sheet(isPresented: $moderation) { NavigationStack { ModerationView() } }
             .sheet(isPresented: $privacy) { PrivacyView() }
+            .sheet(isPresented: $rules) { CommunityRulesView() }
             .alert("Modifier le pseudo", isPresented: $editingName) {
                 TextField("Pseudo", text: $name)
                 Button("Enregistrer") { Task { await state.rename(name) } }
@@ -250,11 +254,14 @@ struct PrivacyView: View {
     ]
     var body: some View {
         NavigationStack {
-            List(sections, id: \.0) { section in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(section.0).font(.headline)
-                    Text(section.1).font(.subheadline).foregroundStyle(.secondary)
-                }.padding(.vertical, 4)
+            List {
+                ForEach(sections, id: \.0) { section in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(section.0).font(.headline)
+                        Text(section.1).font(.subheadline).foregroundStyle(.secondary)
+                    }.padding(.vertical, 4)
+                }
+                Link("Politique de confidentialité complète", destination: Site.privacy)
             }
             .navigationTitle("Confidentialité")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supprimer mon compte · CNSNN</title>
+<meta name="description" content="Supprimez votre compte CNSNN et toutes vos données, sans l’application.">
+<meta name="theme-color" content="#06070c">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a><a href="/suppression">Supprimer mon compte</a></nav>
+<h1>Supprimer mon compte</h1>
+<p class="lead">Effacez votre compte CNSNN et toutes vos données.</p>
+<p>La suppression efface votre profil, vos résultats, votre place au classement, vos amis, votre code ami, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom. <strong>C’est définitif.</strong></p>
+<form class="card" id="delete" autocomplete="on">
+  <h2 style="margin-top:0">Compte avec email</h2>
+  <label for="email">Email</label>
+  <input id="email" type="email" autocomplete="email" required>
+  <label for="password">Mot de passe</label>
+  <input id="password" type="password" autocomplete="current-password" required>
+  <label class="check"><input id="confirm" type="checkbox" required> <span>Je comprends que mon compte et mes données seront supprimés définitivement.</span></label>
+  <div class="buttons"><button id="submit" type="submit">Supprimer mon compte</button></div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+</form>
+<div class="card">
+  <h2 style="margin-top:0">Compte invité</h2>
+  <p class="muted">Un compte invité n’a pas de mot de passe : supprimez-le depuis l’application (Profil, puis Mon compte, puis Supprimer mes données). Si vous n’avez plus l’appareil, écrivez à <a href="mailto:jeucnsnn@gmail.com?subject=Suppression%20de%20compte">jeucnsnn@gmail.com</a> avec votre pseudo et, si possible, votre code ami : la suppression est faite sous 30 jours.</p>
+</div>
+<noscript><p class="status error">Cette page a besoin de JavaScript. Vous pouvez aussi écrire à jeucnsnn@gmail.com.</p></noscript>
+<footer>CNSNN, une application créée par Poupoutch. Contact : <a href="mailto:jeucnsnn@gmail.com">jeucnsnn@gmail.com</a></footer>
+</main>
+<script type="module" src="/suppression.js"></script>
+</body>
+</html>

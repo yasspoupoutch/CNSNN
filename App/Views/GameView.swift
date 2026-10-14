@@ -126,8 +126,10 @@ struct GameView: View {
                     Text("Vérification…").foregroundStyle(Palette.secondary)
                 } else if let notice = session.notice {
                     Text(notice).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
+                } else if let left = session.guessesNotice {
+                    Text(left).foregroundStyle(Palette.secondary)
                 } else {
-                    Text(session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
+                    Text(session.secret ? "Chrono officiel. 20 essais pour trouver le mot." : session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
                         .foregroundStyle(Palette.tertiary)
                 }
             }.scaledFont(12).padding(.top, 6)

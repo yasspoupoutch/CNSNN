@@ -30,9 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Difficulty
+import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.data.CardReport
 import com.poupoutch.cnsnn.data.CloudError
+import com.poupoutch.cnsnn.data.DailyRank
 import com.poupoutch.cnsnn.data.PlayerReport
 import com.poupoutch.cnsnn.data.SuspendedPlayer
 import com.poupoutch.cnsnn.state.AppViewModel
@@ -45,6 +48,7 @@ fun ModerationContent(state: AppViewModel) {
     var reports by remember { mutableStateOf<List<CardReport>>(emptyList()) }
     var playerReports by remember { mutableStateOf<List<PlayerReport>>(emptyList()) }
     var suspended by remember { mutableStateOf<List<SuspendedPlayer>>(emptyList()) }
+    var suspicious by remember { mutableStateOf<List<DailyRank>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -56,6 +60,7 @@ fun ModerationContent(state: AppViewModel) {
             if (!cloud.isAdmin()) { message = "Accès administrateur requis."; return }
             cards = cloud.pendingCards(); reports = cloud.pendingReports()
             playerReports = cloud.pendingPlayerReports(); suspended = cloud.suspendedPlayers()
+            suspicious = cloud.suspiciousTimes(DailySchedule.key())
             loaded = true
         } catch (e: Exception) { message = CloudError.message(e) }
     }
@@ -120,7 +125,23 @@ fun ModerationContent(state: AppViewModel) {
                 }
             }
         }
-        Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler.", fontSize = 12.sp, color = Palette.tertiary)
+        Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses points sont conservés.", fontSize = 12.sp, color = Palette.tertiary)
+
+        Kicker("Temps suspects", modifier = Modifier.padding(top = 10.dp))
+        if (suspicious.isEmpty()) Text(loading ?: "Aucun temps sous 5 secondes aujourd’hui.", color = Palette.secondary)
+        suspicious.forEach { rank ->
+            SectionCard(radius = 22.dp, padding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(rank.username, fontWeight = FontWeight.SemiBold)
+                        Text(Format.seconds(rank.timeMs) + if (rank.usedHint) " · indice" else "", fontSize = 12.sp, color = Palette.secondary)
+                    }
+                    Button({ act { cloud.suspend(rank.uid, rank.username, "Temps suspect") } }, enabled = !busy,
+                        colors = ButtonDefaults.buttonColors(containerColor = Palette.red)) { Text("Suspendre") }
+                }
+            }
+        }
+        Text("Mots du jour trouvés aujourd’hui en moins de 5 secondes.", fontSize = 12.sp, color = Palette.tertiary)
 
         Kicker("Joueurs suspendus", modifier = Modifier.padding(top = 10.dp))
         if (suspended.isEmpty()) Text(loading ?: "Aucun joueur suspendu.", color = Palette.secondary)
@@ -131,10 +152,12 @@ fun ModerationContent(state: AppViewModel) {
                         Text(player.username, fontWeight = FontWeight.SemiBold)
                         if (player.reason.isNotEmpty()) Text(player.reason, fontSize = 12.sp, color = Palette.secondary)
                     }
-                    OutlinedButton({ act { cloud.unsuspend(player.id) } }, enabled = !busy) { Text("Rétablir") }
+                    OutlinedButton({ act { cloud.unsuspend(player.id); message = "${player.username} est rétabli et retrouve ses résultats, ses points et sa place au classement." } },
+                        enabled = !busy) { Text("Rétablir") }
                 }
             }
         }
+        Text("Rétablir un joueur lui rend tout : ses résultats, ses points et sa place au classement.", fontSize = 12.sp, color = Palette.tertiary)
         Spacer(Modifier.height(24.dp))
     }
 }

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Shield
@@ -63,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -73,7 +75,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.poupoutch.cnsnn.BuildConfig
+import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.Format
+import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.state.AppViewModel
@@ -87,6 +91,7 @@ fun ProfileScreen(state: AppViewModel) {
     var account by rememberSaveable { mutableStateOf(false) }
     var moderation by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
+    var rules by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     LaunchedEffect(Unit) { state.refreshModeration() }
 
@@ -113,6 +118,8 @@ fun ProfileScreen(state: AppViewModel) {
                 context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SUPPORT_EMAIL?subject=CNSNN")))
             }
             Divider()
+            NavRow(CommunityRules.TITLE, Icons.Outlined.Gavel) { rules = true }
+            Divider()
             NavRow("Confidentialité", Icons.Outlined.PrivacyTip) { privacy = true }
         }
         Text(when {
@@ -131,6 +138,12 @@ fun ProfileScreen(state: AppViewModel) {
     if (account) FullScreen("Votre compte", { account = false }) { AccountContent(state) { account = false } }
     if (moderation) FullScreen("Modération", { moderation = false }) { ModerationContent(state) }
     if (privacy) FullScreen("Confidentialité", { privacy = false }) { PrivacyContent() }
+    if (rules) FullScreen(CommunityRules.TITLE, { rules = false }) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+            CommunityRulesList()
+            Spacer(Modifier.height(24.dp))
+        }
+    }
 }
 
 @Composable
@@ -297,11 +310,13 @@ private fun PrivacyContent() {
     val sections = listOf(
         "Ce que nous enregistrons" to "Votre pseudo, vos parties (mots du jour, temps, points, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter.",
         "Ce qui est public" to "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché.",
-        "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication et Cloud Firestore), et sur votre téléphone. Aucune publicité, aucun traceur, aucune revente de données.",
+        "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et Crashlytics), et sur votre téléphone. Aucune publicité, aucun traceur, aucune revente de données.",
+        "Rapports de plantage" to "Si l’application plante, un rapport technique (modèle et version du téléphone, version de l’app, détail de l’erreur) est envoyé à Firebase Crashlytics pour corriger le problème. Il ne contient ni votre pseudo ni votre email et ne sert jamais à la publicité ni au suivi.",
         "Notifications et widget" to "Le rappel du mot du jour et le widget sont calculés sur votre téléphone : rien n’est envoyé par un serveur.",
         "Supprimer vos données" to "Profil > Mon compte > Supprimer mon compte efface votre profil, vos résultats, votre place au classement, vos amis, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom.",
         "Nous contacter" to "Pour toute question ou demande sur vos données : $SUPPORT_EMAIL.",
     )
+    val links = LocalUriHandler.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         sections.forEach { (title, body) ->
             SectionCard(radius = 22.dp, padding = 18.dp) {
@@ -309,7 +324,23 @@ private fun PrivacyContent() {
                 Text(body, fontSize = 14.sp, color = Palette.secondary, modifier = Modifier.padding(top = 6.dp))
             }
         }
+        TonalButton("Lire la politique complète", Modifier.fillMaxWidth()) { runCatching { links.openUri(Site.PRIVACY) } }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** The community rules, numbered, as in the onboarding, the acceptance sheet and the site. */
+@Composable
+fun CommunityRulesList(modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CommunityRules.items.forEachIndexed { index, rule ->
+            SectionCard(radius = 22.dp, padding = 16.dp) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("${index + 1}", fontWeight = FontWeight.Black, color = Palette.accent, fontSize = 17.sp)
+                    Text(rule, fontSize = 14.sp, color = Palette.secondary)
+                }
+            }
+        }
     }
 }
 

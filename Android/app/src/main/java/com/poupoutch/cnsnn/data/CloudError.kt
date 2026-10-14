@@ -22,6 +22,9 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         ALREADY_REPORTED("Votre signalement est déjà envoyé. Merci !"),
         FRIEND_NOT_FOUND("Aucun joueur n’a ce code. Vérifiez les 6 caractères."),
         FRIEND_IS_YOU("C’est votre propre code. Envoyez-le à vos amis !"),
+        GUESS_TOO_SOON("Patientez une seconde avant de réessayer."),
+        GUESS_LIMIT("Vous avez utilisé vos 20 essais du jour."),
+        DAILY_FINISHED("Votre partie du jour est déjà terminée."),
     }
 
     enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }

@@ -88,7 +88,10 @@ data class Submission(
     val id: String = UUID.randomUUID().toString().uppercase(),
     val card: Card,
     @Serializable(with = AppleDateSerializer::class) val createdAt: Instant = Instant.now(),
-)
+) {
+    /** The proposed word, normalized: the same card id on every device and on the server. */
+    val word: String get() = WordEngine.normalize(card.wordFull)
+}
 
 @Serializable
 data class Progress(
@@ -100,6 +103,8 @@ data class Progress(
     val dailyStartedAt: Map<String, @Serializable(with = AppleDateSerializer::class) Instant> = emptyMap(),
     /** Secret Mot du jour words, revealed by the server once the day's game is over (by day key). */
     val dailyWords: Map<String, Card>? = null,
+    /** Version of the community rules this player accepted (CommunityRules.VERSION), null before any. */
+    val rulesVersion: Int? = null,
 ) {
     val score: Int get() = attempts.sumOf { it.points }
     val correctAnswers: Int get() = attempts.count { it.correct }
@@ -142,15 +147,23 @@ data class Progress(
                 }
             }
         }
-        val submissionIds = submissions.map { it.id }.toSet()
+        // One proposal per word: the reviewed copy wins over a pending one, otherwise this device's.
+        val proposals = LinkedHashMap<String, Submission>()
+        for (submission in submissions) proposals.putIfAbsent(submission.word, submission)
+        for (submission in other.submissions) {
+            val known = proposals[submission.word]
+            if (known == null || (known.card.status == ReviewStatus.PENDING && submission.card.status != ReviewStatus.PENDING)) proposals[submission.word] = submission
+        }
+        val rules = listOfNotNull(rulesVersion, other.rulesVersion).maxOrNull()
         return copy(
             username = username.ifEmpty { other.username },
             attempts = all.sortedBy { it.date },
             dailyStarted = other.dailyStarted + dailyStarted,
             dailyStartedAt = other.dailyStartedAt + dailyStartedAt,
             dailyWords = words,
-            submissions = submissions + other.submissions.filter { it.id !in submissionIds },
+            submissions = proposals.values.toList(),
             recentCards = recentCards.ifEmpty { other.recentCards },
+            rulesVersion = rules,
         )
     }
 

@@ -73,3 +73,40 @@ object FriendCode {
     fun normalize(text: String): String = text.uppercase().filter { it in ALPHABET }.take(6)
     fun random(): String = (1..6).map { ALPHABET.random() }.joinToString("")
 }
+
+/** The public site: rules, privacy policy, and the link that ends every share. */
+object Site {
+    const val URL = "https://cnsnn-9ctosy.web.app"
+    const val RULES = "$URL/regles"
+    const val PRIVACY = "$URL/confidentialite"
+    fun friendInvite(code: String) = "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est $code. $URL"
+}
+
+/** The community rules every player accepts (same text and version as the iPhone app and the site). */
+object CommunityRules {
+    const val VERSION = 1
+    const val TITLE = "Règles de la communauté"
+    val items = listOf(
+        "Un pseudo correct : pas d’insulte, de propos haineux ou sexuels, ni d’usurpation d’identité.",
+        "Des cartes pour tous : les mots et indices proposés ne contiennent rien d’offensant ni de données personnelles.",
+        "Pas de triche : ni programme, ni aide automatique, ni comptes multiples pour fausser les classements.",
+        "Du respect : pas de harcèlement, pas de signalements abusifs.",
+        "La modération peut refuser une carte, masquer un pseudo ou suspendre un compte. Une question : jeucnsnn@gmail.com.",
+    )
+    /** A player with a pseudo who has not accepted the current version yet. */
+    fun mustAccept(progress: Progress): Boolean = progress.username.isNotEmpty() && (progress.rulesVersion ?: 0) < VERSION
+}
+
+/** The Mot du jour allows 20 guesses, each counted by the server before it is checked. */
+object Guesses {
+    const val MAX = 20
+    /** "Plus que 3 essais" once 5 or fewer remain, null before. */
+    fun remainingText(used: Int): String? {
+        val left = MAX - used
+        return when {
+            left > 5 || left < 1 -> null
+            left == 1 -> "Plus qu’un essai"
+            else -> "Plus que $left essais"
+        }
+    }
+}
