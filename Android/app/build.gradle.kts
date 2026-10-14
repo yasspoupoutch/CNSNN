@@ -1,5 +1,3 @@
-import java.util.Base64
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,11 +6,8 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// Release signing comes from GitHub secrets (the keystore never goes in the repository).
-val keystoreBase64: String? = System.getenv("ANDROID_KEYSTORE_BASE64")?.takeIf { it.isNotBlank() }
-val releaseKeystore = keystoreBase64?.let {
-    layout.buildDirectory.file("release.keystore").get().asFile.apply { parentFile.mkdirs(); writeBytes(Base64.getMimeDecoder().decode(it)) }
-}
+// Release signing: CI decrypts Android/signing/release.enc.json into a temporary file (never in the repository).
+val releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }?.let { file(it) }
 
 android {
     namespace = "com.poupoutch.cnsnn"

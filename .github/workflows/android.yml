@@ -61,6 +61,7 @@ jobs:
         run: |
           ./gradlew --no-daemon :app:assembleRelease :app:lintRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/CNSNN.apk"
+          rm -f "$RUNNER_TEMP/release.p12"
       - uses: actions/upload-artifact@v4
         with:
           name: CNSNN-Android-APK

@@ -22,9 +22,12 @@ if (command === 'encrypt') {
   if (!path) throw new Error('GOOGLE_APPLICATION_CREDENTIALS manquant');
   const { private_key: privateKey } = JSON.parse(await readFile(path, 'utf8'));
   const [{ keystore, password: pass }] = decrypt(JSON.parse(await readFile(boxFile, 'utf8')), privateKey);
-  // Masked in the logs, then handed to the next steps only.
+  // The key goes to a private file outside the repository; only its path and the masked
+  // password are handed to the next steps, so nothing of the key appears in the logs.
+  const target = `${process.env.RUNNER_TEMP}/release.p12`;
+  await writeFile(target, Buffer.from(keystore, 'base64'), { mode: 0o600 });
   console.log(`::add-mask::${pass}`);
-  await appendFile(process.env.GITHUB_ENV, `ANDROID_KEYSTORE_PASSWORD=${pass}\nANDROID_KEYSTORE_BASE64<<KEYSTORE_EOF\n${keystore}\nKEYSTORE_EOF\n`);
+  await appendFile(process.env.GITHUB_ENV, `ANDROID_KEYSTORE_FILE=${target}\nANDROID_KEYSTORE_PASSWORD=${pass}\n`);
   console.log('Clé de signature prête.');
 } else {
   console.error('Usage : signing.mjs encrypt <fichier.p12> <mot de passe> | decrypt');
