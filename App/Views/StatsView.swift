@@ -22,6 +22,7 @@ struct StatsView: View {
         }.tabBarInset().scrollIndicators(.hidden)
             .refreshable { refreshToken += 1; await state.refreshOfficial() }
             .animation(CNSNNTheme.ease, value: page)
+            .onChange(of: state.leaderboardRequest) { _, _ in page = 1 }
     }
 
     @ViewBuilder private var mine: some View {

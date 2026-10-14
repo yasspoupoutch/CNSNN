@@ -139,6 +139,57 @@ import CNSNNCore
         XCTAssertEqual(alone.map(\.uid), [bob.uid])
     }
 
+    /// A friend challenge from end to end: sent to a friend only, both clocks kept by the server,
+    /// the same winner on both sides, and gone with either account.
+    func testFriendChallengeFlow() async throws {
+        let alice = try await repo.bootstrap(username: "Alice")
+        _ = try await repo.createPermanentAccount(email: "alice@cnsnn.test", password: "motdepasse1")
+        let aliceCode = try await repo.friendCode(uid: alice.uid, username: "Alice")
+        try repo.signOut()
+        let bob = try await repo.bootstrap(username: "Bob")
+        _ = try await repo.createPermanentAccount(email: "bob@cnsnn.test", password: "motdepasse2")
+        let ids = ChallengeRules.draw(seed: 42)
+        // Only a friend can be challenged.
+        await assertThrows { _ = try await self.repo.createChallenge(uid: bob.uid, username: "Bob", friend: alice.uid, friendName: "Alice", cardIDs: ids) }
+        _ = try await repo.addFriend(code: aliceCode, uid: bob.uid)
+        let challenge = try await repo.createChallenge(uid: bob.uid, username: "Bob", friend: alice.uid, friendName: "Alice", cardIDs: ids)
+        XCTAssertEqual(challenge.cardIds, ids)
+        XCTAssertNotNil(challenge.from.startedMs)
+        XCTAssertNil(challenge.to.startedMs)
+        // Too fast for 5 words: refused. Bob skips all 5 (+100 s).
+        await assertThrows { _ = try await self.repo.finishChallenge(challenge, uid: bob.uid, skips: 0, errors: 0) }
+        XCTAssertTrue(try await repo.finishChallenge(challenge, uid: bob.uid, skips: 5, errors: 2))
+        let sent = try await repo.challenges(uid: bob.uid)
+        XCTAssertEqual(sent.map(\.id), [challenge.id])
+        XCTAssertEqual(sent.first?.state(for: bob.uid, now: now()), .waiting)
+
+        // Alice sees it, starts her clock (and gets Bob as a friend), then finds 2 words and skips 3.
+        try repo.signOut()
+        _ = try await repo.signIn(email: "alice@cnsnn.test", password: "motdepasse1")
+        let inbox = try await repo.challenges(uid: alice.uid)
+        let received = try XCTUnwrap(inbox.first)
+        XCTAssertEqual(received.state(for: alice.uid, now: now()), .yourTurn)
+        XCTAssertEqual(received.from.name, "Bob")
+        let started = try await repo.startChallenge(received, uid: alice.uid)
+        XCTAssertNotNil(started.to.startedMs)
+        let friends = try await repo.friends(uid: alice.uid)
+        XCTAssertEqual(friends.map(\.uid), [bob.uid])
+        await assertThrows { _ = try await self.repo.finishChallenge(started, uid: alice.uid, skips: 3, errors: 0) }
+        try await Task.sleep(for: .milliseconds(4300))
+        XCTAssertTrue(try await repo.finishChallenge(started, uid: alice.uid, skips: 3, errors: 1))
+        let over = try await XCTUnwrapAsync(try await repo.challenge(id: challenge.id))
+        XCTAssertEqual(over.result(for: alice.uid, now: now()), .won)
+        XCTAssertEqual(over.result(for: bob.uid, now: now()), .lost)
+        XCTAssertEqual(ChallengeTally.of([over], me: alice.uid, friend: bob.uid, now: now()).label, "1 victoire · 0 défaite")
+
+        // Deleting Alice's account removes the challenge for Bob too.
+        try await repo.deleteAccount(uid: alice.uid, password: "motdepasse1")
+        _ = try await repo.signIn(email: "bob@cnsnn.test", password: "motdepasse2")
+        let left = try await repo.challenges(uid: bob.uid)
+        XCTAssertTrue(left.isEmpty)
+    }
+    private func now() -> Int { Int(Date().timeIntervalSince1970 * 1000) }
+
     /// Sprint, Survie and Double sens records follow the account: two devices that never saw each
     /// other's games keep both, a reinstall gets them back, and a cut connection loses nothing.
     func testModeRecordsSyncAcrossDevices() async throws {

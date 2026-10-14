@@ -263,6 +263,10 @@ struct FriendsBoard: View {
                             Text(Format.number(row.points) + " pts" + (row.streak > 0 ? " · série \(row.streak)" : "")
                                  + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) : ""))
                                 .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
+                            // Friend challenges: "2 victoires · 1 défaite" against this friend.
+                            if !mine, let tally = state.challengeTally(friend: row.uid).label {
+                                Text(tally).scaledFont(12, .medium).foregroundStyle(Palette.duelSoft).lineLimit(1)
+                            }
                         }
                         Spacer(minLength: 8)
                         Text(todayText(row)).scaledFont(15, .semibold).monospacedDigit()
@@ -295,6 +299,7 @@ struct FriendsBoard: View {
         do {
             if code == nil { code = try await cloud.friendCode(uid: uid, username: name) }
             rows = try await cloud.friendsBoard(uid: uid, username: name, day: DailySchedule.key())
+            await state.refreshChallenges()
         } catch { failed = true }
     }
     private func add() {

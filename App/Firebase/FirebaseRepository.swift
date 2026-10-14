@@ -200,7 +200,8 @@ enum DailyGuesses {
         ]
         refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
-        for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId")] {
+        for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId"),
+                                    ("challenges", "from"), ("challenges", "to")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         }
         // Approved cards stay in the game without the author's name or id; the other proposals go.
@@ -490,6 +491,12 @@ enum DailyGuesses {
     func removeFriend(uid: String, friend: String) async throws {
         try await db.collection("users").document(uid).collection("friends").document(friend).delete()
     }
+    /// The friends' ids and names only (one read each, for the challenge list).
+    func friends(uid: String) async throws -> [(uid: String, name: String)] {
+        let docs = try await db.collection("users").document(uid).collection("friends").limit(to: 100).getDocuments(source: .server).documents
+        return docs.map { (uid: $0.documentID, name: $0.data()["username"] as? String ?? "Joueur") }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
     /// The player and their friends, with today's Mot du jour result for each.
     func friendsBoard(uid: String, username: String, day: String) async throws -> [FriendStanding] {
         let friends = try await db.collection("users").document(uid).collection("friends").limit(to: 100).getDocuments(source: .server).documents
@@ -513,6 +520,61 @@ enum DailyGuesses {
                                        streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int))
         }
         return FriendStanding.ordered(rows)
+    }
+
+    // MARK: Friend challenges
+
+    /// Sends a challenge to a friend and starts the challenger's clock on the server at once.
+    func createChallenge(uid: String, username: String, friend: String, friendName: String, cardIDs: [String]) async throws -> Challenge {
+        let ref = db.collection("challenges").document()
+        let data: [String: Any] = ["from": uid, "fromName": username, "to": friend, "toName": friendName, "cardIds": cardIDs,
+                                   "createdAt": FieldValue.serverTimestamp(), "fromStartedAt": FieldValue.serverTimestamp()]
+        guard try await Self.awaitWrite({ done in ref.setData(data, completion: done) }), let challenge = try await self.challenge(id: ref.documentID) else { throw CloudError.offline }
+        return challenge
+    }
+    /// Starts the friend's clock (once), and adds the challenger to their friends so the scores show up.
+    func startChallenge(_ challenge: Challenge, uid: String) async throws -> Challenge {
+        let ref = db.collection("challenges").document(challenge.id)
+        if challenge.to.startedMs == nil {
+            guard try await Self.awaitWrite({ done in ref.updateData(["toStartedAt": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+            let friend = db.collection("users").document(uid).collection("friends").document(challenge.from.uid)
+            let known = try await friend.getDocument(source: .server).exists
+            if !known {
+                try? await friend.setData(["username": challenge.from.name, "addedAt": FieldValue.serverTimestamp()])
+            }
+        }
+        guard let fresh = try await self.challenge(id: challenge.id) else { throw CloudError.offline }
+        return fresh
+    }
+    /// Stamps the finish with the server time. False if the network did not confirm in time (the write stays queued).
+    func finishChallenge(_ challenge: Challenge, uid: String, skips: Int, errors: Int) async throws -> Bool {
+        let side = challenge.from.uid == uid ? "from" : "to"
+        let ref = db.collection("challenges").document(challenge.id)
+        let data: [String: Any] = [side + "FinishedAt": FieldValue.serverTimestamp(), side + "Skips": skips, side + "Errors": errors]
+        return try await Self.awaitWrite { done in ref.updateData(data, completion: done) }
+    }
+    func challenge(id: String) async throws -> Challenge? {
+        let doc = try await db.collection("challenges").document(id).getDocument(source: .server)
+        return doc.data().flatMap { Self.challenge(id: id, $0) }
+    }
+    /// The challenges sent and received, newest first (equality queries only: no composite index needed).
+    func challenges(uid: String) async throws -> [Challenge] {
+        var all: [Challenge] = []
+        for field in ["from", "to"] {
+            let docs = try await db.collection("challenges").whereField(field, isEqualTo: uid).limit(to: 200).getDocuments(source: .server).documents
+            all += docs.compactMap { Self.challenge(id: $0.documentID, $0.data()) }
+        }
+        return all.sorted { $0.createdMs > $1.createdMs }
+    }
+    nonisolated static func challenge(id: String, _ d: [String: Any]) -> Challenge? {
+        guard let from = d["from"] as? String, let to = d["to"] as? String, let ids = d["cardIds"] as? [String],
+              let created = d["createdAt"] as? Timestamp else { return nil }
+        func ms(_ key: String) -> Int? { (d[key] as? Timestamp).map(millis) }
+        return Challenge(id: id, cardIds: ids, createdMs: millis(created),
+                         from: .init(uid: from, name: d["fromName"] as? String ?? "Joueur", startedMs: ms("fromStartedAt"), finishedMs: ms("fromFinishedAt"),
+                                     skips: d["fromSkips"] as? Int ?? 0, errors: d["fromErrors"] as? Int ?? 0),
+                         to: .init(uid: to, name: d["toName"] as? String ?? "Joueur", startedMs: ms("toStartedAt"), finishedMs: ms("toFinishedAt"),
+                                   skips: d["toSkips"] as? Int ?? 0, errors: d["toErrors"] as? Int ?? 0))
     }
 
     // MARK: Cards
@@ -717,7 +779,7 @@ enum DailyGuesses {
                 "bestTimeMs":best,"lastWinDay":laterWin ? day : lastWin,"lastResult":day,"updatedAt":FieldValue.serverTimestamp()]
     }
     /// Milliseconds exactly as the rules' `timestamp.toMillis()`.
-    static func millis(_ t: Timestamp) -> Int { Int(t.seconds) * 1000 + Int(t.nanoseconds) / 1_000_000 }
+    nonisolated static func millis(_ t: Timestamp) -> Int { Int(t.seconds) * 1000 + Int(t.nanoseconds) / 1_000_000 }
 
     /// Waits for the server to confirm a write, up to `timeout`. Firestore keeps unconfirmed writes
     /// queued and sends them later, so a timeout is not a failure, only "not confirmed yet".
@@ -769,6 +831,8 @@ enum CloudError: LocalizedError {
     case friendNotFound
     case friendIsYou
     case noGuessesLeft
+    case suspended
+    case challengeUnavailable
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -815,6 +879,8 @@ enum CloudError: LocalizedError {
         case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
         case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
         case .noGuessesLeft: "Vous avez utilisé vos 20 essais pour aujourd’hui."
+        case .suspended: "Votre compte est suspendu : les défis ne sont pas disponibles."
+        case .challengeUnavailable: "Ce défi n’est plus disponible. Mettez l’application à jour si le problème continue."
         }
     }
 }
