@@ -259,21 +259,16 @@ enum DailyGuesses {
     /// offline, nothing is written and the next sync tries again.
     func saveCloudProgress(_ progress: CNSNNCore.Progress, uid: String) async throws -> CNSNNCore.Progress {
         let ref = progressRef(uid)
-        let merged = try await db.runTransaction { transaction, errorPointer -> Any? in
-            do {
-                let snapshot = try transaction.getDocument(ref)
-                var merged = progress
-                if let json = snapshot.data()?["json"] as? String {
-                    merged = progress.merged(with: try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(json.utf8)))
-                }
-                let data = try JSONEncoder().encode(merged)
-                guard data.count <= 900_000 else { throw CloudError.progressTooLarge }
-                transaction.setData(["json": String(decoding: data, as: UTF8.self), "schema": 1, "updatedAt": FieldValue.serverTimestamp()], forDocument: ref)
-                return data
-            } catch {
-                errorPointer?.pointee = error as NSError
-                return nil
+        let merged = try await Self.transact(db) { transaction in
+            let snapshot = try transaction.getDocument(ref)
+            var merged = progress
+            if let json = snapshot.data()?["json"] as? String {
+                merged = progress.merged(with: try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(json.utf8)))
             }
+            let data = try JSONEncoder().encode(merged)
+            guard data.count <= 900_000 else { throw CloudError.progressTooLarge }
+            transaction.setData(["json": String(decoding: data, as: UTF8.self), "schema": 1, "updatedAt": FieldValue.serverTimestamp()], forDocument: ref)
+            return data
         }
         guard let data = merged as? Data else { throw CloudError.offline }
         return try JSONDecoder().decode(CNSNNCore.Progress.self, from: data)
@@ -347,17 +342,12 @@ enum DailyGuesses {
     /// script cannot try answers until one is accepted. Returns the number of guesses made today.
     func registerGuess(uid: String, day: String, guess: String) async throws -> Int {
         let ref = sessionRef(uid, day)
-        let count = try await db.runTransaction { transaction, errorPointer -> Any? in
-            do {
-                let data = try transaction.getDocument(ref).data() ?? [:]
-                let next = (data["guesses"] as? Int ?? 0) + 1
-                guard data["finishedAt"] == nil, next <= DailyGuesses.max else { throw CloudError.noGuessesLeft }
-                transaction.updateData(["guesses": next, "guess": guess, "guessAt": FieldValue.serverTimestamp()], forDocument: ref)
-                return next
-            } catch {
-                errorPointer?.pointee = error as NSError
-                return nil
-            }
+        let count = try await Self.transact(db) { transaction in
+            let data = try transaction.getDocument(ref).data() ?? [:]
+            let next = (data["guesses"] as? Int ?? 0) + 1
+            guard data["finishedAt"] == nil, next <= DailyGuesses.max else { throw CloudError.noGuessesLeft }
+            transaction.updateData(["guesses": next, "guess": guess, "guessAt": FieldValue.serverTimestamp()], forDocument: ref)
+            return next
         }
         guard let count = count as? Int else { throw CloudError.offline }
         return count
@@ -731,6 +721,21 @@ enum DailyGuesses {
 
     /// Waits for the server to confirm a write, up to `timeout`. Firestore keeps unconfirmed writes
     /// queued and sends them later, so a timeout is not a failure, only "not confirmed yet".
+    /// Runs a Firestore transaction through its completion handler. The SDK's async overload, called from
+    /// this main-actor class, runs the update block on Firestore's queue as if it were main-actor code,
+    /// which crashes the app ("freed pointer was not the last allocation").
+    nonisolated static func transact(_ db: Firestore, _ body: @escaping @Sendable (Transaction) throws -> Any?) async throws -> Any? {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
+            db.runTransaction({ transaction, errorPointer -> Any? in
+                do { return try body(transaction) } catch {
+                    errorPointer?.pointee = error as NSError
+                    return nil
+                }
+            }, completion: { value, error in
+                if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) }
+            })
+        }
+    }
     static func awaitWrite(timeout: TimeInterval = 10, _ start: (@escaping (Error?) -> Void) -> Void) async throws -> Bool {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
             let gate = OnceGate()
