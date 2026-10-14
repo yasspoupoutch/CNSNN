@@ -36,11 +36,12 @@ async function ensureWebApp() {
 }
 
 async function ensureSite() {
-  try { await call('GET', `${api}/sites/${site}`); return; } catch (error) { if (error.status !== 404) throw error; }
+  try { await call('GET', `${api}/projects/${projectId}/sites/${site}`); return; } catch (error) { if (error.status !== 404) throw error; }
   try {
     await call('POST', `${api}/projects/${projectId}/sites?siteId=${site}`, {});
     console.log(`Site créé : ${site}`);
   } catch (error) {
+    if (error.status === 409) return; // The site exists already.
     console.error('::error::Firebase Hosting n’est pas encore activé. Ouvrez la console Firebase > Hosting > Commencer, puis relancez.');
     throw error;
   }
