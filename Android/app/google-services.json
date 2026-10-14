@@ -1,0 +1,19 @@
+{
+  "project_info": {
+    "project_number": "552154693596",
+    "project_id": "cnsnn-9ctosy",
+    "storage_bucket": "cnsnn-9ctosy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:552154693596:android:51047615d6885f70afd919",
+        "android_client_info": { "package_name": "com.poupoutch.cnsnn" }
+      },
+      "oauth_client": [],
+      "api_key": [ { "current_key": "AIzaSyBXgHU-F581JLBoGu1VDe6XG3TSiYwTF3w" } ],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}
