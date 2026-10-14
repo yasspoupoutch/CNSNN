@@ -338,8 +338,23 @@ class DuoGame:
 
 # ---- Scenarios replayed by both test suites
 
+# Friend challenge: 2 easy, 2 medium and 1 hard word, the same for both players (Core/Challenge.swift).
+CHALLENGE_LEVELS = [[100, 0, 0], [100, 0, 0], [0, 100, 0], [0, 100, 0], [0, 0, 100]]
+
+
+def challenge_draw(pool, seed, recent=()):
+    rng, used = Random(seed), []
+    for weights in CHALLENGE_LEVELS:
+        used.append(pick(pool, weights, set(used), set(recent), rng)['id'])
+    return used
+
+
 def scenarios(pool, duos):
-    out = {'random': [], 'sprint': [], 'survival': [], 'duo': []}
+    out = {'random': [], 'sprint': [], 'survival': [], 'duo': [], 'challenge': []}
+    for seed, recent in ((0, ()), (42, ()), (2**63 + 5, ()), (MASK, ())):
+        out['challenge'].append((seed, list(recent), challenge_draw(pool, seed, recent)))
+    first = challenge_draw(pool, 42)
+    out['challenge'].append((42, first[:3], challenge_draw(pool, 42, first[:3])))
     for seed in (0, 1, 42, 2**63 + 5, MASK):
         rng = Random(seed)
         out['random'].append((seed, [rng.next() for _ in range(4)], Random(seed).int(97)))
@@ -475,6 +490,8 @@ def vector_rows(s, lang):
         a, rnd, found, solved, errors, ms, score, fin = st
         return (f'DuoStep(action: {q(a)}, round: {rnd}, found: {found}, solved: {solved}, errors: {errors}, playMs: {ms}, score: {score}, finished: {b(fin)})' if lang == 'swift'
                 else f'DuoStep({q(a)}, {rnd}, {found}, {solved}, {errors}, {ms}, {score}, {b(fin)})')
+    out['challenge'] = [(f'ChallengeCase(seed: {u(seed)}, recent: {lst([q(i) for i in recent])}, cards: {lst([q(i) for i in ids])})' if lang == 'swift'
+                         else f'ChallengeCase({u(seed)}, {lst([q(i) for i in recent])}, {lst([q(i) for i in ids])})') for seed, recent, ids in s['challenge']]
     out['duo'] = [(f'DuoCase(seed: {u(seed)}, duos: {lst([q(i) for i in ids])}, steps: {lst([duo_step(x) for x in steps])})' if lang == 'swift'
                    else f'DuoCase({u(seed)}, {lst([q(i) for i in ids])}, {lst([duo_step(x) for x in steps])})') for seed, ids, steps in s['duo']]
     return out
@@ -494,6 +511,7 @@ struct SurvivalStep {{ let action: String; let card: String; let difficulty: Str
 struct SurvivalCase {{ let seed: UInt64; let steps: [SurvivalStep] }}
 struct DuoStep {{ let action: String; let round: Int; let found: Int; let solved: Int; let errors: Int; let playMs: Int; let score: Int; let finished: Bool }}
 struct DuoCase {{ let seed: UInt64; let duos: [String]; let steps: [DuoStep] }}
+struct ChallengeCase {{ let seed: UInt64; let recent: [String]; let cards: [String] }}
 
 enum ModeVectors {{
     static let random: [RandomCase] = [
@@ -507,6 +525,9 @@ enum ModeVectors {{
     ]
     static let duo: [DuoCase] = [
 {body('duo')}
+    ]
+    static let challenge: [ChallengeCase] = [
+{body('challenge')}
     ]
 }}
 '''
@@ -526,6 +547,7 @@ data class SurvivalStep(val action: String, val card: String, val difficulty: St
 data class SurvivalCase(val seed: ULong, val steps: List<SurvivalStep>)
 data class DuoStep(val action: String, val round: Int, val found: Int, val solved: Int, val errors: Int, val playMs: Int, val score: Int, val finished: Boolean)
 data class DuoCase(val seed: ULong, val duos: List<String>, val steps: List<DuoStep>)
+data class ChallengeCase(val seed: ULong, val recent: List<String>, val cards: List<String>)
 
 object ModeVectors {{
     val random = listOf(
@@ -539,6 +561,9 @@ object ModeVectors {{
     )
     val duo = listOf(
 {body('duo')}
+    )
+    val challenge = listOf(
+{body('challenge')}
     )
 }}
 '''
