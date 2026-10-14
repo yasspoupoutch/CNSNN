@@ -1,0 +1,362 @@
+package com.poupoutch.cnsnn.ui
+
+import android.content.Intent
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.core.Format
+import com.poupoutch.cnsnn.core.FriendCode
+import com.poupoutch.cnsnn.core.FriendStanding
+import com.poupoutch.cnsnn.core.LeaderboardEntry
+import com.poupoutch.cnsnn.core.Mistakes
+import com.poupoutch.cnsnn.data.CloudError
+import com.poupoutch.cnsnn.data.DailyRank
+import com.poupoutch.cnsnn.state.AppViewModel
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatsScreen(state: AppViewModel) {
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    var refreshToken by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    PullToRefreshBox(refreshing, { scope.launch { refreshing = true; refreshToken++; state.refreshOfficial(); refreshing = false } }, Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ScreenTitle("Statistiques", Modifier.padding(top = 8.dp))
+            SecondaryTabRow(page, containerColor = androidx.compose.ui.graphics.Color.Transparent, divider = {}) {
+                Tab(page == 0, { page = 0 }, text = { Text("Mes stats", fontWeight = FontWeight.SemiBold) })
+                Tab(page == 1, { page = 1 }, text = { Text("Classement", fontWeight = FontWeight.SemiBold) })
+            }
+            if (page == 0) MyStats(state) else Leaderboard(state, refreshToken)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun MyStats(state: AppViewModel) {
+    val p = state.progress
+    state.official?.let { entry ->
+        SectionCard {
+            Kicker("Mot du jour · officiel")
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
+                Text(Format.number(entry.points), fontSize = 34.sp, fontWeight = FontWeight.Black)
+                Text("points", color = Palette.secondary, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+            }
+            Row(Modifier.padding(top = 12.dp)) {
+                listOf("${entry.currentStreak()}" to "série", "${entry.bestStreak}" to "record de série",
+                    "${Math.round(entry.successRate * 100)} %" to "réussite", Format.seconds(entry.bestTimeMs) to "meilleur temps").forEach { (v, l) ->
+                    Column(Modifier.weight(1f)) {
+                        Text(v, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                        Text(l, fontSize = 11.sp, color = Palette.tertiary, maxLines = 2)
+                    }
+                }
+            }
+        }
+    }
+    val level = p.score / 1000 + 1; val into = p.score % 1000
+    SectionCard {
+        Text(if (state.official == null) "Vos points" else "Tous vos points, entraînement compris", fontSize = 13.sp, color = Palette.secondary)
+        Text(Format.number(p.score), fontSize = 52.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp)
+        Row(Modifier.padding(top = 10.dp)) {
+            Text("Niveau $level", fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.weight(1f))
+            Text("${1000 - into} pts avant le niveau ${level + 1}", fontSize = 13.sp, color = Palette.secondary)
+        }
+        LevelBar(into / 1000f, Modifier.padding(top = 8.dp))
+    }
+    val tiles = listOf(
+        "${p.attempts.size}" to "Cartes jouées", "${(p.successRate * 100).toInt()} %" to "Réussite · ${p.correctAnswers} trouvés",
+        "${state.streak}" to "Série quotidienne", "${p.dailyWins}" to "Défis réussis",
+        Format.seconds(p.bestTimeMs) to "Meilleur temps", Format.seconds(p.averageTimeMs) to "Temps moyen")
+    tiles.chunked(2).forEach { pair ->
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { pair.forEach { (v, l) -> StatTile(v, l, Modifier.weight(1f)) } }
+    }
+    SectionCard {
+        Text("Mots du jour · 7 derniers jours", fontWeight = FontWeight.SemiBold)
+        Row(Modifier.padding(top = 14.dp)) {
+            val today = LocalDate.now(DailySchedule.zone)
+            (6 downTo 0).forEach { offset ->
+                val day = today.minusDays(offset.toLong())
+                val attempt = p.attempts.firstOrNull { it.dailyKey == day.toString() }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(36.dp).background(when (attempt?.correct) { true -> Palette.mint; false -> Palette.red; null -> Palette.fill1 }, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center) {
+                        when (attempt?.correct) {
+                            true -> Icon(Icons.Filled.Check, "trouvé", Modifier.size(18.dp), tint = Palette.ink)
+                            false -> Icon(Icons.Filled.Close, "raté", Modifier.size(18.dp), tint = Palette.ink)
+                            null -> {}
+                        }
+                    }
+                    Text(day.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.FRENCH).uppercase(), fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+    }
+    if (p.attempts.isEmpty()) Text("Votre première partie lance l’histoire.", color = Palette.secondary)
+}
+
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), POINTS("Points"), FASTEST("Records") }
+private data class Line(val id: String, val name: String, val value: String, val detail: String? = null)
+
+@Composable
+private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
+    if (state.uid == null) {
+        SectionCard { Text("Connectez-vous à Internet pour voir le classement.", color = Palette.secondary) }; return
+    }
+    var board by rememberSaveable { mutableStateOf(Board.TODAY) }
+    var today by remember { mutableStateOf<List<DailyRank>>(emptyList()) }
+    var players by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
+    var fastest by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
+    var myRank by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var suspending by remember { mutableStateOf<Line?>(null) }
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    suspend fun refresh() {
+        loading = true; failed = false
+        state.refreshOfficial()
+        try {
+            today = state.cloud.dailyRanking(DailySchedule.key())
+            players = state.cloud.topPlayers()
+            fastest = state.cloud.fastestPlayers()
+            state.official?.let { myRank = state.cloud.rank(it.points) }
+        } catch (_: Exception) { failed = true } finally { loading = false }
+    }
+    LaunchedEffect(state.uid, refreshToken) { refresh() }
+
+    val entry = state.official
+    if (entry != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        StatTile(myRank?.let { Format.ordinal(it.first) } ?: "—", myRank?.let { "sur ${Format.number(it.second)} joueurs" } ?: "Rang", Modifier.weight(1f))
+        StatTile(Format.number(entry.points), "points officiels", Modifier.weight(1f))
+        StatTile("${entry.currentStreak()}", "série en cours", Modifier.weight(1f))
+    } else SectionCard { Text("Jouez le Mot du jour pour entrer au classement.", color = Palette.secondary) }
+
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Board.entries.forEach { item ->
+            FilterChip(board == item, { board = item }, { Text(item.label) }, shape = RoundedCornerShape(50),
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.foreground, selectedLabelColor = Palette.ink))
+        }
+    }
+    if (board == Board.FRIENDS) { FriendsBoard(state, refreshToken); return }
+    message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
+    val hidden = state.hiddenPlayers
+    val rows = when (board) {
+        Board.TODAY -> today.map { Line(it.uid, it.username, Format.clock(it.timeMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice" else "") }
+        Board.POINTS -> players.map { Line(it.uid, it.username, Format.number(it.points) + " pts") }
+        Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
+        Board.FRIENDS -> emptyList()
+    }.filter { it.id !in hidden }
+    SectionCard(padding = 0.dp, radius = 24.dp) {
+        if (rows.isEmpty()) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else
+            if (board == Board.TODAY) "Personne n’a encore trouvé le mot du jour." else "Aucun résultat pour le moment.")
+        rows.forEachIndexed { index, row ->
+            if (index > 0) Divider()
+            val mine = row.id == state.uid
+            var menu by remember(row.id) { mutableStateOf(false) }
+            Box {
+                RankRow(index, row.name, row.id, mine, row.detail, row.value, onLongPress = { if (!mine) { haptics.selection(); menu = true } })
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem({ Text("Signaler ce pseudo") }, {
+                        menu = false
+                        scope.launch {
+                            message = try { state.cloud.reportPlayer(row.id, row.name); "Merci, la modération va vérifier le pseudo de ${row.name}." }
+                            catch (e: Exception) { CloudError.message(e) }
+                        }
+                    })
+                    DropdownMenuItem({ Text("Masquer ce joueur") }, { menu = false; state.hide(row.id) })
+                    if (state.isAdmin) DropdownMenuItem({ Text("Suspendre ce joueur", color = Palette.red) }, { menu = false; suspending = row })
+                }
+            }
+        }
+    }
+    if (hidden.isNotEmpty()) TextButton(state::showAllPlayers) {
+        Text((if (hidden.size == 1) "1 joueur masqué" else "${hidden.size} joueurs masqués") + " · Tout afficher", color = Palette.secondary)
+    }
+    Text("Appui long sur un joueur pour le signaler ou le masquer.", fontSize = 12.sp, color = Palette.tertiary)
+    suspending?.let { row ->
+        AlertDialog({ suspending = null }, title = { Text("Suspendre ${row.name} ?") },
+            text = { Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Vous pourrez lever la suspension dans Modération.") },
+            confirmButton = { TextButton({
+                suspending = null
+                scope.launch {
+                    message = try { state.cloud.suspend(row.id, row.name, "Depuis le classement"); refresh(); "${row.name} est suspendu." } catch (e: Exception) { CloudError.message(e) }
+                }
+            }) { Text("Suspendre", color = Palette.red) } },
+            dismissButton = { TextButton({ suspending = null }) { Text("Annuler") } })
+    }
+}
+
+@Composable
+private fun EmptyLine(loading: Boolean, text: String) {
+    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (loading) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Palette.secondary); Spacer(Modifier.width(10.dp)) }
+        Text(if (loading) "Chargement…" else text, fontSize = 14.sp, color = Palette.tertiary)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail: String?, value: String, valueColor: androidx.compose.ui.graphics.Color = Palette.foreground, onLongPress: () -> Unit) {
+    Row(Modifier.fillMaxWidth().background(if (mine) Palette.fill1 else androidx.compose.ui.graphics.Color.Transparent)
+        .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Options").heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(Format.ordinal(index + 1), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (index < 3) Palette.foreground else Palette.tertiary, modifier = Modifier.width(36.dp))
+        Avatar(name, colorIndex(id), 32.dp)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, fontWeight = if (mine) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                if (mine) Text("vous", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
+            }
+            if (!detail.isNullOrEmpty()) Text(detail, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)
+        }
+        Text(value, fontWeight = FontWeight.SemiBold, color = valueColor)
+    }
+}
+
+/** The player and the friends added with a 6-character code, ranked on today's Mot du jour. */
+@Composable
+private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
+    var code by rememberSaveable { mutableStateOf<String?>(null) }
+    var rows by remember { mutableStateOf<List<FriendStanding>>(emptyList()) }
+    var friendCode by rememberSaveable { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val haptics = rememberHaptics()
+    val uid = state.uid ?: return
+    val name = state.progress.username.ifEmpty { "Joueur" }
+    suspend fun refresh() {
+        loading = true; failed = false
+        try {
+            if (code == null) code = state.cloud.friendCode(uid, name)
+            rows = state.cloud.friendsBoard(uid, name, DailySchedule.key())
+        } catch (_: Exception) { failed = true } finally { loading = false }
+    }
+    LaunchedEffect(uid, refreshToken) { refresh() }
+    fun add() {
+        if (friendCode.length != 6 || busy) return
+        busy = true; message = null
+        scope.launch {
+            try {
+                val friend = state.cloud.addFriend(friendCode, uid)
+                friendCode = ""; message = "$friend fait partie de vos amis."; haptics.success(); refresh()
+            } catch (e: Exception) { message = CloudError.message(e); haptics.retry() } finally { busy = false }
+        }
+    }
+
+    SectionCard(radius = 24.dp, padding = 18.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Votre code ami", fontSize = 13.sp, color = Palette.secondary)
+                Text(code ?: "······", fontSize = 26.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            }
+            code?.let { c ->
+                IconButton({
+                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est $c"), null))
+                }) { Icon(Icons.Filled.Share, "Partager mon code") }
+            }
+        }
+    }
+    SectionCard(radius = 24.dp, padding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(friendCode, { friendCode = FriendCode.normalize(it) }, Modifier.weight(1f), singleLine = true,
+                placeholder = { Text("Code d’un ami") }, textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false), shape = RoundedCornerShape(14.dp))
+            Button(::add, enabled = friendCode.length == 6 && !busy, shape = RoundedCornerShape(24.dp)) { Text("Ajouter") }
+        }
+        message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)) }
+    }
+    SectionCard(padding = 0.dp, radius = 24.dp) {
+        if (rows.size <= 1) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else "Ajoutez un ami avec son code pour comparer vos temps chaque jour.")
+        else rows.forEachIndexed { index, row ->
+            if (index > 0) Divider()
+            val mine = row.uid == uid
+            var menu by remember(row.uid) { mutableStateOf(false) }
+            val today = row.today
+            Box {
+                RankRow(index, row.username, row.uid, mine,
+                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else ""),
+                    when { today == null -> "pas joué"; today.correct -> Format.clock(today.timeMs); else -> "raté" },
+                    if (today?.correct == true) Palette.foreground else Palette.tertiary) { if (!mine) menu = true }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem({ Text("Retirer de mes amis", color = Palette.red) }, {
+                        menu = false
+                        scope.launch {
+                            try { state.cloud.removeFriend(uid, row.uid); rows = rows.filter { it.uid != row.uid } } catch (e: Exception) { message = CloudError.message(e) }
+                        }
+                    })
+                }
+            }
+        }
+    }
+}
+

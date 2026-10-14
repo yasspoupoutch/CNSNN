@@ -122,6 +122,26 @@ jobs:
             DEVELOPMENT_TEAM='' \
             2>&1 | tee "$CI_ROOT/logs/build.log"
 
+      - name: Vérifier que le widget s'installe et s'enregistre
+        run: |
+          set -euo pipefail
+          app="$CI_ROOT/DerivedData/Build/Products/Debug-iphonesimulator/CNSNN.app"
+          appex="$app/PlugIns/CNSNNWidget.appex"
+          test -d "$appex" || { echo '::error::Widget absent du bundle.'; exit 1; }
+          echo '--- Contenu du widget'; find "$appex" -maxdepth 2 | sed "s|$app/||"
+          echo '--- Info.plist du widget'; plutil -p "$appex/Info.plist"
+          xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl install "$SIMULATOR_ID" "$app"
+          xcrun simctl launch "$SIMULATOR_ID" com.mycompany.cnsnn || true
+          for attempt in 1 2 3 4 5 6; do
+            if xcrun simctl spawn "$SIMULATOR_ID" pluginkit -m -p com.apple.widgetkit-extension -v | tee "$CI_ROOT/logs/widget.log" | grep -q 'com.mycompany.cnsnn.widget'; then
+              echo 'Widget enregistré par iOS.'; exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::iOS n’a pas enregistré le widget.'; cat "$CI_ROOT/logs/widget.log"; exit 1
+
       - name: Exécuter les tests unitaires du moteur et de l'application
         run: |
           set -euo pipefail
