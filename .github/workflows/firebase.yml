@@ -26,6 +26,10 @@ on:
         description: Publier les mots du jour secrets (Firebase/daily/words.enc.json)
         type: boolean
         default: false
+      android_app:
+        description: Enregistrer l'application Android et afficher son google-services.json
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,7 +64,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key is harmless, so it also runs on a branch.
-    if: ${{ github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed)) || inputs.daily_public_key) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed || inputs.android_app)) || inputs.daily_public_key) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -100,6 +104,9 @@ jobs:
       - name: Publier les mots du jour
         if: ${{ inputs.daily_seed && github.ref == 'refs/heads/main' }}
         run: node tools/daily.mjs seed
+      - name: Enregistrer l'application Android
+        if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
+        run: node tools/android-app.mjs
       - name: Effacer la clé
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/sa.json"
