@@ -1,0 +1,131 @@
+package com.poupoutch.cnsnn.state
+
+import android.os.SystemClock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeGame
+import com.poupoutch.cnsnn.core.ChallengeRules
+import com.poupoutch.cnsnn.core.WordEngine
+import com.poupoutch.cnsnn.data.CloudError
+import kotlinx.coroutines.launch
+
+/**
+ * One side of a friend challenge on screen, the Android twin of the iPhone's ChallengeSession. The
+ * official time is the server's (start and finish stamped in Firestore); the chrono shown while
+ * playing is this phone's. The game is saved after every word, so a closed app picks up at the same
+ * word, the time away included.
+ */
+class ChallengeViewModel : ViewModel() {
+    sealed interface Phase {
+        data object Starting : Phase
+        data object Playing : Phase
+        data object Sending : Phase
+        data object Done : Phase
+        data class Failed(val message: String) : Phase
+    }
+
+    var challenge by mutableStateOf<Challenge?>(null); private set
+    var game: ChallengeGame? = null; private set
+    var phase by mutableStateOf<Phase>(Phase.Starting); private set
+    var answer by mutableStateOf("")
+    /** The core game is a plain object: this counter tells the screen it changed. */
+    var version by mutableIntStateOf(0); private set
+    var mistakeTick by mutableIntStateOf(0); private set
+    var successTick by mutableIntStateOf(0); private set
+    private var start = SystemClock.elapsedRealtime()
+    private var baseMs = 0L
+    private var loaded = false
+
+    val elapsedMs: Long get() = baseMs + (SystemClock.elapsedRealtime() - start)
+
+    fun loadOnce(id: String, state: AppViewModel) {
+        if (loaded) return
+        loaded = true
+        begin(id, state)
+    }
+
+    /** Starts the friend's clock on the server (the challenger's started with the challenge), then plays. */
+    fun begin(id: String, state: AppViewModel) = viewModelScope.launch {
+        phase = Phase.Starting
+        val uid = state.uid
+        val known = state.challenges.firstOrNull { it.id == id } ?: runCatching { state.cloud.challenge(id) }.getOrNull()
+        if (uid == null || known == null) { phase = Phase.Failed(CloudError.Kind.OFFLINE.message); return@launch }
+        challenge = known
+        if (known.mine(uid).finished) { phase = Phase.Done; return@launch }
+        val cards = ChallengeRules.cards(known.cardIds) ?: run { phase = Phase.Failed(CloudError.Kind.CHALLENGE_UNAVAILABLE.message); return@launch }
+        val started = try { state.startChallenge(known) } catch (e: Exception) { phase = Phase.Failed(CloudError.message(e)); return@launch }
+        challenge = started
+        val saved = state.local.loadChallengeRun(id)
+        val restored = saved?.let { ChallengeGame.restore(cards, it.first) }
+        if (saved != null && restored != null) {
+            game = restored
+            baseMs = saved.second + maxOf(0L, System.currentTimeMillis() - saved.third)
+        } else {
+            game = ChallengeGame(cards); baseMs = 0
+        }
+        start = SystemClock.elapsedRealtime()
+        version++
+        phase = Phase.Playing
+        if (game?.finished == true) finish(state)
+    }
+
+    fun press(letter: String) {
+        if (phase != Phase.Playing || answer.length >= 40) return
+        if (letter == " " && (answer.isEmpty() || answer.endsWith(" "))) return
+        answer += letter
+    }
+    fun delete() { if (answer.isNotEmpty()) answer = answer.dropLast(1) }
+
+    fun submit(state: AppViewModel) {
+        val current = game
+        if (phase != Phase.Playing || current == null || WordEngine.normalize(answer).isEmpty()) { mistakeTick++; return }
+        when (current.answer(answer)) {
+            ChallengeGame.Outcome.RIGHT -> { answer = ""; successTick++ }
+            ChallengeGame.Outcome.WRONG -> { answer = ""; mistakeTick++ }
+            ChallengeGame.Outcome.OVER -> {}
+        }
+        afterMove(state)
+    }
+
+    /** Next word, for 20 seconds. */
+    fun skip(state: AppViewModel) {
+        val current = game ?: return
+        if (phase != Phase.Playing) return
+        answer = ""; current.skip()
+        afterMove(state)
+    }
+
+    /** Gives up: the words left count as skipped. */
+    fun abandon(state: AppViewModel) {
+        val current = game ?: return
+        if (phase != Phase.Playing) return
+        while (!current.finished) current.skip()
+        afterMove(state)
+    }
+
+    private fun afterMove(state: AppViewModel) {
+        version++
+        val current = game ?: return
+        val id = challenge?.id ?: return
+        if (current.finished) viewModelScope.launch { finish(state) }
+        else state.local.saveChallengeRun(id, current.saved(), elapsedMs)
+    }
+
+    private suspend fun finish(state: AppViewModel) {
+        val current = game ?: return
+        val playing = challenge ?: return
+        if (phase != Phase.Playing) return
+        phase = Phase.Sending
+        challenge = state.finishChallenge(playing, current.skips, current.errors)
+        state.local.clearChallengeRun(playing.id)
+        phase = Phase.Done
+    }
+
+    /** My time as the server measured it, or this phone's while the server has not confirmed. */
+    fun myScoreMs(uid: String): Long = challenge?.mine(uid)?.scoreMs ?: game?.scoreMs(elapsedMs) ?: 0L
+}

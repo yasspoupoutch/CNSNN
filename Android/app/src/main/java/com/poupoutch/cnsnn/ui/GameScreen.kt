@@ -344,6 +344,9 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
             if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
             else if (result.correct && result.timeMs == state.progress.bestTimeMs)
                 Text("🏆 Votre meilleur temps", color = Palette.mint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            if (mode == GameMode.DAILY && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
+                ChallengePrompt(result.correct) { state.challengeRequest++; close() }
+            }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton({ Share.result(context, result, card, mode) }, Modifier.height(56.dp), shape = RoundedCornerShape(28.dp)) {
                     Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))

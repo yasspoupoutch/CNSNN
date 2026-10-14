@@ -55,6 +55,17 @@ class ChallengeGame(val cards: List<Card>) {
 
     /** The time shown and compared: play time plus 20 s per skipped word. */
     fun scoreMs(elapsed: Long): Long = elapsed + skips * ChallengeRules.SKIP_PENALTY_MS
+
+    /** "index,found,skips,errors", to pick a closed game up at the same word. */
+    fun saved(): String = "$index,$found,$skips,$errors"
+
+    companion object {
+        fun restore(cards: List<Card>, saved: String): ChallengeGame? {
+            val parts = saved.split(",").mapNotNull { it.toIntOrNull() }
+            if (parts.size != 4 || parts[0] !in 0..cards.size) return null
+            return ChallengeGame(cards).apply { index = parts[0]; found = parts[1]; skips = parts[2]; errors = parts[3] }
+        }
+    }
 }
 
 /** A challenge as stored in Firestore, with times in milliseconds. */

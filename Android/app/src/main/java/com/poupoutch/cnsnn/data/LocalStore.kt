@@ -77,6 +77,18 @@ class LocalStore(context: Context) {
     fun clearRun(mode: PlayMode) { prefs.edit().remove("run.${mode.key}").apply() }
     fun clearRuns() { PlayMode.entries.forEach(::clearRun) }
 
+    /** An unfinished friend challenge: "index,found,skips,errors", the play time and when it was saved. */
+    fun loadChallengeRun(id: String): Triple<String, Long, Long>? {
+        val game = prefs.getString("challenge.$id", null) ?: return null
+        return Triple(game, prefs.getLong("challenge.$id.elapsed", 0), prefs.getLong("challenge.$id.savedAt", 0))
+    }
+    fun saveChallengeRun(id: String, game: String, elapsedMs: Long, savedAt: Long = System.currentTimeMillis()) {
+        prefs.edit().putString("challenge.$id", game).putLong("challenge.$id.elapsed", elapsedMs).putLong("challenge.$id.savedAt", savedAt).apply()
+    }
+    fun clearChallengeRun(id: String) {
+        prefs.edit().remove("challenge.$id").remove("challenge.$id.elapsed").remove("challenge.$id.savedAt").apply()
+    }
+
     /** Cards (Sprint, Survie) or duos (Double sens) played lately, so a new game draws other ones. */
     fun recent(mode: PlayMode): List<String> =
         prefs.getString(recentKey(mode), null)?.let { json -> runCatching { ProgressJson.decodeFromString(ListSerializer(String.serializer()), json) }.getOrNull() } ?: emptyList()

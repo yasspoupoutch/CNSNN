@@ -76,6 +76,14 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Partie terminée"].waitForExistence(timeout: 5))
         app.buttons["Accueil"].tap()
 
+        // The lilac tile opens the challenge sheet (offline here: it says so).
+        let challenge = app.buttons["challengeTile"]
+        XCTAssertTrue(challenge.waitForExistence(timeout: 5))
+        challenge.tap()
+        XCTAssertTrue(app.staticTexts["Mêmes 5 mots. Le plus rapide gagne."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Connectez-vous à Internet pour défier vos amis."].exists)
+        app.swipeDown(velocity: .fast)
+
         // The records page lists the three modes.
         app.buttons["Stats"].tap()
         XCTAssertTrue(app.staticTexts["Records personnels"].waitForExistence(timeout: 5))

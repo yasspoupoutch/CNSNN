@@ -8,6 +8,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeRules
+import com.poupoutch.cnsnn.core.ChallengeTally
+import com.poupoutch.cnsnn.core.ModeRandom
 import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.DailyPool
 import com.poupoutch.cnsnn.core.DailySchedule
@@ -56,6 +60,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var isRestoring by mutableStateOf(false); private set
     var avatar by mutableStateOf(local.avatar); private set
     var hiddenPlayers by mutableStateOf(local.hiddenPlayers); private set
+    /** Friend challenges sent and received (see core Challenge.kt). */
+    var challenges by mutableStateOf<List<Challenge>>(emptyList()); private set
+    /** Asks the home page to open the challenge sheet (from the daily result). */
+    var challengeRequest by mutableStateOf(0)
+    /** Asks the shell to show the leaderboard (from the home page). */
+    var leaderboardRequest by mutableStateOf(0)
 
     private var scope: String? = local.activeScope
     private var savingAllowed = true
@@ -175,6 +185,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshCards()
         finishPendingDaily()
         refreshOfficial()
+        refreshChallenges()
         isAdmin = runCatching { cloud.isAdmin() }.getOrDefault(false)
         uid?.let { user -> isSuspended = runCatching { cloud.isSuspended(user) }.getOrDefault(isSuspended) }
     }
@@ -212,7 +223,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         resetToGuest()
     }
     private fun resetToGuest() {
-        uid = null; isAnonymous = true; email = null; isAdmin = false; isSuspended = false; official = null
+        uid = null; isAnonymous = true; email = null; isAdmin = false; isSuspended = false; official = null; challenges = emptyList()
         progress = Progress(); cards = SeedCards.all + ExtraCards.all
         local.clearRuns()
         scope = null; local.activeScope = null; persist()
@@ -356,6 +367,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshSubmissions() = viewModelScope.launch {
         val user = uid ?: return@launch
         runCatching { cloud.submissions(user) }.onSuccess { list -> update { it.copy(submissions = list) } }
+    }
+
+    // ---- Friend challenges
+
+    fun refreshChallengesSoon() { viewModelScope.launch { refreshChallenges() } }
+    suspend fun refreshChallenges() {
+        val user = uid ?: return
+        runCatching { cloud.challenges(user) }.getOrNull()?.let { if (uid == user) challenges = it }
+    }
+    /**
+     * The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
+     * then one of mine left unfinished, then the latest one waiting for the friend.
+     */
+    fun featuredChallenge(now: Long = System.currentTimeMillis()): Pair<Challenge, Challenge.State>? {
+        val user = uid ?: return null
+        val open = challenges.mapNotNull { c ->
+            val state = c.state(user, now)
+            if (state is Challenge.State.Over || ChallengeRules.cards(c.cardIds) == null) null else c to state
+        }
+        return open.filter { it.second == Challenge.State.YourTurn }.minByOrNull { it.first.createdMs }
+            ?: open.firstOrNull { it.second == Challenge.State.Playing }
+            ?: open.firstOrNull { it.second == Challenge.State.Waiting }
+    }
+    fun challengeTally(friend: String? = null): ChallengeTally {
+        val user = uid ?: return ChallengeTally()
+        return ChallengeTally.of(challenges, user, friend, System.currentTimeMillis())
+    }
+    /** Draws 5 public words (avoiding the player's recent ones) and starts the challenger's clock. */
+    suspend fun sendChallenge(friend: String, name: String): Challenge {
+        val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
+        if (isSuspended) throw CloudError(CloudError.Kind.SUSPENDED)
+        val ids = ChallengeRules.draw(ModeRandom.seed(), progress.recentCards)
+        val challenge = cloud.createChallenge(user, progress.username, friend, name, ids)
+        challenges = listOf(challenge) + challenges
+        return challenge
+    }
+    /** Starts (or resumes) my side of a challenge: the friend's clock starts on the server here. */
+    suspend fun startChallenge(challenge: Challenge): Challenge {
+        val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
+        val fresh = if (challenge.to.uid == user) cloud.startChallenge(challenge, user) else challenge
+        replace(fresh)
+        return fresh
+    }
+    /** Stamps my finish on the server, then reads back the official times. */
+    suspend fun finishChallenge(challenge: Challenge, skips: Int, errors: Int): Challenge {
+        val user = uid ?: return challenge
+        runCatching { cloud.finishChallenge(challenge, user, skips, errors) }
+        val fresh = runCatching { cloud.challenge(challenge.id) }.getOrNull() ?: return challenge
+        replace(fresh)
+        return fresh
+    }
+    private fun replace(challenge: Challenge) {
+        challenges = if (challenges.any { it.id == challenge.id }) challenges.map { if (it.id == challenge.id) challenge else it } else listOf(challenge) + challenges
     }
 
     fun hide(player: String) { hiddenPlayers = hiddenPlayers + player; local.hiddenPlayers = hiddenPlayers }

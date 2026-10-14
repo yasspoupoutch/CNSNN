@@ -7,6 +7,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeRules
+import com.poupoutch.cnsnn.core.ChallengeTally
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
@@ -129,6 +132,50 @@ class CloudRepositoryTest {
         assertEquals(setOf("Alice", "Bob"), board.map { it.username }.toSet())
         repo.removeFriend(bob.uid, alice.uid)
         assertEquals(1, repo.friendsBoard(bob.uid, "Bob", DailySchedule.key()).size)
+    }
+
+    /** A friend challenge from end to end, on the same documents as the iPhone app. */
+    @Test fun friendChallengeFlow() = runBlocking<Unit> {
+        repo.bootstrap("Alice")
+        val alice = repo.createPermanentAccount("alice@example.com", "motdepasse")
+        assertEquals("Alice", alice.username)
+        val aliceCode = repo.friendCode(alice.uid, "Alice")
+        auth.signOut()
+        repo.bootstrap("Bob")
+        val bob = repo.createPermanentAccount("bob@example.com", "motdepasse")
+        val ids = ChallengeRules.draw(42uL)
+        // Only a friend can be challenged.
+        expectDenied { repo.createChallenge(bob.uid, "Bob", alice.uid, "Alice", ids) }
+        repo.addFriend(aliceCode, bob.uid)
+        val challenge = repo.createChallenge(bob.uid, "Bob", alice.uid, "Alice", ids)
+        assertEquals(ids, challenge.cardIds)
+        assertTrue(challenge.from.startedMs != null && challenge.to.startedMs == null)
+        // Too fast for 5 words: refused. Bob skips all 5 (+100 s).
+        expectDenied { repo.finishChallenge(challenge, bob.uid, 0, 0) }
+        assertTrue(repo.finishChallenge(challenge, bob.uid, 5, 2))
+        assertEquals(Challenge.State.Waiting, repo.challenges(bob.uid).single().state(bob.uid, System.currentTimeMillis()))
+
+        // Alice starts her clock (and gets Bob as a friend), finds 2 words and skips 3.
+        auth.signOut()
+        repo.signIn("alice@example.com", "motdepasse")
+        val received = repo.challenges(alice.uid).single()
+        assertEquals(Challenge.State.YourTurn, received.state(alice.uid, System.currentTimeMillis()))
+        val started = repo.startChallenge(received, alice.uid)
+        assertTrue(started.to.startedMs != null)
+        assertEquals(listOf(bob.uid), repo.friends(alice.uid).map { it.first })
+        expectDenied { repo.finishChallenge(started, alice.uid, 3, 0) }
+        delay(4300)
+        assertTrue(repo.finishChallenge(started, alice.uid, 3, 1))
+        val over = repo.challenge(challenge.id)!!
+        val now = System.currentTimeMillis()
+        assertEquals(Challenge.Result.WON, over.result(alice.uid, now))
+        assertEquals(Challenge.Result.LOST, over.result(bob.uid, now))
+        assertEquals("1 victoire · 0 défaite", ChallengeTally.of(listOf(over), alice.uid, bob.uid, now).label)
+
+        // Deleting Alice's account removes the challenge for Bob too.
+        repo.deleteAccount(alice.uid, "motdepasse")
+        repo.signIn("bob@example.com", "motdepasse")
+        assertTrue(repo.challenges(bob.uid).isEmpty())
     }
 
     @Test fun proposalsAreUniqueAndRateLimited() = runBlocking<Unit> {

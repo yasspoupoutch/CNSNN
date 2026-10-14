@@ -143,7 +143,10 @@ private fun AppNavigation(state: AppViewModel) {
         composable("main") {
             MainShell(state, { mode, category, difficulty ->
                 nav.navigate("game/${mode.name}?category=${category?.name ?: ""}&difficulty=${difficulty?.name ?: ""}")
-            }, { mode -> nav.navigate("mode/${mode.key}") })
+            }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") })
+        }
+        composable("challenge/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+            ChallengeScreen(state, entry.arguments?.getString("id") ?: "") { nav.popBackStack() }
         }
         composable("mode/{mode}", arguments = listOf(navArgument("mode") { type = NavType.StringType })) { entry ->
             val mode = PlayMode.of(entry.arguments?.getString("mode")) ?: PlayMode.SPRINT
@@ -170,8 +173,11 @@ private enum class Tab(val label: String, val icon: ImageVector, val selectedIco
 }
 
 @Composable
-private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit) {
+private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.PLAY) }
+    // "Classement" on the home page.
+    var seenRequest by rememberSaveable { mutableStateOf(state.leaderboardRequest) }
+    LaunchedEffect(state.leaderboardRequest) { if (state.leaderboardRequest != seenRequest) { seenRequest = state.leaderboardRequest; tab = Tab.STATS } }
     val holder = rememberSaveableStateHolder()
     val haptics = rememberHaptics()
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, bottomBar = {
@@ -189,7 +195,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
         AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
             holder.SaveableStateProvider(page.name) {
                 when (page) {
-                    Tab.PLAY -> HomeScreen(state, play, playMode)
+                    Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge)
                     Tab.STATS -> StatsScreen(state)
                     Tab.PROPOSE -> ProposeScreen(state)
                     Tab.PROFILE -> ProfileScreen(state)
