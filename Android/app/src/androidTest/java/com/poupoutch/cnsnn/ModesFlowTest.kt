@@ -74,7 +74,11 @@ class ModesFlowTest {
         rule.onNodeWithTag("challengeTile").performScrollTo().performClick()
         waitFor("Mêmes 5 mots. Le plus rapide gagne.")
         waitFor("Inviter par message")
-        rule.waitUntil(20_000) { has("Ajoutez d’abord un ami", substring = true) || has("Connectez-vous à Internet", substring = true) }
+        // The friends list loads (earlier tests may leave a signed-in player who already has friends).
+        rule.waitUntil(20_000) {
+            !has("Chargement…") && (has("Ajoutez d’abord un ami", substring = true) || has("Connectez-vous à Internet", substring = true) ||
+                rule.onAllNodes(hasContentDescription("Défier ", substring = true)).fetchSemanticsNodes().isNotEmpty())
+        }
     }
 
     @Test fun sprintRightWrongSkipAndStop() {
