@@ -42,7 +42,7 @@ class CloudRepositoryTest {
     private lateinit var auth: FirebaseAuth
     private lateinit var repo: CloudRepository
 
-    @Before fun setUp() = runBlocking {
+    @Before fun setUp() = runBlocking<Unit> {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         Cloud.useEmulators(context, host)
         val app = Cloud.app!!
@@ -53,7 +53,7 @@ class CloudRepositoryTest {
         emulator("DELETE", "http://$host:9099/emulator/v1/projects/$project/accounts")
     }
 
-    @Test fun secretDailyWordIsCheckedByTheServer() = runBlocking {
+    @Test fun secretDailyWordIsCheckedByTheServer() = runBlocking<Unit> {
         val day = DailySchedule.key()
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         val alice = repo.bootstrap("Alice")
@@ -85,7 +85,7 @@ class CloudRepositoryTest {
         assertEquals(1, repo.wrongOf(alice.uid, day))
     }
 
-    @Test fun givingUpRevealsTheWordAndCountsALoss() = runBlocking {
+    @Test fun givingUpRevealsTheWordAndCountsALoss() = runBlocking<Unit> {
         val day = DailySchedule.key()
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         val bob = repo.bootstrap("Bob")
@@ -97,7 +97,7 @@ class CloudRepositoryTest {
         assertEquals(0, repo.leaderboardEntry(bob.uid)!!.streak)
     }
 
-    @Test fun friendsCodeAndBoard() = runBlocking {
+    @Test fun friendsCodeAndBoard() = runBlocking<Unit> {
         val alice = repo.bootstrap("Alice")
         val code = repo.friendCode(alice.uid, "Alice")
         assertEquals(6, code.length)
@@ -112,7 +112,7 @@ class CloudRepositoryTest {
         assertEquals(1, repo.friendsBoard(bob.uid, "Bob", DailySchedule.key()).size)
     }
 
-    @Test fun proposalsAreUniqueAndRateLimited() = runBlocking {
+    @Test fun proposalsAreUniqueAndRateLimited() = runBlocking<Unit> {
         val alice = repo.bootstrap("Alice")
         val card = Card("x", "Ornithorynque", "Un mammifère qui pond des œufs.", Category.entries.first(), Difficulty.entries.last())
         val stored = repo.submit(card, alice.uid)
@@ -130,7 +130,7 @@ class CloudRepositoryTest {
         try { repo.report("KANGOUROU", "Encore une fois"); fail() } catch (e: CloudError) { assertEquals(CloudError.Kind.ALREADY_REPORTED, e.kind) }
     }
 
-    @Test fun progressIsSharedWithTheIphoneFormat() = runBlocking {
+    @Test fun progressIsSharedWithTheIphoneFormat() = runBlocking<Unit> {
         val alice = repo.bootstrap("Alice")
         val progress = Progress(username = "Alice", attempts = listOf(Attempt(cardID = "seed-001", mode = GameMode.CLASSIC, correct = true, timeMs = 4200, points = 90, date = Instant.parse("2026-10-14T10:00:00Z"))))
         repo.saveCloudProgress(progress, alice.uid)
@@ -138,14 +138,14 @@ class CloudRepositoryTest {
         assertEquals(progress, repo.cloudProgress(alice.uid))
     }
 
-    @Test fun pseudoIsCheckedAndRenameUpdatesTheBoard() = runBlocking {
+    @Test fun pseudoIsCheckedAndRenameUpdatesTheBoard() = runBlocking<Unit> {
         val alice = repo.bootstrap("Alice")
         expectDenied { repo.rename(alice.uid, "connard") }
         repo.rename(alice.uid, "Alicia")
         assertEquals("Alicia", repo.bootstrap("x").username)
     }
 
-    @Test fun deletingTheAccountRemovesEverything() = runBlocking {
+    @Test fun deletingTheAccountRemovesEverything() = runBlocking<Unit> {
         val day = DailySchedule.key()
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         val alice = repo.bootstrap("Alice")

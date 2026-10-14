@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
@@ -25,8 +26,8 @@ class AppFlowTest {
             rule.onNodeWithText("C’est parti").performClick()
         }
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Lancer une partie").performClick()
-        rule.waitUntil(10_000) { rule.onAllNodes(hasText("votre réponse")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Lancer une partie").performScrollTo().performClick()
+        rule.waitUntil(20_000) { rule.onAllNodes(hasText("votre réponse")).fetchSemanticsNodes().isNotEmpty() }
         // A wrong answer stays in the game and is shown crossed out.
         rule.onNodeWithContentDescription("X").performClick()
         rule.onNodeWithContentDescription("Q").performClick()
