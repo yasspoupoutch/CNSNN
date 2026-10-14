@@ -95,6 +95,7 @@ import CNSNNCore
                     return
                 }
                 usedHint = session.hintUsed; resumedDaily = true
+                wrongAnswers = session.guesses
                 dailyStart = session.startedAt
                 if let local = state.progress.attempts.first(where: { $0.dailyKey == key }) {
                     // Finished on this iPhone but the finish never reached the server: send it again.
@@ -171,24 +172,59 @@ import CNSNNCore
     private func missed() {
         wrongAnswers += 1; wrongGuesses.append(answer); feedback = "Pas encore. Essayez une autre idée."; Haptics.retry()
     }
-    /// The guess goes to the server as the finish of the session: accepted only if it is the word.
+    /// "Plus que 3 essais" once five or fewer guesses remain on a secret word (20 a day).
+    var guessesNotice: String? {
+        let left = DailyGuesses.max - wrongAnswers
+        guard secret, result == nil, left <= 5 else { return nil }
+        return left == 1 ? "Plus qu’un essai" : "Plus que \(left) essais"
+    }
+    /// The guess is first counted on the server (20 a day), then sent as the finish of the session:
+    /// accepted only if it is the word.
     private func submitSecret(state: AppState) async {
         guard let cloud = state.cloud, let uid = state.uid, let dailyKey else { return }
         let guess = WordEngine.normalize(answer)
         checking = true; notice = nil
         defer { checking = false }
+        let count: Int
         do {
-            guard try await cloud.finishDaily(uid: uid, day: dailyKey, correct: true, wrongAnswers: wrongAnswers, answer: guess) else {
+            count = try await cloud.registerGuess(uid: uid, day: dailyKey, guess: guess)
+        } catch let error where CloudError.code(error) == .permissionDenied {
+            notice = "Patientez une seconde avant de réessayer."; return
+        } catch {
+            if (error as? CloudError) == .noGuessesLeft { notice = CloudError.noGuessesLeft.errorDescription; await giveUp(cloud: cloud, uid: uid, day: dailyKey, state: state) }
+            else { notice = CloudError.message(error) }
+            return
+        }
+        do {
+            guard try await cloud.finishDaily(uid: uid, day: dailyKey, correct: true, wrongAnswers: count - 1, answer: guess) else {
                 // Not confirmed in time. If it was right, the server keeps it and the next opening shows the result.
                 notice = "Connexion trop lente. Vérifiez le réseau puis réessayez."; return
             }
             await reveal(cloud: cloud, day: dailyKey, state: state)
             finish(correct: true, mode: .daily, state: state, alreadyFinished: true)
         } catch let error where CloudError.code(error) == .permissionDenied {
+            wrongAnswers = count - 1
             missed()
+            // The twentieth wrong guess ends the game.
+            if count >= DailyGuesses.max { await giveUp(cloud: cloud, uid: uid, day: dailyKey, state: state) }
         } catch {
+            wrongAnswers = count
             notice = CloudError.message(error)
         }
+    }
+    /// Records the loss on the server with the errors it counted, then reveals the word.
+    /// Returns false if the server could not be reached.
+    @discardableResult private func giveUp(cloud: FirebaseRepository, uid: String, day: String, state: AppState) async -> Bool {
+        var confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers)) == true
+        if !confirmed, let session = try? await cloud.dailySession(uid: uid, day: day), !session.finished {
+            // This iPhone's count was off (a guess sent from elsewhere): use the server's.
+            wrongAnswers = session.guesses
+            confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers)) == true
+        }
+        guard confirmed else { notice = CloudError.offline.errorDescription; return false }
+        await reveal(cloud: cloud, day: day, state: state)
+        finish(correct: false, mode: .daily, state: state, alreadyFinished: true)
+        return true
     }
     /// Swaps the masked card for the real word once the server has recorded the end of the game.
     private func reveal(cloud: FirebaseRepository, day: String, state: AppState) async {
@@ -202,11 +238,7 @@ import CNSNNCore
             checking = true; notice = nil
             Task {
                 defer { checking = false }
-                guard (try? await cloud.finishDaily(uid: uid, day: dailyKey, correct: false, wrongAnswers: wrongAnswers)) == true else {
-                    notice = CloudError.offline.errorDescription; return
-                }
-                await reveal(cloud: cloud, day: dailyKey, state: state)
-                finish(correct: false, mode: mode, state: state, alreadyFinished: true)
+                await giveUp(cloud: cloud, uid: uid, day: dailyKey, state: state)
             }
             return
         }

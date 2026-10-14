@@ -20,6 +20,9 @@ service cloud.firestore {
     && !k.matches('(pute|lapute|con|lecon|nazi|bite|pd|ntm|nique|p[eé]d[eé]|viol|suce|sucemoi)');
   }
   // Suspended players keep reading, but can no longer play ranked, propose, report or rename.
+  function acceptsRules(d) { return d.rulesVersion is int && d.rulesVersion >= 1 && d.rulesVersion <= 100 && d.rulesAcceptedAt == request.time; }
+  // While deleting the whole account: the profile is gone (or goes in the same batch).
+  function leaving() { return signedIn() && !existsAfter(at('users/' + request.auth.uid)); }
   function active() { return signedIn() && !exists(at('banned/' + request.auth.uid)); }
   function categories() { return ['Général','Football','Cinéma','Géographie','Animaux','Objets']; }
   function difficulties() { return ['Facile','Moyen','Difficile']; }
@@ -64,7 +67,8 @@ service cloud.firestore {
   match /users/{uid} {
    allow read: if owner(uid) || admin();
    allow create: if owner(uid)
-    && request.resource.data.keys().hasOnly(['uid','username','createdAt','updatedAt','score','gamesPlayed','correctAnswers','bestTimeMs','currentStreak'])
+    && request.resource.data.keys().hasOnly(['uid','username','createdAt','updatedAt','score','gamesPlayed','correctAnswers','bestTimeMs','currentStreak','rulesVersion','rulesAcceptedAt'])
+    && (!('rulesVersion' in request.resource.data) || acceptsRules(request.resource.data))
     && request.resource.data.uid == uid && validName(request.resource.data.username)
     && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
     && request.resource.data.score == 0 && request.resource.data.gamesPlayed == 0
@@ -75,6 +79,10 @@ service cloud.firestore {
     && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time
     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastProposalAt','proposalWindowAt','proposalCount'])
      || consumesProposalQuota(resource.data, request.resource.data));
+   // Accepting the community rules (a newer version is accepted again), even while suspended.
+   allow update: if owner(uid)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rulesVersion','rulesAcceptedAt'])
+    && acceptsRules(request.resource.data);
    allow delete: if owner(uid);
 
    // Synced practice progress (Classic points, history, local stats): owner only, not official.
@@ -112,7 +120,7 @@ service cloud.firestore {
     && request.resource.data.username is string && request.resource.data.username.size() <= 40
     && request.resource.data.reason is string && request.resource.data.reason.size() <= 300
     && request.resource.data.bannedBy == request.auth.uid && request.resource.data.bannedAt == request.time;
-   allow delete: if admin();
+   allow delete: if admin() || (owner(uid) && leaving());
   }
   // Left by a deleted account (no personal data), so friends can drop it from their list.
   match /deletedUsers/{uid} {
@@ -136,19 +144,38 @@ service cloud.firestore {
     && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
     && request.resource.data.startedAt == request.time && request.resource.data.hintUsed == false
     && exists(at('users/' + request.auth.uid));
-   // Reveal the hint once, or finish once. Nothing can be rewound.
+   // Reveal the hint once, register a guess, or finish once. Nothing can be rewound.
    allow update: if owner(resource.data.userId) && !('finishedAt' in resource.data) && (
      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hintUsed'])
       && request.resource.data.hintUsed == true)
+     || registersGuess(resource.data, request.resource.data)
      || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers','answer'])
       && request.resource.data.finishedAt == request.time && request.resource.data.correct is bool
-      && request.resource.data.wrongAnswers is int && request.resource.data.wrongAnswers >= 0 && request.resource.data.wrongAnswers <= 1000
-      && provesAnswer(resource.data.day, request.resource.data))
+      && finishes(resource.data, request.resource.data))
    );
    // Only while deleting the whole account.
-   allow delete: if owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid));
+   allow delete: if owner(resource.data.userId) && leaving();
   }
 
+  // Every guess is counted on the server before it can be checked: at most 20 a day, one per second.
+  // So a script cannot try answers until one is accepted.
+  function maxGuesses() { return 20; }
+  function registersGuess(old, s) {
+   return s.diff(old).affectedKeys().hasOnly(['guesses','guess','guessAt'])
+    && s.guesses == old.get('guesses', 0) + 1 && s.guesses <= maxGuesses()
+    && s.guess is string && s.guess.size() >= 1 && s.guess.size() <= 80
+    && s.guessAt == request.time
+    && (!('guessAt' in old) || request.time > old.guessAt + duration.value(1, 's'));
+  }
+  // A win names the last registered guess (which must be the word), no sooner than 2 s after the start.
+  // The wrong answers are the registered guesses, so "sans faute" cannot be forged either.
+  function finishes(old, s) {
+   let guesses = old.get('guesses', 0);
+   return s.wrongAnswers is int && (s.correct
+    ? s.get('answer', '') == old.get('guess', null) && s.wrongAnswers == guesses - 1
+      && request.time > old.startedAt + duration.value(2, 's') && provesAnswer(old.day, s)
+    : !('answer' in s) && s.wrongAnswers == guesses);
+  }
   // A win on a secret daily word must carry the right answer: a wrong guess is simply refused.
   function provesAnswer(day, s) {
    return (!('answer' in s) || (s.answer is string && s.answer.size() <= 80))
@@ -180,8 +207,10 @@ service cloud.firestore {
   match /dailyResults/{id} {
    allow read: if signedIn();
    allow create: if active() && createsResult(id, request.resource.data, get(at('dailySessions/' + id)).data);
-   allow update: if false;
-   allow delete: if (owner(resource.data.userId) && !existsAfter(at('users/' + request.auth.uid))) || admin();
+   // A suspension hides the results without deleting them, so lifting it gives everything back.
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended'])
+    && (!('suspended' in request.resource.data) || request.resource.data.suspended == true);
+   allow delete: if (owner(resource.data.userId) && leaving()) || admin();
   }
   function createsResult(id, r, s) {
    return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','wrongAnswers','timeMs','points','startedAt','finishedAt'])
@@ -205,6 +234,9 @@ service cloud.firestore {
      || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt'])
       && request.resource.data.username == getAfter(at('users/' + uid)).data.username && request.resource.data.updatedAt == request.time)
    );
+   // Suspension: hidden from the rankings, totals kept.
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended'])
+    && (!('suspended' in request.resource.data) || request.resource.data.suspended == true);
    allow delete: if owner(uid) || admin();
   }
   function tallies(uid, old, n) {
@@ -223,6 +255,12 @@ service cloud.firestore {
     && n.lastWinDay == (laterWin ? day : old.lastWinDay);
   }
   function validDayKeyOr(day) { return validDayKey(day) ? day : 'invalid'; }
+
+  // ---- Version of the approved card catalogue: the app downloads the cards again only when it moved.
+  match /meta/cards {
+   allow get: if signedIn();
+   allow write: if admin() && request.resource.data.keys().hasOnly(['updatedAt']) && request.resource.data.updatedAt == request.time;
+  }
 
   // ---- Community cards. The document id is the normalized answer, so a word exists only once.
   match /cards/{cardId} {
@@ -279,7 +317,9 @@ service cloud.firestore {
 
   // ---- Player reports (offensive pseudo): one per reporter and player, on a ranked player only.
   match /playerReports/{id} {
-   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+   // The reported player sees and removes the reports that name them only while deleting the account.
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin()
+    || (resource.data.playerId == request.auth.uid && !exists(at('users/' + request.auth.uid))));
    allow create: if active()
     && request.resource.data.keys().hasOnly(['userId','playerId','username','reason','createdAt','status'])
     && request.resource.data.userId == request.auth.uid && request.resource.data.playerId is string
@@ -289,7 +329,8 @@ service cloud.firestore {
     && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt'])
     && request.resource.data.status == 'resolved' && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt == request.time;
-   allow delete: if (signedIn() && resource.data.userId == request.auth.uid) || admin();
+   allow delete: if (signedIn() && resource.data.userId == request.auth.uid) || admin()
+    || (resource.data.playerId == request.auth.uid && leaving());
   }
 
   // ---- Server-only legacy collections (optional Blaze backend).

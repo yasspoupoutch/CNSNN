@@ -55,6 +55,8 @@ public struct Progress: Codable, Sendable {
     public var dailyStartedAt: [String: Date] = [:]
     /// Secret Mot du jour words, revealed by the server once the day's game is over (by day key).
     public var dailyWords: [String: Card]?
+    /// Version of the community rules the player accepted (nil: never).
+    public var rulesVersion: Int?
     public init() {}
     public var score: Int { attempts.reduce(0) { $0 + $1.points } }
     public var correctAnswers: Int { attempts.filter(\.correct).count }
@@ -95,9 +97,18 @@ extension Progress {
         result.dailyStarted.merge(other.dailyStarted) { mine, _ in mine }
         result.dailyStartedAt.merge(other.dailyStartedAt) { mine, _ in mine }
         if let words = other.dailyWords { result.dailyWords = (result.dailyWords ?? [:]).merging(words) { mine, theirs in mine.wordFull.isEmpty ? theirs : mine } }
-        let submissionIDs = Set(result.submissions.map(\.id))
-        result.submissions += other.submissions.filter { !submissionIDs.contains($0.id) }
+        // A proposal is one word: two devices may know it under different ids, and one may already
+        // have its moderation verdict.
+        for theirs in other.submissions {
+            let word = WordEngine.normalize(theirs.card.wordFull)
+            if let index = result.submissions.firstIndex(where: { WordEngine.normalize($0.card.wordFull) == word }) {
+                if result.submissions[index].card.status == .pending && theirs.card.status != .pending { result.submissions[index] = theirs }
+            } else {
+                result.submissions.append(theirs)
+            }
+        }
         if result.recentCards.isEmpty { result.recentCards = other.recentCards }
+        if let theirs = other.rulesVersion, theirs > (result.rulesVersion ?? 0) { result.rulesVersion = theirs }
         return result
     }
 }

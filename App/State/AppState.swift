@@ -26,6 +26,7 @@ import CNSNNCore
     init(local: any ProgressRepository = LocalRepository()) {
         if RuntimeFlags.isTesting { self.local = MemoryRepository() } else { self.local = local }
         do { progress = try self.local.load() } catch { savingAllowed = false; self.error = "La sauvegarde locale est illisible. Elle n’a pas été écrasée." }
+        if !RuntimeFlags.isTesting, let cached = CardCache.load() { cards = Self.catalogue(community: cached.cards) }
         isRestoring = !RuntimeFlags.isTesting && progress.username.isEmpty && FirebaseRepository.hasSignedInUser
     }
 
@@ -48,20 +49,26 @@ import CNSNNCore
         cloudSave = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled, let self, self.uid == uid else { return }
-            try? cloud.saveCloudProgress(self.progress, uid: uid)
+            await self.syncProgress()
         }
     }
-    /// Brings the cloud copy and this device together, so a reinstall or a second iPhone finds everything.
+    /// Brings the cloud copy and this device together, so a reinstall or a second device finds everything.
+    /// The cloud copy is merged in a transaction, never overwritten: games saved by another device in the
+    /// meantime are kept. Offline, nothing is written and the next change, launch or return to the app syncs again.
     func syncProgress() async {
         guard let cloud, let uid else { return }
-        do {
-            if let remote = try await cloud.cloudProgress(uid: uid) {
-                var merged = progress.merged(with: remote)
-                merged.username = progress.username.isEmpty ? remote.username : progress.username
-                progress = merged
-            }
-            persist()
-        } catch { /* Offline: the next change or launch syncs again. */ }
+        guard let merged = try? await cloud.saveCloudProgress(progress, uid: uid), self.uid == uid else { return }
+        adopt(merged)
+    }
+    /// Takes in what another device saved. Saved on this device only: the cloud already has it.
+    private func adopt(_ cloudCopy: CNSNNCore.Progress) {
+        let merged = progress.merged(with: cloudCopy)
+        guard merged.attempts.count != progress.attempts.count || merged.submissions.count != progress.submissions.count
+            || (merged.dailyWords?.count ?? 0) != (progress.dailyWords?.count ?? 0) || merged.rulesVersion != progress.rulesVersion else { return }
+        progress = merged
+        guard savingAllowed else { return }
+        try? local.save(progress)
+        refreshGlance()
     }
 
     // MARK: Session
@@ -75,7 +82,7 @@ import CNSNNCore
         defer { isBusy = false }
         if let cloud {
             do {
-                let profile = try await cloud.bootstrap(username: name)
+                let profile = try await cloud.bootstrap(username: name, rulesVersion: progress.rulesVersion)
                 try activate(profile, preservingGuest: true)
             } catch { self.error = "Connexion impossible : " + CloudError.message(error); return }
         }
@@ -186,14 +193,33 @@ import CNSNNCore
             await refreshOfficial()
         } catch { self.error = CloudError.message(error) }
     }
-    /// Classic plays the built-in cards plus every approved community card.
+    /// Classic plays the built-in cards plus every approved community card. The community cards are kept
+    /// on this device and downloaded again only when a moderator changed the catalogue (`meta/cards`),
+    /// so a launch costs one read instead of one per card on the free plan.
     func refreshCards() async {
         guard let cloud, uid != nil else { return }
         do {
+            let cached = CardCache.load()
+            let version = try await cloud.cardsVersion()
+            if let cached, cached.isCurrent(version: version) { cards = Self.catalogue(community: cached.cards); return }
             let community = try await cloud.cards()
-            let known = Set(SeedCards.all.map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
-            cards = SeedCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
-        } catch { /* Offline: the built-in cards remain. */ }
+            CardCache.save(CardCache(version: version ?? 0, savedAt: Date(), cards: community))
+            cards = Self.catalogue(community: community)
+        } catch { /* Offline: the cards kept on this device remain. */ }
+    }
+    private static func catalogue(community: [Card]) -> [Card] {
+        let known = Set(SeedCards.all.map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
+        return SeedCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
+    }
+
+    // MARK: Community rules
+
+    /// The player has a pseudo but has not accepted the current community rules yet.
+    var needsRulesAcceptance: Bool { !progress.username.isEmpty && (progress.rulesVersion ?? 0) < CommunityRules.version }
+    func acceptRules() {
+        progress.rulesVersion = CommunityRules.version
+        persist()
+        if let cloud, let uid { cloud.acceptRules(uid: uid, version: CommunityRules.version) }
     }
     func card(id: String) -> Card? {
         if let day = FirebaseRepository.secretDay(cardID: id) { return progress.dailyWords?[day] }

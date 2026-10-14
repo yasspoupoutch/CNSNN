@@ -90,6 +90,12 @@ struct DailySessionState {
     let startedAt: Date
     let hintUsed: Bool
     let finished: Bool
+    /// Guesses registered on the server (firestore.rules allows `DailyGuesses.max` a day).
+    var guesses = 0
+}
+
+enum DailyGuesses {
+    static let max = 20
 }
 
 @MainActor final class FirebaseRepository {
@@ -116,6 +122,10 @@ struct DailySessionState {
         Firestore.firestore().settings = settings
     }
     var currentUID: String? { auth.currentUser?.uid }
+    /// Integration tests only: cuts or restores the connection, like a network outage.
+    func setNetwork(enabled: Bool) async throws {
+        if enabled { try await db.enableNetwork() } else { try await db.disableNetwork() }
+    }
     #endif
     private var auth: Auth { Auth.auth() }
     var hasCurrentUser: Bool { auth.currentUser != nil }
@@ -124,7 +134,7 @@ struct DailySessionState {
 
     // MARK: Profile
 
-    func bootstrap(username: String) async throws -> CloudProfile {
+    func bootstrap(username: String, rulesVersion: Int? = nil) async throws -> CloudProfile {
         let user: User
         if let current = auth.currentUser { user = current }
         else { user = try await auth.signInAnonymously().user }
@@ -133,7 +143,9 @@ struct DailySessionState {
         let doc = try await ref.getDocument()
         if !doc.exists {
             guard !doc.metadata.isFromCache else { throw CloudError.offline }
-            try await ref.setData(["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0])
+            var data: [String: Any] = ["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0]
+            if let rulesVersion { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
+            try await ref.setData(data)
         }
         return CloudProfile(uid:user.uid,anonymous:user.isAnonymous,username:doc.data()?["username"] as? String ?? username,email:user.email)
     }
@@ -145,6 +157,11 @@ struct DailySessionState {
             batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("leaderboard").document(uid))
         }
         try await batch.commit()
+    }
+
+    /// Records that the player accepted the community rules (best effort: the app keeps its own copy).
+    func acceptRules(uid: String, version: Int) {
+        db.collection("users").document(uid).updateData(["rulesVersion": version, "rulesAcceptedAt": FieldValue.serverTimestamp()])
     }
 
     // MARK: Accounts
@@ -190,21 +207,40 @@ struct DailySessionState {
         let authored = try await db.collection("cards").whereField("createdBy", isEqualTo: uid).getDocuments(source: .server).documents
         refs += authored.filter { $0.data()["status"] as? String != "approved" }.map(\.reference)
         let live = authored.filter { $0.data()["status"] as? String == "approved" }.map(\.reference)
-        // The profile goes first: the rules only let the daily history go once it is gone.
-        // The first batch also leaves the tombstone that lets friends drop this account.
-        for start in stride(from: 0, to: refs.count, by: 400) {
-            let batch = db.batch()
-            for ref in refs[start..<min(start + 400, refs.count)] { batch.deleteDocument(ref) }
-            if start == 0 {
-                batch.setData(["deletedAt": FieldValue.serverTimestamp()], forDocument: db.collection("deletedUsers").document(uid))
-                for ref in live.prefix(80) { batch.updateData(["createdBy": "deleted", "authorName": FieldValue.delete()], forDocument: ref) }
-            }
-            try await batch.commit()
-        }
+        // The profile goes first, with the tombstone that lets friends drop this account and the
+        // suspension record: the rules only let the daily history and the rest go once it is gone.
+        var writes: [BatchWrite] = [.set(["deletedAt": FieldValue.serverTimestamp()], db.collection("deletedUsers").document(uid)),
+                                    .delete(db.collection("banned").document(uid))]
+        writes += refs.map { BatchWrite.delete($0) }
+        writes += live.map { BatchWrite.update(["createdBy": "deleted", "authorName": FieldValue.delete()], $0) }
+        try await commit(writes)
+        // Reports naming this player can only be read once the profile is gone.
+        let about = try await db.collection("playerReports").whereField("playerId", isEqualTo: uid).getDocuments(source: .server).documents
+        try await commit(about.map { BatchWrite.delete($0.reference) })
         do { try await user.delete() }
         catch where CloudError.code(error) == .requiresRecentLogin && user.isAnonymous {
             // A guest cannot sign in again: its data is already gone, so simply leave the account.
             try auth.signOut()
+        }
+    }
+
+    enum BatchWrite {
+        case set([String: Any], DocumentReference)
+        case update([String: Any], DocumentReference)
+        case delete(DocumentReference)
+    }
+    /// Commits writes in order, 400 per batch (Firestore allows 500).
+    private func commit(_ writes: [BatchWrite]) async throws {
+        for start in stride(from: 0, to: writes.count, by: 400) {
+            let batch = db.batch()
+            for write in writes[start..<min(start + 400, writes.count)] {
+                switch write {
+                case let .set(data, ref): batch.setData(data, forDocument: ref)
+                case let .update(data, ref): batch.updateData(data, forDocument: ref)
+                case let .delete(ref): batch.deleteDocument(ref)
+                }
+            }
+            try await batch.commit()
         }
     }
 
@@ -218,11 +254,29 @@ struct DailySessionState {
         guard let json = snapshot.data()?["json"] as? String else { return nil }
         return try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(json.utf8))
     }
-    /// Queued by Firestore when offline and sent once the network is back.
-    func saveCloudProgress(_ progress: CNSNNCore.Progress, uid: String) throws {
-        let data = try JSONEncoder().encode(progress)
-        guard data.count <= 900_000 else { throw CloudError.progressTooLarge }
-        progressRef(uid).setData(["json": String(decoding: data, as: UTF8.self), "schema": 1, "updatedAt": FieldValue.serverTimestamp()])
+    /// Merges this device's progress into the cloud copy in a transaction, so another device's games
+    /// saved in the meantime are never overwritten. Returns the merged copy. Needs the network:
+    /// offline, nothing is written and the next sync tries again.
+    func saveCloudProgress(_ progress: CNSNNCore.Progress, uid: String) async throws -> CNSNNCore.Progress {
+        let ref = progressRef(uid)
+        let merged = try await db.runTransaction { transaction, errorPointer -> Any? in
+            do {
+                let snapshot = try transaction.getDocument(ref)
+                var merged = progress
+                if let json = snapshot.data()?["json"] as? String {
+                    merged = progress.merged(with: try JSONDecoder().decode(CNSNNCore.Progress.self, from: Data(json.utf8)))
+                }
+                let data = try JSONEncoder().encode(merged)
+                guard data.count <= 900_000 else { throw CloudError.progressTooLarge }
+                transaction.setData(["json": String(decoding: data, as: UTF8.self), "schema": 1, "updatedAt": FieldValue.serverTimestamp()], forDocument: ref)
+                return data
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+        }
+        guard let data = merged as? Data else { throw CloudError.offline }
+        return try JSONDecoder().decode(CNSNNCore.Progress.self, from: data)
     }
 
     // MARK: Mot du jour
@@ -289,6 +343,25 @@ struct DailySessionState {
         guard try await Self.awaitWrite({ done in ref.updateData(["hintUsed": true], completion: done) }) else { return nil }
         return try await dailyHint(day: day)
     }
+    /// Counts a guess on the server before it can be checked (at most 20 a day, one per second), so a
+    /// script cannot try answers until one is accepted. Returns the number of guesses made today.
+    func registerGuess(uid: String, day: String, guess: String) async throws -> Int {
+        let ref = sessionRef(uid, day)
+        let count = try await db.runTransaction { transaction, errorPointer -> Any? in
+            do {
+                let data = try transaction.getDocument(ref).data() ?? [:]
+                let next = (data["guesses"] as? Int ?? 0) + 1
+                guard data["finishedAt"] == nil, next <= DailyGuesses.max else { throw CloudError.noGuessesLeft }
+                transaction.updateData(["guesses": next, "guess": guess, "guessAt": FieldValue.serverTimestamp()], forDocument: ref)
+                return next
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+        }
+        guard let count = count as? Int else { throw CloudError.offline }
+        return count
+    }
     /// Stamps the finish with the server time. Returns false if the network did not confirm in time:
     /// the write stays queued and the official result is published on a later launch.
     /// For a secret word, `answer` is the normalized guess: the server refuses a wrong one (permission denied).
@@ -333,28 +406,39 @@ struct DailySessionState {
         let doc = try await db.collection("leaderboard").document(uid).getDocument(source: source)
         return doc.data().flatMap { Self.entry(uid: uid, $0) }
     }
-    func topPlayers(limit: Int = 50) async throws -> [LeaderboardEntry] {
-        try await db.collection("leaderboard").order(by: "points", descending: true).limit(to: limit).getDocuments()
-            .documents.compactMap { Self.entry(uid: $0.documentID, $0.data()) }
+    // Rankings show 25 lines: a few more are read so suspended players can be left out.
+    func topPlayers(limit: Int = 25) async throws -> [LeaderboardEntry] {
+        let docs = try await db.collection("leaderboard").order(by: "points", descending: true).limit(to: limit + 10).getDocuments().documents
+        return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))
     }
-    func fastestPlayers(limit: Int = 50) async throws -> [LeaderboardEntry] {
-        try await db.collection("leaderboard").whereField("bestTimeMs", isGreaterThan: 0).order(by: "bestTimeMs").limit(to: limit).getDocuments()
-            .documents.compactMap { Self.entry(uid: $0.documentID, $0.data()) }
+    func fastestPlayers(limit: Int = 25) async throws -> [LeaderboardEntry] {
+        let docs = try await db.collection("leaderboard").whereField("bestTimeMs", isGreaterThan: 0).order(by: "bestTimeMs").limit(to: limit + 10).getDocuments().documents
+        return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))
     }
+    /// A suspended player's totals and results stay stored but are hidden from everyone else.
+    private static func visible(_ doc: QueryDocumentSnapshot) -> Bool { doc.data()["suspended"] as? Bool != true }
     /// Rank by official points among every player.
     func rank(points: Int) async throws -> (rank: Int, players: Int) {
         let board = db.collection("leaderboard")
         let ahead = try await Self.count(board.whereField("points", isGreaterThan: points))
         return (ahead + 1, try await Self.count(board))
     }
-    func dailyRanking(day: String, limit: Int = 50) async throws -> [DailyRank] {
-        try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
-            .order(by: "timeMs").limit(to: limit).getDocuments().documents.compactMap { doc in
-                let d = doc.data()
-                guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
-                return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false,
-                                 wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
-            }
+    func dailyRanking(day: String, limit: Int = 25) async throws -> [DailyRank] {
+        let docs = try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
+            .order(by: "timeMs").limit(to: limit + 10).getDocuments().documents
+        return Array(docs.filter(Self.visible).compactMap(Self.rank).prefix(limit))
+    }
+    /// Moderation: today's wins under 5 s, too fast to be read and typed by hand.
+    func suspiciousResults(day: String) async throws -> [DailyRank] {
+        let docs = try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
+            .whereField("timeMs", isLessThan: 5000).order(by: "timeMs").limit(to: 20).getDocuments(source: .server).documents
+        return docs.filter(Self.visible).compactMap(Self.rank)
+    }
+    private static func rank(_ doc: QueryDocumentSnapshot) -> DailyRank? {
+        let d = doc.data()
+        guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
+        return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false,
+                         wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
     }
     /// "Plus rapide que 98 % des joueurs": players who were slower or did not find the word,
     /// among everyone else who played today.
@@ -423,12 +507,16 @@ struct DailySessionState {
         players.insert((uid: uid, name: username), at: 0)
         var rows: [FriendStanding] = []
         for player in players {
-            // A friend who deleted their account leaves the list for good.
-            if player.uid != uid, try await db.collection("deletedUsers").document(player.uid).getDocument(source: .server).exists {
-                try? await removeFriend(uid: uid, friend: player.uid)
-                continue
+            let doc = try await db.collection("leaderboard").document(player.uid).getDocument(source: .server)
+            let entry = doc.data().flatMap { Self.entry(uid: player.uid, $0) }
+            if player.uid != uid {
+                // A friend who deleted their account leaves the list for good (deleted accounts have no totals).
+                if entry == nil, try await db.collection("deletedUsers").document(player.uid).getDocument(source: .server).exists {
+                    try? await removeFriend(uid: uid, friend: player.uid)
+                    continue
+                }
+                if doc.data()?["suspended"] as? Bool == true { continue }
             }
-            let entry = try await leaderboardEntry(uid: player.uid, source: .server)
             let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
             let today = data.flatMap { Self.attempt(day: day, $0) }
             rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
@@ -439,9 +527,18 @@ struct DailySessionState {
 
     // MARK: Cards
 
+    /// Version of the approved catalogue (`meta/cards`), moved by moderators: the cards are downloaded
+    /// again only when it changed, which saves the free plan's daily reads. Nil when never set.
+    func cardsVersion() async throws -> Int? {
+        let doc = try await db.collection("meta").document("cards").getDocument(source: .server)
+        return (doc.data()?["updatedAt"] as? Timestamp).map(Self.millis)
+    }
     func cards() async throws -> [Card] {
-        let snap = try await db.collection("cards").whereField("status",isEqualTo:"approved").limit(to:500).getDocuments()
+        let snap = try await db.collection("cards").whereField("status",isEqualTo:"approved").limit(to:500).getDocuments(source: .server)
         return snap.documents.compactMap { decode($0.documentID,$0.data()) }
+    }
+    private func bumpCardsVersion(_ batch: WriteBatch) {
+        batch.setData(["updatedAt": FieldValue.serverTimestamp()], forDocument: db.collection("meta").document("cards"))
     }
     /// Proposes a card under its normalized word, which makes duplicates impossible,
     /// and consumes the anti-spam quota (30 s apart, 10 per 24 h) in the same batch.
@@ -503,18 +600,24 @@ struct DailySessionState {
     func isSuspended(uid: String) async throws -> Bool {
         try await db.collection("banned").document(uid).getDocument(source: .server).exists
     }
-    /// Suspends a player and takes them off the leaderboards; their games stay recorded.
+    /// Suspends a player and hides them from the rankings. Nothing is deleted: lifting the suspension
+    /// gives back every result and total.
     func suspend(player: String, username: String, reason: String) async throws {
         guard let uid = auth.currentUser?.uid else { throw CloudError.authentication }
-        let results = try await db.collection("dailyResults").whereField("userId", isEqualTo: player).getDocuments(source: .server).documents
-        let batch = db.batch()
-        batch.setData(["username": username, "reason": reason, "bannedAt": FieldValue.serverTimestamp(), "bannedBy": uid], forDocument: db.collection("banned").document(player))
-        batch.deleteDocument(db.collection("leaderboard").document(player))
-        for doc in results.prefix(400) { batch.deleteDocument(doc.reference) }
-        try await batch.commit()
+        let hide = try await hidingWrites(player: player, suspended: true)
+        try await commit([.set(["username": username, "reason": reason, "bannedAt": FieldValue.serverTimestamp(), "bannedBy": uid], db.collection("banned").document(player))] + hide)
     }
     func unsuspend(player: String) async throws {
-        try await db.collection("banned").document(player).delete()
+        let show = try await hidingWrites(player: player, suspended: false)
+        try await commit([.delete(db.collection("banned").document(player))] + show)
+    }
+    /// Sets or clears the `suspended` flag on the player's totals and every daily result.
+    private func hidingWrites(player: String, suspended: Bool) async throws -> [BatchWrite] {
+        let flag: [String: Any] = ["suspended": suspended ? true : FieldValue.delete()]
+        var refs = try await db.collection("dailyResults").whereField("userId", isEqualTo: player).getDocuments(source: .server).documents.map(\.reference)
+        let board = db.collection("leaderboard").document(player)
+        if try await board.getDocument(source: .server).exists { refs.append(board) }
+        return refs.map { BatchWrite.update(flag, $0) }
     }
     func suspendedPlayers() async throws -> [SuspendedPlayer] {
         try await db.collection("banned").limit(to: 100).getDocuments(source: .server).documents.map {
@@ -558,7 +661,10 @@ struct DailySessionState {
             "wordNoVowels":WordEngine.consonants(card.wordFull),"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue]
         // Older proposals carry no pseudo: the moderator's copy (read from the author's profile) fills it in.
         if let author = card.author { fields["authorName"] = author }
-        try await db.collection("cards").document(card.id).updateData(fields)
+        let batch = db.batch()
+        batch.updateData(fields, forDocument: db.collection("cards").document(card.id))
+        bumpCardsVersion(batch)
+        try await batch.commit()
     }
     func pendingReports() async throws -> [CardReport] {
         let snap = try await db.collection("reports").whereField("status",isEqualTo:"pending").limit(to:50).getDocuments(source: .server)
@@ -576,6 +682,7 @@ struct DailySessionState {
         let batch = db.batch()
         batch.updateData(["status": "rejected", "reviewedBy": uid, "reviewedAt": FieldValue.serverTimestamp()], forDocument: db.collection("cards").document(report.cardID))
         batch.updateData(["status": "resolved", "reviewedBy": uid, "reviewedAt": FieldValue.serverTimestamp()], forDocument: db.collection("reports").document(report.id))
+        bumpCardsVersion(batch)
         try await batch.commit()
     }
     func resolve(report: CardReport) async throws {
@@ -594,7 +701,8 @@ struct DailySessionState {
     }
     private static func session(day: String, _ d: [String: Any]) -> DailySessionState? {
         guard let cardID = d["cardId"] as? String, let started = d["startedAt"] as? Timestamp else { return nil }
-        return DailySessionState(day: day, cardID: cardID, startedAt: started.dateValue(), hintUsed: d["hintUsed"] as? Bool ?? false, finished: d["finishedAt"] != nil)
+        return DailySessionState(day: day, cardID: cardID, startedAt: started.dateValue(), hintUsed: d["hintUsed"] as? Bool ?? false, finished: d["finishedAt"] != nil,
+                                 guesses: d["guesses"] as? Int ?? 0)
     }
     private static func attempt(day: String, _ d: [String: Any]) -> Attempt? {
         guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int, let points = d["points"] as? Int else { return nil }
@@ -655,6 +763,7 @@ enum CloudError: LocalizedError {
     case alreadyReported
     case friendNotFound
     case friendIsYou
+    case noGuessesLeft
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -700,6 +809,7 @@ enum CloudError: LocalizedError {
         case .alreadyReported: "Votre signalement est déjà envoyé. Merci !"
         case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
         case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
+        case .noGuessesLeft: "Vous avez utilisé vos 20 essais pour aujourd’hui."
         }
     }
 }

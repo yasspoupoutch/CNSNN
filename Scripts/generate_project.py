@@ -17,7 +17,7 @@ projectcfg=configs('Project',common)
 # Firebase SDK, linked only to app. Resolves in Xcode on Mac.
 remote=obj('firebase','isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 12.0.0;};')
 packages=[]
-for name in ['FirebaseCore','FirebaseAuth','FirebaseFirestore']:
+for name in ['FirebaseCore','FirebaseAuth','FirebaseFirestore','FirebaseCrashlytics']:
  packages.append(obj(name,'isa = XCSwiftPackageProductDependency; package = '+remote+'; productName = '+name+';'))
 def target(name,paths,ptype,extension,deps=None,settings=None,packageproducts=None,resources=None):
  tid=ident('target-'+name);sources=[];refs=[]
@@ -53,6 +53,12 @@ embed=obj('embed-widget','isa = PBXCopyFilesBuildPhase; buildActionMask = 214748
 wproxy=obj('proxy-app-widget','isa = PBXContainerItemProxy; containerPortal = '+ident('project')+'; proxyType = 1; remoteGlobalIDString = '+widget+'; remoteInfo = CNSNNWidget;')
 wdep=obj('dep-app-widget','isa = PBXTargetDependency; target = '+widget+'; targetProxy = '+wproxy+';')
 objects[app]=objects[app].replace('buildPhases = (','buildPhases = ('+embed+',',1).replace('dependencies = (','dependencies = ('+wdep+',',1)
+# Crashlytics: upload the Release symbols so crash reports name the code (never fails the build).
+crashscript='if [ "$CONFIGURATION" = "Release" ]; then RUN="${CRASHLYTICS_RUN:-${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run}"; if [ -x "$RUN" ]; then "$RUN" || echo "Crashlytics: symboles non envoyes"; fi; fi'
+crash=obj('crashlytics-script','isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = ("${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}","${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}","${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist","$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist","$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",); name = "Crashlytics"; outputPaths = (); runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = '+q(crashscript)+'; showEnvVarsInLog = 0;')
+# Last phase: the symbols exist only once the app is built.
+start=objects[app].index('buildPhases = (');end=objects[app].index(')',start)
+objects[app]=objects[app][:end]+crash+','+objects[app][end:]
 test=target('CNSNNCoreTests',[str(p.relative_to(root)) for p in sorted((root/'Tests/Core').glob('*.swift'))],'com.apple.product-type.bundle.unit-test','xctest',deps=['CNSNNCore'],settings={'PRODUCT_BUNDLE_IDENTIFIER':q('app.cnsnn.coretests'),'GENERATE_INFOPLIST_FILE':'YES'})
 apptest=target('CNSNNAppTests',[str(p.relative_to(root)) for p in sorted((root/'Tests/App').glob('*.swift'))],'com.apple.product-type.bundle.unit-test','xctest',deps=['CNSNN','CNSNNCore'],settings={'PRODUCT_BUNDLE_IDENTIFIER':q('app.cnsnn.apptests'),'GENERATE_INFOPLIST_FILE':'YES','TEST_HOST':q('$(BUILT_PRODUCTS_DIR)/CNSNN.app/CNSNN'),'BUNDLE_LOADER':q('$(TEST_HOST)')})
 integration=target('CNSNNIntegrationTests',[str(p.relative_to(root)) for p in sorted((root/'Tests/Integration').glob('*.swift'))],'com.apple.product-type.bundle.unit-test','xctest',deps=['CNSNN','CNSNNCore'],settings={'PRODUCT_BUNDLE_IDENTIFIER':q('app.cnsnn.integrationtests'),'GENERATE_INFOPLIST_FILE':'YES','TEST_HOST':q('$(BUILT_PRODUCTS_DIR)/CNSNN.app/CNSNN'),'BUNDLE_LOADER':q('$(TEST_HOST)')})

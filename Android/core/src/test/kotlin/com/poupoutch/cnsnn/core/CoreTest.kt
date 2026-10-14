@@ -57,6 +57,14 @@ class GameRulesTest {
         assertEquals("sans faute", Mistakes.text(0)); assertEquals("1 erreur", Mistakes.text(1)); assertEquals("3 erreurs", Mistakes.text(3))
         assertEquals("L", FriendCode.normalize("o0i1l"))
     }
+    @Test fun remainingGuessesAndSite() {
+        assertNull(Guesses.remainingText(0)); assertNull(Guesses.remainingText(14))
+        assertEquals("Plus que 5 essais", Guesses.remainingText(15))
+        assertEquals("Plus qu’un essai", Guesses.remainingText(19))
+        assertNull(Guesses.remainingText(20))
+        assertEquals("Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est ABC234. https://cnsnn-9ctosy.web.app", Site.friendInvite("ABC234"))
+        assertEquals(5, CommunityRules.items.size)
+    }
     @Test fun seedCardsMatchTheIphone() {
         assertEquals(134, SeedCards.all.size); assertEquals("seed-000", SeedCards.all.first().id); assertEquals("Chocolat", SeedCards.all.first().wordFull)
         assertEquals(200, DailyPool.all.size); assertEquals("daily-e-001", DailyPool.all.first().id)
@@ -107,6 +115,68 @@ class ProgressJsonTest {
         val merged = mine.merged(other)
         assertEquals(2, merged.attempts.size)
         assertEquals("Les Aristochats", merged.dailyWords!!["2026-10-14"]!!.wordFull)
+    }
+}
+
+class ProgressMergeTest {
+    private fun card(word: String, status: ReviewStatus) = Card(WordEngine.normalize(word), word, "Un indice assez long.", Category.GENERAL, Difficulty.EASY, status)
+    private val t0 = Instant.parse("2026-10-14T10:00:00Z")
+
+    @Test fun submissionsAreUnitedByWord() {
+        // This device kept its local proposal (random id), the cloud copy has the server id and the review.
+        val mine = Progress(submissions = listOf(
+            Submission(id = "LOCAL-1", card = card("Kangourou", ReviewStatus.PENDING)),
+            Submission(id = "LOCAL-2", card = card("Ornithorynque", ReviewStatus.APPROVED)),
+            Submission(id = "LOCAL-3", card = card("Pélican", ReviewStatus.PENDING)),
+        ))
+        val cloud = Progress(submissions = listOf(
+            Submission(id = "KANGOUROU", card = card("kangourou", ReviewStatus.APPROVED)),
+            Submission(id = "ORNITHORYNQUE", card = card("Ornithorynque", ReviewStatus.PENDING)),
+            Submission(id = "PELICAN", card = card("Pelican", ReviewStatus.PENDING)),
+            Submission(id = "TATOU", card = card("Tatou", ReviewStatus.REJECTED)),
+        ))
+        val merged = mine.merged(cloud)
+        assertEquals(listOf("KANGOUROU", "ORNITHORYNQUE", "PELICAN", "TATOU"), merged.submissions.map { it.word })
+        // Reviewed beats pending, whichever side has it; otherwise this device's copy stays.
+        assertEquals("KANGOUROU", merged.submissions[0].id); assertEquals(ReviewStatus.APPROVED, merged.submissions[0].card.status)
+        assertEquals("LOCAL-2", merged.submissions[1].id)
+        assertEquals("LOCAL-3", merged.submissions[2].id)
+        // Merging again changes nothing.
+        assertEquals(merged.submissions, merged.merged(cloud).submissions)
+    }
+
+    @Test fun rulesVersionKeepsTheHighest() {
+        assertNull(Progress().merged(Progress()).rulesVersion)
+        assertEquals(1, Progress().merged(Progress(rulesVersion = 1)).rulesVersion)
+        assertEquals(2, Progress(rulesVersion = 2).merged(Progress(rulesVersion = 1)).rulesVersion)
+        assertEquals(1, Progress(rulesVersion = 1).merged(Progress()).rulesVersion)
+        // Optional in the shared JSON: absent while null, read back when set.
+        assertFalse(Progress().toJson().contains("rulesVersion"))
+        assertEquals(1, Progress.fromJson(Progress(rulesVersion = 1).toJson()).rulesVersion)
+        assertTrue(CommunityRules.mustAccept(Progress(username = "Alice")))
+        assertFalse(CommunityRules.mustAccept(Progress(username = "Alice", rulesVersion = 1)))
+        assertFalse(CommunityRules.mustAccept(Progress()))
+    }
+
+    @Test fun twoDevicesKeepEveryGame() {
+        val shared = Attempt(id = "S", cardID = "seed-001", mode = GameMode.CLASSIC, correct = true, timeMs = 3000, points = 90, date = t0)
+        fun classic(id: String, minutes: Long) = Attempt(id = id, cardID = "seed-$id", mode = GameMode.CLASSIC, correct = true, timeMs = 5000, points = 80, date = t0.plusSeconds(minutes * 60))
+        fun daily(id: String, day: String, points: Int) = Attempt(id = id, cardID = SecretDaily.cardId(day), mode = GameMode.DAILY, correct = true, timeMs = 9000, points = points, date = t0, dailyKey = day)
+        // Phone A and phone B, same account, each played offline after the last sync.
+        val phoneA = Progress(username = "Alice", attempts = listOf(shared, classic("A1", 1), classic("A2", 3), daily("DA", "2026-10-14", 140)), rulesVersion = 1)
+        val phoneB = Progress(username = "Alice", attempts = listOf(shared, classic("B1", 2), daily("DB", "2026-10-14", 1), daily("DB2", "2026-10-13", 120)))
+        // A saves first, then B saves over the cloud copy: each save merges with what is there.
+        val cloudAfterA = phoneA.merged(Progress())
+        val cloudAfterB = phoneB.merged(cloudAfterA)
+        assertEquals(setOf("S", "A1", "A2", "B1", "DB", "DB2"), cloudAfterB.attempts.map { it.id }.toSet())
+        // One result per day, and history sorted by date.
+        assertEquals(1, cloudAfterB.attempts.count { it.dailyKey == "2026-10-14" })
+        assertEquals(cloudAfterB.attempts.sortedBy { it.date }, cloudAfterB.attempts)
+        assertEquals(1, cloudAfterB.rulesVersion)
+        // A pulls the cloud copy back: both phones now hold the same games.
+        val backOnA = phoneA.merged(cloudAfterB)
+        assertEquals(cloudAfterB.attempts.map { it.id }.toSet() - "DB" + "DA", backOnA.attempts.map { it.id }.toSet())
+        assertEquals(6, backOnA.attempts.size)
     }
 }
 

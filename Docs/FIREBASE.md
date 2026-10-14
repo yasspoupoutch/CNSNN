@@ -55,9 +55,10 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 | users/{uid}/private/progress | progression d’entraînement synchronisée (JSON) | propriétaire uniquement |
 | users/{uid}/friends/{amiUid} | amis ajoutés par code (pseudo, date) | propriétaire uniquement |
 | friendCodes/{CODE} | code ami de 6 caractères → uid, pseudo | création par le propriétaire ; lecture d’un code par tout joueur, liste de ses seuls codes |
-| dailySessions/{uid_day} | carte du jour, début serveur, indice, fin serveur | création une fois le jour même ; indice puis fin une seule fois |
+| dailySessions/{uid_day} | carte du jour, début serveur, indice, essais (`guesses`, `guess`, `guessAt`), fin serveur | création une fois le jour même ; 20 essais au plus, un par seconde, comptés avant d’être vérifiés ; une victoire nomme le dernier essai, au moins 2 s après le début ; fin une seule fois |
 | dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur, points recalculés | création unique, avec la mise à jour du classement dans le même lot |
-| leaderboard/{uid} | points, parties, victoires, séries, meilleur temps | n’avance que d’un nouveau résultat à la fois |
+| leaderboard/{uid} | points, parties, victoires, séries, meilleur temps, `suspended` | n’avance que d’un nouveau résultat à la fois ; un modérateur peut seulement poser ou retirer `suspended` (aussi sur `dailyResults`) |
+| meta/cards | `updatedAt` : version du catalogue des cartes approuvées | lecture par les joueurs ; un modérateur l’avance en approuvant, refusant ou retirant une carte |
 | dailyPuzzles/{day} | mot du jour secret : consonnes, catégorie, difficulté | outil `tools/daily.mjs` (Admin SDK) ; lecture le jour même et les jours passés |
 | dailyHints/{day} | indice du mot secret | lecture après l’avoir révélé (indice noté dans la session) ou la partie finie |
 | dailySecrets/{day} | réponse normalisée, mot, indice | lecture une fois sa partie finie, ou le jour passé ; une victoire doit porter cette réponse |
@@ -78,6 +79,14 @@ La liste des mots du jour n’est dans le dépôt que chiffrée (`Firebase/daily
 - Sans mot secret publié pour un jour, l’app revient à l’ancienne liste intégrée (publique).
 
 ## Sécurité et limites
+
+**Octobre 2026.** Les règles sont testées à chaque modification (`cd Firebase && npm test`, 46 tests dont la suppression web de `hosting/account.mjs`).
+- Mot du jour : chaque essai est d’abord compté sur le serveur (20 par jour, un par seconde), puis vérifié. Un script ne peut donc plus essayer des réponses jusqu’à en trouver une. Un joueur armé d’un dictionnaire peut toujours trouver vite : les victoires de moins de 5 s apparaissent dans Modération > Temps suspects.
+- Suspension : rien n’est supprimé ; les résultats et totaux portent `suspended: true` et sont masqués des classements. Lever la suspension rend tout.
+- Suppression de compte : profil, suspension, résultats, sessions, amis, code ami, signalements faits et reçus, propositions non publiées ; toutes les cartes publiées sont anonymisées. Même code dans les deux apps et sur https://cnsnn-9ctosy.web.app/suppression.
+- Synchronisation : la progression est fusionnée dans une transaction, jamais écrasée.
+- Mots du jour : toutes les listes `daily/words*.enc.json` sont utilisées (364 mots). Le workflow Firebase les republie chaque 1er du mois pour les 364 jours suivants, en gardant les mots déjà joués pour la fin.
+- Site public : `Firebase/hosting`, publié par le workflow Firebase (case « site ») avec `tools/hosting.mjs`.
 
 Les règles ont des tests émulateur inclus mais n’ont pas été exécutées dans l’environnement initial, faute d’installation des dépendances. Ne pas les considérer comme validées pour production avant ces tests. Les règles n’effectuent pas de normalisation linguistique : les propositions sont privées, et le modérateur recalcule les consonnes/réponses lors de l’approbation. Limiter le spam en production nécessitera App Check et quotas fiables côté serveur ; les bornes de champs ne constituent pas une limitation de fréquence.
 

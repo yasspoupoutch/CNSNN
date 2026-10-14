@@ -180,12 +180,14 @@ enum ShareText {
     static func daily(_ attempt: Attempt, card: Card?) -> String {
         let day = attempt.dailyKey ?? DailySchedule.key(attempt.date)
         let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "raté"
-        return "CNSNN · Mot du jour \(day) : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "")
+        return "CNSNN · Mot du jour \(day) : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "") + invitation
     }
     static func classic(_ attempt: Attempt, card: Card?) -> String {
         let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "raté"
-        return "CNSNN · Classique : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "")
+        return "CNSNN · Classique : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "") + invitation
     }
+    /// Every share says where to get the game.
+    static let invitation = "\nJouez aussi : " + Site.home.absoluteString
 }
 
 /// Picture shared after a game: only the consonants (no spoiler), the result and the wordmark.

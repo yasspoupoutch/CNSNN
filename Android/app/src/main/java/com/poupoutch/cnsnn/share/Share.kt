@@ -18,6 +18,7 @@ import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.GameMode
+import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.core.WordEngine
 import java.io.File
 
@@ -26,7 +27,7 @@ object Share {
     fun text(attempt: Attempt, card: Card?, mode: GameMode): String {
         val outcome = if (attempt.correct) "trouvé en ${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "raté"
         val title = if (mode == GameMode.DAILY) "Mot du jour ${attempt.dailyKey ?: DailySchedule.key(attempt.date)}" else "Classique"
-        return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "")
+        return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "") + "\nJouez aussi : ${Site.URL}"
     }
 
     fun result(context: Context, attempt: Attempt, card: Card?, mode: GameMode) {

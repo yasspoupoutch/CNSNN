@@ -27,12 +27,15 @@ import CNSNNCore
         // A second start would reset the clock: the rules refuse it.
         await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: day, cardID: card.id) }
         repo.revealDailyHint(uid: alice.uid, day: day)
-        try await Task.sleep(for: .milliseconds(1200))
+        // A win needs at least 2 s of play.
+        try await Task.sleep(for: .milliseconds(2200))
         try await seedSecret(day: day, card: card)
-        let confirmed = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 2, answer: WordEngine.normalize(card.wordFull))
+        let guesses = try await repo.registerGuess(uid: alice.uid, day: day, guess: WordEngine.normalize(card.wordFull))
+        XCTAssertEqual(guesses, 1)
+        let confirmed = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
         XCTAssertTrue(confirmed)
         let official = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
-        XCTAssertGreaterThanOrEqual(official.timeMs, 1000)
+        XCTAssertGreaterThanOrEqual(official.timeMs, 2000)
         XCTAssertEqual(official.points, Scoring.points(difficulty: card.difficulty, timeMs: official.timeMs, usedHint: true, correct: true))
         // Publishing again returns the same result and does not count twice.
         let again = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
@@ -52,6 +55,7 @@ import CNSNNCore
         let bob = try await repo.bootstrap(username: "Bob")
         _ = try await repo.startDaily(uid: bob.uid, day: day, cardID: card.id)
         try await Task.sleep(for: .milliseconds(Double(official.timeMs) + 800))
+        _ = try await repo.registerGuess(uid: bob.uid, day: day, guess: WordEngine.normalize(card.wordFull))
         _ = try await repo.finishDaily(uid: bob.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
         let bobResult = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: bob.uid, day: day))
         XCTAssertGreaterThan(bobResult.timeMs, official.timeMs)
@@ -88,8 +92,18 @@ import CNSNNCore
         let hint = try await repo.revealSecretHint(uid: alice.uid, day: day)
         XCTAssertEqual(hint, "Un carré gourmand.")
         await assertThrows { _ = try await self.repo.dailySecret(day: day) }
-        // A wrong guess is refused by the server, the right one finishes the game.
+        // Every guess is counted first: a wrong one is refused and counts as an error, the right one finishes the game.
+        try await Task.sleep(for: .milliseconds(2200))
+        let first = try await repo.registerGuess(uid: alice.uid, day: day, guess: "CHOCOLATS")
+        XCTAssertEqual(first, 1)
         await assertThrows(nil) { _ = try await self.repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0, answer: "CHOCOLATS") }
+        // One guess per second at most.
+        await assertThrows(nil) { _ = try await self.repo.registerGuess(uid: alice.uid, day: day, guess: "CHOCOLAT") }
+        try await Task.sleep(for: .milliseconds(1200))
+        let second = try await repo.registerGuess(uid: alice.uid, day: day, guess: WordEngine.normalize("chocolat"))
+        XCTAssertEqual(second, 2)
+        let resumed = try await XCTUnwrapAsync(try await repo.dailySession(uid: alice.uid, day: day))
+        XCTAssertEqual(resumed.guesses, 2)
         let accepted = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 1, answer: WordEngine.normalize("chocolat"))
         XCTAssertTrue(accepted)
         let secret = try await XCTUnwrapAsync(try await repo.dailySecret(day: day))
@@ -109,10 +123,7 @@ import CNSNNCore
         // Alice finds today's word.
         let day = DailySchedule.key()
         let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
-        _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: card.id)
-        try await seedSecret(day: day, card: card)
-        _ = try await repo.finishDaily(uid: alice.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
-        _ = try await repo.publishDailyResult(uid: alice.uid, day: day)
+        try await win(uid: alice.uid, day: day, card: card)
 
         try repo.signOut()
         let bob = try await repo.bootstrap(username: "Bob")
@@ -132,16 +143,28 @@ import CNSNNCore
         let player = try await repo.bootstrap(username: "Camille")
         var progress = CNSNNCore.Progress(); progress.username = "Camille"
         progress.attempts = [Attempt(cardID: "seed-001", mode: .classic, correct: true, timeMs: 3000, points: 97, date: Date())]
-        try repo.saveCloudProgress(progress, uid: player.uid)
-        try await Task.sleep(for: .milliseconds(800))
+        _ = try await repo.saveCloudProgress(progress, uid: player.uid)
         let restored = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
         XCTAssertEqual(restored.score, 97)
         XCTAssertEqual(restored.attempts.first?.id, progress.attempts.first?.id)
+        // A second device that never saw this game saves its own: both are kept.
+        var tablet = CNSNNCore.Progress(); tablet.username = "Camille"
+        tablet.attempts = [Attempt(cardID: "seed-002", mode: .classic, correct: true, timeMs: 4000, points: 96, date: Date())]
+        let merged = try await repo.saveCloudProgress(tablet, uid: player.uid)
+        XCTAssertEqual(merged.score, 193)
+        let both = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
+        XCTAssertEqual(Set(both.attempts.map(\.cardID)), ["seed-001", "seed-002"])
+        // Offline, nothing is overwritten: the save fails and the next sync merges again.
+        try await setNetwork(enabled: false)
+        await assertThrows { _ = try await self.repo.saveCloudProgress(progress, uid: player.uid) }
+        try await setNetwork(enabled: true)
+        let afterOutage = try await repo.saveCloudProgress(progress, uid: player.uid)
+        XCTAssertEqual(afterOutage.score, 193)
 
         // Rename reaches the leaderboard line once it exists.
         let day = DailySchedule.key()
         _ = try await repo.startDaily(uid: player.uid, day: day, cardID: "x")
-        _ = try await repo.finishDaily(uid: player.uid, day: day, correct: false, wrongAnswers: 3)
+        _ = try await repo.finishDaily(uid: player.uid, day: day, correct: false, wrongAnswers: 0)
         let lost = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: player.uid, day: day))
         XCTAssertEqual(lost.points, 0)
         try await repo.rename(uid: player.uid, username: "Camilla")
@@ -149,9 +172,24 @@ import CNSNNCore
         XCTAssertEqual(renamed?.username, "Camilla")
         XCTAssertEqual(renamed?.streak, 0)
 
-        // Deletion leaves nothing behind.
+        // Deletion leaves nothing behind: more than 80 published cards lose the author's name and id,
+        // and the suspension record and the reports naming the player go too.
         _ = try await repo.submit(card: Card(id: "local", wordFull: "Montgolfière", hint: "Un ballon à air chaud.", category: .objects, difficulty: .hard, status: .pending), uid: player.uid)
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        for index in 0..<85 {
+            let id = "MOTPUBLIE\(index)"
+            try await emulator("PATCH", "\(docs)/cards/\(id)", body: #"{"fields":{"wordFull":{"stringValue":"Mot publié"},"wordNoVowels":{"stringValue":"MTPBL"},"normalizedAnswer":{"stringValue":""# + id + #""},"hint":{"stringValue":"Un mot de test."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"},"status":{"stringValue":"approved"},"createdBy":{"stringValue":""# + player.uid + #""},"authorName":{"stringValue":"Camilla"}}}"#)
+        }
+        try await emulator("PATCH", "\(docs)/banned/\(player.uid)", body: #"{"fields":{"username":{"stringValue":"Camilla"},"reason":{"stringValue":"Test"}}}"#)
+        try await emulator("PATCH", "\(docs)/playerReports/someone_\(player.uid)", body: #"{"fields":{"userId":{"stringValue":"someone"},"playerId":{"stringValue":""# + player.uid + #""},"username":{"stringValue":"Camilla"}}}"#)
         try await repo.deleteAccount(uid: player.uid, password: nil)
+        let leftovers = try await emulatorText("GET", "\(docs)/cards?pageSize=300")
+        XCTAssertFalse(leftovers.contains(player.uid), "Une carte garde l’identifiant du joueur supprimé.")
+        XCTAssertFalse(leftovers.contains("Camilla"), "Une carte garde le pseudo du joueur supprimé.")
+        let reports = try await emulatorText("GET", "\(docs)/playerReports")
+        XCTAssertFalse(reports.contains(player.uid))
+        let banned = try await emulatorText("GET", "\(docs)/banned")
+        XCTAssertFalse(banned.contains(player.uid))
         XCTAssertFalse(repo.hasCurrentUser)
         let other = try await repo.bootstrap(username: "Témoin")
         XCTAssertNotEqual(other.uid, player.uid)
@@ -189,7 +227,12 @@ import CNSNNCore
         XCTAssertTrue(admin)
         var pending = try await XCTUnwrapAsync(try await repo.pendingCards().first)
         pending.hint = "Elle repose avant de finir dans la poêle."
+        let before = try await repo.cardsVersion()
+        XCTAssertNil(before)
         try await repo.review(card: pending, approved: true)
+        // Approving moves the catalogue version, so players download the cards again.
+        let after = try await repo.cardsVersion()
+        XCTAssertNotNil(after)
         let catalogue = try await repo.cards()
         XCTAssertEqual(catalogue.first { $0.id == "PATEACREPES" }?.hint, "Elle repose avant de finir dans la poêle.")
 
@@ -200,7 +243,54 @@ import CNSNNCore
         await assertThrows(CloudError.alreadyReported) { try await self.repo.report(cardID: "PATEACREPES", reason: "Encore une fois.") }
     }
 
+    func testSuspensionHidesThenGivesEverythingBack() async throws {
+        let day = DailySchedule.key()
+        let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
+        let cheater = try await repo.bootstrap(username: "Rapide")
+        try await win(uid: cheater.uid, day: day, card: card)
+        let points = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: cheater.uid, source: .server)).points
+
+        try repo.signOut()
+        let mod = try await repo.bootstrap(username: "Modo")
+        try await emulator("PATCH", "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents/admins/\(mod.uid)", body: #"{"fields":{}}"#)
+        let suspicious = try await repo.suspiciousResults(day: day)
+        XCTAssertTrue(suspicious.allSatisfy { $0.timeMs < 5000 })
+        try await repo.suspend(player: cheater.uid, username: "Rapide", reason: "Temps suspect")
+        let hiddenTop = try await repo.topPlayers()
+        XCTAssertFalse(hiddenTop.contains { $0.uid == cheater.uid })
+        let hiddenToday = try await repo.dailyRanking(day: day)
+        XCTAssertFalse(hiddenToday.contains { $0.uid == cheater.uid })
+        // Nothing was deleted.
+        let kept = try await repo.leaderboardEntry(uid: cheater.uid, source: .server)
+        XCTAssertEqual(kept?.points, points)
+        let result = try await repo.dailyResult(uid: cheater.uid, day: day)
+        XCTAssertNotNil(result)
+
+        try await repo.unsuspend(player: cheater.uid)
+        let back = try await repo.topPlayers()
+        XCTAssertEqual(back.first { $0.uid == cheater.uid }?.points, points)
+        let today = try await repo.dailyRanking(day: day)
+        XCTAssertTrue(today.contains { $0.uid == cheater.uid })
+    }
+
     // MARK: Helpers
+
+    /// Finds today's word as the app does: a registered guess, then the finish, then the official result.
+    private func win(uid: String, day: String, card: Card) async throws {
+        _ = try await repo.startDaily(uid: uid, day: day, cardID: card.id)
+        try await seedSecret(day: day, card: card)
+        try await Task.sleep(for: .milliseconds(2200))
+        let guesses = try await repo.registerGuess(uid: uid, day: day, guess: WordEngine.normalize(card.wordFull))
+        _ = try await repo.finishDaily(uid: uid, day: day, correct: true, wrongAnswers: guesses - 1, answer: WordEngine.normalize(card.wordFull))
+        _ = try await repo.publishDailyResult(uid: uid, day: day)
+    }
+    private func setNetwork(enabled: Bool) async throws { try await repo.setNetwork(enabled: enabled) }
+    private func emulatorText(_ method: String, _ url: String) async throws -> String {
+        var request = URLRequest(url: URL(string: url)!, timeoutInterval: 20)
+        request.httpMethod = method
+        request.setValue("Bearer owner", forHTTPHeaderField: "Authorization")
+        return String(decoding: try await URLSession.shared.data(for: request).0, as: UTF8.self)
+    }
 
     /// Every day has a secret word on the server, and a win must name it.
     private func seedSecret(day: String, card: Card) async throws {

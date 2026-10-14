@@ -10,6 +10,9 @@ final class CNSNNUITests: XCTestCase {
         let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
         XCTAssertTrue(field.waitForExistence(timeout:5))
         field.tap();field.typeText("Camille")
+        // The start button waits for the community rules to be accepted.
+        XCTAssertFalse(app.buttons["C’est parti"].isEnabled)
+        app.buttons["accept-rules"].tap()
         app.buttons["C’est parti"].tap()
         XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout:5))
         app.buttons["Stats"].tap()

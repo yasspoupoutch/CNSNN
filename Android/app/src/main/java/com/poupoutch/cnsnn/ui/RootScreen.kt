@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,21 +68,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
+import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.delay
 
@@ -104,6 +114,8 @@ fun RootScreen(state: AppViewModel) {
             }
         }
     }
+    // Players from before the community rules accept them once before playing on.
+    if (introDone && !state.isRestoring && CommunityRules.mustAccept(state.progress)) RulesAcceptance(state::acceptRules)
     state.error?.let { message ->
         AlertDialog(onDismissRequest = { state.error = null }, confirmButton = { TextButton({ state.error = null }) { Text("Compris") } },
             title = { Text("CNSNN") }, text = { Text(message) })
@@ -234,10 +246,12 @@ private fun Bullet(text: String) {
 @Composable
 private fun Pseudo(state: AppViewModel, back: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
+    var accepted by rememberSaveable { mutableStateOf(false) }
     val trimmed = name.trim()
     val valid = trimmed.length in 2..20
     val haptics = rememberHaptics()
-    val start = { if (valid && !state.isBusy) { haptics.success(); state.start(name) } }
+    val links = LocalUriHandler.current
+    val start = { if (valid && accepted && !state.isBusy) { haptics.success(); state.start(name) } }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 26.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             IconButton(back, Modifier.padding(top = 6.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
@@ -257,11 +271,43 @@ private fun Pseudo(state: AppViewModel, back: () -> Unit) {
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { start() }),
                 colors = TextFieldDefaults.colors(focusedContainerColor = Palette.fill1, unfocusedContainerColor = Palette.fill1))
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(16.dp))
+                .toggleable(accepted, role = Role.Checkbox) { haptics.selection(); accepted = it }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(accepted, onCheckedChange = null, modifier = Modifier.padding(horizontal = 8.dp),
+                    colors = CheckboxDefaults.colors(checkedColor = Palette.accent, checkmarkColor = Palette.onAccent, uncheckedColor = Palette.tertiary))
+                Text("J’accepte les règles de la communauté et la politique de confidentialité", fontSize = 14.sp, modifier = Modifier.padding(end = 8.dp))
+            }
+            Row(Modifier.padding(start = 44.dp)) {
+                TextButton({ runCatching { links.openUri(Site.RULES) } }) { Text("Lire les règles", fontSize = 13.sp) }
+                TextButton({ runCatching { links.openUri(Site.PRIVACY) } }) { Text("Confidentialité", fontSize = 13.sp) }
+            }
         }
         Column(Modifier.padding(bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", enabled = valid && !state.isBusy, onClick = start)
+            PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", enabled = valid && accepted && !state.isBusy, onClick = start)
             Text("Modifiable à tout moment depuis votre profil.", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary,
                 modifier = Modifier.padding(top = 12.dp))
+        }
+    }
+}
+
+/** Blocking sheet: the rules, and a single way on. */
+@Composable
+private fun RulesAcceptance(accept: () -> Unit) {
+    val haptics = rememberHaptics()
+    Dialog({}, DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize()) {
+            AmbientBackground(dimmed = true)
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    Text(CommunityRules.TITLE, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 28.dp))
+                    Text("Pour que CNSNN reste agréable pour tous, merci de lire et d’accepter ces règles.", color = Palette.secondary,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 18.dp))
+                    CommunityRulesList()
+                    Spacer(Modifier.height(16.dp))
+                }
+                PrimaryButton("J’accepte", Modifier.padding(vertical = 12.dp)) { haptics.success(); accept() }
+            }
         }
     }
 }

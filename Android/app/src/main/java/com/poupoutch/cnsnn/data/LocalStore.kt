@@ -1,8 +1,11 @@
 package com.poupoutch.cnsnn.data
 
 import android.content.Context
+import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Glance
 import com.poupoutch.cnsnn.core.Progress
+import com.poupoutch.cnsnn.core.ProgressJson
+import kotlinx.serialization.builtins.ListSerializer
 
 /**
  * Progress kept on the phone, one copy per account (like the iPhone's per-UID archives),
@@ -44,4 +47,17 @@ class LocalStore(context: Context) {
     var glance: Glance?
         get() = Glance.fromJson(prefs.getString("glance", null))
         set(value) { prefs.edit().putString("glance", value?.toJson()).apply() }
+
+    /**
+     * Approved community cards kept on the phone with the catalogue version (`meta/cards`, in ms,
+     * 0 when the server has none yet) and the download time, so they are fetched again only when they changed.
+     */
+    val cachedCards: List<Card>?
+        get() = prefs.getString("cards", null)?.let { json -> runCatching { ProgressJson.decodeFromString(ListSerializer(Card.serializer()), json) }.getOrNull() }
+    val cardsVersion: Long get() = prefs.getLong("cards.version", -1)
+    val cardsFetchedAt: Long get() = prefs.getLong("cards.fetchedAt", 0)
+    fun storeCards(cards: List<Card>, version: Long, fetchedAt: Long) {
+        prefs.edit().putString("cards", ProgressJson.encodeToString(ListSerializer(Card.serializer()), cards))
+            .putLong("cards.version", version).putLong("cards.fetchedAt", fetchedAt).apply()
+    }
 }

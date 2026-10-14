@@ -68,10 +68,21 @@ class CloudRepositoryTest {
         // A second start would reset the clock: refused.
         expectDenied { repo.startDaily(alice.uid, day, SecretDaily.cardId(day)) }
         assertEquals("Un carré gourmand.", repo.revealSecretHint(alice.uid, day))
-        delay(1200)
-        // A wrong guess cannot finish the game.
+        // A win names a guess the server counted first.
+        expectDenied { repo.finishDaily(alice.uid, day, true, 0, "CHOCOLAT") }
+        delay(2100)
+        // A wrong guess is counted, then cannot finish the game.
+        assertEquals(1, repo.registerGuess(alice.uid, day, "CHOCOLAS"))
+        // One guess per second at most.
+        try { repo.registerGuess(alice.uid, day, "CHOCOLAT"); fail() } catch (e: CloudError) { assertEquals(CloudError.Kind.GUESS_TOO_SOON, e.kind) }
         expectDenied { repo.finishDaily(alice.uid, day, true, 0, "CHOCOLAS") }
+        delay(1100)
+        assertEquals(2, repo.registerGuess(alice.uid, day, "CHOCOLAT"))
+        assertEquals(2, repo.dailySession(alice.uid, day)!!.guesses)
+        // "Sans faute" cannot be forged: the wrong answers are the counted guesses.
+        expectDenied { repo.finishDaily(alice.uid, day, true, 0, "CHOCOLAT") }
         assertTrue(repo.finishDaily(alice.uid, day, true, 1, "CHOCOLAT"))
+        try { repo.registerGuess(alice.uid, day, "CHOCOLAT"); fail() } catch (e: CloudError) { assertEquals(CloudError.Kind.DAILY_FINISHED, e.kind) }
         assertEquals("Chocolat", repo.dailySecret(day)!!.wordFull)
         val official = repo.publishDailyResult(alice.uid, day)!!
         assertTrue(official.timeMs >= 1000)
@@ -90,11 +101,15 @@ class CloudRepositoryTest {
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         val bob = repo.bootstrap("Bob")
         repo.startDaily(bob.uid, day, SecretDaily.cardId(day))
-        assertTrue(repo.finishDaily(bob.uid, day, false, 3))
+        assertEquals(1, repo.registerGuess(bob.uid, day, "TARTE"))
+        // A loss carries exactly the counted guesses, and no answer.
+        expectDenied { repo.finishDaily(bob.uid, day, false, 3) }
+        assertTrue(repo.finishDaily(bob.uid, day, false, 1))
         assertEquals("Chocolat", repo.dailySecret(day)!!.wordFull)
         val result = repo.publishDailyResult(bob.uid, day)!!
         assertFalse(result.correct); assertEquals(0, result.points)
         assertEquals(0, repo.leaderboardEntry(bob.uid)!!.streak)
+        assertEquals(1, repo.wrongOf(bob.uid, day))
     }
 
     @Test fun friendsCodeAndBoard() = runBlocking<Unit> {
@@ -133,9 +148,58 @@ class CloudRepositoryTest {
     @Test fun progressIsSharedWithTheIphoneFormat() = runBlocking<Unit> {
         val alice = repo.bootstrap("Alice")
         val progress = Progress(username = "Alice", attempts = listOf(Attempt(cardID = "seed-001", mode = GameMode.CLASSIC, correct = true, timeMs = 4200, points = 90, date = Instant.parse("2026-10-14T10:00:00Z"))))
-        repo.saveCloudProgress(progress, alice.uid)
-        delay(1500)
+        assertEquals(progress, repo.saveCloudProgress(progress, alice.uid))
         assertEquals(progress, repo.cloudProgress(alice.uid))
+        // A second device that never saw the first game saves its own: both are kept.
+        val other = Progress(username = "Alice", attempts = listOf(Attempt(cardID = "seed-002", mode = GameMode.CLASSIC, correct = false, timeMs = 9000, points = 0, date = Instant.parse("2026-10-14T11:00:00Z"))), rulesVersion = 1)
+        val saved = repo.saveCloudProgress(other, alice.uid)
+        assertEquals(setOf("seed-001", "seed-002"), saved.attempts.map { it.cardID }.toSet())
+        assertEquals(1, saved.rulesVersion)
+        assertEquals(saved, repo.cloudProgress(alice.uid))
+    }
+
+    @Test fun rulesAreAcceptedOnTheProfile() = runBlocking<Unit> {
+        val alice = repo.bootstrap("Alice", rulesVersion = 1)
+        assertEquals(1, alice.rulesVersion)
+        assertEquals(1, repo.bootstrap("x").rulesVersion)
+        auth.signOut()
+        val bob = repo.bootstrap("Bob")
+        assertNull(bob.rulesVersion)
+        repo.acceptRules(bob.uid, 1)
+        assertEquals(1, repo.bootstrap("x").rulesVersion)
+    }
+
+    @Test fun suspensionHidesWithoutErasing() = runBlocking<Unit> {
+        val day = DailySchedule.key()
+        seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        val alice = repo.bootstrap("Alice")
+        val official = win(alice.uid, day)
+        val card = Card("x", "Ornithorynque", "Un mammifère qui pond des œufs.", Category.entries.first(), Difficulty.entries.last())
+        repo.submit(card, alice.uid)
+        auth.signOut()
+        val mod = repo.bootstrap("Modo")
+        emulator("POST", "$docs/admins?documentId=${mod.uid}", """{"fields":{}}""")
+        assertTrue(repo.isAdmin())
+        if (official.timeMs < 5000) assertEquals(listOf(alice.uid), repo.suspiciousTimes(day).map { it.uid })
+        // Approving a card moves the catalogue version, so phones download the cards again.
+        assertNull(repo.cardsVersion())
+        repo.review(repo.pendingCards().single(), true)
+        assertTrue((repo.cardsVersion() ?: 0) > 0)
+
+        repo.suspend(alice.uid, "Alice", "Temps suspect")
+        assertTrue(repo.isSuspended(alice.uid))
+        assertTrue(repo.topPlayers().none { it.uid == alice.uid })
+        assertTrue(repo.fastestPlayers().none { it.uid == alice.uid })
+        assertTrue(repo.dailyRanking(day).none { it.uid == alice.uid })
+        assertTrue(repo.suspiciousTimes(day).none { it.uid == alice.uid })
+        // Nothing is erased: totals and results stay.
+        assertEquals(official.points, repo.leaderboardEntry(alice.uid, com.google.firebase.firestore.Source.SERVER)!!.points)
+        assertEquals(official.timeMs, repo.dailyResult(alice.uid, day)!!.first.timeMs)
+
+        repo.unsuspend(alice.uid)
+        assertFalse(repo.isSuspended(alice.uid))
+        assertEquals(listOf(alice.uid), repo.topPlayers().map { it.uid })
+        assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
     }
 
     @Test fun pseudoIsCheckedAndRenameUpdatesTheBoard() = runBlocking<Unit> {
@@ -148,22 +212,57 @@ class CloudRepositoryTest {
     @Test fun deletingTheAccountRemovesEverything() = runBlocking<Unit> {
         val day = DailySchedule.key()
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
-        val alice = repo.bootstrap("Alice")
-        repo.startDaily(alice.uid, day, SecretDaily.cardId(day))
-        repo.finishDaily(alice.uid, day, true, 0, "CHOCOLAT")
-        repo.publishDailyResult(alice.uid, day)
+        // A permanent account, so Alice can come back after Bob reported her pseudo.
+        val alice = repo.createPermanentAccount("alice@example.com", "motdepasse")
+        win(alice.uid, day)
         repo.friendCode(alice.uid, "Alice")
-        repo.deleteAccount(alice.uid, null)
+        // More published cards than one batch used to anonymize (80).
+        val words = (0 until 85).map { "CARTE" + ('A' + it / 26) + ('A' + it % 26) }
+        val writes = words.joinToString(",") { word ->
+            """{"update":{"name":"projects/$project/databases/(default)/documents/cards/$word","fields":{"wordFull":{"stringValue":"$word"},"wordNoVowels":{"stringValue":"CRT"},"normalizedAnswer":{"stringValue":"$word"},"hint":{"stringValue":"Une carte de test."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"},"createdBy":{"stringValue":"${alice.uid}"},"authorName":{"stringValue":"Alice"},"status":{"stringValue":"approved"}}}}"""
+        }
+        assertEquals(200, emulator("POST", "$docs:commit", """{"writes":[$writes]}"""))
+        // A suspension and a report naming Alice go too.
+        emulator("POST", "$docs/banned?documentId=${alice.uid}", """{"fields":{"username":{"stringValue":"Alice"},"reason":{"stringValue":"Test"}}}""")
+        auth.signOut()
+        val bob = repo.bootstrap("Bob")
+        repo.reportPlayer(alice.uid, repo.leaderboardEntry(alice.uid)!!.username)
+        auth.signOut()
+        repo.signIn("alice@example.com", "motdepasse")
+        repo.deleteAccount(alice.uid, "motdepasse")
         assertNull(auth.currentUser)
         // Read back as the emulator owner: nothing of Alice is left, only the tombstone.
         assertEquals(404, emulator("GET", "$docs/users/${alice.uid}"))
         assertEquals(404, emulator("GET", "$docs/leaderboard/${alice.uid}"))
         assertEquals(404, emulator("GET", "$docs/dailyResults/${alice.uid}_$day"))
         assertEquals(404, emulator("GET", "$docs/dailySessions/${alice.uid}_$day"))
+        assertEquals(404, emulator("GET", "$docs/banned/${alice.uid}"))
+        assertEquals(404, emulator("GET", "$docs/playerReports/${bob.uid}_${alice.uid}"))
         assertEquals(200, emulator("GET", "$docs/deletedUsers/${alice.uid}"))
+        // Every published card stays, without her name or id.
+        for (word in listOf(words.first(), words.last())) {
+            val card = emulatorBody("$docs/cards/$word")
+            assertTrue(card, card.contains("\"deleted\"")); assertFalse(card, card.contains("authorName")); assertFalse(card, card.contains(alice.uid))
+        }
     }
 
     // ---- Helpers
+
+    /** Plays and wins today's word the way the app does: guess counted first, no sooner than 2 s after the start. */
+    private suspend fun win(uid: String, day: String): Attempt {
+        repo.startDaily(uid, day, SecretDaily.cardId(day))
+        delay(2100)
+        assertEquals(1, repo.registerGuess(uid, day, "CHOCOLAT"))
+        assertTrue(repo.finishDaily(uid, day, true, 0, "CHOCOLAT"))
+        return repo.publishDailyResult(uid, day)!!
+    }
+
+    private fun emulatorBody(url: String): String {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.setRequestProperty("Authorization", "Bearer owner")
+        connection.connectTimeout = 20_000; connection.readTimeout = 20_000
+        return connection.inputStream.bufferedReader().use { it.readText() }.also { connection.disconnect() }
+    }
 
     private suspend fun CloudRepository.wrongOf(uid: String, day: String): Int? = dailyResult(uid, day)?.second
 

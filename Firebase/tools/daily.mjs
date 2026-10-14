@@ -1,21 +1,24 @@
 // Secret Mot du jour: the word list lives in this public repository only encrypted, and the
 // answers live in Firestore where the rules reveal them only to players who finished the day.
 //
-//   node tools/daily.mjs public-key          prints the public key of the service account (CI)
-//   node tools/daily.mjs encrypt words.tsv   encrypts a list into daily/words.enc.json (local)
-//   node tools/daily.mjs seed [--dry]        decrypts the list and publishes the days (CI)
+//   node tools/daily.mjs public-key                 prints the public key of the service account (CI)
+//   node tools/daily.mjs encrypt words.tsv [name]   encrypts a list into daily/<name>.enc.json (local, default words)
+//   node tools/daily.mjs seed [--dry]               decrypts the lists and publishes the next 364 days (CI)
 //
-// words.tsv: one word per line, tab separated: F|M|D, category, word, hint.
+// words.tsv: one word per line, tab separated: F|M|D, category, word, hint. Every daily/words*.enc.json
+// is used: a new list adds words without needing the older ones in clear. The monthly run of the
+// Firebase workflow keeps 364 days published ahead, preferring words never played.
 // Only the service account key (GitHub secret FIREBASE_SERVICE_ACCOUNT) can decrypt the list.
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createPublicKey, publicEncrypt, privateDecrypt, randomBytes, createCipheriv, createDecipheriv, constants } from 'node:crypto';
 
 const projectId = 'cnsnn-9ctosy';
-const listFile = new URL('../daily/words.enc.json', import.meta.url);
+const listDir = new URL('../daily/', import.meta.url);
 const publicKeyFile = new URL('../daily/public.pem', import.meta.url);
-// The first secret day. The schedule is computed from it, so it never changes.
+// The first secret day (firestore.rules refuses free wins from it on).
 export const firstDay = '2026-10-14';
+// Days published ahead of today.
 export const scheduledDays = 364;
 const categories = ['Général', 'Football', 'Cinéma', 'Géographie', 'Animaux', 'Objets'];
 const difficulties = { F: 'Facile', M: 'Moyen', D: 'Difficile' };
@@ -63,10 +66,28 @@ export function validate(words) {
   }
 }
 
-// Each difficulty walks its own shuffled pool, so the categories vary from day to day.
-export function schedule(words, start = firstDay, days = scheduledDays) {
+// Several lists become one; a word already in an earlier list is skipped.
+export function combine(lists) {
+  const seen = new Set(), words = [];
+  let skipped = 0;
+  for (const w of lists.flat()) {
+    const answer = normalize(w.word);
+    if (seen.has(answer)) { skipped++; continue; }
+    seen.add(answer); words.push(w);
+  }
+  return { words, skipped };
+}
+
+// Each difficulty walks its own shuffled pool, so the categories vary from day to day. Words never
+// played come first; played ones (answer -> last day) come back last, the longest ago first.
+export function schedule(words, start = firstDay, days = scheduledDays, played = new Map()) {
   const pools = {};
-  for (const level of Object.values(difficulties)) pools[level] = shuffle(words.filter((w) => w.difficulty === level), level);
+  for (const level of Object.values(difficulties)) {
+    const shuffled = shuffle(words.filter((w) => w.difficulty === level), level);
+    const fresh = shuffled.filter((w) => !played.has(normalize(w.word)));
+    const again = shuffled.filter((w) => played.has(normalize(w.word))).sort((a, b) => played.get(normalize(a.word)).localeCompare(played.get(normalize(b.word))));
+    pools[level] = [...fresh, ...again];
+  }
   const used = { Facile: 0, Moyen: 0, Difficile: 0 };
   const out = [];
   for (let i = 0; i < days; i++) {
@@ -107,17 +128,24 @@ async function serviceAccount() {
 
 async function seed(dry) {
   const { private_key: privateKey } = await serviceAccount();
-  const words = decrypt(JSON.parse(await readFile(listFile, 'utf8')), privateKey);
+  const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
+  const lists = await Promise.all(files.map(async (name) => decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)));
+  const { words, skipped } = combine(lists);
   validate(words);
-  const today = parisDay();
-  // Today and past days are never rewritten: someone may already be playing them.
-  const days = schedule(words).filter((d) => d.day > today);
-  console.log(`${words.length} mots, ${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}.`);
-  if (dry) return;
   const { initializeApp, applicationDefault } = await import('firebase-admin/app');
-  const { getFirestore } = await import('firebase-admin/firestore');
+  const { getFirestore, FieldPath } = await import('firebase-admin/firestore');
   initializeApp({ credential: applicationDefault(), projectId });
   const db = getFirestore();
+  const today = parisDay();
+  // Words already played (today included) wait for the others before coming back.
+  const past = await db.collection('dailySecrets').where(FieldPath.documentId(), '<=', today).get();
+  const played = new Map(past.docs.map((d) => [d.get('answer'), d.id]));
+  // Today and past days are never rewritten: someone may already be playing them.
+  const days = schedule(words, shiftDay(today, 1), scheduledDays, played);
+  const repeats = days.filter((d) => played.has(normalize(d.word))).length;
+  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s) ignoré(s)), ${played.size} déjà joués.`);
+  console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
+  if (dry) return;
   for (let i = 0; i < days.length; i += 150) {
     const batch = db.batch();
     for (const d of days.slice(i, i + 150)) {
@@ -139,8 +167,10 @@ if (command === 'public-key') {
   console.log(createPublicKey(privateKey).export({ type: 'spki', format: 'pem' }));
 } else if (command === 'encrypt') {
   const words = parseList(await readFile(arg, 'utf8'));
-  await writeFile(listFile, JSON.stringify(encrypt(words, await readFile(publicKeyFile, 'utf8')), null, 1) + '\n');
-  console.log(`${words.length} mots chiffrés dans daily/words.enc.json`);
+  const name = `${process.argv[4] ?? 'words'}.enc.json`;
+  if (!/^words[\w-]*\.enc\.json$/.test(name)) throw new Error('Le nom doit commencer par words');
+  await writeFile(new URL(name, listDir), JSON.stringify(encrypt(words, await readFile(publicKeyFile, 'utf8')), null, 1) + '\n');
+  console.log(`${words.length} mots chiffrés dans daily/${name}`);
 } else if (command === 'seed') {
   await seed(arg === '--dry');
 } else if (command) {

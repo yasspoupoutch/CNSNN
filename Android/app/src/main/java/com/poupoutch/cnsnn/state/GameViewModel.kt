@@ -15,6 +15,7 @@ import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
+import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.Scoring
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.WordEngine
@@ -27,7 +28,8 @@ import java.time.Instant
 /**
  * One game, the Android twin of the iPhone's GameSession. The Mot du jour is always the official,
  * server-timed game: the consonants appear once the server has recorded the start, each guess is
- * checked by the security rules, and the word is revealed only once the game is over.
+ * counted by the server (20 a day) then checked by the security rules, and the word is revealed
+ * only once the game is over.
  */
 class GameViewModel : ViewModel() {
     sealed interface Phase { data object Loading : Phase; data object Playing : Phase; data class Failed(val message: String) : Phase }
@@ -51,6 +53,8 @@ class GameViewModel : ViewModel() {
     /** Bumped on each wrong guess, so the answer line shakes. */
     var mistakeTick by mutableStateOf(0); private set
     var finishedHere by mutableStateOf(false); private set
+    /** "Plus que 3 essais" under the board once few guesses remain on the Mot du jour. */
+    val remainingText: String? get() = if (ranked && result == null) Guesses.remainingText(wrongAnswers) else null
 
     var mode = GameMode.CLASSIC; private set
     private var category: Category? = null
@@ -61,6 +65,8 @@ class GameViewModel : ViewModel() {
     private var elapsedBeforePause = 0L
     private var paused = false
     private var loaded = false
+    /** The last guess the server counted, which a win must name. */
+    private var lastGuess: String? = null
 
     fun loadOnce(mode: GameMode, category: Category?, difficulty: Difficulty?, state: AppViewModel) {
         if (loaded) return
@@ -70,7 +76,7 @@ class GameViewModel : ViewModel() {
 
     private fun load(state: AppViewModel) {
         answer = ""; feedback = null; result = null; usedHint = false; wrongAnswers = 0; wrongGuesses.clear()
-        started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null
+        started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null; lastGuess = null
         ranked = false; pendingOfficial = false; standing = null; phase = Phase.Playing; checking = false; notice = null; finishedHere = false
         if (mode == GameMode.DAILY) {
             val key = DailySchedule.key(); dailyKey = key
@@ -110,8 +116,11 @@ class GameViewModel : ViewModel() {
                 }
                 usedHint = session.hintUsed
                 dailyStart = session.startedAt
+                // Every guess counted so far was wrong (a right one ends the game).
+                wrongAnswers = session.guesses; lastGuess = session.guess
                 state.progress.attempts.firstOrNull { it.dailyKey == key }?.let { local ->
                     // Finished on this phone but the finish never reached the server: send it again.
+                    if (local.correct) wrongAnswers = maxOf(0, session.guesses - 1)
                     result = local; pendingOfficial = true; phase = Phase.Playing
                     makeOfficial(cloud, uid, key, local.correct, state)
                     return
@@ -177,33 +186,81 @@ class GameViewModel : ViewModel() {
         val shown = card ?: return
         if (result != null || checking) return
         if (WordEngine.normalize(answer).isEmpty()) { mistakeTick++; return }
-        if (secret) { submitSecret(state); return }
+        if (ranked && state.uid != null && dailyKey != null) { submitRanked(state); return }
         if (!WordEngine.matches(answer, shown.wordFull)) { missed(); return }
         finishedHere = true
         finish(true, state)
     }
-    private fun missed() {
-        wrongAnswers++; wrongGuesses += answer; feedback = "Pas encore. Essayez une autre idée."; mistakeTick++; answer = ""
+    private fun missed(counted: Int? = null) {
+        wrongAnswers = counted ?: (wrongAnswers + 1); wrongGuesses += answer; feedback = "Pas encore. Essayez une autre idée."; mistakeTick++; answer = ""
     }
-    /** The guess goes to the server as the finish of the session: accepted only if it is the word. */
-    private fun submitSecret(state: AppViewModel) {
-        val uid = state.uid ?: return; val day = dailyKey ?: return
+    /**
+     * The server counts the guess first (20 a day, one per second), then the guess goes as the finish
+     * of the session: the rules accept it only if it is the word. A refused finish is a wrong guess.
+     */
+    private fun submitRanked(state: AppViewModel) {
+        val uid = state.uid ?: return; val day = dailyKey ?: return; val shown = card ?: return
         val guess = WordEngine.normalize(answer)
         checking = true; notice = null
         viewModelScope.launch {
             try {
-                if (!state.cloud.finishDaily(uid, day, true, wrongAnswers, guess)) {
-                    // Not confirmed in time. If it was right, the server keeps it and the next opening shows the result.
-                    notice = "Connexion trop lente. Vérifiez le réseau puis réessayez."; return@launch
+                val count = state.cloud.registerGuess(uid, day, guess)
+                lastGuess = guess
+                // A secret word is checked by the server only; a known one is checked here first.
+                if (secret || WordEngine.matches(answer, shown.wordFull)) {
+                    val confirmed = try { state.cloud.finishDaily(uid, day, true, count - 1, guess) } catch (e: Exception) {
+                        if (CloudError.code(e) != CloudError.Code.PERMISSION_DENIED) throw e
+                        null
+                    }
+                    if (confirmed == false) {
+                        // Not confirmed in time. If it was right, the server keeps it and the next opening shows the result.
+                        wrongAnswers = count - 1
+                        notice = "Connexion trop lente. Vérifiez le réseau puis réessayez."; return@launch
+                    }
+                    if (confirmed == true) {
+                        wrongAnswers = count - 1
+                        if (secret) reveal(state, day)
+                        finishedHere = true
+                        finish(true, state, alreadyFinished = true)
+                        return@launch
+                    }
                 }
-                reveal(state, day)
-                finishedHere = true
-                checking = false
-                finish(true, state, alreadyFinished = true)
+                missed(count)
+                // The 20th wrong guess ends the game as lost.
+                if (count >= Guesses.MAX) outOfGuesses(state, uid, day)
             } catch (e: Exception) {
-                if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED) missed() else notice = CloudError.message(e)
+                when ((e as? CloudError)?.kind) {
+                    CloudError.Kind.GUESS_LIMIT -> { wrongAnswers = Guesses.MAX; outOfGuesses(state, uid, day) }
+                    // Finished on another device: show the official result.
+                    CloudError.Kind.DAILY_FINISHED -> { checking = false; load(state) }
+                    else -> notice = CloudError.message(e)
+                }
             } finally { checking = false }
         }
+    }
+    private suspend fun outOfGuesses(state: AppViewModel, uid: String, day: String) {
+        finishedHere = true
+        if (secret) loseSecret(state, uid, day)
+        else { checking = false; finish(false, state) }
+    }
+    /** Records the loss on the server, then reveals the word and shows the result. */
+    private suspend fun loseSecret(state: AppViewModel, uid: String, day: String) {
+        val ok = runCatching { recordLoss(state.cloud, uid, day) }.getOrDefault(false)
+        if (!ok) { notice = CloudError.Kind.OFFLINE.message; return }
+        reveal(state, day)
+        finish(false, state, alreadyFinished = true)
+    }
+    /**
+     * A loss carries the server's count of guesses as its wrong answers. If the server counted
+     * differently (another device, a lost reply), the session is read again and the finish retried once.
+     */
+    private suspend fun recordLoss(cloud: CloudRepository, uid: String, day: String): Boolean = try {
+        cloud.finishDaily(uid, day, false, wrongAnswers)
+    } catch (e: Exception) {
+        if (CloudError.code(e) != CloudError.Code.PERMISSION_DENIED) throw e
+        val session = cloud.dailySession(uid, day) ?: throw e
+        if (session.finished) true
+        else { wrongAnswers = session.guesses; cloud.finishDaily(uid, day, false, session.guesses) }
     }
     private suspend fun reveal(state: AppViewModel, day: String) {
         runCatching { state.cloud.dailySecret(day) }.getOrNull()?.let { card = it; state.storeDailyWord(it, day) }
@@ -218,11 +275,7 @@ class GameViewModel : ViewModel() {
         if (secret && !correct && !alreadyFinished && uid != null && day != null) {
             checking = true; notice = null
             viewModelScope.launch {
-                val ok = runCatching { state.cloud.finishDaily(uid, day, false, wrongAnswers) }.getOrDefault(false)
-                if (!ok) { notice = CloudError.Kind.OFFLINE.message; checking = false; return@launch }
-                reveal(state, day)
-                checking = false
-                finish(false, state, alreadyFinished = true)
+                try { loseSecret(state, uid, day) } finally { checking = false }
             }
             return
         }
@@ -239,7 +292,10 @@ class GameViewModel : ViewModel() {
     /** Stamps the finish on the server, then shows the server's time and points instead of the local ones. */
     private suspend fun makeOfficial(cloud: CloudRepository, uid: String, day: String, correct: Boolean, state: AppViewModel, finished: Boolean = false) {
         try {
-            if (!finished && !cloud.finishDaily(uid, day, correct, wrongAnswers)) return
+            if (!finished) {
+                val ok = if (correct) cloud.finishDaily(uid, day, true, wrongAnswers, lastGuess ?: return) else recordLoss(cloud, uid, day)
+                if (!ok) return
+            }
             val official = cloud.publishDailyResult(uid, day) ?: return
             state.recordOfficial(official)
             result = official.copy(id = result?.id ?: official.id)

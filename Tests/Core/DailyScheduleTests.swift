@@ -58,4 +58,27 @@ final class DailyScheduleTests: XCTestCase {
         XCTAssertEqual(merged.attempts.filter { $0.dailyKey == "2026-10-12" }.first?.points, 140)
         XCTAssertEqual(cloud.merged(with: phone).attempts.count, 3)
     }
+    /// Two devices on one account: each one's new games survive whichever saves last.
+    func testTwoDevicesSavingInTurnLoseNothing() {
+        var cloud = Progress(); cloud.username = "Alice"
+        var phone = cloud, tablet = cloud
+        phone.attempts.append(Attempt(cardID: "a", mode: .classic, correct: true, timeMs: 1000, points: 90, date: Date(timeIntervalSince1970: 10)))
+        tablet.attempts.append(Attempt(cardID: "b", mode: .classic, correct: true, timeMs: 2000, points: 80, date: Date(timeIntervalSince1970: 11)))
+        cloud = phone.merged(with: cloud)
+        cloud = tablet.merged(with: cloud)
+        XCTAssertEqual(Set(cloud.attempts.map(\.cardID)), ["a", "b"])
+        XCTAssertEqual(phone.merged(with: cloud).score, 170)
+    }
+    func testMergeUnitesProposalsByWordAndKeepsTheVerdict() {
+        var pending = Card(id: "local-id", wordFull: "Chocolat", hint: "Un carré gourmand.", category: .general, difficulty: .easy, status: .pending)
+        var phone = Progress(); phone.submissions = [Submission(card: pending)]
+        pending.id = "CHOCOLAT"; pending.status = .approved
+        var cloud = Progress(); cloud.submissions = [Submission(card: pending)]
+        cloud.rulesVersion = 1
+        let merged = phone.merged(with: cloud)
+        XCTAssertEqual(merged.submissions.count, 1)
+        XCTAssertEqual(merged.submissions.first?.card.status, .approved)
+        XCTAssertEqual(merged.rulesVersion, 1)
+        XCTAssertEqual(cloud.merged(with: phone).submissions.first?.card.status, .approved)
+    }
 }
