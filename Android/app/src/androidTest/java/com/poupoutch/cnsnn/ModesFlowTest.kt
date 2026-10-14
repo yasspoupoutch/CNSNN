@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.poupoutch.cnsnn.core.DuoGame
+import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.SprintGame
 import com.poupoutch.cnsnn.core.SurvivalGame
@@ -76,7 +77,7 @@ class ModesFlowTest {
         val first = expected.card!!
         type(first.wordFull)
         val points = SprintGame.basePoints(first.difficulty)
-        waitFor("+$points")
+        waitForDescription("Score : ${Format.number(points)}")
         waitFor("×2")
         // A wrong answer keeps the word and resets the combo.
         type("XQ")

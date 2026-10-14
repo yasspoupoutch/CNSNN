@@ -146,6 +146,7 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
 
 @Composable
 private fun TopBar(game: ModeViewModel, mode: PlayMode, leave: () -> Unit) {
+    game.version // The core games are plain objects: each part re-reads them after every move.
     Box(Modifier.fillMaxWidth().height(56.dp)) {
         IconButton(leave, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Quitter") }
         Column(Modifier.align(Alignment.Center).semantics(mergeDescendants = true) { heading() }, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -203,6 +204,7 @@ private fun Hearts(lives: Int, lost: Int, gained: Int) {
 
 @Composable
 private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sprint: SprintGame) {
+    game.version // The core games are plain objects: each part re-reads them after every move.
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(200); tick++ } }
     tick
@@ -239,6 +241,7 @@ private fun SprintClock(remainingMs: Int) {
 
 @Composable
 private fun ColumnScope.SurvivalBoard(state: AppViewModel, game: ModeViewModel, survival: SurvivalGame) {
+    game.version // The core games are plain objects: each part re-reads them after every move.
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Stat("${survival.found}", if (survival.found > 1) "mots trouvés" else "mot trouvé", Modifier.weight(1f))
         Stat("${survival.level}", "niveau", Modifier.weight(1f))
@@ -253,6 +256,7 @@ private fun ColumnScope.SurvivalBoard(state: AppViewModel, game: ModeViewModel, 
 
 @Composable
 private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: DuoGame) {
+    game.version // The core games are plain objects: each part re-reads them after every move.
     val current = duo.duo ?: return
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         val consonants = current.consonants
