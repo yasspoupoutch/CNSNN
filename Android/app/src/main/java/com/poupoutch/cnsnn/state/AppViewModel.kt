@@ -11,11 +11,15 @@ import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.DailyPool
 import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.core.ExtraCards
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Glance
 import com.poupoutch.cnsnn.core.LeaderboardEntry
+import com.poupoutch.cnsnn.core.ModeCatalogue
 import com.poupoutch.cnsnn.core.NameFilter
+import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.Progress
+import com.poupoutch.cnsnn.core.recordingMode
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.SeedCards
 import com.poupoutch.cnsnn.core.Submission
@@ -37,7 +41,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val cloud = CloudRepository()
 
     var progress by mutableStateOf(Progress()); private set
-    var cards by mutableStateOf(SeedCards.all); private set
+    var cards by mutableStateOf(SeedCards.all + ExtraCards.all); private set
     var error by mutableStateOf<String?>(null)
     var isBusy by mutableStateOf(false); private set
     var uid by mutableStateOf<String?>(null); private set
@@ -64,6 +68,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else progress = saved
         local.cachedCards?.let { cards = withCommunity(it) }
         isRestoring = progress.username.isEmpty() && cloud.hasCurrentUser
+        if (saved != null) finishInterruptedSprint()
         viewModelScope.launch { connect() }
     }
 
@@ -208,7 +213,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun resetToGuest() {
         uid = null; isAnonymous = true; email = null; isAdmin = false; isSuspended = false; official = null
-        progress = Progress(); cards = SeedCards.all
+        progress = Progress(); cards = SeedCards.all + ExtraCards.all
+        local.clearRuns()
         scope = null; local.activeScope = null; persist()
     }
 
@@ -273,12 +279,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } catch (_: Exception) { /* Offline: the built-in and cached cards remain. */ }
     }
     private fun withCommunity(community: List<Card>): List<Card> {
-        val known = (SeedCards.all + DailyPool.all).map { WordEngine.normalize(it.wordFull) }.toSet()
-        return SeedCards.all + community.filter { WordEngine.normalize(it.wordFull) !in known }
+        val known = (SeedCards.all + ExtraCards.all + DailyPool.all).map { WordEngine.normalize(it.wordFull) }.toSet()
+        return SeedCards.all + ExtraCards.all + community.filter { WordEngine.normalize(it.wordFull) !in known }
     }
     fun card(id: String): Card? {
         SecretDaily.day(id)?.let { return progress.dailyWords?.get(it) }
-        return DailyPool.card(id) ?: cards.firstOrNull { it.id == id } ?: SeedCards.all.firstOrNull { it.id == id }
+        return DailyPool.card(id) ?: cards.firstOrNull { it.id == id } ?: ModeCatalogue.cards.firstOrNull { it.id == id }
     }
 
     // ---- Mot du jour
@@ -319,6 +325,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val index = progress.attempts.indexOfFirst { it.dailyKey == day }
         if (index < 0) { record(attempt); return }
         update { p -> p.copy(attempts = p.attempts.toMutableList().also { it[index] = attempt.copy(id = p.attempts[index].id) }) }
+    }
+
+    // ---- Sprint, Survie, Double sens
+
+    /** Adds a finished game to the personal records (synced like the rest; never on a leaderboard). */
+    fun recordMode(mode: PlayMode, best: Map<String, Int>, add: Map<String, Int>): Set<String> {
+        val (next, beaten) = progress.recordingMode(mode, best, add, local.deviceID)
+        progress = next; persist()
+        return beaten
+    }
+    /** A Sprint whose app was closed during play is over: it counts as it stood (its clock never stops). */
+    fun finishInterruptedSprint() {
+        val game = local.loadRun(PlayMode.SPRINT)?.sprint ?: return
+        local.clearRun(PlayMode.SPRINT)
+        game.stop()
+        recordMode(PlayMode.SPRINT, game.best, game.add)
     }
 
     // ---- Community

@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Format
+import com.poupoutch.cnsnn.core.ModeStat
+import com.poupoutch.cnsnn.core.PlayMode
+import com.poupoutch.cnsnn.core.records
 import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.LeaderboardEntry
@@ -156,7 +159,47 @@ private fun MyStats(state: AppViewModel) {
             }
         }
     }
+    ModeRecordsCard(state)
     if (p.attempts.isEmpty()) Text("Votre première partie lance l’histoire.", color = Palette.secondary)
+}
+
+/** Personal records of Sprint, Survie and Double sens. They never reach a leaderboard. */
+@Composable
+private fun ModeRecordsCard(state: AppViewModel) {
+    SectionCard {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Records personnels", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("hors classement", fontSize = 12.sp, color = Palette.tertiary)
+        }
+        PlayMode.entries.forEachIndexed { index, mode ->
+            val r = state.progress.records(mode)
+            val games = r.total(ModeStat.GAMES)
+            val values = when (mode) {
+                PlayMode.SPRINT -> listOf(Format.number(r.best(ModeStat.SCORE)) to "meilleur score", "${r.best(ModeStat.WORDS)}" to "mots max",
+                    "${r.best(ModeStat.COMBO)}" to "meilleur combo", "$games" to if (games > 1) "parties" else "partie")
+                PlayMode.SURVIVAL -> listOf("${r.best(ModeStat.WORDS)}" to "meilleur parcours", "${r.best(ModeStat.LEVEL)}" to "niveau max",
+                    "$games" to if (games > 1) "parties" else "partie")
+                PlayMode.DUO -> {
+                    val played = r.total(ModeStat.DUOS_PLAYED)
+                    listOf(Format.number(r.best(ModeStat.SCORE)) to "meilleur score", "${r.total(ModeStat.PERFECT)}" to "parfaites",
+                        "${if (played == 0) 0 else r.total(ModeStat.DUOS_SOLVED) * 100 / played} %" to "duos résolus", "$games" to if (games > 1) "parties" else "partie")
+                }
+            }
+            if (index > 0) Box(Modifier.padding(top = 14.dp)) { Divider() }
+            Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(mode.icon, null, Modifier.size(15.dp), tint = mode.tint)
+                Text(mode.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
+            }
+            Row(Modifier.padding(top = 8.dp)) {
+                values.forEach { (v, l) ->
+                    Column(Modifier.weight(1f)) {
+                        Text(v, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                        Text(l, fontSize = 11.sp, color = Palette.tertiary, maxLines = 2)
+                    }
+                }
+            }
+        }
+    }
 }
 
 private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), POINTS("Points"), FASTEST("Records") }

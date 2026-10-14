@@ -4,7 +4,7 @@ import CNSNNCore
 
 @MainActor @Observable final class AppState {
     var progress = CNSNNCore.Progress()
-    var cards = SeedCards.all
+    var cards = SeedCards.all + ExtraCards.all
     var error: String?
     var isBusy = false
     var cloud: FirebaseRepository?
@@ -143,7 +143,7 @@ import CNSNNCore
     private func resetToGuest() {
         ModeRunStore.clearAll()
         uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil
-        progress = CNSNNCore.Progress(); cards = SeedCards.all
+        progress = CNSNNCore.Progress(); cards = SeedCards.all + ExtraCards.all
         local = LocalRepository(); persist()
     }
 
@@ -210,8 +210,8 @@ import CNSNNCore
         } catch { /* Offline: the cards kept on this device remain. */ }
     }
     private static func catalogue(community: [Card]) -> [Card] {
-        let known = Set(SeedCards.all.map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
-        return SeedCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
+        let known = Set((SeedCards.all + ExtraCards.all).map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
+        return SeedCards.all + ExtraCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
     }
 
     // MARK: Community rules
@@ -226,7 +226,7 @@ import CNSNNCore
     func card(id: String) -> Card? {
         if let day = FirebaseRepository.secretDay(cardID: id) { return progress.dailyWords?[day] }
         if let published = publishedDaily, published.card.id == id { return published.card }
-        return DailyPool.card(id: id) ?? cards.first(where: { $0.id == id }) ?? SeedCards.all.first(where: { $0.id == id })
+        return DailyPool.card(id: id) ?? cards.first(where: { $0.id == id }) ?? ModeCatalogue.cards.first(where: { $0.id == id })
     }
 
     // MARK: Mot du jour
