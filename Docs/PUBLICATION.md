@@ -44,4 +44,4 @@ Ce qui est prêt dans le dépôt, et ce qu'il restera à faire le jour où les c
 ## Quotas gratuits à surveiller (plan Spark)
 
 - Firestore : 50 000 lectures et 20 000 écritures par jour. Les cartes sont gardées sur l'appareil (version `meta/cards`) et les classements limités à 25 lignes ; une partie classée coûte environ deux écritures par essai.
-- Hosting : 10 Go de transfert par mois. Chaque téléchargement de l'APK en consomme une part : passer au Play Store le moment venu.
+- Hosting : 10 Go de transfert par mois. Le plan gratuit refuse les fichiers exécutables : l'APK Android n'est pas sur le site, il passera par le Play Store.

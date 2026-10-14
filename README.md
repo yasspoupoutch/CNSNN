@@ -36,7 +36,7 @@ TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne s
 
 ## Site public
 
-https://cnsnn-9ctosy.web.app : présentation, téléchargement Android, [règles de la communauté](https://cnsnn-9ctosy.web.app/regles), [politique de confidentialité](https://cnsnn-9ctosy.web.app/confidentialite) et [suppression de compte](https://cnsnn-9ctosy.web.app/suppression). Sources dans `Firebase/hosting`, publiées par le workflow **CNSNN - Firebase** (case `site`). Ce qu'il reste pour l'App Store et Google Play : `Docs/PUBLICATION.md`.
+https://cnsnn-9ctosy.web.app : présentation (sans APK : le plan gratuit refuse les fichiers exécutables), [règles de la communauté](https://cnsnn-9ctosy.web.app/regles), [politique de confidentialité](https://cnsnn-9ctosy.web.app/confidentialite) et [suppression de compte](https://cnsnn-9ctosy.web.app/suppression). Sources dans `Firebase/hosting`, publiées par le workflow **CNSNN - Firebase** (case `site`). Ce qu'il reste pour l'App Store et Google Play : `Docs/PUBLICATION.md`.
 
 ## Développer et tester
 
