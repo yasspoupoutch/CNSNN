@@ -105,6 +105,8 @@ data class Progress(
     val dailyWords: Map<String, Card>? = null,
     /** Version of the community rules this player accepted (CommunityRules.VERSION), null before any. */
     val rulesVersion: Int? = null,
+    /** Personal records of Sprint, Survie and Double sens (by PlayMode key). Never official. */
+    val modes: Map<String, ModeRecords>? = null,
 ) {
     val score: Int get() = attempts.sumOf { it.points }
     val correctAnswers: Int get() = attempts.count { it.correct }
@@ -155,6 +157,9 @@ data class Progress(
             if (known == null || (known.card.status == ReviewStatus.PENDING && submission.card.status != ReviewStatus.PENDING)) proposals[submission.word] = submission
         }
         val rules = listOfNotNull(rulesVersion, other.rulesVersion).maxOrNull()
+        val records = if (other.modes == null) modes else (modes ?: emptyMap()).toMutableMap().also { mine ->
+            for ((mode, theirs) in other.modes) mine[mode] = (mine[mode] ?: ModeRecords()).merged(theirs)
+        }
         return copy(
             username = username.ifEmpty { other.username },
             attempts = all.sortedBy { it.date },
@@ -164,6 +169,7 @@ data class Progress(
             submissions = proposals.values.toList(),
             recentCards = recentCards.ifEmpty { other.recentCards },
             rulesVersion = rules,
+            modes = records,
         )
     }
 

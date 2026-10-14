@@ -1,0 +1,290 @@
+# Cartes Classique ajoutées en version 1.0, aussi jouées en Sprint et en Survie.
+# Une carte par ligne, séparée par des tabulations : difficulté (F, M, D), catégorie, mot, indice.
+# Vérifiées une à une : orthographe, consonnes, indice juste et distinctif, difficulté.
+# Scripts/generate_content.py les valide puis écrit Core/ExtraCards.swift et ExtraCards.kt.
+F	Général	Tomate	Un fruit rouge qu’on range souvent parmi les légumes.
+F	Général	Fraise	Un petit fruit rouge parsemé de graines.
+F	Général	Banane	Un fruit jaune qu’on épluche, le préféré des singes.
+F	Général	Carotte	Un légume orange qui croque sous la dent.
+F	Général	Salade	On la mélange avec de la vinaigrette.
+F	Général	Omelette	On casse des œufs dans la poêle pour la préparer.
+F	Général	Confiture	Des fruits cuits avec du sucre, à tartiner.
+F	Général	Biscuit	Un petit gâteau sec qu’on trempe parfois dans le lait.
+F	Général	Citron	Un agrume jaune très acide.
+F	Général	Cerise	Un petit fruit rouge à noyau, souvent accroché par deux.
+F	Général	Hiver	La saison la plus froide de l’année.
+F	Général	Dimanche	Le dernier jour de la semaine.
+F	Général	Cuisine	La pièce où l’on prépare les repas.
+F	Général	Sandwich	Deux tranches de pain et une garniture au milieu.
+F	Général	Pyjama	On l’enfile pour aller dormir.
+F	Général	École	Les enfants y apprennent à lire et à écrire.
+F	Général	Hôpital	On y soigne les malades.
+F	Général	Plage	Du sable au bord de la mer.
+F	Général	Forêt	Un grand espace couvert d’arbres.
+F	Général	Pomme	Le fruit empoisonné de Blanche-Neige.
+F	Général	Gâteau	Il est couvert de bougies le jour de l’anniversaire.
+F	Général	Bonbon	Une petite sucrerie qu’on suce ou qu’on mâche.
+F	Général	Glace	Un dessert froid servi en cornet.
+F	Général	Matin	Le début de la journée.
+M	Général	Brioche	Une viennoiserie moelleuse au beurre.
+M	Général	Courgette	Un légume vert allongé de la ratatouille.
+M	Général	Aubergine	Un légume violet à la peau brillante.
+M	Général	Poireau	Un légume long, blanc et vert, idéal en soupe.
+M	Général	Framboise	Un petit fruit rouge, cousin de la mûre.
+M	Général	Vinaigrette	La sauce classique de la salade verte.
+M	Général	Quiche	Une tarte salée, lorraine avec ses lardons.
+M	Général	Fondue	Un plat savoyard où l’on trempe du pain dans le fromage.
+M	Général	Tartiflette	Pommes de terre, lardons et reblochon gratinés.
+M	Général	Bouquet	Des fleurs assemblées pour être offertes.
+M	Général	Éclair	Un gâteau allongé au chocolat ou au café.
+M	Général	Macaron	Un petit biscuit rond et coloré, garni de crème.
+M	Général	Cauchemar	Un mauvais rêve qui fait peur.
+M	Général	Tonnerre	Le grondement qui suit l’éclair.
+M	Général	Brouillard	Un nuage au ras du sol qui cache la vue.
+M	Général	Automne	La saison où tombent les feuilles.
+M	Général	Coquillage	On le ramasse sur la plage et on croit y entendre la mer.
+M	Général	Poubelle	On y jette les déchets.
+M	Général	Myrtille	Une petite baie bleue des sous-bois.
+M	Général	Pâtisserie	La boutique des gâteaux et des tartes.
+M	Général	Feu d’artifice	Des explosions colorées dans le ciel du 14 Juillet.
+M	Général	Bonhomme de neige	On le construit l’hiver, avec une carotte pour nez.
+D	Général	Déménagement	Changer de logement avec tous ses cartons.
+D	Général	Ventriloque	Il parle sans bouger les lèvres, une marionnette à la main.
+D	Général	Aquarelle	Une peinture légère, diluée à l’eau.
+D	Général	Mille-feuille	Un gâteau à étages de pâte feuilletée et de crème.
+D	Général	Cassoulet	Des haricots blancs et des saucisses, spécialité de Castelnaudary.
+D	Général	Choucroute	Du chou fermenté servi avec des saucisses, spécialité alsacienne.
+D	Général	Pissenlit	Une fleur jaune qui devient une boule de graines à souffler.
+D	Général	Équinoxe	Le jour où la nuit dure autant que le jour.
+D	Général	Solstice	Le jour le plus long ou le plus court de l’année.
+D	Général	Calligraphie	L’art de la belle écriture.
+D	Général	Onomatopée	Un mot qui imite un bruit, comme « boum ».
+D	Général	Palindrome	Un mot qui se lit dans les deux sens, comme « radar ».
+D	Général	Archéologue	Il fouille le sol pour retrouver des vestiges anciens.
+D	Général	Funambule	Un artiste qui marche sur un fil.
+F	Animaux	Zèbre	Un cheval sauvage rayé de noir et de blanc.
+F	Animaux	Tigre	Un grand félin orange rayé de noir.
+F	Animaux	Hibou	Un rapace nocturne aux aigrettes en forme d’oreilles.
+F	Animaux	Renard	Un animal roux et rusé des fables.
+F	Animaux	Souris	Un petit rongeur que le chat chasse.
+F	Animaux	Cochon	Il se roule dans la boue à la ferme.
+F	Animaux	Poussin	Le petit de la poule.
+F	Animaux	Canard	Il fait coin-coin sur la mare.
+F	Animaux	Dinosaure	Un reptile géant disparu il y a des millions d’années.
+F	Animaux	Chenille	Elle deviendra papillon.
+F	Animaux	Moustique	Un insecte qui pique la nuit.
+F	Animaux	Araignée	Elle tisse sa toile pour piéger les insectes.
+F	Animaux	Hamster	Un petit rongeur qui court dans sa roue.
+F	Animaux	Poisson rouge	Il tourne en rond dans son bocal.
+F	Animaux	Vache	Elle donne du lait et broute dans le pré.
+F	Animaux	Crabe	Il marche de côté sur la plage.
+F	Animaux	Lama	Un animal des Andes qui crache quand il est fâché.
+M	Animaux	Castor	Il construit des barrages en rongeant les arbres.
+M	Animaux	Panthère	Un félin agile au pelage tacheté ou tout noir.
+M	Animaux	Guépard	L’animal terrestre le plus rapide.
+M	Animaux	Jaguar	Le grand félin tacheté d’Amérique du Sud.
+M	Animaux	Bison	Un grand bovin à bosse des plaines d’Amérique.
+M	Animaux	Morse	Un mammifère marin à longues défenses.
+M	Animaux	Phoque	Un mammifère marin qui se prélasse sur la banquise.
+M	Animaux	Otarie	Un cousin du phoque, aux petites oreilles visibles.
+M	Animaux	Colibri	Le plus petit des oiseaux, il butine en vol.
+M	Animaux	Toucan	Un oiseau tropical au bec énorme et coloré.
+M	Animaux	Cigogne	Un grand oiseau blanc qui niche sur les toits alsaciens.
+M	Animaux	Belette	Un petit carnivore au corps allongé, cousin de l’hermine.
+M	Animaux	Sauterelle	Un insecte vert qui bondit dans l’herbe.
+M	Animaux	Crevette	Un petit crustacé qui devient rose à la cuisson.
+M	Animaux	Bouquetin	Une chèvre sauvage des montagnes aux longues cornes.
+M	Animaux	Chamois	Un petit bovidé agile des Alpes, aux cornes en crochet.
+M	Animaux	Tatou	Un mammifère d’Amérique protégé par une carapace articulée.
+M	Animaux	Albatros	Un oiseau de mer aux ailes immenses.
+M	Animaux	Lémurien	Un primate de Madagascar aux grands yeux.
+D	Animaux	Axolotl	Un amphibien mexicain qui garde toute sa vie l’allure d’une larve.
+D	Animaux	Okapi	La girafe des forêts, aux pattes rayées.
+D	Animaux	Narval	La licorne des mers.
+D	Animaux	Mangouste	Un petit carnivore célèbre pour affronter les cobras.
+D	Animaux	Musaraigne	Un minuscule mammifère au museau pointu, souvent pris pour une souris.
+D	Animaux	Ouistiti	Un tout petit singe d’Amérique du Sud.
+D	Animaux	Tapir	Un mammifère à petite trompe des forêts tropicales.
+D	Animaux	Coyote	Un canidé d’Amérique du Nord qui hurle à la lune.
+D	Animaux	Gnou	Une antilope barbue des grandes migrations africaines.
+D	Animaux	Cachalot	Un grand cétacé à tête carrée, chasseur de calmars.
+F	Objets	Lampe	Elle éclaire la table de chevet.
+F	Objets	Bouteille	On y met de l’eau ou du vin.
+F	Objets	Miroir	Il renvoie votre reflet.
+F	Objets	Téléphone	On décroche quand il sonne.
+F	Objets	Cartable	Le sac de l’écolier.
+F	Objets	Stylo	On écrit avec, à bille ou à plume.
+F	Objets	Gomme	Elle efface le crayon.
+F	Objets	Clé	Elle ouvre la porte.
+F	Objets	Couteau	On coupe la viande avec.
+F	Objets	Assiette	On y sert le repas.
+F	Objets	Brosse à dents	On s’en sert matin et soir devant le lavabo.
+F	Objets	Peigne	Il démêle les cheveux.
+F	Objets	Télévision	On l’allume pour regarder un film dans le salon.
+F	Objets	Casque	Il protège la tête à vélo.
+F	Objets	Ceinture	Elle tient le pantalon.
+F	Objets	Écharpe	On l’enroule autour du cou en hiver.
+F	Objets	Trousse	On y range ses stylos.
+F	Objets	Raquette	On frappe la balle de tennis avec.
+M	Objets	Tabouret	Un siège sans dossier.
+M	Objets	Cadenas	Il verrouille un casier ou un vélo.
+M	Objets	Entonnoir	Il aide à verser un liquide dans un goulot.
+M	Objets	Râteau	On l’utilise pour ramasser les feuilles mortes.
+M	Objets	Perceuse	Elle fait des trous dans le mur.
+M	Objets	Bouilloire	Elle chauffe l’eau du thé.
+M	Objets	Grille-pain	Il fait sauter les tartines dorées.
+M	Objets	Lave-vaisselle	Il fait la plonge à votre place.
+M	Objets	Dé à coudre	Il protège le doigt de la couturière.
+M	Objets	Épingle	Une petite pointe de métal pour fixer le tissu.
+M	Objets	Boomerang	Lancé au loin, il revient vers vous.
+M	Objets	Cerf-volant	Il vole au bout d’une ficelle les jours de vent.
+M	Objets	Toboggan	On glisse dessus au parc.
+M	Objets	Lanterne	Une lampe d’autrefois qu’on porte à la main.
+M	Objets	Chandelier	Il porte plusieurs bougies.
+M	Objets	Aimant	Il attire le fer.
+M	Objets	Pupitre	Le petit bureau incliné de l’écolier ou du chef d’orchestre.
+M	Objets	Éventail	On l’agite pour se rafraîchir.
+M	Objets	Tire-bouchon	Il ouvre les bouteilles de vin.
+D	Objets	Sextant	L’instrument des marins pour mesurer la hauteur des astres.
+D	Objets	Clepsydre	Une horloge à eau de l’Antiquité.
+D	Objets	Périscope	Il permet de voir la surface depuis un sous-marin.
+D	Objets	Baromètre	Il mesure la pression de l’air pour prévoir le temps.
+D	Objets	Gyrophare	La lumière tournante des ambulances.
+D	Objets	Abat-jour	Il adoucit la lumière de la lampe.
+D	Objets	Presse-agrumes	Il extrait le jus des oranges.
+D	Objets	Interrupteur	On appuie dessus pour allumer la lumière.
+D	Objets	Thermostat	Il règle la température du chauffage.
+D	Objets	Escarpin	Une chaussure élégante à talon.
+F	Géographie	Lille	La grande ville du Nord, célèbre pour sa braderie.
+F	Géographie	Rome	La capitale de l’Italie.
+F	Géographie	Madrid	La capitale de l’Espagne.
+F	Géographie	Belgique	Le pays des frites et de Bruxelles.
+F	Géographie	Suisse	Un pays alpin célèbre pour ses montres et son chocolat.
+F	Géographie	Allemagne	Le pays de Berlin.
+F	Géographie	Chine	Le pays de la Grande Muraille.
+F	Géographie	Afrique	Le continent du Sahara.
+F	Géographie	Europe	Le continent de la France.
+F	Géographie	Océan	Une immense étendue d’eau salée.
+F	Géographie	Seine	Le fleuve qui traverse Paris.
+F	Géographie	Grèce	Le pays de l’Acropole.
+F	Géographie	Russie	Le plus grand pays du monde.
+F	Géographie	Inde	Le pays du Taj Mahal.
+F	Géographie	Maroc	Le pays de Marrakech.
+F	Géographie	Irlande	L’île verte du trèfle.
+F	Géographie	Nil	Le grand fleuve d’Égypte.
+M	Géographie	Nantes	La ville des ducs de Bretagne, au bord de la Loire.
+M	Géographie	Montpellier	La grande ville universitaire de l’Hérault.
+M	Géographie	Rennes	La capitale de la Bretagne.
+M	Géographie	Provence	La région de la lavande et des cigales.
+M	Géographie	Alsace	La région des cigognes et de la choucroute.
+M	Géographie	Loire	Le plus long fleuve de France.
+M	Géographie	Rhône	Le fleuve qui traverse Lyon avant de rejoindre la Méditerranée.
+M	Géographie	Pérou	Le pays du Machu Picchu.
+M	Géographie	Chili	Un pays très long et étroit, le long des Andes.
+M	Géographie	Turquie	Le pays d’Istanbul.
+M	Géographie	Suède	Le pays de Stockholm.
+M	Géographie	Pologne	Le pays de Varsovie.
+M	Géographie	Finlande	Le pays des mille lacs, voisin de la Suède.
+M	Géographie	Antarctique	Le continent glacé du pôle Sud.
+M	Géographie	Atlantique	L’océan entre l’Europe et l’Amérique.
+M	Géographie	Pacifique	Le plus grand océan du monde.
+M	Géographie	Everest	Le plus haut sommet du monde.
+M	Géographie	Sicile	La grande île à la pointe de la botte italienne.
+M	Géographie	Versailles	La ville du château du Roi-Soleil.
+M	Géographie	Saint-Malo	La cité corsaire bretonne.
+D	Géographie	Copenhague	La capitale du Danemark.
+D	Géographie	Reykjavik	La capitale de l’Islande.
+D	Géographie	Budapest	La capitale de la Hongrie, coupée en deux par le Danube.
+D	Géographie	Bratislava	La capitale de la Slovaquie.
+D	Géographie	Kirghizistan	Un pays montagneux d’Asie centrale, voisin du Kazakhstan.
+D	Géographie	Mozambique	Un pays d’Afrique australe bordé par l’océan Indien.
+D	Géographie	Ouzbékistan	Le pays de Samarcande.
+D	Géographie	Carcassonne	Une cité médiévale fortifiée de l’Aude.
+D	Géographie	Mont-Saint-Michel	Un îlot normand couronné d’une abbaye.
+D	Géographie	Patagonie	La pointe sud de l’Amérique, partagée entre le Chili et l’Argentine.
+D	Géographie	Tasmanie	Une île au sud de l’Australie.
+D	Géographie	Zanzibar	L’île aux épices, au large de la Tanzanie.
+D	Géographie	Vladivostok	Le grand port russe au bout du Transsibérien.
+D	Géographie	Tombouctou	La ville malienne aux portes du désert, symbole du bout du monde.
+F	Football	Ballon	Il roule sur la pelouse.
+F	Football	But	On le marque en trompant le gardien.
+F	Football	Équipe	Onze joueurs qui jouent ensemble.
+F	Football	Match	La rencontre entre deux équipes.
+F	Football	Terrain	La surface de jeu et ses lignes blanches.
+F	Football	Mi-temps	La pause entre les deux périodes.
+F	Football	Victoire	Elle rapporte trois points au classement.
+M	Football	Coup d’envoi	Il lance la partie depuis le rond central.
+M	Football	Hors-jeu	La règle qui pénalise l’attaquant trop avancé.
+M	Football	Classement	Le tableau qui range les équipes selon leurs points.
+M	Football	Sélectionneur	Il choisit les joueurs de l’équipe nationale.
+M	Football	Ailier	Le joueur qui déborde le long de la ligne de touche.
+M	Football	Touche	La remise en jeu à la main.
+M	Football	Centre	Le ballon envoyé depuis le côté vers la surface.
+M	Football	Frappe	Un tir puissant.
+M	Football	Expulsion	La sortie forcée d’un joueur après un carton rouge.
+M	Football	Égalisation	Le but qui recolle au score.
+M	Football	Coupe du monde	Le tournoi des nations, tous les quatre ans.
+M	Football	Derby	Un match entre deux voisins rivaux.
+M	Football	Clasico	Le choc entre le Real Madrid et le FC Barcelone.
+M	Football	Gradins	Les marches où s’assoient les spectateurs.
+M	Football	Petit pont	Faire passer le ballon entre les jambes de l’adversaire.
+M	Football	Feinte	Un geste pour tromper le défenseur.
+M	Football	Lob	Un ballon piqué par-dessus le gardien.
+M	Football	Contre-pied	Envoyer le gardien du mauvais côté.
+M	Football	Messi	Le génie argentin aux huit Ballons d’or.
+M	Football	Pelé	Le roi brésilien aux trois Coupes du monde.
+M	Football	Maradona	L’Argentin de la « main de Dieu ».
+M	Football	Ronaldo	Le Portugais aux cinq Ligues des champions.
+M	Football	Benzema	L’attaquant français, Ballon d’or 2022.
+M	Football	Ribéry	Un ailier français, légende du Bayern Munich.
+D	Football	Reprise de volée	Frapper le ballon avant qu’il ne touche le sol.
+D	Football	Pressing	Harceler l’adversaire pour récupérer le ballon très haut.
+D	Football	Arbitrage vidéo	Il permet de revoir une action litigieuse sur écran.
+D	Football	Platini	Le Français triple Ballon d’or dans les années 1980.
+D	Football	Griezmann	L’attaquant français surnommé « Grizou ».
+D	Football	Deschamps	Champion du monde comme capitaine en 1998, puis comme sélectionneur en 2018.
+D	Football	Cantona	« King Eric », idole de Manchester United.
+D	Football	Kopa	Le premier Ballon d’or français, en 1958.
+F	Cinéma	Cars	Flash McQueen, voiture de course.
+F	Cinéma	Dumbo	Un éléphanteau aux grandes oreilles qui vole.
+F	Cinéma	Raiponce	Une princesse aux cheveux immenses enfermée dans une tour.
+F	Cinéma	Vaiana	Une jeune navigatrice polynésienne et le demi-dieu Maui.
+F	Cinéma	L’Âge de glace	Un mammouth, un paresseux et un tigre à dents de sabre.
+F	Cinéma	Les Aristochats	Des chats de la haute société parisienne.
+F	Cinéma	La Belle et la Bête	Une jeune femme dans le château d’un prince maudit.
+F	Cinéma	Wall-E	Un petit robot qui nettoie la Terre abandonnée.
+F	Cinéma	Superman	Un héros venu de la planète Krypton.
+F	Cinéma	Mary Poppins	Une nounou magique qui vole avec son parapluie.
+M	Cinéma	Pocahontas	Une princesse amérindienne et un colon anglais.
+M	Cinéma	Encanto	Une famille colombienne aux dons magiques.
+M	Cinéma	Zootopie	Une lapine policière dans une ville d’animaux.
+M	Cinéma	Moi, moche et méchant	Gru, le méchant au grand cœur, et ses Minions.
+M	Cinéma	Les Dents de la mer	Un requin terrorise une station balnéaire.
+M	Cinéma	E.T. l’extra-terrestre	Un visiteur de l’espace qui veut « téléphoner maison ».
+M	Cinéma	Bienvenue chez les Ch’tis	Un directeur de la poste muté dans le Nord.
+M	Cinéma	Kaamelott	Le roi Arthur vu par Alexandre Astier.
+M	Cinéma	Terminator	« I’ll be back », promet un cyborg venu du futur.
+M	Cinéma	Alien	Dans l’espace, personne ne vous entendra crier.
+M	Cinéma	Jumanji	Un jeu de société qui libère la jungle.
+M	Cinéma	Rambo	Un ancien béret vert seul contre tous, joué par Stallone.
+M	Cinéma	Top Gun	Tom Cruise en pilote de chasse.
+M	Cinéma	Forrest Gump	Un homme simple traverse l’histoire américaine, une boîte de chocolats à la main.
+M	Cinéma	King Kong	Un gorille géant au sommet de l’Empire State Building.
+M	Cinéma	Godzilla	Un monstre géant sorti de la mer qui ravage Tokyo.
+M	Cinéma	Pirates des Caraïbes	Les aventures du capitaine Jack Sparrow.
+D	Cinéma	La Grande Vadrouille	Bourvil et de Funès dans la France occupée.
+D	Cinéma	Le Corniaud	Bourvil, de Funès et une Cadillac pleine de contrebande.
+D	Cinéma	Le Cinquième Élément	Bruce Willis en chauffeur de taxi volant, et Leeloo.
+D	Cinéma	Le Silence des agneaux	Clarice Starling face à Hannibal Lecter.
+D	Cinéma	Amadeus	La rivalité de Salieri et de Mozart.
+D	Cinéma	Fight Club	La première règle : on n’en parle pas.
+D	Cinéma	Sueurs froides	Hitchcock filme un ancien policier sujet au vertige.
+D	Cinéma	La Cité de la peur	Une comédie des Nuls autour du festival de Cannes.
+D	Cinéma	Les Parapluies de Cherbourg	Une comédie musicale de Jacques Demy entièrement chantée.
+D	Cinéma	Persepolis	Une enfance à Téhéran racontée en noir et blanc.
+D	Cinéma	Le Mépris	Godard filme Bardot et Piccoli à Capri.
+D	Cinéma	Metropolis	Un film muet de Fritz Lang sur une cité futuriste.
+D	Cinéma	Nosferatu	Un vampire du cinéma muet allemand.
+D	Cinéma	Shining	Jack Nicholson, gardien d’un hôtel isolé en hiver.
+D	Cinéma	Chantons sous la pluie	Gene Kelly danse avec son parapluie sous l’averse.
+D	Cinéma	Les Temps modernes	Charlot pris dans les engrenages d’une usine.

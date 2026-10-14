@@ -57,6 +57,8 @@ public struct Progress: Codable, Sendable {
     public var dailyWords: [String: Card]?
     /// Version of the community rules the player accepted (nil: never).
     public var rulesVersion: Int?
+    /// Personal records of Sprint, Survie and Double sens (by PlayMode raw value). Never official.
+    public var modes: [String: ModeRecords]?
     public init() {}
     public var score: Int { attempts.reduce(0) { $0 + $1.points } }
     public var correctAnswers: Int { attempts.filter(\.correct).count }
@@ -109,6 +111,11 @@ extension Progress {
         }
         if result.recentCards.isEmpty { result.recentCards = other.recentCards }
         if let theirs = other.rulesVersion, theirs > (result.rulesVersion ?? 0) { result.rulesVersion = theirs }
+        if let theirs = other.modes {
+            var mine = result.modes ?? [:]
+            for (mode, records) in theirs { mine[mode] = (mine[mode] ?? ModeRecords()).merged(with: records) }
+            result.modes = mine
+        }
         return result
     }
 }

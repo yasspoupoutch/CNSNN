@@ -1,0 +1,55 @@
+# Double sens : deux vrais mots français différents qui ont exactement les mêmes consonnes,
+# dans le même ordre (accents ignorés, Y compté comme voyelle, comme dans tout le jeu).
+# Une ligne par duo, séparée par des tabulations : mot 1, indice 1, mot 2, indice 2.
+# Scripts/generate_content.py vérifie chaque duo puis écrit Core/Duos.swift et Duos.kt.
+Farine	On l’utilise pour préparer du pain.	Frein	Il permet de ralentir une voiture.
+Piano	Un instrument à touches noires et blanches.	Paon	Un oiseau qui fait la roue.
+Chat	Un félin domestique qui ronronne.	Château	La demeure fortifiée d’un seigneur.
+Bol	On y verse ses céréales le matin.	Balai	On s’en sert pour faire le ménage, ou pour voler si l’on est sorcière.
+Poule	Elle pond des œufs au poulailler.	Pluie	Elle tombe des nuages.
+Poire	Un fruit en forme de goutte.	Purée	Des pommes de terre écrasées.
+Taureau	Il charge dans l’arène.	Truie	La femelle du cochon.
+Sel	Il relève le goût des plats.	Saule	Un arbre dit pleureur.
+Bateau	Il navigue sur l’eau.	Boîte	On y range des objets, en carton ou en métal.
+Rose	Une fleur à épines.	Ours	Un grand animal brun qui hiberne.
+Lune	Elle éclaire la nuit.	Lion	Le roi des animaux.
+Moto	Un deux-roues à moteur.	Météo	Elle annonce le temps qu’il fera.
+Cœur	Il bat dans la poitrine.	Acier	Un métal très solide, fait de fer et de carbone.
+Gâteau	On y souffle des bougies.	Gîte	Un logement de vacances à la campagne.
+Avion	Il vole d’un aéroport à l’autre.	Vin	Une boisson faite de raisin.
+Vélo	Il a deux roues et des pédales.	Voile	Elle se gonfle de vent sur un bateau.
+Crâne	Les os de la tête.	Corne	Le rhinocéros en porte une sur le nez.
+Perle	Une huître peut en cacher une.	Parole	Elle se donne et doit se tenir.
+Brise	Un vent léger.	Bourse	Un petit sac à monnaie, ou le marché des actions.
+Chien	Le meilleur ami de l’homme.	Chêne	Un grand arbre qui donne des glands.
+Musée	On y admire des œuvres d’art.	Maïs	Une céréale aux grains jaunes, en épis.
+Reine	Elle porte la couronne.	Ruine	Ce qu’il reste d’un édifice écroulé.
+Pêche	Un fruit à la peau veloutée.	Poche	On y glisse ses mains ou ses clés.
+Bouche	On y met la nourriture.	Biche	La femelle du cerf.
+Mouche	Un insecte qui bourdonne autour de la confiture.	Mèche	Celle d’une bougie, ou de cheveux.
+Ruche	La maison des abeilles.	Roche	Le matériau dur des falaises.
+Touche	Une des pièces du clavier.	Tache	Une salissure sur un vêtement.
+Livre	On le lit, page après page.	Lièvre	Un cousin du lapin, aux longues oreilles.
+Pause	Un moment de repos.	Épouse	La femme mariée.
+Dune	Une colline de sable.	Douane	Le contrôle des marchandises à la frontière.
+Ange	Un être céleste avec des ailes.	Neige	Des flocons blancs qui tombent l’hiver.
+Orage	Pluie, éclairs et tonnerre.	Orgue	Le grand instrument à tuyaux des églises.
+Luge	On glisse dessus sur la neige.	Algue	Une plante qui pousse dans la mer.
+Tuba	Un gros instrument à vent en cuivre.	Tibia	L’os de la jambe.
+Espoir	Le sentiment que tout ira mieux.	Soupir	Une respiration qui trahit la lassitude.
+Chemin	Un petit sentier.	Cheminée	On y fait du feu dans le salon.
+Marteau	On s’en sert pour planter des clous.	Mérite	La valeur reconnue d’un effort.
+Plume	L’oiseau en est couvert.	Palme	Elle se fixe au pied pour nager plus vite.
+Masque	Il cache le visage au carnaval.	Mosquée	Le lieu de prière des musulmans.
+Train	Il roule sur des rails.	Trône	Le siège du roi.
+Colère	L’émotion d’une personne fâchée.	Calorie	L’unité qui mesure l’énergie des aliments.
+Sauce	Elle accompagne les pâtes.	Souci	Une inquiétude.
+Évier	On y fait la vaisselle.	Ivoire	La matière des défenses d’éléphant.
+Moine	Un religieux qui vit au monastère.	Menu	La liste des plats au restaurant.
+Carte	On la déplie pour trouver sa route.	Crête	Le coq la porte sur la tête.
+Pilote	Il est aux commandes de l’avion.	Pelote	Une boule de laine.
+Pinte	Un grand verre de bière.	Pente	Une route qui monte.
+Minute	Soixante secondes.	Manteau	On l’enfile pour sortir l’hiver.
+Olive	Un petit fruit dont on tire de l’huile.	Élève	Il va en classe.
+Ogre	Un géant qui mange les enfants dans les contes.	Gare	On y attend le train.
+Fil	On le passe dans le chas d’une aiguille.	Foule	Une multitude de gens.
