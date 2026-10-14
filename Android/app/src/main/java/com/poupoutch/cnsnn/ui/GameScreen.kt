@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -201,7 +203,8 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
 private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewModel, game: GameViewModel, card: Card, mode: GameMode, skip: () -> Unit) {
     val haptics = rememberHaptics()
     val consonants = card.wordNoVowels
-    Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
+    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
             modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + consonants.toList().joinToString(", ") })
         Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
@@ -222,7 +225,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 else -> "Chrono officiel. Les erreurs ne terminent pas la partie."
             }, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
         }
-        Spacer(Modifier.weight(1f))
+    }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         AnswerLine(game)
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip({ haptics.selection(); game.revealHint(state) }, {

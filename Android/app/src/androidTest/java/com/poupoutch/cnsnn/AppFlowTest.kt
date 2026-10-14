@@ -36,6 +36,7 @@ class AppFlowTest {
         // Hint, then give up: the result sheet shows the word.
         rule.onNodeWithText("Indice  points ÷ 2").performClick()
         rule.onNodeWithText("Passer").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Révéler le mot")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Révéler le mot").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Pas cette fois…")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Mot suivant").assertIsDisplayed()
