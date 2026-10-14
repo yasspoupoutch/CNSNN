@@ -36,6 +36,7 @@ struct StatsView: View {
             tile(time(progress.averageTimeMs), "Temps moyen")
         }
         weekCard
+        modeRecords
         if progress.attempts.isEmpty {
             Text("Votre première partie lance l’histoire.").scaledFont(15).foregroundStyle(Palette.secondary).padding(.horizontal, 2)
         }
@@ -94,6 +95,46 @@ struct StatsView: View {
         .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
         .glassPanel(radius: 24, padding: 16)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Personal records of Sprint, Survie and Double sens. They never reach a leaderboard.
+    private var modeRecords: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Records personnels").scaledFont(15, .semibold)
+                Spacer()
+                Text("hors classement").scaledFont(12).foregroundStyle(Palette.tertiary)
+            }
+            ForEach(PlayMode.allCases) { mode in
+                let records = progress.records(mode)
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(mode.title, systemImage: mode.symbol).labelStyle(.titleAndIcon)
+                        .scaledFont(13, .semibold).foregroundStyle(Palette.secondary)
+                    HStack(spacing: 0) {
+                        ForEach(modeStats(mode, records), id: \.1) { value, label in officialStat(value, label) }
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                if mode != PlayMode.allCases.last { Rectangle().fill(Palette.line).frame(height: 1) }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(radius: 26, padding: 18)
+    }
+
+    private func modeStats(_ mode: PlayMode, _ records: ModeRecords) -> [(String, String)] {
+        let games = records.total(ModeStat.games)
+        switch mode {
+        case .sprint:
+            return [(Format.number(records.best(ModeStat.score)), "meilleur score"), ("\(records.best(ModeStat.words))", "mots max"),
+                    ("\(records.best(ModeStat.combo))", "meilleur combo"), ("\(games)", games > 1 ? "parties" : "partie")]
+        case .survival:
+            return [("\(records.best(ModeStat.words))", "meilleur parcours"), ("\(records.best(ModeStat.level))", "niveau max"), ("\(games)", games > 1 ? "parties" : "partie")]
+        case .duo:
+            let played = records.total(ModeStat.duosPlayed)
+            let rate = played == 0 ? 0 : records.total(ModeStat.duosSolved) * 100 / played
+            return [(Format.number(records.best(ModeStat.score)), "meilleur score"), ("\(records.total(ModeStat.perfect))", "parfaites"), ("\(rate) %", "duos résolus"), ("\(games)", games > 1 ? "parties" : "partie")]
+        }
     }
 
     private var weekCard: some View {

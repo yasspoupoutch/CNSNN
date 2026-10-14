@@ -64,7 +64,8 @@ import CNSNNCore
     private func adopt(_ cloudCopy: CNSNNCore.Progress) {
         let merged = progress.merged(with: cloudCopy)
         guard merged.attempts.count != progress.attempts.count || merged.submissions.count != progress.submissions.count
-            || (merged.dailyWords?.count ?? 0) != (progress.dailyWords?.count ?? 0) || merged.rulesVersion != progress.rulesVersion else { return }
+            || (merged.dailyWords?.count ?? 0) != (progress.dailyWords?.count ?? 0) || merged.rulesVersion != progress.rulesVersion
+            || merged.modes != progress.modes else { return }
         progress = merged
         guard savingAllowed else { return }
         try? local.save(progress)
@@ -140,6 +141,7 @@ import CNSNNCore
         resetToGuest()
     }
     private func resetToGuest() {
+        ModeRunStore.clearAll()
         uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil
         progress = CNSNNCore.Progress(); cards = SeedCards.all
         local = LocalRepository(); persist()
@@ -282,6 +284,23 @@ import CNSNNCore
         } else {
             record(attempt)
         }
+    }
+
+    // MARK: Sprint, Survie, Double sens
+
+    /// Adds a finished game to the personal records (never to the official leaderboard), saves it on
+    /// this device and soon in the cloud. Returns the records it beat.
+    @discardableResult func recordMode(_ mode: PlayMode, best: [String: Int], add: [String: Int]) -> Set<String> {
+        let beaten = progress.recordMode(mode, best: best, add: add, device: ModeRunStore.deviceID)
+        persist()
+        return beaten
+    }
+    /// A Sprint whose app was closed during play is over: it counts as it stood (its clock never stops).
+    func finishInterruptedSprint() {
+        guard let run = ModeRunStore.load(.sprint), var game = run.sprint else { return }
+        ModeRunStore.clear(.sprint)
+        game.stop()
+        recordMode(.sprint, best: game.records.best, add: game.records.add)
     }
 
     // MARK: Community

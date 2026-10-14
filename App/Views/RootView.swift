@@ -17,6 +17,7 @@ struct RootView: View {
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
         .animation(CNSNNTheme.ease, value: state.isRestoring)
         .task {
+            state.finishInterruptedSprint()
             guard !introDone else { return }
             try? await Task.sleep(for: .seconds(reduceMotion ? 0.8 : VowelWord.introDuration(LaunchView.word)))
             introDone = true
@@ -49,6 +50,8 @@ struct GameRoute: Identifiable {
     var mode: GameMode
     var category: CNSNNCore.Category? = nil
     var difficulty: Difficulty? = nil
+    /// Sprint, Survie or Double sens instead of a daily or Classique game.
+    var play: PlayMode? = nil
 }
 
 struct MainShell: View {
@@ -71,7 +74,8 @@ struct MainShell: View {
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
         .fullScreenCover(item: $game) { route in
-            GameView(mode: route.mode, category: route.category, difficulty: route.difficulty)
+            if let play = route.play { ModeGameView(mode: play) }
+            else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty) }
         }
     }
     @ViewBuilder private func content(_ page: AppTab) -> some View {
