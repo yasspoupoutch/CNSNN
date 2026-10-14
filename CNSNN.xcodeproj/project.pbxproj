@@ -149,10 +149,12 @@ AFACE5004273754BAB0E35CD = {isa = XCBuildConfiguration; buildSettings = {SDKROOT
 D5932CB8E27391038ED6E989 = {isa = PBXNativeTarget; buildConfigurationList = 4733065E9BE338166DBE08D7; buildPhases = (542B070506DCB881A4378D96,65FCB956BF859D89B33938D9,F0CE10C52ADB83CC656EFB42,); buildRules = (); dependencies = (3EBD6AEAF98029D23152FC43,); name = "CNSNNCoreTests"; productName = "CNSNNCoreTests"; productReference = D822CE0D14CEFF7E19AA5D57; productType = "com.apple.product-type.bundle.unit-test"; packageProductDependencies = ();};
 C8FF3B2711576784C99610AA = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/App/FriendsAndStandingTests.swift"; sourceTree = SOURCE_ROOT;};
 E5A4716013700B0E5E9B58C3 = {isa = PBXBuildFile; fileRef = C8FF3B2711576784C99610AA;};
+0B5BEEF609E1EE348AEA525B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/App/ModeSessionTests.swift"; sourceTree = SOURCE_ROOT;};
+32E83095131D365C0549CCBF = {isa = PBXBuildFile; fileRef = 0B5BEEF609E1EE348AEA525B;};
 FB951DF491F9F2BBFA595318 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/App/RepositoryTests.swift"; sourceTree = SOURCE_ROOT;};
 A567FB361A59D89BA745E266 = {isa = PBXBuildFile; fileRef = FB951DF491F9F2BBFA595318;};
-23489CA0C7A24143D762E6F7 = {isa = PBXGroup; name = "CNSNNAppTests"; children = (C8FF3B2711576784C99610AA,FB951DF491F9F2BBFA595318,); sourceTree = "<group>";};
-C2CD53D2B6CE1BAC6AA44C02 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (E5A4716013700B0E5E9B58C3,A567FB361A59D89BA745E266,); runOnlyForDeploymentPostprocessing = 0;};
+23489CA0C7A24143D762E6F7 = {isa = PBXGroup; name = "CNSNNAppTests"; children = (C8FF3B2711576784C99610AA,0B5BEEF609E1EE348AEA525B,FB951DF491F9F2BBFA595318,); sourceTree = "<group>";};
+C2CD53D2B6CE1BAC6AA44C02 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (E5A4716013700B0E5E9B58C3,32E83095131D365C0549CCBF,A567FB361A59D89BA745E266,); runOnlyForDeploymentPostprocessing = 0;};
 C1C7474BADB30AFCFD9260C5 = {isa = PBXBuildFile; fileRef = DA158C91A0F308D23130ECBB;};
 05168E1DE4DBED13AA8221E2 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (C1C7474BADB30AFCFD9260C5,); runOnlyForDeploymentPostprocessing = 0;};
 30AB26878DEE1093D66F4059 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
