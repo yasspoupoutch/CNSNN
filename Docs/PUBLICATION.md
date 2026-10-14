@@ -11,9 +11,9 @@ Ce qui est prêt dans le dépôt, et ce qu'il restera à faire le jour où les c
 | Suppression du compte depuis le web (Google Play) | https://cnsnn-9ctosy.web.app/suppression (`Firebase/hosting/suppression.html`, même code que les apps, testé dans `Firebase/tests/account.test.mjs`) |
 | Contenu créé par les joueurs (Apple 1.2) : règles acceptées, filtre, signalement, blocage, modération | Règles de la communauté acceptées à l'inscription (version dans `users/{uid}.rulesVersion`), filtre des pseudos, signalement des cartes et des pseudos, suspension réversible, temps suspects visibles en Modération |
 | Contact support | jeucnsnn@gmail.com, dans l'app et sur le site |
-| Manifeste de confidentialité iOS | `App/Resources/PrivacyInfo.xcprivacy` (identifiant, pseudo, email, contenu de jeu et des joueurs, rapports de plantage) |
+| Manifeste de confidentialité iOS | `App/Resources/PrivacyInfo.xcprivacy` (identifiant, pseudo, email, contenu de jeu et des joueurs) |
 | Chiffrement (export) | `ITSAppUsesNonExemptEncryption = false` dans `App/Resources/Info.plist` |
-| Rapports de plantage | Firebase Crashlytics, iPhone et Android |
+| Rapports de plantage | Firebase Crashlytics sur Android. Retiré sur iPhone : soupçonné de faire planter l'app dans les tests avec Xcode 27 (à réessayer avec une version plus récente du SDK) |
 
 ## À faire avant la première soumission iPhone
 

@@ -248,7 +248,6 @@ struct PrivacyView: View {
         ("Ce que nous enregistrons", "Votre pseudo, vos parties (mots du jour, temps, points, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter."),
         ("Ce qui est public", "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché."),
         ("Où sont les données", "Sur les serveurs Firebase de Google (Authentication et Cloud Firestore), et sur votre iPhone. Aucune publicité, aucun traceur, aucune revente de données."),
-        ("Rapports de plantage", "Si l’application plante, un rapport technique anonyme (modèle d’appareil, version, endroit du code) est envoyé à Firebase Crashlytics pour corriger le problème. Il ne contient ni votre pseudo ni votre email."),
         ("Notifications et widget", "Le rappel du mot du jour et le widget sont calculés sur votre iPhone : rien n’est envoyé par un serveur."),
         ("Supprimer vos données", "Profil > Mon compte > Supprimer mon compte efface votre profil, vos résultats, votre place au classement, vos amis, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom."),
         ("Nous contacter", "Pour toute question ou demande sur vos données : " + Support.email + "."),

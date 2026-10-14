@@ -59,7 +59,6 @@ jobs:
             -resultBundlePath "$IPA_ROOT/build.xcresult" \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
-            CRASHLYTICS_RUN="$IPA_ROOT/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
             2>&1 | tee "$IPA_ROOT/logs/build.log"
