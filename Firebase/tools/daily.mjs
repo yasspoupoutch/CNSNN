@@ -8,6 +8,7 @@
 // words.tsv: one word per line, tab separated: F|M|D, category, word, hint.
 // Only the service account key (GitHub secret FIREBASE_SERVICE_ACCOUNT) can decrypt the list.
 import { readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { createPublicKey, publicEncrypt, privateDecrypt, randomBytes, createCipheriv, createDecipheriv, constants } from 'node:crypto';
 
 const projectId = 'cnsnn-9ctosy';
@@ -129,7 +130,9 @@ async function seed(dry) {
   console.log('Mots du jour publiés.');
 }
 
-const [command, arg] = process.argv.slice(2);
+// Command line only when run directly, not when another tool imports the functions above.
+const direct = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const [command, arg] = direct ? process.argv.slice(2) : [];
 if (command === 'public-key') {
   const { private_key: privateKey, client_email: email } = await serviceAccount();
   console.log(`Clé publique de ${email} :`);

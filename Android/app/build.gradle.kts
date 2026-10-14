@@ -31,6 +31,7 @@ android {
     signingConfigs {
         if (releaseKeystore != null) create("release") {
             storeFile = releaseKeystore
+            storeType = "pkcs12"
             storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias = "cnsnn"
             keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -50,6 +51,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    lint {
+        // The report is kept with the build; warnings never block the APK.
+        abortOnError = false
+        checkReleaseBuilds = true
+    }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 

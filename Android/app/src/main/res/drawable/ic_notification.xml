@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "C_" mark of the app icon, as a single-colour shape for notifications. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M11.5,5.6c-0.9,-0.6 -2,-0.9 -3.1,-0.9C4.9,4.7 2.5,7.6 2.5,11.6s2.4,6.9 5.9,6.9c1.5,0 2.8,-0.5 3.8,-1.5l-1.2,-1.6c-0.7,0.6 -1.5,1 -2.4,1c-2,0 -3.4,-1.9 -3.4,-4.8s1.4,-4.8 3.3,-4.8c1,0 1.8,0.5 2.4,1.5l1.6,-0.9z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M14.5,16.6h6a1,1 0,0 1,0 2h-6a1,1 0,0 1,0 -2z" />
+</vector>

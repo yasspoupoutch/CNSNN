@@ -1,0 +1,134 @@
+name: CNSNN - Android
+
+# Builds the Android app, runs the unit tests, then the instrumented tests on an Android
+# emulator against the Firebase emulators (real security rules), and publishes the APK.
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['Android/**', 'Firebase/firestore.rules', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['Android/**', 'Firebase/firestore.rules', '.github/workflows/android.yml']
+  workflow_dispatch:
+    inputs:
+      emulator_tests:
+        description: Lancer les tests sur émulateur Android (Firebase local)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compiler et tester (unitaires)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: Android
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Ouvrir la clé de signature
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo '::warning::Secret FIREBASE_SERVICE_ACCOUNT absent : APK signé avec une clé de test (ne s’installera pas par-dessus la version officielle).'
+            exit 0
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Android/signing/signing.mjs decrypt
+          rm -f "$RUNNER_TEMP/sa.json"
+      - name: Tests unitaires (règles du jeu partagées)
+        run: ./gradlew --no-daemon :core:test
+      - name: Compiler l'APK
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease :app:lintRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/CNSNN.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CNSNN-Android-APK
+          path: ${{ runner.temp }}/CNSNN.apk
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            Android/core/build/reports
+            Android/app/build/reports
+          retention-days: 1
+
+  emulator-tests:
+    name: Tester sur émulateur Android (Firebase local, vraies règles)
+    if: github.event_name != 'workflow_dispatch' || inputs.emulator_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Démarrer les émulateurs Firebase
+        working-directory: Firebase
+        run: |
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          nohup npx firebase emulators:start --only auth,firestore --project demo-cnsnn > "$RUNNER_TEMP/emulators.log" 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null http://127.0.0.1:8080 && curl -s -o /dev/null http://127.0.0.1:9099; then echo "Émulateurs prêts"; exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/emulators.log"; exit 1
+      - name: Compiler les tests
+        working-directory: Android
+        env:
+          CNSNN_EMULATOR_HOST: 10.0.2.2
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Tests instrumentés (Firebase, parcours de l'app)
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CNSNN_EMULATOR_HOST: 10.0.2.2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          working-directory: Android
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-reports
+          path: |
+            Android/app/build/reports/androidTests
+            Android/app/build/outputs/androidTest-results
+            ${{ runner.temp }}/emulators.log
+          retention-days: 2

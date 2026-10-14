@@ -46,8 +46,8 @@ data class DailySession(val day: String, val cardId: String, val startedAt: Inst
  * the iPhone app (App/Firebase/FirebaseRepository.swift): Firebase/firestore.rules checks both.
  */
 class CloudRepository(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = com.poupoutch.cnsnn.Cloud.auth,
+    private val db: FirebaseFirestore = com.poupoutch.cnsnn.Cloud.db,
 ) {
     val hasCurrentUser: Boolean get() = auth.currentUser != null
     val currentUid: String? get() = auth.currentUser?.uid
