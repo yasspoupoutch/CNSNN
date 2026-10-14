@@ -113,21 +113,20 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
 @Composable
 private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit) {
     val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
-    val tiles: List<@Composable (Modifier) -> Unit> = listOf(
-        { m -> ModeTile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, m, openClassic) },
-    ) + PlayMode.entries.map { mode ->
-        { m: Modifier -> ModeTile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs, m) { playMode(mode) } }
-    }
+    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
+        PlayMode.entries.map { mode -> Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs) { playMode(mode) } }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Kicker("Autres modes", Palette.tertiary, Modifier.padding(start = 4.dp, top = 6.dp))
         val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
         tiles.chunked(columns).forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) }
+                row.forEach { t -> ModeTile(t.icon, t.tint, t.title, t.tagline, t.detail, t.inProgress, Modifier.weight(1f).fillMaxHeight(), t.open) }
             }
         }
     }
 }
+
+private class Tile(val icon: ImageVector, val tint: Color, val title: String, val tagline: String, val detail: String, val inProgress: Boolean, val open: () -> Unit)
 
 private fun recordLine(state: AppViewModel, mode: PlayMode): String {
     val records = state.progress.records(mode)
