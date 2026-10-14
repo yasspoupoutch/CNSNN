@@ -7,10 +7,10 @@ on:
   schedule:
     - cron: '17 3 1 * *'
   pull_request:
-    paths: ['Firebase/**', '.github/workflows/firebase.yml']
+    paths: ['Firebase/**', 'Shared/**', '.github/workflows/firebase.yml']
   push:
     branches: [main]
-    paths: ['Firebase/**', '.github/workflows/firebase.yml']
+    paths: ['Firebase/**', 'Shared/**', '.github/workflows/firebase.yml']
   workflow_dispatch:
     inputs:
       deploy:
@@ -67,6 +67,35 @@ jobs:
           java-version: 21
       - run: npm ci || npm install --no-audit --no-fund
       - run: npm test
+
+  secret-words:
+    name: Vérifier que les cartes ne dévoilent aucun mot du jour
+    # The secret key is only given to runs of this repository (never to a fork's pull request).
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Comparer les cartes et les duos aux mots du jour chiffrés
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then echo '::error::Le secret FIREBASE_SERVICE_ACCOUNT est absent.'; exit 1; fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          python3 Scripts/generate_content.py --check
+          python3 Scripts/generate_content.py --words > "$RUNNER_TEMP/words.txt"
+          report=''
+          if [ -f Firebase/daily/report.pem ]; then report=Firebase/daily/report.pem; fi
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Firebase/tools/daily.mjs overlap "$RUNNER_TEMP/words.txt" $report
+      - name: Effacer la clé
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/sa.json"
 
   deploy:
     name: Publier sur Firebase

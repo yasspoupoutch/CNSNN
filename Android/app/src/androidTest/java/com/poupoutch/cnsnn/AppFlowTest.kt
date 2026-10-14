@@ -33,7 +33,10 @@ class AppFlowTest {
         // A player from before the rules accepts them once.
         if (rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isNotEmpty()) rule.onNodeWithText("J’accepte").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isEmpty() }
-        rule.onNodeWithText("Lancer une partie").performScrollTo().performClick()
+        // Classique opens its filters in a sheet.
+        rule.onNodeWithText("Classique").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Lancer une partie")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Lancer une partie").performClick()
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("votre réponse")).fetchSemanticsNodes().isNotEmpty() }
         // A wrong answer stays in the game and is shown crossed out.
         rule.onNodeWithContentDescription("X").performClick()

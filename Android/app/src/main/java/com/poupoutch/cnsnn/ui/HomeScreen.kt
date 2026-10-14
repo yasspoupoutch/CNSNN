@@ -1,5 +1,30 @@
 package com.poupoutch.cnsnn.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import com.poupoutch.cnsnn.core.ModeStat
+import com.poupoutch.cnsnn.core.PlayMode
+import com.poupoutch.cnsnn.core.records
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,16 +84,96 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit) {
+fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit) {
+    var classic by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Header(state)
         DailyCard(state) { play(GameMode.DAILY, null, null) }
-        ClassicCard(state) { c, d -> play(GameMode.CLASSIC, c, d) }
+        Modes(state, openClassic = { classic = true }, playMode = playMode)
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
             Text(syncLabel(state), style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, modifier = Modifier.padding(start = 6.dp))
+        }
+    }
+    if (classic) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val scope = rememberCoroutineScope()
+        ModalBottomSheet({ classic = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
+            ClassicCard(state) { c, d ->
+                scope.launch { sheet.hide() }.invokeOnCompletion { classic = false; play(GameMode.CLASSIC, c, d) }
+            }
+        }
+    }
+}
+
+/** Classique, Sprint, Survie and Double sens: two columns, one when the text is very large. */
+@Composable
+private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit) {
+    val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
+    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
+        PlayMode.entries.map { mode -> Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs) { playMode(mode) } }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Kicker("Autres modes", Palette.tertiary, Modifier.padding(start = 4.dp, top = 6.dp))
+        val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
+        tiles.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { t -> ModeTile(t.icon, t.tint, t.title, t.tagline, t.detail, t.inProgress, Modifier.weight(1f).fillMaxHeight(), t.open) }
+            }
+        }
+    }
+}
+
+private class Tile(val icon: ImageVector, val tint: Color, val title: String, val tagline: String, val detail: String, val inProgress: Boolean, val open: () -> Unit)
+
+private fun recordLine(state: AppViewModel, mode: PlayMode): String {
+    val records = state.progress.records(mode)
+    if (records.total(ModeStat.GAMES) == 0) return "Première partie"
+    return when (mode) {
+        PlayMode.SURVIVAL -> "Record ${records.best(ModeStat.WORDS)} mots"
+        else -> "Record ${Format.number(records.best(ModeStat.SCORE))} pts"
+    }
+}
+
+val PlayMode.icon: ImageVector get() = when (this) {
+    PlayMode.SPRINT -> Icons.Filled.Bolt
+    PlayMode.SURVIVAL -> Icons.Filled.Favorite
+    PlayMode.DUO -> Icons.Filled.ViewAgenda
+}
+/** A quiet tint per mode, only on its glyph. */
+val PlayMode.tint: Color get() = when (this) {
+    PlayMode.SPRINT -> Palette.mint
+    PlayMode.SURVIVAL -> Palette.red
+    PlayMode.DUO -> Color(0xFF9EB5FF)
+}
+val PlayMode.tagline: String get() = when (this) {
+    PlayMode.SPRINT -> "90 secondes pour battre votre record."
+    PlayMode.SURVIVAL -> "Jusqu’où irez-vous avec 3 vies ?"
+    PlayMode.DUO -> "Deux mots, les mêmes consonnes."
+}
+
+@Composable
+private fun ModeTile(icon: ImageVector, tint: Color, title: String, tagline: String, detail: String, inProgress: Boolean, modifier: Modifier, open: () -> Unit) {
+    val haptics = rememberHaptics()
+    Surface({ haptics.selection(); open() }, modifier.heightIn(min = 150.dp), shape = RoundedCornerShape(26.dp), color = Palette.surface.copy(alpha = 0.82f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Palette.border, Palette.line)))) {
+        Column(Modifier.padding(16.dp).semantics(mergeDescendants = true) {
+            contentDescription = "$title. $tagline $detail" + if (inProgress) ". Partie en cours" else ""
+        }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(34.dp).background(tint.copy(alpha = 0.12f), CircleShape).border(1.dp, tint.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, Modifier.size(17.dp), tint = tint)
+                }
+                Spacer(Modifier.weight(1f))
+                if (inProgress) Text("En cours", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint,
+                    modifier = Modifier.background(Palette.mint.copy(alpha = 0.12f), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 3.dp))
+            }
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+            Text(tagline, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 3.dp))
+            Spacer(Modifier.weight(1f).heightIn(min = 12.dp))
+            Text(detail, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Palette.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -104,7 +209,7 @@ private fun DailyCard(state: AppViewModel, play: () -> Unit) {
     val attempt = state.progress.attempts.firstOrNull { it.dailyKey == today }
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }
-    SectionCard(radius = 34.dp) {
+    SectionCard(radius = 38.dp, padding = 24.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Kicker("Mot du jour", Palette.foreground, Modifier.weight(1f))
             Text(LocalDate.now(DailySchedule.zone).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)), style = MaterialTheme.typography.bodySmall, color = Palette.tertiary)
@@ -129,7 +234,7 @@ private fun DailyCard(state: AppViewModel, play: () -> Unit) {
             }
         } else {
             val consonants = started?.wordNoVowels
-            Text(consonants ?: "· · ·", style = Type.serif(if ((consonants?.length ?: 0) > 7) 56 else 80), letterSpacing = 4.sp, maxLines = 1,
+            Text(consonants ?: "· · ·", style = Type.serif(if ((consonants?.length ?: 0) > 7) 60 else 92), letterSpacing = 5.sp, maxLines = 1,
                 color = if (consonants == null) Palette.tertiary else Palette.foreground,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 22.dp))
             Box(Modifier.align(Alignment.CenterHorizontally).padding(vertical = 18.dp).width(36.dp)) { Divider() }
@@ -156,7 +261,7 @@ private fun ClassicCard(state: AppViewModel, play: (Category?, Difficulty?) -> U
     var difficulty by rememberSaveable { mutableStateOf<Difficulty?>(null) }
     val score = state.progress.score
     val level = score / 1000 + 1; val into = score % 1000
-    SectionCard(radius = 34.dp) {
+    Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Kicker("Classique", modifier = Modifier.weight(1f))
             Text("${state.progress.correctAnswers} mots trouvés", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary)
@@ -171,7 +276,7 @@ private fun ClassicCard(state: AppViewModel, play: (Category?, Difficulty?) -> U
             FilterMenu(category?.label ?: "Toutes catégories", listOf<Category?>(null) + Category.entries, { it?.label ?: "Toutes catégories" }) { category = it }
             FilterMenu(difficulty?.label ?: "Toutes difficultés", listOf<Difficulty?>(null) + Difficulty.entries, { it?.label ?: "Toutes difficultés" }) { difficulty = it }
         }
-        TonalButton("Lancer une partie", Modifier.fillMaxWidth().padding(top = 10.dp)) { play(category, difficulty) }
+        PrimaryButton("Lancer une partie", Modifier.padding(top = 20.dp)) { play(category, difficulty) }
     }
 }
 

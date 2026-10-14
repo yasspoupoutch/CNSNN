@@ -431,7 +431,7 @@ private struct KeyCap: View {
     }
 }
 
-private struct Caret: View {
+struct Caret: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
@@ -441,7 +441,7 @@ private struct Caret: View {
     }
 }
 
-private struct Shake: GeometryEffect {
+struct Shake: GeometryEffect {
     var animatableData: CGFloat
     func effectValue(size: CGSize) -> ProjectionTransform {
         ProjectionTransform(CGAffineTransform(translationX: 10 * sin(animatableData * .pi * 4) * (1 - animatableData.truncatingRemainder(dividingBy: 1)), y: 0))
@@ -492,12 +492,15 @@ struct VowelReveal: View {
     var word: String
     var correct: Bool
     var revealed: Bool
+    /// Largest letter size, and the width the whole word must fit in.
+    var maxSize: CGFloat = 42
+    var width: CGFloat = 318
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Letters are separate views here (the vowels slide in), so the size is chosen for the
     /// whole word from its length, instead of each letter shrinking on its own. It does not
     /// change while the vowels slide in.
     var body: some View {
-        let size = min(42, 318 / (CGFloat(max(word.count, 1)) * 0.8))
+        let size = min(maxSize, width / (CGFloat(max(word.count, 1)) * 0.8))
         letters.font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
     }
     private var letters: some View {

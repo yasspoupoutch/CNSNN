@@ -89,6 +89,7 @@ import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
+import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.delay
@@ -140,9 +141,13 @@ private fun AppNavigation(state: AppViewModel) {
         enterTransition = { slideInHorizontally { it / 3 } + fadeIn() }, exitTransition = { fadeOut() },
         popEnterTransition = { fadeIn() }, popExitTransition = { slideOutHorizontally { it / 3 } + fadeOut() }) {
         composable("main") {
-            MainShell(state) { mode, category, difficulty ->
+            MainShell(state, { mode, category, difficulty ->
                 nav.navigate("game/${mode.name}?category=${category?.name ?: ""}&difficulty=${difficulty?.name ?: ""}")
-            }
+            }, { mode -> nav.navigate("mode/${mode.key}") })
+        }
+        composable("mode/{mode}", arguments = listOf(navArgument("mode") { type = NavType.StringType })) { entry ->
+            val mode = PlayMode.of(entry.arguments?.getString("mode")) ?: PlayMode.SPRINT
+            ModeScreen(state, mode) { nav.popBackStack() }
         }
         composable("game/{mode}?category={category}&difficulty={difficulty}", arguments = listOf(
             navArgument("mode") { type = NavType.StringType },
@@ -165,7 +170,7 @@ private enum class Tab(val label: String, val icon: ImageVector, val selectedIco
 }
 
 @Composable
-private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit) {
+private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.PLAY) }
     val holder = rememberSaveableStateHolder()
     val haptics = rememberHaptics()
@@ -184,7 +189,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
         AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
             holder.SaveableStateProvider(page.name) {
                 when (page) {
-                    Tab.PLAY -> HomeScreen(state, play)
+                    Tab.PLAY -> HomeScreen(state, play, playMode)
                     Tab.STATS -> StatsScreen(state)
                     Tab.PROPOSE -> ProposeScreen(state)
                     Tab.PROFILE -> ProfileScreen(state)

@@ -139,6 +139,43 @@ import CNSNNCore
         XCTAssertEqual(alone.map(\.uid), [bob.uid])
     }
 
+    /// Sprint, Survie and Double sens records follow the account: two devices that never saw each
+    /// other's games keep both, a reinstall gets them back, and a cut connection loses nothing.
+    func testModeRecordsSyncAcrossDevices() async throws {
+        let player = try await repo.bootstrap(username: "Lou")
+        var phone = CNSNNCore.Progress(); phone.username = "Lou"
+        phone.recordMode(.sprint, best: [ModeStat.score: 240, ModeStat.words: 9, ModeStat.combo: 6], add: [ModeStat.games: 1], device: "phone")
+        phone.recordMode(.duo, best: [ModeStat.score: 900], add: [ModeStat.games: 1, ModeStat.perfect: 1, ModeStat.duosSolved: 5, ModeStat.duosPlayed: 5], device: "phone")
+        _ = try await repo.saveCloudProgress(phone, uid: player.uid)
+        var tablet = CNSNNCore.Progress(); tablet.username = "Lou"
+        tablet.recordMode(.sprint, best: [ModeStat.score: 300, ModeStat.words: 7], add: [ModeStat.games: 1], device: "tablet")
+        tablet.recordMode(.survival, best: [ModeStat.words: 23, ModeStat.level: 5], add: [ModeStat.games: 1], device: "tablet")
+        let merged = try await repo.saveCloudProgress(tablet, uid: player.uid)
+        XCTAssertEqual(merged.records(.sprint).best(ModeStat.score), 300)
+        XCTAssertEqual(merged.records(.sprint).best(ModeStat.words), 9)
+        XCTAssertEqual(merged.records(.sprint).best(ModeStat.combo), 6)
+        XCTAssertEqual(merged.records(.sprint).total(ModeStat.games), 2)
+        XCTAssertEqual(merged.records(.survival).best(ModeStat.words), 23)
+        XCTAssertEqual(merged.records(.duo).total(ModeStat.perfect), 1)
+        // The phone saves again (same games, nothing new): no game is counted twice.
+        let again = try await repo.saveCloudProgress(phone, uid: player.uid)
+        XCTAssertEqual(again.records(.sprint).total(ModeStat.games), 2)
+        // Offline, the phone plays on; back online, its new game joins without erasing the tablet's.
+        try await setNetwork(enabled: false)
+        phone.recordMode(.sprint, best: [ModeStat.score: 50], add: [ModeStat.games: 1], device: "phone")
+        try await setNetwork(enabled: true)
+        _ = try await repo.saveCloudProgress(phone, uid: player.uid)
+        // A reinstall (empty phone) gets everything back.
+        let restored = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
+        XCTAssertEqual(restored.records(.sprint).total(ModeStat.games), 3)
+        XCTAssertEqual(restored.records(.sprint).best(ModeStat.score), 300)
+        XCTAssertEqual(restored.records(.survival).total(ModeStat.games), 1)
+        XCTAssertEqual(restored.records(.duo).best(ModeStat.score), 900)
+        // Records never touch the official numbers.
+        XCTAssertEqual(restored.score, 0)
+        XCTAssertTrue(restored.attempts.isEmpty)
+    }
+
     func testProgressSyncRenameAndDeletion() async throws {
         let player = try await repo.bootstrap(username: "Camille")
         var progress = CNSNNCore.Progress(); progress.username = "Camille"

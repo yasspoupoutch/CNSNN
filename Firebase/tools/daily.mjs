@@ -4,6 +4,7 @@
 //   node tools/daily.mjs public-key                 prints the public key of the service account (CI)
 //   node tools/daily.mjs encrypt words.tsv [name]   encrypts a list into daily/<name>.enc.json (local, default words)
 //   node tools/daily.mjs seed [--dry]               decrypts the lists and publishes the next 364 days (CI)
+//   node tools/daily.mjs overlap words.txt [key.pem] fails if a card or duo of the app is a secret word (CI)
 //
 // words.tsv: one word per line, tab separated: F|M|D, category, word, hint. Every daily/words*.enc.json
 // is used: a new list adds words without needing the older ones in clear. The monthly run of the
@@ -158,6 +159,22 @@ async function seed(dry) {
   console.log('Mots du jour publiés.');
 }
 
+// The app ships its Classique cards and Double sens words in clear: none of them may be a secret
+// daily word, or anyone could read the answer of that day. Only the number of clashes is printed
+// (the logs may become public); with a public key, the clashing words are printed encrypted for it.
+async function overlap(wordsFile, reportKeyFile) {
+  const { private_key: privateKey } = await serviceAccount();
+  const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
+  const lists = await Promise.all(files.map(async (name) => decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)));
+  const secret = new Set(combine(lists).words.map((w) => normalize(w.word)));
+  const shipped = (await readFile(wordsFile, 'utf8')).split('\n').map((line) => line.trim().split(' ').at(-1)).filter(Boolean);
+  const clashes = [...new Set(shipped.filter((word) => secret.has(normalize(word))))];
+  console.log(`${shipped.length} mots de l'app comparés à ${secret.size} mots du jour secrets : ${clashes.length} en commun.`);
+  if (!clashes.length) return;
+  if (reportKeyFile) console.log(JSON.stringify(encrypt(clashes, await readFile(reportKeyFile, 'utf8'))));
+  process.exitCode = 1;
+}
+
 // Command line only when run directly, not when another tool imports the functions above.
 const direct = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 const [command, arg] = direct ? process.argv.slice(2) : [];
@@ -173,6 +190,8 @@ if (command === 'public-key') {
   console.log(`${words.length} mots chiffrés dans daily/${name}`);
 } else if (command === 'seed') {
   await seed(arg === '--dry');
+} else if (command === 'overlap') {
+  await overlap(arg, process.argv[4]);
 } else if (command) {
   console.error(`Commande inconnue : ${command}`); process.exit(1);
 }

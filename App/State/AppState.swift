@@ -4,7 +4,7 @@ import CNSNNCore
 
 @MainActor @Observable final class AppState {
     var progress = CNSNNCore.Progress()
-    var cards = SeedCards.all
+    var cards = SeedCards.all + ExtraCards.all
     var error: String?
     var isBusy = false
     var cloud: FirebaseRepository?
@@ -64,7 +64,8 @@ import CNSNNCore
     private func adopt(_ cloudCopy: CNSNNCore.Progress) {
         let merged = progress.merged(with: cloudCopy)
         guard merged.attempts.count != progress.attempts.count || merged.submissions.count != progress.submissions.count
-            || (merged.dailyWords?.count ?? 0) != (progress.dailyWords?.count ?? 0) || merged.rulesVersion != progress.rulesVersion else { return }
+            || (merged.dailyWords?.count ?? 0) != (progress.dailyWords?.count ?? 0) || merged.rulesVersion != progress.rulesVersion
+            || merged.modes != progress.modes else { return }
         progress = merged
         guard savingAllowed else { return }
         try? local.save(progress)
@@ -140,8 +141,9 @@ import CNSNNCore
         resetToGuest()
     }
     private func resetToGuest() {
+        ModeRunStore.clearAll()
         uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil
-        progress = CNSNNCore.Progress(); cards = SeedCards.all
+        progress = CNSNNCore.Progress(); cards = SeedCards.all + ExtraCards.all
         local = LocalRepository(); persist()
     }
 
@@ -208,8 +210,8 @@ import CNSNNCore
         } catch { /* Offline: the cards kept on this device remain. */ }
     }
     private static func catalogue(community: [Card]) -> [Card] {
-        let known = Set(SeedCards.all.map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
-        return SeedCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
+        let known = Set((SeedCards.all + ExtraCards.all).map { WordEngine.normalize($0.wordFull) } + DailyPool.all.map { WordEngine.normalize($0.wordFull) })
+        return SeedCards.all + ExtraCards.all + community.filter { !known.contains(WordEngine.normalize($0.wordFull)) }
     }
 
     // MARK: Community rules
@@ -224,7 +226,7 @@ import CNSNNCore
     func card(id: String) -> Card? {
         if let day = FirebaseRepository.secretDay(cardID: id) { return progress.dailyWords?[day] }
         if let published = publishedDaily, published.card.id == id { return published.card }
-        return DailyPool.card(id: id) ?? cards.first(where: { $0.id == id }) ?? SeedCards.all.first(where: { $0.id == id })
+        return DailyPool.card(id: id) ?? cards.first(where: { $0.id == id }) ?? ModeCatalogue.cards.first(where: { $0.id == id })
     }
 
     // MARK: Mot du jour
@@ -282,6 +284,23 @@ import CNSNNCore
         } else {
             record(attempt)
         }
+    }
+
+    // MARK: Sprint, Survie, Double sens
+
+    /// Adds a finished game to the personal records (never to the official leaderboard), saves it on
+    /// this device and soon in the cloud. Returns the records it beat.
+    @discardableResult func recordMode(_ mode: PlayMode, best: [String: Int], add: [String: Int]) -> Set<String> {
+        let beaten = progress.recordMode(mode, best: best, add: add, device: ModeRunStore.deviceID)
+        persist()
+        return beaten
+    }
+    /// A Sprint whose app was closed during play is over: it counts as it stood (its clock never stops).
+    func finishInterruptedSprint() {
+        guard let run = ModeRunStore.load(.sprint), var game = run.sprint else { return }
+        ModeRunStore.clear(.sprint)
+        game.stop()
+        recordMode(.sprint, best: game.records.best, add: game.records.add)
     }
 
     // MARK: Community

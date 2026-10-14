@@ -6,6 +6,11 @@ struct HomeView: View {
     @AppStorage(CNSNNTheme.avatarKey) private var avatar = 0
     @State private var category: CNSNNCore.Category?
     @State private var difficulty: Difficulty?
+    @State private var showClassic = false
+    @State private var pending: GameRoute?
+    /// Bumped when a saved game changes, so "Partie en cours" stays right.
+    @State private var savedRuns = ModeRunStore.inProgress()
+    @Environment(\.dynamicTypeSize) private var typeSize
     var play: (GameRoute) -> Void
 
     private var todayKey: String { DailySchedule.key() }
@@ -21,11 +26,21 @@ struct HomeView: View {
             VStack(spacing: 16) {
                 header
                 dailyCard
-                classicCard
+                modes
                 Label(syncLabel, systemImage: state.uid == nil ? "iphone" : "checkmark.icloud")
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.top, 4)
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            let runs = ModeRunStore.inProgress()
+            if runs != savedRuns { savedRuns = runs }
+        }
+        .sheet(isPresented: $showClassic, onDismiss: {
+            if let route = pending { pending = nil; play(route) }
+        }) {
+            classicSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+                .presentationBackground(.ultraThinMaterial)
+        }
     }
 
     private var header: some View {
@@ -60,9 +75,9 @@ struct HomeView: View {
             } else {
                 let consonants = startedDailyCard?.wordNoVowels
                 Text(consonants ?? "· · ·")
-                    .font(Typo.serif(84)).tracking(4).lineLimit(1).minimumScaleFactor(0.4)
+                    .font(Typo.serif(100)).tracking(5).lineLimit(1).minimumScaleFactor(0.4)
                     .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
-                    .padding(.top, 26).padding(.bottom, 4)
+                    .padding(.top, 34).padding(.bottom, 6)
                     .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
                 Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.vertical, 18)
                 Text(consonants == nil ? "Un mot, un indice, un chrono. À vous de jouer." : "Votre chrono tourne. Reprenez la partie.")
@@ -70,9 +85,9 @@ struct HomeView: View {
                 Text(state.uid == nil ? "Une seule partie par jour, enregistrée sur cet iPhone" : "Le même mot pour tous, une seule partie classée par jour")
                     .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 8)
                 Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
-                    .buttonStyle(PrimaryPillStyle(height: 54)).padding(.top, 20)
+                    .buttonStyle(PrimaryPillStyle(height: 58)).padding(.top, 24)
             }
-        }.glassCard(radius: 34, padding: 20).padding(.top, 2)
+        }.glassCard(radius: 38, padding: 24).padding(.top, 2)
     }
 
     @ViewBuilder private func dailyDone(_ attempt: Attempt) -> some View {
@@ -101,14 +116,46 @@ struct HomeView: View {
         }.padding(.top, 20)
     }
 
-    private var classicCard: some View {
+    // MARK: Modes
+
+    /// Classique, Sprint, Survie and Double sens: two columns, one on the largest text sizes.
+    private var modes: some View {
+        let columns = typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionKicker(text: "Autres modes").padding(.leading, 4).padding(.top, 6)
+            LazyVGrid(columns: columns, spacing: 12) {
+                ModeTile(symbol: "infinity", tint: Palette.foreground, title: "Classique", tagline: "Jouez sans limite.",
+                         detail: "\(state.progress.correctAnswers) mots trouvés", inProgress: false) {
+                    showClassic = true
+                }
+                ForEach(PlayMode.allCases) { mode in
+                    ModeTile(symbol: mode.symbol, tint: mode.tint, title: mode.title, tagline: mode.tagline,
+                             detail: recordLine(mode), inProgress: savedRuns.contains(mode)) {
+                        play(GameRoute(mode: .classic, play: mode))
+                    }
+                }
+            }
+        }
+    }
+
+    private func recordLine(_ mode: PlayMode) -> String {
+        let records = state.progress.records(mode)
+        guard records.total(ModeStat.games) > 0 else { return "Première partie" }
+        switch mode {
+        case .sprint: return "Record \(Format.number(records.best(ModeStat.score))) pts"
+        case .survival: return "Record \(records.best(ModeStat.words)) mots"
+        case .duo: return "Record \(Format.number(records.best(ModeStat.score))) pts"
+        }
+    }
+
+    private var classicSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 SectionKicker(text: "Classique", color: Palette.secondary)
                 Spacer()
                 Text("\(state.progress.correctAnswers) mots trouvés").scaledFont(13).foregroundStyle(Palette.tertiary)
             }
-            Text("Jouez sans limite").scaledFont(22, .bold).tracking(-0.2).padding(.top, 10)
+            Text("Jouez sans limite").scaledFont(24, .bold).tracking(-0.2).padding(.top, 10)
             HStack {
                 Text("Niveau \(level.number)")
                 Spacer()
@@ -124,10 +171,16 @@ struct HomeView: View {
                     Button("Toutes difficultés") { difficulty = nil }
                     ForEach(Difficulty.allCases) { item in Button(item.rawValue) { difficulty = item } }
                 }
-            }.padding(.top, 16)
-            Button("Lancer une partie") { Haptics.selection(); play(GameRoute(mode: .classic, category: category, difficulty: difficulty)) }
-                .buttonStyle(GlassPillStyle()).padding(.top, 14)
-        }.glassCard(radius: 34, padding: 20)
+            }.padding(.top, 18)
+            Spacer(minLength: 20)
+            Button("Lancer une partie") {
+                Haptics.selection()
+                pending = GameRoute(mode: .classic, category: category, difficulty: difficulty)
+                showClassic = false
+            }.buttonStyle(PrimaryPillStyle(height: 56))
+        }
+        .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 16)
+        .environment(\.colorScheme, .dark)
     }
 
     private var syncLabel: String {
@@ -141,6 +194,72 @@ struct HomeView: View {
         let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
         let seconds = max(0, Int(midnight.timeIntervalSince(date)))
         return String(format: "%02d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
+    }
+}
+
+/// One mode on the home page: a small glyph, its name, its promise and the player's record.
+struct ModeTile: View {
+    var symbol: String
+    var tint: Color
+    var title: String
+    var tagline: String
+    var detail: String
+    var inProgress: Bool
+    var action: () -> Void
+    var body: some View {
+        Button { Haptics.selection(); action() } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(tint)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(tint.opacity(0.12)))
+                        .overlay(Circle().strokeBorder(tint.opacity(0.25), lineWidth: 1))
+                    Spacer(minLength: 4)
+                    if inProgress {
+                        Text("En cours").scaledFont(11, .semibold).foregroundStyle(Palette.mint)
+                            .padding(.horizontal, 8).frame(minHeight: 22)
+                            .background(Capsule().fill(Palette.mint.opacity(0.12)))
+                    }
+                }
+                Text(title).scaledFont(18, .bold).tracking(-0.2).foregroundStyle(Palette.foreground).padding(.top, 14)
+                Text(tagline).scaledFont(13).foregroundStyle(Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 3)
+                Spacer(minLength: 12)
+                Text(detail).scaledFont(12, .medium).foregroundStyle(Palette.tertiary).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+            .glassPanel(radius: 26, padding: 16)
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(tagline) \(detail)" + (inProgress ? ". Partie en cours" : ""))
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+extension PlayMode {
+    var symbol: String {
+        switch self {
+        case .sprint: "bolt.fill"
+        case .survival: "heart.fill"
+        case .duo: "square.split.2x1.fill"
+        }
+    }
+    /// A quiet tint per mode, only on its glyph.
+    var tint: Color {
+        switch self {
+        case .sprint: Palette.mint
+        case .survival: Palette.red
+        case .duo: Color(red: 0.62, green: 0.71, blue: 1.0)
+        }
+    }
+    var tagline: String {
+        switch self {
+        case .sprint: "90 secondes pour battre votre record."
+        case .survival: "Jusqu’où irez-vous avec 3 vies ?"
+        case .duo: "Deux mots, les mêmes consonnes."
+        }
     }
 }
 

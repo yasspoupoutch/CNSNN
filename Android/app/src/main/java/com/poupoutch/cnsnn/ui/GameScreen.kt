@@ -249,19 +249,23 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
 }
 
 @Composable
-private fun AnswerLine(game: GameViewModel) {
+private fun AnswerLine(game: GameViewModel) = AnswerLine(game.answer, game.mistakeTick, game.result == null)
+
+/** The typed answer, gold vowels, a caret, and a shake on each wrong guess. */
+@Composable
+fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean) {
     val shake = remember { Animatable(0f) }
-    LaunchedEffect(game.mistakeTick) {
-        if (game.mistakeTick > 0) { shake.snapTo(0f); shake.animateTo(1f, tween(420)) }
+    LaunchedEffect(mistakeTick) {
+        if (mistakeTick > 0) { shake.snapTo(0f); shake.animateTo(1f, tween(420)) }
     }
     val dx = (10 * sin(shake.value * PI * 4) * (1 - shake.value)).toFloat()
     Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 24.dp).offset(x = dx.dp)
         .drawBehind { drawLine(Palette.tertiary, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 2f) }
-        .semantics { contentDescription = "Votre réponse : " + game.answer.ifEmpty { "vide" } },
+        .semantics { contentDescription = "Votre réponse : " + answer.ifEmpty { "vide" } },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        if (game.answer.isEmpty()) Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary)
-        else Text(highlighted(game.answer), fontSize = if (game.answer.length > 14) 22.sp else 30.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
-        if (game.result == null) Caret()
+        if (answer.isEmpty()) Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary)
+        else Text(highlighted(answer), fontSize = if (answer.length > 14) 22.sp else 30.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
+        if (active) Caret()
     }
 }
 
@@ -384,7 +388,7 @@ private fun ResultTile(value: String, label: String, modifier: Modifier) {
 
 /** The signature moment: consonants stay, the vowels slide into the gaps one by one, then the word glows. */
 @Composable
-fun VowelReveal(word: String, correct: Boolean, modifier: Modifier = Modifier) {
+fun VowelReveal(word: String, correct: Boolean, modifier: Modifier = Modifier, maxSize: Float = 42f, width: Float = 318f) {
     val reduce = rememberReduceMotion()
     val haptics = rememberHaptics()
     val vowelCount = word.count { isVowel(it) }
@@ -400,7 +404,7 @@ fun VowelReveal(word: String, correct: Boolean, modifier: Modifier = Modifier) {
         }
         if (correct && vowelCount > 0) { delay(300); glow.animateTo(1f, tween(350)); delay(500); glow.animateTo(0f, tween(900)) }
     }
-    val size = minOf(42f, 318f / (maxOf(word.length, 1) * 0.8f))
+    val size = minOf(maxSize, width / (maxOf(word.length, 1) * 0.8f))
     Row(modifier.widthIn(max = 360.dp).drawBehind {
         if (glow.value > 0) drawCircle(Brush.radialGradient(listOf(Palette.accent.copy(alpha = 0.45f * glow.value), Color.Transparent), radius = this.size.width / 1.6f),
             radius = this.size.width / 1.6f)

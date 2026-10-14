@@ -11,6 +11,10 @@ import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Progress
+import com.poupoutch.cnsnn.core.recordingMode
+import com.poupoutch.cnsnn.core.records
+import com.poupoutch.cnsnn.core.PlayMode
+import com.poupoutch.cnsnn.core.ModeStat
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Scoring
 import com.poupoutch.cnsnn.core.SecretDaily
@@ -156,6 +160,33 @@ class CloudRepositoryTest {
         assertEquals(setOf("seed-001", "seed-002"), saved.attempts.map { it.cardID }.toSet())
         assertEquals(1, saved.rulesVersion)
         assertEquals(saved, repo.cloudProgress(alice.uid))
+    }
+
+    /** Sprint, Survie and Double sens records: kept from both devices, counted once, back after a reinstall. */
+    @Test fun modeRecordsSyncAcrossDevices() = runBlocking<Unit> {
+        val lou = repo.bootstrap("Lou")
+        var phone = Progress(username = "Lou")
+            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 240, ModeStat.WORDS to 9, ModeStat.COMBO to 6), mapOf(ModeStat.GAMES to 1), "phone").first
+            .recordingMode(PlayMode.DUO, mapOf(ModeStat.SCORE to 900), mapOf(ModeStat.GAMES to 1, ModeStat.PERFECT to 1, ModeStat.DUOS_SOLVED to 5, ModeStat.DUOS_PLAYED to 5), "phone").first
+        repo.saveCloudProgress(phone, lou.uid)
+        val tablet = Progress(username = "Lou")
+            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 300, ModeStat.WORDS to 7), mapOf(ModeStat.GAMES to 1), "tablet").first
+            .recordingMode(PlayMode.SURVIVAL, mapOf(ModeStat.WORDS to 23, ModeStat.LEVEL to 5), mapOf(ModeStat.GAMES to 1), "tablet").first
+        val merged = repo.saveCloudProgress(tablet, lou.uid)
+        assertEquals(300, merged.records(PlayMode.SPRINT).best(ModeStat.SCORE))
+        assertEquals(9, merged.records(PlayMode.SPRINT).best(ModeStat.WORDS))
+        assertEquals(2, merged.records(PlayMode.SPRINT).total(ModeStat.GAMES))
+        assertEquals(23, merged.records(PlayMode.SURVIVAL).best(ModeStat.WORDS))
+        // Saving the same games again counts nothing twice.
+        assertEquals(2, repo.saveCloudProgress(phone, lou.uid).records(PlayMode.SPRINT).total(ModeStat.GAMES))
+        phone = phone.recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 50), mapOf(ModeStat.GAMES to 1), "phone").first
+        repo.saveCloudProgress(phone, lou.uid)
+        val restored = repo.cloudProgress(lou.uid)!!
+        assertEquals(3, restored.records(PlayMode.SPRINT).total(ModeStat.GAMES))
+        assertEquals(900, restored.records(PlayMode.DUO).best(ModeStat.SCORE))
+        assertEquals(1, restored.records(PlayMode.DUO).total(ModeStat.PERFECT))
+        assertEquals(0, restored.score)
+        assertTrue(restored.attempts.isEmpty())
     }
 
     @Test fun rulesAreAcceptedOnTheProfile() = runBlocking<Unit> {
