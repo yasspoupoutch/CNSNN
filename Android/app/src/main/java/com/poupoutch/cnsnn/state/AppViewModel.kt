@@ -106,7 +106,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Session
 
-    fun setAvatar(index: Int) { avatar = index; local.avatar = index }
+    fun chooseAvatar(index: Int) { avatar = index; local.avatar = index }
 
     fun start(username: String) = viewModelScope.launch {
         if (isBusy) return@launch
@@ -196,7 +196,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         cloudSave?.cancel()
         cloud.deleteAccount(user, password)
         local.erase(user); local.erase(null)
-        setAvatar(0)
+        chooseAvatar(0)
         resetToGuest()
     }
 

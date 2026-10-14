@@ -98,7 +98,7 @@ fun ProfileScreen(state: AppViewModel) {
                 Avatar(state.progress.username, state.avatar, 96.dp)
                 Text(state.progress.username, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp))
                 Text("Niveau ${state.progress.score / 1000 + 1} · ${Format.number(state.progress.score)} points", color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
-                AvatarPicker(state.avatar, state::setAvatar, Modifier.padding(top = 14.dp))
+                AvatarPicker(state.avatar, state::chooseAvatar, Modifier.padding(top = 14.dp))
                 TonalButton("Modifier le pseudo", Modifier.fillMaxWidth().padding(top = 14.dp)) { editingName = true }
             }
         }

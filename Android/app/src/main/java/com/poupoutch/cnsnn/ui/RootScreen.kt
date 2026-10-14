@@ -244,7 +244,7 @@ private fun Pseudo(state: AppViewModel, back: () -> Unit) {
             Text("Choisissez un pseudo", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 16.dp))
             Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.", color = Palette.secondary, modifier = Modifier.padding(top = 8.dp))
             Avatar(trimmed.ifEmpty { "?" }, state.avatar, 104.dp, Modifier.align(Alignment.CenterHorizontally).padding(top = 34.dp))
-            AvatarPicker(state.avatar, state::setAvatar, Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp))
+            AvatarPicker(state.avatar, state::chooseAvatar, Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp))
             OutlinedTextField(name, { name = it.take(20) }, Modifier.fillMaxWidth().padding(top = 30.dp),
                 placeholder = { Text("ex. voyelle_hunter") }, singleLine = true, shape = RoundedCornerShape(20.dp),
                 label = { Text("Pseudo") }, supportingText = {
