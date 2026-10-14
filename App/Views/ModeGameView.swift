@@ -376,7 +376,7 @@ private struct ModeResultView: View {
             if let missed { Text(missed).scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 8) }
             HStack(spacing: 10) {
                 Button("Accueil", action: close).buttonStyle(GlassPillStyle(height: 54))
-                Button("Rejouer", action: replay).buttonStyle(PrimaryPillStyle(height: 54)).layoutPriority(1)
+                Button("Rejouer", action: replay).buttonStyle(PrimaryPillStyle(height: 54))
             }.padding(.top, 20)
             Text("Record personnel : il ne compte pas dans les classements du mot du jour.")
                 .scaledFont(11).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 12)
