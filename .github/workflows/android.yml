@@ -124,6 +124,11 @@ jobs:
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           working-directory: Android
           script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+      - name: Détail des échecs
+        if: failure()
+        run: |
+          find Android/app/build/outputs/androidTest-results -name '*.xml' -exec grep -h -A25 '<failure' {} + | head -300 || true
+          tail -50 "$RUNNER_TEMP/emulators.log" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
