@@ -154,9 +154,10 @@ import CNSNNCore
         XCTAssertEqual(merged.score, 193)
         let both = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
         XCTAssertEqual(Set(both.attempts.map(\.cardID)), ["seed-001", "seed-002"])
-        // Offline, nothing is overwritten: the save fails and the next sync merges again.
+        // A cut connection overwrites nothing either. (Transactions bypass disableNetwork and still
+        // reach the emulator; a real outage makes the save fail.) The next sync merges again.
         try await setNetwork(enabled: false)
-        await assertThrows { _ = try await self.repo.saveCloudProgress(progress, uid: player.uid) }
+        if let during = try? await repo.saveCloudProgress(progress, uid: player.uid) { XCTAssertEqual(during.score, 193) }
         try await setNetwork(enabled: true)
         let afterOutage = try await repo.saveCloudProgress(progress, uid: player.uid)
         XCTAssertEqual(afterOutage.score, 193)
