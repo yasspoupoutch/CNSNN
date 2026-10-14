@@ -115,21 +115,10 @@ jobs:
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
-      - name: Récupérer le dernier APK Android
-        if: ${{ inputs.site && github.ref == 'refs/heads/main' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -uo pipefail
-          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow android.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-          if [ -n "$run" ] && gh run download "$run" -R "$GITHUB_REPOSITORY" -n CNSNN-Android-APK -D "$RUNNER_TEMP/apk"; then
-            echo "APK=$(find "$RUNNER_TEMP/apk" -name '*.apk' | head -1)" >> "$GITHUB_ENV"
-          else
-            echo '::warning::Aucun APK récent (les artefacts expirent après 7 jours) : le site est publié sans le téléchargement Android.'
-          fi
       - name: Publier le site
         if: ${{ inputs.site && github.ref == 'refs/heads/main' }}
-        run: node tools/hosting.mjs ${APK:-}
+        # No APK: the free Spark plan refuses executable files on Hosting.
+        run: node tools/hosting.mjs
       - name: Effacer la clé
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/sa.json"
