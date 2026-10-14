@@ -219,17 +219,13 @@ D	Cinéma	Mon voisin Totoro	Deux sœurs rencontrent un grand esprit de la forêt
 D	Cinéma	Citizen Kane	« Rosebud », murmure le magnat en mourant.
 D	Cinéma	Les Enfants du paradis	Garance et le mime Baptiste, sur le boulevard du Crime.
 D	Cinéma	Playtime	Monsieur Hulot perdu dans un Paris de verre et d’acier.
-F	Général	Moustache	Des poils qui poussent au-dessus de la lèvre.
 F	Général	Bisou	Un petit baiser sur la joue.
 F	Général	Goûter	Le petit repas de quatre heures.
 F	Général	Chantier	On y construit un immeuble, avec grues et casques.
-F	Général	Bonbon	Une sucrerie qu’on suce ou qu’on mâche.
 F	Général	Câlin	On serre quelqu’un dans ses bras.
-F	Général	Pyjama	On l’enfile pour aller dormir.
 F	Général	Tartine	Une tranche de pain beurrée.
 M	Général	Pâte à crêpes	Farine, œufs et lait, à laisser reposer.
 M	Général	Coquelicot	Une fleur rouge des champs de blé.
-M	Général	Tournesol	Une grande fleur jaune qui suit le soleil.
 M	Général	Muguet	On l’offre le 1er mai.
 M	Général	Jardinier	Il taille les haies et plante les fleurs.
 M	Général	Plombier	Il répare les fuites d’eau.
@@ -238,25 +234,16 @@ M	Général	Pharmacien	Il délivre les médicaments sur ordonnance.
 M	Général	Garagiste	Il répare les voitures.
 M	Général	Chocolatine	Le nom du pain au chocolat dans le Sud-Ouest.
 M	Général	Barbe à papa	Un nuage de sucre filé sur un bâton.
-M	Général	Feu d’artifice	Il illumine le ciel le soir du 14 Juillet.
-D	Général	Acrostiche	Un poème dont les premières lettres des vers forment un mot.
 D	Général	Calembour	Un jeu de mots fondé sur des sons semblables.
 D	Général	Contrepèterie	On inverse des sons pour faire naître un sens caché.
-D	Général	Sérendipité	L’art de trouver ce qu’on ne cherchait pas.
-D	Général	Procrastination	La tendance à toujours remettre au lendemain.
 D	Général	Éphéméride	Un calendrier dont on arrache une page chaque jour.
-D	Général	Mnémotechnique	Un moyen pour retenir plus facilement.
-D	Général	Pléonasme	Une répétition inutile, comme « monter en haut ».
 D	Général	Oxymore	Deux mots contraires réunis, comme « obscure clarté ».
 D	Général	Apothicaire	L’ancien nom du pharmacien.
-F	Animaux	Chaton	Le petit du chat.
 F	Animaux	Agneau	Le petit de la brebis.
 F	Animaux	Poulain	Le petit de la jument.
 F	Animaux	Louveteau	Le petit du loup.
-F	Animaux	Hamster doré	Un petit rongeur qui court dans sa roue.
 M	Animaux	Ver de terre	Il aère le sol du jardin.
 M	Animaux	Mille-pattes	Un petit animal aux très nombreuses pattes.
-M	Animaux	Bernard-l’ermite	Un crustacé qui s’abrite dans une coquille vide.
 M	Animaux	Étoile de mer	Un animal marin à cinq bras.
 M	Animaux	Rouge-gorge	Un petit oiseau à la poitrine orangée.
 M	Animaux	Mésange	Un petit oiseau des jardins, souvent bleu et jaune.
@@ -273,7 +260,6 @@ F	Objets	Biberon	Le bébé y boit son lait.
 F	Objets	Tétine	Le bébé la suce pour se calmer.
 M	Objets	Pince à linge	Elle accroche les vêtements sur le fil.
 M	Objets	Porte-clés	On y accroche ses clés.
-M	Objets	Bouilloire	Elle chauffe l’eau du thé.
 M	Objets	Cocotte-minute	Une casserole sous pression qui siffle.
 M	Objets	Fer à repasser	Il défroisse les vêtements.
 M	Objets	Taille-haie	Un outil électrique pour tailler les buissons.
@@ -282,28 +268,23 @@ D	Objets	Théodolite	L’instrument du géomètre pour mesurer les angles.
 D	Objets	Alambic	Il sert à distiller.
 D	Objets	Rouet	On y filait la laine en faisant tourner une roue.
 D	Objets	Encrier	Le petit pot où l’on trempait sa plume.
-F	Géographie	Marne	Une rivière et un département de l’est de Paris.
+F	Géographie	Marne	Une rivière qui rejoint la Seine aux portes de Paris.
 F	Géographie	Garonne	Le fleuve qui traverse Toulouse et Bordeaux.
 M	Géographie	Gironde	L’estuaire de la Garonne et de la Dordogne.
 M	Géographie	Ardèche	Une rivière célèbre pour ses gorges et son pont d’Arc.
 M	Géographie	Camargue	Une région de taureaux, de chevaux blancs et de flamants roses.
 M	Géographie	Quiberon	Une presqu’île bretonne à la côte sauvage.
 M	Géographie	Biarritz	Une station balnéaire basque, haut lieu du surf.
-M	Géographie	Montpellier	La grande ville universitaire de l’Hérault.
 D	Géographie	Lesotho	Un royaume enclavé dans l’Afrique du Sud.
 D	Géographie	Djibouti	Un petit pays de la Corne de l’Afrique.
 D	Géographie	Tadjikistan	Un pays d’Asie centrale couvert par le Pamir.
 D	Géographie	Spitzberg	Une île de l’archipel norvégien du Svalbard.
-D	Géographie	Saint-Pierre-et-Miquelon	Un archipel français au large de Terre-Neuve.
-M	Football	Tifo	Une grande animation visuelle des tribunes.
 M	Football	Ultras	Les supporters les plus fervents d’un club.
 D	Football	Kanté	Un milieu français champion du monde, à l’activité inépuisable.
 D	Football	Lizarazu	Un latéral gauche basque champion du monde en 1998.
 D	Football	Thuram	Un défenseur auteur d’un doublé en demi-finale du Mondial 1998.
 D	Football	Barthez	Le gardien chauve des Bleus de 1998.
-M	Cinéma	Kirikou	Un petit garçon africain qui affronte la sorcière Karaba.
 M	Cinéma	Ponyo	Une petite fille-poisson rencontre un garçon, chez Miyazaki.
-M	Cinéma	Le Petit Prince	Un aviateur rencontre un enfant venu d’un astéroïde.
 D	Cinéma	Les Triplettes de Belleville	Une grand-mère part sauver son petit-fils cycliste.
 D	Cinéma	La Nuit américaine	Truffaut filme le tournage d’un film.
 D	Cinéma	Les Quatre Cents Coups	Antoine Doinel fugue, chez Truffaut.
