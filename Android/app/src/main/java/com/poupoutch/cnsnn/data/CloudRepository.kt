@@ -16,6 +16,7 @@ import com.google.firebase.firestore.WriteBatch
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
@@ -127,6 +128,10 @@ class CloudRepository(
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }
+        }
+        // Friend challenges, sent or received: they carry the player's name.
+        for (field in listOf("from", "to")) {
+            refs += db.collection("challenges").whereEqualTo(field, uid).get(Source.SERVER).await().documents.map { it.reference }
         }
         // Approved cards stay in the game without the author's name or id; the other proposals go.
         val authored = db.collection("cards").whereEqualTo("createdBy", uid).get(Source.SERVER).await().documents
@@ -379,6 +384,51 @@ class CloudRepository(
         return FriendStanding.ordered(rows)
     }
 
+    /** The friends' ids and names only (one read each, for the challenge list). */
+    suspend fun friends(uid: String): List<Pair<String, String>> =
+        db.collection("users").document(uid).collection("friends").limit(100).get(Source.SERVER).await().documents
+            .map { it.id to (it.getString("username") ?: "Joueur") }.sortedBy { it.second.lowercase() }
+
+    // ---- Friend challenges (same documents as the iPhone app, see Firebase/firestore.rules)
+
+    /** Sends a challenge to a friend and starts the challenger's clock on the server at once. */
+    suspend fun createChallenge(uid: String, username: String, friend: String, friendName: String, cardIds: List<String>): Challenge {
+        val ref = db.collection("challenges").document()
+        val data = mapOf("from" to uid, "fromName" to username, "to" to friend, "toName" to friendName, "cardIds" to cardIds,
+            "createdAt" to FieldValue.serverTimestamp(), "fromStartedAt" to FieldValue.serverTimestamp())
+        if (!awaitWrite(ref.set(data))) throw CloudError(CloudError.Kind.OFFLINE)
+        return challenge(ref.id) ?: throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** Starts the friend's clock (once), and adds the challenger to their friends so the scores show up. */
+    suspend fun startChallenge(challenge: Challenge, uid: String): Challenge {
+        if (challenge.to.startedMs == null) {
+            val ref = db.collection("challenges").document(challenge.id)
+            if (!awaitWrite(ref.update("toStartedAt", FieldValue.serverTimestamp()))) throw CloudError(CloudError.Kind.OFFLINE)
+            val friend = db.collection("users").document(uid).collection("friends").document(challenge.from.uid)
+            if (!friend.get(Source.SERVER).await().exists()) {
+                runCatching { friend.set(mapOf("username" to challenge.from.name, "addedAt" to FieldValue.serverTimestamp())).await() }
+            }
+        }
+        return challenge(challenge.id) ?: throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** Stamps the finish with the server time. False if the network did not confirm in time (the write stays queued). */
+    suspend fun finishChallenge(challenge: Challenge, uid: String, skips: Int, errors: Int): Boolean {
+        val side = if (challenge.from.uid == uid) "from" else "to"
+        return awaitWrite(db.collection("challenges").document(challenge.id)
+            .update(mapOf(side + "FinishedAt" to FieldValue.serverTimestamp(), side + "Skips" to skips, side + "Errors" to errors)))
+    }
+    suspend fun challenge(id: String): Challenge? =
+        db.collection("challenges").document(id).get(Source.SERVER).await().data?.let { challenge(id, it) }
+    /** The challenges sent and received, newest first (equality queries only: no composite index needed). */
+    suspend fun challenges(uid: String): List<Challenge> {
+        val all = mutableListOf<Challenge>()
+        for (field in listOf("from", "to")) {
+            all += db.collection("challenges").whereEqualTo(field, uid).limit(200).get(Source.SERVER).await().documents
+                .mapNotNull { doc -> doc.data?.let { challenge(doc.id, it) } }
+        }
+        return all.sortedByDescending { it.createdMs }
+    }
+
     // ---- Community cards
 
     /**
@@ -570,6 +620,18 @@ class CloudRepository(
     }
 
     companion object {
+        fun challenge(id: String, d: Map<String, Any?>): Challenge? {
+            val from = d["from"] as? String ?: return null
+            val to = d["to"] as? String ?: return null
+            val ids = (d["cardIds"] as? List<*>)?.filterIsInstance<String>() ?: return null
+            val created = d["createdAt"] as? Timestamp ?: return null
+            fun ms(key: String) = (d[key] as? Timestamp)?.let { millis(it) }
+            fun int(key: String) = (d[key] as? Number)?.toInt() ?: 0
+            return Challenge(id, ids, millis(created),
+                Challenge.Side(from, d["fromName"] as? String ?: "Joueur", ms("fromStartedAt"), ms("fromFinishedAt"), int("fromSkips"), int("fromErrors")),
+                Challenge.Side(to, d["toName"] as? String ?: "Joueur", ms("toStartedAt"), ms("toFinishedAt"), int("toSkips"), int("toErrors")))
+        }
+
         /** Milliseconds exactly as the rules' `timestamp.toMillis()`. */
         fun millis(t: Timestamp): Long = t.seconds * 1000 + t.nanoseconds / 1_000_000
         private fun Timestamp.toInstant(): Instant = Instant.ofEpochSecond(seconds, nanoseconds.toLong())

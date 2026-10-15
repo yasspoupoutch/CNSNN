@@ -9,6 +9,7 @@ data class SurvivalStep(val action: String, val card: String, val difficulty: St
 data class SurvivalCase(val seed: ULong, val steps: List<SurvivalStep>)
 data class DuoStep(val action: String, val round: Int, val found: Int, val solved: Int, val errors: Int, val playMs: Int, val score: Int, val finished: Boolean)
 data class DuoCase(val seed: ULong, val duos: List<String>, val steps: List<DuoStep>)
+data class ChallengeCase(val seed: ULong, val recent: List<String>, val cards: List<String>)
 
 object ModeVectors {
     val random = listOf(
@@ -31,5 +32,12 @@ object ModeVectors {
         DuoCase(42uL, listOf("duo-livre-levure", "duo-ogre-gare", "duo-poire-puree", "duo-sauce-souci", "duo-pause-epouse"), listOf(DuoStep("a@4000", 0, 1, 0, 0, 4000, 129, false), DuoStep("ko@6000", 0, 1, 0, 1, 6000, 109, false), DuoStep("b@9000", 0, 2, 1, 1, 9000, 288, false), DuoStep("next@15000", 1, 2, 1, 1, 9000, 288, false), DuoStep("b@20000", 1, 3, 1, 1, 14000, 415, false), DuoStep("a@21000", 1, 4, 2, 1, 15000, 594, false), DuoStep("next@22000", 2, 4, 2, 1, 15000, 594, false), DuoStep("a@30000", 2, 5, 2, 1, 23000, 718, false), DuoStep("skip@40000", 2, 5, 2, 1, 33000, 713, false), DuoStep("next@41000", 3, 5, 2, 1, 33000, 713, false), DuoStep("b@50000", 3, 6, 2, 1, 42000, 834, false), DuoStep("a@51000", 3, 7, 3, 1, 43000, 1009, false), DuoStep("next@60000", 4, 7, 3, 1, 43000, 1009, false), DuoStep("a@61000", 4, 8, 3, 1, 44000, 1134, false), DuoStep("b@62000", 4, 9, 4, 1, 45000, 1309, true))),
         DuoCase(5uL, listOf("duo-furet-frite", "duo-bol-balai", "duo-coeur-acier", "duo-bateau-boite", "duo-peniche-panache"), listOf(DuoStep("b@1000", 0, 1, 0, 0, 1000, 129, false), DuoStep("a@2000", 0, 2, 1, 0, 2000, 309, false), DuoStep("next@2500", 1, 2, 1, 0, 2000, 309, false), DuoStep("a@3000", 1, 3, 1, 0, 2500, 439, false), DuoStep("b@4000", 1, 4, 2, 0, 3500, 618, false), DuoStep("next@4000", 2, 4, 2, 0, 3500, 618, false), DuoStep("b@5000", 2, 5, 2, 0, 4500, 748, false), DuoStep("a@6000", 2, 6, 3, 0, 5500, 927, false), DuoStep("next@6000", 3, 6, 3, 0, 5500, 927, false), DuoStep("a@7000", 3, 7, 3, 0, 6500, 1055, false), DuoStep("b@8000", 3, 8, 4, 0, 7500, 1234, false), DuoStep("next@8000", 4, 8, 4, 0, 7500, 1234, false), DuoStep("a@9000", 4, 9, 4, 0, 8500, 1362, false), DuoStep("b@10000", 4, 10, 5, 0, 9500, 1541, true))),
         DuoCase(77uL, listOf("duo-farine-frein", "duo-averse-virus", "duo-sante-sonate", "duo-carte-crete", "duo-olive-eleve"), listOf(DuoStep("skip@500000", 0, 0, 0, 0, 500000, 0, false), DuoStep("next@500000", 1, 0, 0, 0, 500000, 0, false), DuoStep("ko@500001", 1, 0, 0, 1, 500001, 0, false), DuoStep("skip@500002", 1, 0, 0, 1, 500002, 0, false), DuoStep("next@500002", 2, 0, 0, 1, 500002, 0, false), DuoStep("skip@500003", 2, 0, 0, 1, 500003, 0, false), DuoStep("next@500003", 3, 0, 0, 1, 500003, 0, false), DuoStep("skip@500004", 3, 0, 0, 1, 500004, 0, false), DuoStep("next@500004", 4, 0, 0, 1, 500004, 0, false), DuoStep("a@900000", 4, 1, 0, 1, 900000, 80, false), DuoStep("skip@900000", 4, 1, 0, 1, 900000, 80, true)))
+    )
+    val challenge = listOf(
+        ChallengeCase(0uL, listOf(), listOf("seed-dinosaure", "seed-008", "seed-grelon", "seed-071", "seed-fightclub")),
+        ChallengeCase(42uL, listOf(), listOf("seed-109", "seed-120", "seed-tartiflette", "seed-075", "seed-tadjikistan")),
+        ChallengeCase(9223372036854775813uL, listOf(), listOf("seed-044", "seed-nil", "seed-automne", "seed-042", "seed-apothicaire")),
+        ChallengeCase(18446744073709551615uL, listOf(), listOf("seed-louveteau", "seed-105", "seed-080", "seed-rougegorge", "seed-auroreboreale")),
+        ChallengeCase(42uL, listOf("seed-109", "seed-120", "seed-tartiflette"), listOf("seed-poussin", "seed-alpes", "seed-canicule", "seed-moimocheetmechant", "seed-tadjikistan"))
     )
 }

@@ -1,0 +1,112 @@
+import Foundation
+import Observation
+import CNSNNCore
+
+/// One side of a friend challenge on screen. The official time is the server's (start and finish
+/// stamped in Firestore); the chrono shown while playing is this iPhone's. The game is saved after
+/// every word, so a closed app picks up at the same word, the time away included.
+@MainActor @Observable final class ChallengeSession {
+    enum Phase: Equatable { case starting, playing, sending, done, failed(String) }
+
+    var challenge: Challenge
+    var game: ChallengeGame?
+    var phase: Phase = .starting
+    var answer = ""
+    var mistakeTick = 0
+    var successTick = 0
+    private var start = ContinuousClock.now
+    private var baseMs = 0
+
+    init(challenge: Challenge) { self.challenge = challenge }
+
+    var elapsedMs: Int {
+        let duration = start.duration(to: .now)
+        return baseMs + Int(duration.components.seconds * 1000 + duration.components.attoseconds / 1_000_000_000_000_000)
+    }
+
+    /// Starts the friend's clock on the server (the challenger's started with the challenge), then plays.
+    func begin(state: AppState) async {
+        guard let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
+        if challenge.mine(uid).finished { phase = .done; return }
+        guard let cards = ChallengeRules.cards(challenge.cardIds) else { phase = .failed(CloudError.challengeUnavailable.errorDescription ?? ""); return }
+        do { challenge = try await state.startChallenge(challenge) }
+        catch { phase = .failed(CloudError.message(error)); return }
+        if let saved = ChallengeStore.load(challenge.id) {
+            game = saved.game
+            baseMs = saved.elapsedMs + max(0, Int(Date().timeIntervalSince(saved.savedAt) * 1000))
+        } else {
+            game = ChallengeGame(cards: cards)
+            baseMs = 0
+        }
+        start = .now
+        phase = .playing
+        if game?.finished == true { await finish(state: state) }
+    }
+
+    func press(_ letter: String) {
+        guard phase == .playing, answer.count < 40 else { return }
+        if letter == " ", answer.isEmpty || answer.hasSuffix(" ") { return }
+        answer += letter
+    }
+    func delete() { if !answer.isEmpty { answer.removeLast() } }
+
+    func submit(state: AppState) {
+        guard phase == .playing, var game, !WordEngine.normalize(answer).isEmpty else { mistakeTick += 1; return }
+        switch game.answer(answer) {
+        case .right: answer = ""; successTick += 1; Haptics.success()
+        case .wrong: answer = ""; mistakeTick += 1; Haptics.retry()
+        case .over: break
+        }
+        self.game = game
+        afterMove(state: state)
+    }
+
+    /// Next word, for 20 seconds.
+    func skip(state: AppState) {
+        guard phase == .playing, var game else { return }
+        answer = ""
+        game.skip()
+        self.game = game
+        afterMove(state: state)
+    }
+
+    /// Gives up: the words left count as skipped.
+    func abandon(state: AppState) {
+        guard phase == .playing, var game else { return }
+        while !game.finished { game.skip() }
+        self.game = game
+        afterMove(state: state)
+    }
+
+    private func afterMove(state: AppState) {
+        guard let game else { return }
+        if game.finished { Task { await finish(state: state) } }
+        else { ChallengeStore.save(ChallengeStore.Run(game: game, elapsedMs: elapsedMs, savedAt: Date()), id: challenge.id) }
+    }
+
+    private func finish(state: AppState) async {
+        guard phase == .playing, let game else { return }
+        phase = .sending
+        challenge = await state.finishChallenge(challenge, skips: game.skips, errors: game.errors)
+        ChallengeStore.clear(challenge.id)
+        phase = .done
+    }
+
+    /// My time as the server measured it, or this iPhone's while the server has not confirmed.
+    func myScoreMs(uid: String) -> Int {
+        challenge.mine(uid).scoreMs ?? game?.scoreMs(elapsed: elapsedMs) ?? 0
+    }
+}
+
+/// The unfinished challenge games of this device.
+enum ChallengeStore {
+    struct Run: Codable { var game: ChallengeGame; var elapsedMs: Int; var savedAt: Date }
+    private static func key(_ id: String) -> String { "challenge.run." + id }
+    static func save(_ run: Run, id: String) {
+        if let data = try? JSONEncoder().encode(run) { UserDefaults.standard.set(data, forKey: key(id)) }
+    }
+    static func load(_ id: String) -> Run? {
+        UserDefaults.standard.data(forKey: key(id)).flatMap { try? JSONDecoder().decode(Run.self, from: $0) }
+    }
+    static func clear(_ id: String) { UserDefaults.standard.removeObject(forKey: key(id)) }
+}

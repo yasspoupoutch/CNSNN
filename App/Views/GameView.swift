@@ -291,6 +291,9 @@ private struct ResultSheet: View {
             } else if result.correct, result.timeMs == state.progress.bestTimeMs {
                 Label("Votre meilleur temps", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint).padding(.top, 12)
             }
+            if mode == .daily && state.uid != nil {
+                ChallengePrompt(correct: result.correct) { state.challengeRequest += 1; close() }.padding(.top, 18)
+            }
             HStack(spacing: 10) {
                 ShareResultLink(attempt: result, card: card, mode: mode) {
                     Text("Partager")

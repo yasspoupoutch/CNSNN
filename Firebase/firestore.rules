@@ -352,6 +352,47 @@ service cloud.firestore {
    allow delete: if admin();
   }
 
+  // ---- Friend challenges: the same 5 public Classique words for two friends, timed by the server.
+  // The challenger starts at creation; the friend has 48 h to start; both finish before the 50th hour.
+  match /challenges/{id} {
+   allow read: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || admin());
+   allow create: if active() && createsChallenge(request.resource.data);
+   allow update: if active() && (finishesChallenge('from', resource.data, request.resource.data)
+    || startsChallenge(resource.data, request.resource.data)
+    || finishesChallenge('to', resource.data, request.resource.data));
+   allow delete: if admin() || (signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid) && leaving());
+  }
+  function challengeCards(c) {
+   return c is list && c.size() == 5
+    && c[0] is string && c[0].size() >= 1 && c[0].size() <= 80 && c[1] is string && c[1].size() >= 1 && c[1].size() <= 80
+    && c[2] is string && c[2].size() >= 1 && c[2].size() <= 80 && c[3] is string && c[3].size() >= 1 && c[3].size() <= 80
+    && c[4] is string && c[4].size() >= 1 && c[4].size() <= 80 && c.toSet().size() == 5;
+  }
+  // Only a player the challenger added as a friend, under the name saved with that friend.
+  function createsChallenge(c) {
+   return c.keys().hasOnly(['from','fromName','to','toName','cardIds','createdAt','fromStartedAt'])
+    && c.from == request.auth.uid && c.to is string && c.to != c.from
+    && c.fromName == get(at('users/' + request.auth.uid)).data.username
+    && exists(at('users/' + request.auth.uid + '/friends/' + c.to))
+    && c.toName == get(at('users/' + request.auth.uid + '/friends/' + c.to)).data.username
+    && challengeCards(c.cardIds) && c.createdAt == request.time && c.fromStartedAt == request.time;
+  }
+  function startsChallenge(old, c) {
+   return old.to == request.auth.uid && !('toStartedAt' in old)
+    && c.diff(old).affectedKeys().hasOnly(['toStartedAt']) && c.toStartedAt == request.time
+    && request.time < old.createdAt + duration.value(48, 'h');
+  }
+  // Finish once at the server's time (the score is finish - start), at least 2 s per word found.
+  // A skipped word costs 20 s, added by the apps.
+  function finishesChallenge(side, old, c) {
+   return old[side] == request.auth.uid && (side + 'StartedAt') in old && !((side + 'FinishedAt') in old)
+    && c.diff(old).affectedKeys().hasOnly([side + 'FinishedAt', side + 'Skips', side + 'Errors'])
+    && c[side + 'FinishedAt'] == request.time && request.time < old.createdAt + duration.value(50, 'h')
+    && c[side + 'Skips'] is int && c[side + 'Skips'] >= 0 && c[side + 'Skips'] <= 5
+    && c[side + 'Errors'] is int && c[side + 'Errors'] >= 0 && c[side + 'Errors'] <= 500
+    && request.time >= old[side + 'StartedAt'] + duration.value((5 - c[side + 'Skips']) * 2, 's');
+  }
+
   match /{document=**} { allow read, write: if false; }
  }
 }

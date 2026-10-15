@@ -20,6 +20,12 @@ import CNSNNCore
     var publishedDaily: (day: String, card: Card)?
     /// True while a returning player's profile is being fetched at launch: hide onboarding meanwhile.
     var isRestoring = false
+    /// Friend challenges sent and received (see Core/Challenge.swift).
+    var challenges: [Challenge] = []
+    /// Asks the home page to open the challenge sheet (from the daily result).
+    var challengeRequest = 0
+    /// Asks the shell to show the leaderboard (from the home page).
+    var leaderboardRequest = 0
     private var local: any ProgressRepository
     private var savingAllowed = true
     private var cloudSave: Task<Void, Never>?
@@ -116,6 +122,7 @@ import CNSNNCore
         await refreshDailyChallenge()
         await finishPendingDaily()
         await refreshOfficial()
+        await refreshChallenges()
         isAdmin = (try? await cloud?.isAdmin()) ?? false
         if let cloud, let uid { isSuspended = (try? await cloud.isSuspended(uid: uid)) ?? isSuspended }
     }
@@ -142,7 +149,7 @@ import CNSNNCore
     }
     private func resetToGuest() {
         ModeRunStore.clearAll()
-        uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil
+        uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil; challenges = []
         progress = CNSNNCore.Progress(); cards = SeedCards.all + ExtraCards.all
         local = LocalRepository(); persist()
     }
@@ -301,6 +308,57 @@ import CNSNNCore
         ModeRunStore.clear(.sprint)
         game.stop()
         recordMode(.sprint, best: game.records.best, add: game.records.add)
+    }
+
+    // MARK: Friend challenges
+
+    func refreshChallenges() async {
+        guard let cloud, let uid else { return }
+        if let list = try? await cloud.challenges(uid: uid), self.uid == uid { challenges = list }
+    }
+    /// The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
+    /// then one of mine left unfinished, then the latest one waiting for the friend.
+    func featuredChallenge(now: Int = Int(Date().timeIntervalSince1970 * 1000)) -> (challenge: Challenge, state: Challenge.State)? {
+        guard let uid else { return nil }
+        let open = challenges.compactMap { c -> (Challenge, Challenge.State)? in
+            let state = c.state(for: uid, now: now)
+            if case .over = state { return nil }
+            return ChallengeRules.cards(c.cardIds) == nil ? nil : (c, state)
+        }
+        if let turn = open.filter({ $0.1 == .yourTurn }).min(by: { $0.0.createdMs < $1.0.createdMs }) { return turn }
+        if let playing = open.first(where: { $0.1 == .playing }) { return playing }
+        return open.first { $0.1 == .waiting }
+    }
+    func challengeTally(friend: String? = nil) -> ChallengeTally {
+        guard let uid else { return ChallengeTally() }
+        return ChallengeTally.of(challenges, me: uid, friend: friend, now: Int(Date().timeIntervalSince1970 * 1000))
+    }
+    /// Draws 5 public words (avoiding the player's recent ones) and starts the challenger's clock.
+    func sendChallenge(to friend: String, name: String) async throws -> Challenge {
+        guard let cloud, let uid else { throw CloudError.offline }
+        if isSuspended { throw CloudError.suspended }
+        let ids = ChallengeRules.draw(seed: ModeRandom.seed(), recent: progress.recentCards)
+        let challenge = try await cloud.createChallenge(uid: uid, username: progress.username, friend: friend, friendName: name, cardIDs: ids)
+        challenges.insert(challenge, at: 0)
+        return challenge
+    }
+    /// Starts (or resumes) my side of a challenge: the friend's clock starts on the server here.
+    func startChallenge(_ challenge: Challenge) async throws -> Challenge {
+        guard let cloud, let uid else { throw CloudError.offline }
+        let fresh = challenge.to.uid == uid ? try await cloud.startChallenge(challenge, uid: uid) : challenge
+        replace(fresh)
+        return fresh
+    }
+    /// Stamps my finish on the server, then reads back the official times.
+    func finishChallenge(_ challenge: Challenge, skips: Int, errors: Int) async -> Challenge {
+        guard let cloud, let uid else { return challenge }
+        _ = try? await cloud.finishChallenge(challenge, uid: uid, skips: skips, errors: errors)
+        guard let fresh = try? await cloud.challenge(id: challenge.id) else { return challenge }
+        replace(fresh)
+        return fresh
+    }
+    private func replace(_ challenge: Challenge) {
+        if let index = challenges.firstIndex(where: { $0.id == challenge.id }) { challenges[index] = challenge } else { challenges.insert(challenge, at: 0) }
     }
 
     // MARK: Community

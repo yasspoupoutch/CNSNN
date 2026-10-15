@@ -30,6 +30,11 @@ object Share {
         return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "") + "\nJouez aussi : ${Site.URL}"
     }
 
+    /** Shares plain text (challenge invitations). */
+    fun plain(context: Context, text: String) {
+        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
+    }
+
     fun result(context: Context, attempt: Attempt, card: Card?, mode: GameMode) {
         val text = text(attempt, card, mode)
         val intent = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, text)

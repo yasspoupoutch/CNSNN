@@ -18,6 +18,8 @@ export async function deleteAccountData(db, uid, fs) {
   refs.push(...(await getDocs(collection(db, 'users', uid, 'friends'))).docs.map((d) => d.ref));
   refs.push(...(await owned('friendCodes', 'uid')).map((d) => d.ref));
   for (const name of ['dailyResults', 'dailySessions', 'reports', 'playerReports']) refs.push(...(await owned(name)).map((d) => d.ref));
+  // Friend challenges, sent or received: they carry the player's name.
+  for (const field of ['from', 'to']) refs.push(...(await owned('challenges', field)).map((d) => d.ref));
   // Approved cards stay in the game without the author's name or id; the other proposals go.
   const authored = await owned('cards', 'createdBy');
   refs.push(...authored.filter((d) => d.data().status !== 'approved').map((d) => d.ref));

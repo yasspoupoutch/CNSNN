@@ -174,7 +174,7 @@ private fun TopBar(game: ModeViewModel, mode: PlayMode, leave: () -> Unit) {
 }
 
 @Composable
-private fun Pill(value: String, label: String) {
+internal fun Pill(value: String, label: String) {
     Surface(shape = RoundedCornerShape(50), color = Palette.fill1) {
         Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
             .semantics { contentDescription = "$label : $value" })
@@ -299,7 +299,7 @@ private fun DuoClue(number: Int, word: DuoWord, found: Boolean, revealed: Boolea
 }
 
 @Composable
-private fun ColumnScope.Clue(card: Card) {
+internal fun ColumnScope.Clue(card: Card) {
     val reduce = rememberReduceMotion()
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         AnimatedContent(card, transitionSpec = {
@@ -326,7 +326,7 @@ private fun Controls(state: AppViewModel, game: ModeViewModel, skip: String, ski
 }
 
 @Composable
-private fun SkipChip(text: String, label: String, action: () -> Unit) {
+internal fun SkipChip(text: String, label: String, action: () -> Unit) {
     val haptics = rememberHaptics()
     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
         AssistChip({ haptics.selection(); action() }, { Text(text) }, Modifier.semantics { contentDescription = label }, shape = RoundedCornerShape(50),

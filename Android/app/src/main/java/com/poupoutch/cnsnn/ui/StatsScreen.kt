@@ -83,6 +83,9 @@ import java.util.Locale
 @Composable
 fun StatsScreen(state: AppViewModel) {
     var page by rememberSaveable { mutableIntStateOf(0) }
+    // "Classement" on the home page.
+    var seenRequest by rememberSaveable { mutableIntStateOf(state.leaderboardRequest) }
+    LaunchedEffect(state.leaderboardRequest) { if (state.leaderboardRequest != seenRequest) { seenRequest = state.leaderboardRequest; page = 1 } }
     var refreshToken by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -305,7 +308,8 @@ private fun EmptyLine(loading: Boolean, text: String) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail: String?, value: String, valueColor: androidx.compose.ui.graphics.Color = Palette.foreground, onLongPress: () -> Unit) {
+private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail: String?, value: String, valueColor: androidx.compose.ui.graphics.Color = Palette.foreground,
+                    extra: String? = null, onLongPress: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(if (mine) Palette.fill1 else androidx.compose.ui.graphics.Color.Transparent)
         .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Options").heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -317,6 +321,7 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
                 if (mine) Text("vous", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
             }
             if (!detail.isNullOrEmpty()) Text(detail, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)
+            if (!extra.isNullOrEmpty()) Text(extra, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Duel.soft, maxLines = 1)
         }
         Text(value, fontWeight = FontWeight.SemiBold, color = valueColor)
     }
@@ -342,6 +347,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
         try {
             if (code == null) code = state.cloud.friendCode(uid, name)
             rows = state.cloud.friendsBoard(uid, name, DailySchedule.key())
+            state.refreshChallenges()
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
     LaunchedEffect(uid, refreshToken) { refresh() }
@@ -388,9 +394,12 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
             val today = row.today
             Box {
                 RankRow(index, row.username, row.uid, mine,
-                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else ""),
+                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else "")
+,
                     when { today == null -> "pas joué"; today.correct -> Format.clock(today.timeMs); else -> "raté" },
-                    if (today?.correct == true) Palette.foreground else Palette.tertiary) { if (!mine) menu = true }
+                    if (today?.correct == true) Palette.foreground else Palette.tertiary,
+                    // Friend challenges: "2 victoires · 1 défaite" against this friend.
+                    extra = if (mine) null else state.challengeTally(row.uid).label) { if (!mine) menu = true }
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem({ Text("Retirer de mes amis", color = Palette.red) }, {
                         menu = false

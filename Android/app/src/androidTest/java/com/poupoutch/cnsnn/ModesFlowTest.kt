@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -65,6 +66,19 @@ class ModesFlowTest {
         WordEngine.normalize(word).forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
         rule.onNodeWithText("Valider").performClick()
         rule.waitForIdle()
+    }
+
+    /** The lilac tile opens the challenge sheet: rules, friends to challenge, and the invitation. */
+    @Test fun challengeTileOpensTheSheet() {
+        home()
+        rule.onNodeWithTag("challengeTile").performScrollTo().performClick()
+        waitFor("Mêmes 5 mots. Le plus rapide gagne.")
+        waitFor("Inviter par message")
+        // The friends list loads (earlier tests may leave a signed-in player who already has friends).
+        rule.waitUntil(20_000) {
+            !has("Chargement…") && (has("Ajoutez d’abord un ami", substring = true) || has("Connectez-vous à Internet", substring = true) ||
+                rule.onAllNodes(hasContentDescription("Défier ", substring = true)).fetchSemanticsNodes().isNotEmpty())
+        }
     }
 
     @Test fun sprintRightWrongSkipAndStop() {

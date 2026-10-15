@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -86,13 +87,25 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit) {
+fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit) {
     var classic by rememberSaveable { mutableStateOf(false) }
+    var challenges by rememberSaveable { mutableStateOf(false) }
+    // "Défier un ami" on the daily result opens the sheet once back here.
+    var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
+    LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
+    LaunchedEffect(state.uid) { state.refreshChallenges() }
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) state.refreshChallengesSoon()
+        }
+        lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Header(state)
         DailyCard(state) { play(GameMode.DAILY, null, null) }
-        Modes(state, openClassic = { classic = true }, playMode = playMode)
+        Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
             Text(syncLabel(state), style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, modifier = Modifier.padding(start = 6.dp))
@@ -107,16 +120,26 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
             }
         }
     }
+    if (challenges) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val scope = rememberCoroutineScope()
+        ModalBottomSheet({ challenges = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
+            ChallengeSheet(state) { c ->
+                scope.launch { sheet.hide() }.invokeOnCompletion { challenges = false; playChallenge(c.id) }
+            }
+        }
+    }
 }
 
 /** Classique, Sprint, Survie and Double sens: two columns, one when the text is very large. */
 @Composable
-private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit) {
+private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit, openChallenges: () -> Unit, playChallenge: (com.poupoutch.cnsnn.core.Challenge) -> Unit) {
     val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
     val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
         PlayMode.entries.map { mode -> Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs) { playMode(mode) } }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Kicker("Autres modes", Palette.tertiary, Modifier.padding(start = 4.dp, top = 6.dp))
+        Kicker("Jouer aussi", Palette.tertiary, Modifier.padding(start = 4.dp, top = 6.dp))
+        ChallengeTile(state, openChallenges, playChallenge)
         val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
         tiles.chunked(columns).forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -209,40 +232,53 @@ private fun DailyCard(state: AppViewModel, play: () -> Unit) {
     val attempt = state.progress.attempts.firstOrNull { it.dailyKey == today }
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }
-    SectionCard(radius = 38.dp, padding = 24.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Kicker("Mot du jour", Palette.foreground, Modifier.weight(1f))
-            Text(LocalDate.now(DailySchedule.zone).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)), style = MaterialTheme.typography.bodySmall, color = Palette.tertiary)
-        }
+    // Compact, so the challenge and the modes stay on screen.
+    SectionCard(radius = 32.dp, padding = 20.dp) {
         if (attempt != null) {
             val card = state.card(attempt.cardID)
-            Text(highlighted((card?.wordFull ?: "").uppercase()), fontSize = 32.sp, fontWeight = FontWeight.Black, letterSpacing = 2.6.sp, maxLines = 1,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 22.dp, bottom = 4.dp))
-            Text(if (attempt.correct) "Trouvé en ${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "Raté. Un nouveau mot arrive à minuit.",
-                color = Palette.secondary, modifier = Modifier.align(Alignment.CenterHorizontally))
-            Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(20.dp), color = Palette.fill1) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Text("PROCHAIN MOT", fontSize = 11.sp, letterSpacing = 0.9.sp, color = Palette.tertiary)
-                        Countdown()
+            val context = LocalContext.current
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Kicker("Mot du jour", Palette.foreground)
+                        if (attempt.correct) Text("✓ trouvé", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint, modifier = Modifier.padding(start = 8.dp))
                     }
+                    Text(highlighted((card?.wordFull ?: "").uppercase()), style = Type.serif(40), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+                        modifier = Modifier.padding(top = 4.dp))
+                    Text(if (attempt.correct) "${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "Raté cette fois",
+                        fontSize = 13.sp, color = Palette.secondary, maxLines = 1)
                 }
-                val context = LocalContext.current
-                FilledTonalButton({ Share.result(context, attempt, card, GameMode.DAILY) }, Modifier.height(56.dp), shape = RoundedCornerShape(20.dp)) {
-                    Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilledTonalButton({ state.leaderboardRequest++ }, Modifier.height(40.dp), shape = RoundedCornerShape(20.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) { Text("Classement", fontWeight = FontWeight.SemiBold) }
+                        androidx.compose.material3.IconButton({ Share.result(context, attempt, card, GameMode.DAILY) }) { Icon(Icons.Filled.Share, "Partager") }
+                    }
+                    Text("Prochain mot", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
+                    Countdown()
                 }
             }
         } else {
             val consonants = started?.wordNoVowels
-            Text(consonants ?: "· · ·", style = Type.serif(if ((consonants?.length ?: 0) > 7) 60 else 92), letterSpacing = 5.sp, maxLines = 1,
-                color = if (consonants == null) Palette.tertiary else Palette.foreground,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 22.dp))
-            Box(Modifier.align(Alignment.CenterHorizontally).padding(vertical = 18.dp).width(36.dp)) { Divider() }
-            Text(if (consonants == null) "Un mot, un indice, un chrono. À vous de jouer." else "Votre chrono tourne. Reprenez la partie.",
-                style = Type.serifItalic(21), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-            Text(if (state.uid == null) "Connectez-vous à Internet pour jouer le mot du jour" else "Le même mot pour tous, une seule partie classée par jour",
-                style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-            PrimaryButton(if (consonants == null) "Jouer" else "Reprendre", Modifier.padding(top = 20.dp), onClick = play)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Kicker("Mot du jour", Palette.foreground)
+                        Text(LocalDate.now(DailySchedule.zone).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)), style = MaterialTheme.typography.bodySmall,
+                            color = Palette.tertiary, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+                    }
+                    Text(consonants ?: "· · ·", style = Type.serif(if (consonants == null) 34 else 46), letterSpacing = if (consonants == null) 6.sp else 3.sp, maxLines = 1,
+                        softWrap = false, color = if (consonants == null) Palette.tertiary else Palette.foreground, modifier = Modifier.padding(top = 4.dp)
+                            .semantics { contentDescription = consonants?.let { "Consonnes : " + it.toList().joinToString(", ") } ?: "Mot masqué" })
+                }
+                Button(play, Modifier.height(54.dp).width(128.dp), shape = RoundedCornerShape(27.dp)) {
+                    Text(if (consonants == null) "Jouer" else "Reprendre", fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                }
+            }
+            Text(if (consonants == null) "Un mot, un indice, un chrono." else "Votre chrono tourne. Reprenez la partie.",
+                style = Type.serifItalic(18), color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)
+                    .semantics { contentDescription = (if (consonants == null) "Un mot, un indice, un chrono." else "Votre chrono tourne.") +
+                        if (state.uid == null) " Connectez-vous à Internet pour jouer le mot du jour." else " Le même mot pour tous, une seule partie classée par jour." })
         }
     }
 }
@@ -252,7 +288,7 @@ private fun Countdown() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
     val seconds = Duration.between(Instant.ofEpochMilli(now), DailySchedule.nextDay(Instant.ofEpochMilli(now))).seconds
-    Text(Format.countdown(seconds), fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+    Text(Format.countdown(seconds), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Palette.secondary)
 }
 
 @Composable

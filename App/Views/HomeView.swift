@@ -8,6 +8,8 @@ struct HomeView: View {
     @State private var difficulty: Difficulty?
     @State private var showClassic = false
     @State private var pending: GameRoute?
+    @State private var showChallenges = false
+    @Environment(\.scenePhase) private var scenePhase
     /// Bumped when a saved game changes, so "Partie en cours" stays right.
     @State private var savedRuns = ModeRunStore.inProgress()
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -41,6 +43,19 @@ struct HomeView: View {
             classicSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
                 .presentationBackground(.ultraThinMaterial)
         }
+        .sheet(isPresented: $showChallenges, onDismiss: {
+            if let route = pending { pending = nil; play(route) }
+        }) {
+            ChallengeSheet { pending = GameRoute(mode: .classic, challenge: $0) }
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+                .presentationBackground(.ultraThinMaterial)
+        }
+        // "Défier un ami" on the daily result: opens the sheet once the game has closed.
+        .onChange(of: state.challengeRequest) { _, _ in
+            Task { try? await Task.sleep(for: .seconds(0.7)); showChallenges = true }
+        }
+        .task(id: state.uid) { await state.refreshChallenges() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await state.refreshChallenges() } } }
     }
 
     private var header: some View {
@@ -62,58 +77,74 @@ struct HomeView: View {
         }.padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4)
     }
 
+    /// Compact, so the challenge and the modes stay on screen: the consonants (or dots) with Jouer,
+    /// then the result once played.
     private var dailyCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                SectionKicker(text: "Mot du jour", color: Palette.foreground).accessibilityLabel("Mot du jour")
-                Spacer()
-                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Locale(identifier: "fr_FR"))))
-                    .scaledFont(13).foregroundStyle(Palette.tertiary)
-            }
+        VStack(alignment: .leading, spacing: 0) {
             if let attempt = todayAttempt {
                 dailyDone(attempt)
             } else {
                 let consonants = startedDailyCard?.wordNoVowels
-                Text(consonants ?? "· · ·")
-                    .font(Typo.serif(100)).tracking(5).lineLimit(1).minimumScaleFactor(0.4)
-                    .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
-                    .padding(.top, 34).padding(.bottom, 6)
-                    .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
-                Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.vertical, 18)
-                Text(consonants == nil ? "Un mot, un indice, un chrono. À vous de jouer." : "Votre chrono tourne. Reprenez la partie.")
-                    .font(Typo.serifItalic(21)).multilineTextAlignment(.center)
-                Text(state.uid == nil ? "Une seule partie par jour, enregistrée sur cet iPhone" : "Le même mot pour tous, une seule partie classée par jour")
-                    .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 8)
-                Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
-                    .buttonStyle(PrimaryPillStyle(height: 58)).padding(.top, 24)
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        dailyKicker(done: false)
+                        Text(consonants ?? "· · ·")
+                            .font(Typo.serif(consonants == nil ? 34 : 46)).tracking(consonants == nil ? 6 : 3)
+                            .lineLimit(1).minimumScaleFactor(0.4)
+                            .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
+                            .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
+                    }
+                    Spacer(minLength: 4)
+                    Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
+                        .buttonStyle(PrimaryPillStyle(height: 54)).frame(width: 128)
+                }
+                Text(consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne. Reprenez la partie.")
+                    .font(Typo.serifItalic(18)).foregroundStyle(Palette.secondary).padding(.top, 8)
+                    .accessibilityLabel((consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne.")
+                        + (state.uid == nil ? " Une seule partie par jour, enregistrée sur cet iPhone." : " Le même mot pour tous, une seule partie classée par jour."))
             }
-        }.glassCard(radius: 38, padding: 24).padding(.top, 2)
+        }.glassCard(radius: 32, padding: 20).padding(.top, 2)
+    }
+
+    private func dailyKicker(done: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            SectionKicker(text: "Mot du jour", color: Palette.foreground).fixedSize().accessibilityLabel("Mot du jour")
+            if done {
+                Label("trouvé", systemImage: "checkmark").scaledFont(12, .semibold).foregroundStyle(Palette.mint).labelStyle(.titleAndIcon).fixedSize()
+            } else {
+                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Locale(identifier: "fr_FR"))))
+                    .scaledFont(13).foregroundStyle(Palette.tertiary).lineLimit(1)
+            }
+        }
     }
 
     @ViewBuilder private func dailyDone(_ attempt: Attempt) -> some View {
         let card = state.card(id: attempt.cardID)
-        HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: .system(size: 34, weight: .heavy)).tracking(2.7)
-            .padding(.top, 22).padding(.bottom, 4)
-        Text(attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté. Un nouveau mot arrive à minuit.")
-            .scaledFont(15).foregroundStyle(Palette.secondary)
-        HStack(spacing: 10) {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                VStack(spacing: 0) {
-                    Text("PROCHAIN MOT").scaledFont(11).tracking(0.9).foregroundStyle(Palette.tertiary)
-                    Text(countdown(from: context.date)).scaledFont(18, .semibold).monospacedDigit()
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                if attempt.correct { dailyKicker(done: true) } else {
+                    SectionKicker(text: "Mot du jour", color: Palette.foreground).fixedSize()
                 }
-                .frame(maxWidth: .infinity).frame(minHeight: 54)
-                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill1))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
-                .accessibilityElement(children: .combine)
+                HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: Typo.serif(40)).tracking(1)
+                Text(attempt.correct ? "\(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois")
+                    .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.8)
             }
-            ShareResultLink(attempt: attempt, card: card, mode: .daily) {
-                Text("Partager").scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
-                    .frame(minWidth: 120, minHeight: 54)
-                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill2))
-                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.glassBorder, lineWidth: 1))
-            }.buttonStyle(PressStyle())
-        }.padding(.top, 20)
+            Spacer(minLength: 4)
+            VStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Button("Classement") { Haptics.selection(); state.leaderboardRequest += 1 }
+                        .buttonStyle(GlassPillStyle(height: 40)).frame(width: 118)
+                    ShareResultLink(attempt: attempt, card: card, mode: .daily) {
+                        Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.foreground)
+                            .frame(width: 40, height: 40).glassCapsule()
+                    }.buttonStyle(PressStyle()).accessibilityLabel("Partager")
+                }
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("Prochain mot\ndans " + countdown(from: context.date))
+                        .scaledFont(12).monospacedDigit().foregroundStyle(Palette.tertiary).multilineTextAlignment(.center)
+                }
+            }
+        }
     }
 
     // MARK: Modes
@@ -122,7 +153,8 @@ struct HomeView: View {
     private var modes: some View {
         let columns = typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return VStack(alignment: .leading, spacing: 12) {
-            SectionKicker(text: "Autres modes").padding(.leading, 4).padding(.top, 6)
+            SectionKicker(text: "Jouer aussi").padding(.leading, 4).padding(.top, 6)
+            ChallengeTile(open: { showChallenges = true }, play: { play(GameRoute(mode: .classic, challenge: $0)) })
             LazyVGrid(columns: columns, spacing: 12) {
                 ModeTile(symbol: "infinity", tint: Palette.foreground, title: "Classique", tagline: "Jouez sans limite.",
                          detail: "\(state.progress.correctAnswers) mots trouvés", inProgress: false) {

@@ -52,9 +52,12 @@ struct GameRoute: Identifiable {
     var difficulty: Difficulty? = nil
     /// Sprint, Survie or Double sens instead of a daily or Classique game.
     var play: PlayMode? = nil
+    /// A friend challenge.
+    var challenge: Challenge? = nil
 }
 
 struct MainShell: View {
+    @Environment(AppState.self) private var state
     @State private var tab: AppTab = .play
     @State private var game: GameRoute?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -73,8 +76,10 @@ struct MainShell: View {
                 .ignoresSafeArea(.keyboard)
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
+        .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
         .fullScreenCover(item: $game) { route in
-            if let play = route.play { ModeGameView(mode: play) }
+            if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
+            else if let play = route.play { ModeGameView(mode: play) }
             else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty) }
         }
     }
