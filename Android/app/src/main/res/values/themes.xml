@@ -7,7 +7,7 @@
     </style>
     <style name="Theme.Cnsnn.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/night</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_notification_large</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
         <item name="postSplashScreenTheme">@style/Theme.Cnsnn</item>
     </style>
     <color name="night">#FF06070C</color>
