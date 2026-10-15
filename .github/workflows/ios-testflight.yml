@@ -1,0 +1,122 @@
+name: CNSNN - iPhone TestFlight
+
+# Signs the app with the Apple Developer account and sends it to App Store Connect (TestFlight),
+# without a Mac: Xcode creates the certificate and profiles itself through an App Store Connect
+# API key (role Admin). Needs these repository secrets, see Docs/PUBLICATION.md:
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (content of the .p8 file).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Signer et envoyer sur TestFlight
+    runs-on: xcode-27
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Verifier les secrets et l'identifiant de l'app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name manquant (voir Docs/PUBLICATION.md)."; exit 1; fi
+          done
+          # Automatic signing would register the placeholder identifier in the Apple account.
+          if grep -q 'com.mycompany.cnsnn' Scripts/generate_project.py; then
+            echo "::error::L'identifiant iOS est encore com.mycompany.cnsnn : le passer à l'identifiant définitif d'abord."
+            exit 1
+          fi
+          xcodebuild -version
+          python3 Scripts/verify_project.py
+          root="$RUNNER_TEMP/cnsnn-tf"
+          mkdir -p "$root/logs" "$root/key"
+          printf '%s' "$ASC_KEY_P8" > "$root/key/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$root/key/AuthKey_$ASC_KEY_ID.p8"
+          printf 'TF_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
+
+      - name: Archiver l'app signee
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project CNSNN.xcodeproj -scheme CNSNN -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$TF_ROOT/CNSNN.xcarchive" \
+            -derivedDataPath "$TF_ROOT/DerivedData" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            2>&1 | tee "$TF_ROOT/logs/archive.log"
+          test -d "$TF_ROOT/CNSNN.xcarchive/Products/Applications/CNSNN.app/PlugIns/CNSNNWidget.appex" \
+            || { echo '::error::Widget absent de l archive.'; exit 1; }
+
+      - name: Envoyer sur App Store Connect
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$TF_ROOT/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$TF_ROOT/CNSNN.xcarchive" \
+            -exportOptionsPlist "$TF_ROOT/ExportOptions.plist" \
+            -exportPath "$TF_ROOT/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            2>&1 | tee "$TF_ROOT/logs/export.log"
+          echo "Build ${{ github.run_number }} envoyé sur App Store Connect. Il apparaît dans TestFlight après le traitement d'Apple." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Effacer la cle API
+        if: ${{ always() }}
+        run: rm -rf "$RUNNER_TEMP/cnsnn-tf/key"
+
+      - name: Conserver les diagnostics
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CNSNN-TestFlight-diagnostics-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnsnn-tf/logs/
+          if-no-files-found: warn
+          retention-days: 3
