@@ -62,6 +62,8 @@ class GameRulesTest {
     }
     @Test fun formats() {
         assertEquals("1:05", Format.clock(65_400))
+        assertEquals("59:59", Format.clock(3_599_000))
+        assertEquals("19:51:25", Format.clock(71_485_000))
         assertEquals("1er", Format.ordinal(1)); assertEquals("12e", Format.ordinal(12))
         assertEquals("12 345", Format.number(12345))
         assertEquals("sans faute", Mistakes.text(0)); assertEquals("1 erreur", Mistakes.text(1)); assertEquals("3 erreurs", Mistakes.text(3))
