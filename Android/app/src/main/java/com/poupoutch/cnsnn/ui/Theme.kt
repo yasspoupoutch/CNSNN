@@ -75,7 +75,11 @@ object Type {
 
 @Composable
 fun CnsnnTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+    // Light text by default everywhere, also on screens outside a Scaffold or on translucent cards
+    // (the default content color is black, unreadable on the night background).
+    MaterialTheme(colorScheme = scheme, typography = typography) {
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Palette.foreground, content = content)
+    }
 }
 
 /** Vowels (Y included), with or without accents, and Œ/Æ. */

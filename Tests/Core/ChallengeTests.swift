@@ -97,4 +97,43 @@ final class ChallengeTests: XCTestCase {
         XCTAssertEqual(ChallengeFormat.left(31 * hour + 5), "31 h")
         XCTAssertEqual(ChallengeFormat.left(45 * 60_000), "45 min")
     }
+
+    func testIdsStartWithTheTimeSoTheLatestComeAfterACursor() {
+        XCTAssertEqual(ChallengeRules.newId(nowMs: 1234, random: "abc"), "0000000001234-abc")
+        let now = 1_760_000_000_000
+        XCTAssertEqual(ChallengeRules.newId(nowMs: now, random: "x"), "1760000000000-x")
+        XCTAssertEqual(ChallengeRules.recentFromId(nowMs: now), String(now - 52 * hour))
+        XCTAssertGreaterThan(ChallengeRules.newId(nowMs: now - 51 * hour, random: "zz"), ChallengeRules.recentFromId(nowMs: now))
+        XCTAssertLessThan(ChallengeRules.newId(nowMs: now - 53 * hour, random: "zz"), ChallengeRules.recentFromId(nowMs: now))
+        XCTAssertEqual(ChallengeRules.recentFromId(nowMs: 0), "0000000000000")
+    }
+
+    func testAlertsForANewChallengeAndForAResultOnlyOnce() {
+        let sent = Challenge(id: "c", cardIds: [], createdMs: 0, from: .init(uid: "alice", name: "Alice", startedMs: 0, finishedMs: 60_000), to: .init(uid: "bob", name: "Bob"))
+        // Bob is challenged; Alice (who sent it) gets nothing yet.
+        let forBob = ChallengeAlerts.pending([sent], uid: "bob", now: hour, seen: [])
+        XCTAssertEqual(forBob.map(\.key), ["c.new"])
+        XCTAssertEqual(forBob.first?.title, "Alice vous a défié !")
+        XCTAssertEqual(forBob.first?.body, "Mêmes 5 mots, le plus rapide gagne. Plus que 47 h pour jouer.")
+        XCTAssertTrue(ChallengeAlerts.pending([sent], uid: "alice", now: hour, seen: []).isEmpty)
+        XCTAssertTrue(ChallengeAlerts.pending([sent], uid: "bob", now: hour, seen: ["c.new"]).isEmpty)
+        // Bob finished after Alice: Alice hears the result, Bob saw it on screen.
+        var done = sent
+        done.to = .init(uid: "bob", name: "Bob", startedMs: 2 * hour, finishedMs: 2 * hour + 90_000)
+        let forAlice = ChallengeAlerts.pending([done], uid: "alice", now: 3 * hour, seen: [])
+        XCTAssertEqual(forAlice.map(\.key), ["c.done"])
+        XCTAssertEqual(forAlice.first?.title, "Victoire contre Bob !")
+        XCTAssertEqual(forAlice.first?.body, "Votre chrono : 1:00 · Bob : 1:30")
+        XCTAssertTrue(ChallengeAlerts.pending([done], uid: "bob", now: 3 * hour, seen: []).isEmpty)
+        // Lost and draw titles; an expired challenge says nothing.
+        var slow = done
+        slow.to.finishedMs = 2 * hour + 30_000
+        XCTAssertEqual(ChallengeAlerts.all([slow], uid: "alice", now: 3 * hour).map(\.title), ["Défaite contre Bob"])
+        var tie = done
+        tie.to.finishedMs = 2 * hour + 60_000
+        XCTAssertEqual(ChallengeAlerts.all([tie], uid: "alice", now: 3 * hour).map(\.title), ["Égalité avec Bob"])
+        XCTAssertTrue(ChallengeAlerts.all([sent], uid: "alice", now: 49 * hour).isEmpty)
+        XCTAssertTrue(ChallengeAlerts.all([sent], uid: "bob", now: 49 * hour).isEmpty)
+        XCTAssertTrue(ChallengeAlerts.all([sent], uid: "carol", now: hour).isEmpty)
+    }
 }

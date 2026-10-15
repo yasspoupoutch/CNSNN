@@ -316,9 +316,13 @@ enum DailyGuesses {
         try await db.collection("dailyChallenges").document(day).setData(["cardId":card.id,"wordFull":card.wordFull,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"publishedBy":uid,"publishedAt":FieldValue.serverTimestamp()])
     }
 
+    /// A query, not a direct read: the rules refuse to read a session that does not exist yet
+    /// (they check its owner), so the first game of the day would be refused.
     func dailySession(uid: String, day: String) async throws -> DailySessionState? {
-        let doc = try await sessionRef(uid, day).getDocument(source: .server)
-        return doc.data().flatMap { Self.session(day: day, $0) }
+        let docs = try await db.collection("dailySessions").whereField("userId", isEqualTo: uid)
+            .whereField("day", isEqualTo: day).limit(to: 1).getDocuments(source: .server).documents
+        guard let doc = docs.first else { return nil }
+        return Self.session(day: day, doc.data())
     }
     /// Starts today's clock on the server. Only returns once the server has recorded the start,
     /// so the consonants are never shown before the official timer runs.
@@ -526,7 +530,8 @@ enum DailyGuesses {
 
     /// Sends a challenge to a friend and starts the challenger's clock on the server at once.
     func createChallenge(uid: String, username: String, friend: String, friendName: String, cardIDs: [String]) async throws -> Challenge {
-        let ref = db.collection("challenges").document()
+        let random = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
+        let ref = db.collection("challenges").document(ChallengeRules.newId(nowMs: Int(Date().timeIntervalSince1970 * 1000), random: random))
         let data: [String: Any] = ["from": uid, "fromName": username, "to": friend, "toName": friendName, "cardIds": cardIDs,
                                    "createdAt": FieldValue.serverTimestamp(), "fromStartedAt": FieldValue.serverTimestamp()]
         guard try await Self.awaitWrite({ done in ref.setData(data, completion: done) }), let challenge = try await self.challenge(id: ref.documentID) else { throw CloudError.offline }
@@ -565,6 +570,22 @@ enum DailyGuesses {
             all += docs.compactMap { Self.challenge(id: $0.documentID, $0.data()) }
         }
         return all.sorted { $0.createdMs > $1.createdMs }
+    }
+    /// The challenges of the last ~52 hours, the only ones a notification can be about. The ids start
+    /// with the time, so a cursor on the id keeps this to a few reads (no composite index needed).
+    func recentChallenges(uid: String, nowMs: Int) async throws -> [Challenge] {
+        var all: [Challenge] = []
+        for field in ["from", "to"] {
+            let docs = try await db.collection("challenges").whereField(field, isEqualTo: uid).order(by: FieldPath.documentID())
+                .start(after: [ChallengeRules.recentFromId(nowMs: nowMs)]).limit(to: 50).getDocuments(source: .server).documents
+            all += docs.compactMap { Self.challenge(id: $0.documentID, $0.data()) }
+        }
+        return all
+    }
+    /// One read: whether this player has at least one friend to be challenged by.
+    func hasFriends(uid: String) async throws -> Bool {
+        let docs = try await db.collection("users").document(uid).collection("friends").limit(to: 1).getDocuments(source: .server).documents
+        return !docs.isEmpty
     }
     nonisolated static func challenge(id: String, _ d: [String: Any]) -> Challenge? {
         guard let from = d["from"] as? String, let to = d["to"] as? String, let ids = d["cardIds"] as? [String],

@@ -94,17 +94,24 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
     LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
     LaunchedEffect(state.uid) { state.refreshChallenges() }
+    // The day on screen, moved on at midnight and whenever the app comes back (a notification tap
+    // the next morning), so yesterday's found word never stays up.
+    var today by remember { mutableStateOf(DailySchedule.key()) }
+    LaunchedEffect(today) {
+        kotlinx.coroutines.delay(maxOf(1_000L, DailySchedule.nextDay().toEpochMilli() - System.currentTimeMillis() + 1_000L))
+        today = DailySchedule.key()
+    }
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     androidx.compose.runtime.DisposableEffect(lifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) state.refreshChallengesSoon()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon() }
         }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Header(state)
-        DailyCard(state) { play(GameMode.DAILY, null, null) }
+        DailyCard(state, today) { play(GameMode.DAILY, null, null) }
         Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
@@ -137,12 +144,12 @@ private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayM
     val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
     val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
         PlayMode.entries.map { mode -> Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs) { playMode(mode) } }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Kicker("Jouer aussi", Palette.tertiary, Modifier.padding(start = 4.dp, top = 6.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Kicker("Jouer aussi", Palette.tertiary, Modifier.padding(start = 4.dp, top = 4.dp))
         ChallengeTile(state, openChallenges, playChallenge)
         val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
         tiles.chunked(columns).forEach { row ->
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { t -> ModeTile(t.icon, t.tint, t.title, t.tagline, t.detail, t.inProgress, Modifier.weight(1f).fillMaxHeight(), t.open) }
             }
         }
@@ -180,22 +187,23 @@ val PlayMode.tagline: String get() = when (this) {
 @Composable
 private fun ModeTile(icon: ImageVector, tint: Color, title: String, tagline: String, detail: String, inProgress: Boolean, modifier: Modifier, open: () -> Unit) {
     val haptics = rememberHaptics()
-    Surface({ haptics.selection(); open() }, modifier.heightIn(min = 150.dp), shape = RoundedCornerShape(26.dp), color = Palette.surface.copy(alpha = 0.82f),
+    Surface({ haptics.selection(); open() }, modifier.heightIn(min = 112.dp), shape = RoundedCornerShape(22.dp), color = Palette.surface.copy(alpha = 0.82f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Palette.border, Palette.line)))) {
-        Column(Modifier.padding(16.dp).semantics(mergeDescendants = true) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp).semantics(mergeDescendants = true) {
             contentDescription = "$title. $tagline $detail" + if (inProgress) ". Partie en cours" else ""
         }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).background(tint.copy(alpha = 0.12f), CircleShape).border(1.dp, tint.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, Modifier.size(17.dp), tint = tint)
+                Box(Modifier.size(30.dp).background(tint.copy(alpha = 0.12f), CircleShape).border(1.dp, tint.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, Modifier.size(16.dp), tint = tint)
                 }
                 Spacer(Modifier.weight(1f))
                 if (inProgress) Text("En cours", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint,
                     modifier = Modifier.background(Palette.mint.copy(alpha = 0.12f), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 3.dp))
             }
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
-            Text(tagline, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 3.dp))
-            Spacer(Modifier.weight(1f).heightIn(min = 12.dp))
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text(tagline, fontSize = 12.sp, lineHeight = 16.sp, color = Palette.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp))
+            Spacer(Modifier.weight(1f).heightIn(min = 8.dp))
             Text(detail, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Palette.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -227,13 +235,12 @@ private fun Header(state: AppViewModel) {
 }
 
 @Composable
-private fun DailyCard(state: AppViewModel, play: () -> Unit) {
-    val today = DailySchedule.key()
+private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
     val attempt = state.progress.attempts.firstOrNull { it.dailyKey == today }
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }
     // Compact, so the challenge and the modes stay on screen.
-    SectionCard(radius = 32.dp, padding = 20.dp) {
+    SectionCard(radius = 28.dp, padding = 18.dp) {
         if (attempt != null) {
             val card = state.card(attempt.cardID)
             val context = LocalContext.current

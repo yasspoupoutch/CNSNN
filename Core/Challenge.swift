@@ -24,6 +24,16 @@ public enum ChallengeRules {
         return used
     }
 
+    /// Document ids start with the sending phone's clock (13 digits, then a random part), so the
+    /// background check can ask for the latest challenges with a cursor on the id: no composite index.
+    public static func newId(nowMs: Int, random: String) -> String { padded(max(0, nowMs)) + "-" + random }
+    /// Ids above this one cover the challenges still open, with 2 h of slack for a wrong phone clock.
+    public static func recentFromId(nowMs: Int) -> String { padded(max(0, nowMs - finishWindowMs - 2 * 3_600_000)) }
+    private static func padded(_ ms: Int) -> String {
+        let digits = String(ms)
+        return String(repeating: "0", count: max(0, 13 - digits.count)) + digits
+    }
+
     public static func cards(_ ids: [String]) -> [Card]? {
         let found = ids.compactMap { id in ModeCatalogue.cards.first { $0.id == id } }
         return found.count == ids.count && found.count == words ? found : nil
@@ -175,5 +185,42 @@ public enum ChallengeFormat {
     public static func left(_ ms: Int) -> String {
         let minutes = max(0, ms) / 60_000
         return minutes >= 60 ? "\(minutes / 60) h" : "\(max(1, minutes)) min"
+    }
+}
+
+/// The notifications a background check shows: a friend's new challenge, and the result once the
+/// friend finished after you. Each one has a key, remembered so it is shown only once.
+public enum ChallengeAlerts {
+    public struct Alert: Equatable, Sendable {
+        public let key: String
+        public let challengeID: String
+        public let title: String
+        public let body: String
+    }
+
+    public static func all(_ challenges: [Challenge], uid: String, now: Int) -> [Alert] {
+        challenges.compactMap { alert($0, uid: uid, now: now) }
+    }
+    public static func pending(_ challenges: [Challenge], uid: String, now: Int, seen: Set<String>) -> [Alert] {
+        all(challenges, uid: uid, now: now).filter { !seen.contains($0.key) }
+    }
+
+    private static func alert(_ c: Challenge, uid: String, now: Int) -> Alert? {
+        guard c.involves(uid) else { return nil }
+        let mine = c.mine(uid), theirs = c.theirs(uid)
+        if c.state(for: uid, now: now) == .yourTurn && c.to.uid == uid {
+            return Alert(key: c.id + ".new", challengeID: c.id, title: "\(theirs.name) vous a défié !",
+                         body: "Mêmes 5 mots, le plus rapide gagne. Plus que \(ChallengeFormat.left(c.startDeadlineMs() - now)) pour jouer.")
+        }
+        guard let result = c.result(for: uid, now: now), result != .expired,
+              let mineAt = mine.finishedMs, let theirsAt = theirs.finishedMs, theirsAt > mineAt else { return nil }
+        let title: String
+        switch result {
+        case .won: title = "Victoire contre \(theirs.name) !"
+        case .lost: title = "Défaite contre \(theirs.name)"
+        default: title = "Égalité avec \(theirs.name)"
+        }
+        let body = "Votre chrono : \(ChallengeFormat.time(mine.scoreMs ?? 0)) · \(theirs.name) : \(ChallengeFormat.time(theirs.scoreMs ?? 0))"
+        return Alert(key: c.id + ".done", challengeID: c.id, title: title, body: body)
     }
 }

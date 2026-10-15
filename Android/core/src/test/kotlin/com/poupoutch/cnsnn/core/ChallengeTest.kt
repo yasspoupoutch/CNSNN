@@ -87,4 +87,40 @@ class ChallengeTest {
         assertEquals("31 h", ChallengeFormat.left(31 * hour + 5))
         assertEquals("45 min", ChallengeFormat.left(45 * 60_000L))
     }
+
+    @Test fun idsStartWithTheTimeSoTheLatestComeAfterACursor() {
+        assertEquals("0000000001234-abc", ChallengeRules.newId(1234, "abc"))
+        val now = 1_760_000_000_000L
+        assertEquals("1760000000000-x", ChallengeRules.newId(now, "x"))
+        assertEquals((now - 52 * hour).toString(), ChallengeRules.recentFromId(now))
+        assertTrue(ChallengeRules.newId(now - 51 * hour, "zz") > ChallengeRules.recentFromId(now))
+        assertTrue(ChallengeRules.newId(now - 53 * hour, "zz") < ChallengeRules.recentFromId(now))
+        assertEquals("0000000000000", ChallengeRules.recentFromId(0))
+    }
+
+    @Test fun alertsForANewChallengeAndForAResultOnlyOnce() {
+        val sent = Challenge("c", emptyList(), 0, Challenge.Side("alice", "Alice", startedMs = 0, finishedMs = 60_000), Challenge.Side("bob", "Bob"))
+        // Bob is challenged; Alice (who sent it) gets nothing yet.
+        val forBob = ChallengeAlerts.pending(listOf(sent), "bob", hour, emptySet())
+        assertEquals(listOf("c.new"), forBob.map { it.key })
+        assertEquals("Alice vous a défié !", forBob[0].title)
+        assertEquals("Mêmes 5 mots, le plus rapide gagne. Plus que 47 h pour jouer.", forBob[0].body)
+        assertTrue(ChallengeAlerts.pending(listOf(sent), "alice", hour, emptySet()).isEmpty())
+        assertTrue(ChallengeAlerts.pending(listOf(sent), "bob", hour, setOf("c.new")).isEmpty())
+        // Bob finished after Alice: Alice hears the result, Bob saw it on screen.
+        val done = sent.copy(to = Challenge.Side("bob", "Bob", startedMs = 2 * hour, finishedMs = 2 * hour + 90_000))
+        val forAlice = ChallengeAlerts.pending(listOf(done), "alice", 3 * hour, emptySet())
+        assertEquals(listOf("c.done"), forAlice.map { it.key })
+        assertEquals("Victoire contre Bob !", forAlice[0].title)
+        assertEquals("Votre chrono : 1:00 · Bob : 1:30", forAlice[0].body)
+        assertTrue(ChallengeAlerts.pending(listOf(done), "bob", 3 * hour, emptySet()).isEmpty())
+        // Lost and draw titles; an expired challenge says nothing.
+        val slow = done.copy(to = Challenge.Side("bob", "Bob", startedMs = 2 * hour, finishedMs = 2 * hour + 30_000))
+        assertEquals("Défaite contre Bob", ChallengeAlerts.all(listOf(slow), "alice", 3 * hour).single().title)
+        val tie = done.copy(to = Challenge.Side("bob", "Bob", startedMs = 2 * hour, finishedMs = 2 * hour + 60_000))
+        assertEquals("Égalité avec Bob", ChallengeAlerts.all(listOf(tie), "alice", 3 * hour).single().title)
+        assertTrue(ChallengeAlerts.all(listOf(sent), "alice", 49 * hour).isEmpty())
+        assertTrue(ChallengeAlerts.all(listOf(sent), "bob", 49 * hour).isEmpty())
+        assertTrue(ChallengeAlerts.all(listOf(sent), "carol", hour).isEmpty())
+    }
 }

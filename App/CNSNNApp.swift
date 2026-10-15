@@ -19,6 +19,9 @@ import SwiftUI
             // A new day may have started: refresh the widget and the next reminders.
             // Another device may have saved games meanwhile: merge them in.
             if phase == .active { state.refreshGlance(force: true); Task { await state.syncProgress() } }
+            if phase == .background { ChallengeWatch.schedule() }
         }
+        // Friend challenges: a short check when iOS grants a background refresh (see ChallengeWatch).
+        .backgroundTask(.appRefresh(ChallengeWatch.identifier)) { await ChallengeWatch.run() }
     }
 }

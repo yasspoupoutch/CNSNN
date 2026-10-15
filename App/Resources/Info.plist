@@ -15,4 +15,6 @@
 <key>UIAppFonts</key><array><string>InstrumentSerif-Regular.ttf</string><string>InstrumentSerif-Italic.ttf</string><string>Fraunces-Black.ttf</string></array>
 <key>UIUserInterfaceStyle</key><string>Dark</string>
 <key>ITSAppUsesNonExemptEncryption</key><false/>
+<key>UIBackgroundModes</key><array><string>fetch</string></array>
+<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>cnsnn.challenges</string></array>
 </dict></plist>

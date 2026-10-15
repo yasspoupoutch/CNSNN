@@ -15,7 +15,9 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     var play: (GameRoute) -> Void
 
-    private var todayKey: String { DailySchedule.key() }
+    /// The day on screen, moved on at midnight and whenever the app comes back (a notification tap
+    /// the next morning), so yesterday's found word never stays up.
+    @State private var todayKey = DailySchedule.key()
     private var todayAttempt: Attempt? { state.progress.attempts.first { $0.dailyKey == todayKey } }
     /// Only reveal the consonants once the daily card is locked, so the clock is already running.
     private var startedDailyCard: Card? {
@@ -55,7 +57,19 @@ struct HomeView: View {
             Task { try? await Task.sleep(for: .seconds(0.7)); showChallenges = true }
         }
         .task(id: state.uid) { await state.refreshChallenges() }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await state.refreshChallenges() } } }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            todayKey = DailySchedule.key()
+            Task { await state.refreshChallenges() }
+        }
+        .task(id: todayKey) {
+            // Wakes up just after midnight to show the new word, then waits for the next day.
+            let calendar = DailySchedule.calendar
+            let now = Date()
+            let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+            try? await Task.sleep(for: .seconds(max(1, midnight.timeIntervalSince(now) + 1)))
+            if !Task.isCancelled { todayKey = DailySchedule.key() }
+        }
     }
 
     private var header: some View {

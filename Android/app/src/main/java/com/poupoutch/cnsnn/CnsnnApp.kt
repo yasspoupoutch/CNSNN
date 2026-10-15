@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.poupoutch.cnsnn.reminders.ChallengeWatch
 import com.poupoutch.cnsnn.reminders.Reminders
 
 class CnsnnApp : Application() {
@@ -13,6 +14,7 @@ class CnsnnApp : Application() {
         val host = BuildConfig.EMULATOR_HOST
         if (host.isNotEmpty()) Cloud.useEmulators(this, host)
         Reminders.createChannel(this)
+        ChallengeWatch.createChannel(this)
     }
 }
 

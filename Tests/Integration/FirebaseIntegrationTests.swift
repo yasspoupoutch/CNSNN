@@ -88,6 +88,9 @@ import CNSNNCore
         // Before playing, neither the hint nor the word can be read.
         await assertThrows { _ = try await self.repo.dailySecret(day: day) }
         await assertThrows { _ = try await self.repo.dailyHint(day: day) }
+        // The game asks for today's session first: a brand-new player gets "none", not a refusal.
+        let none = try await repo.dailySession(uid: alice.uid, day: day)
+        XCTAssertNil(none)
         _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: puzzle.id)
         let hint = try await repo.revealSecretHint(uid: alice.uid, day: day)
         XCTAssertEqual(hint, "Un carré gourmand.")
@@ -163,6 +166,12 @@ import CNSNNCore
         let sent = try await repo.challenges(uid: bob.uid)
         XCTAssertEqual(sent.map(\.id), [challenge.id])
         XCTAssertEqual(sent.first?.state(for: bob.uid, now: now()), .waiting)
+        // Ids start with the time: the background check finds it with a cursor, and only while it is recent.
+        XCTAssertTrue(challenge.id.prefix(13).allSatisfy(\.isNumber))
+        let recentForBob = try await repo.recentChallenges(uid: bob.uid, nowMs: now())
+        XCTAssertEqual(recentForBob.map(\.id), [challenge.id])
+        let later = try await repo.recentChallenges(uid: bob.uid, nowMs: now() + 60 * 3_600_000)
+        XCTAssertTrue(later.isEmpty)
 
         // Alice sees it, starts her clock (and gets Bob as a friend), then finds 2 words and skips 3.
         try repo.signOut()
@@ -171,6 +180,13 @@ import CNSNNCore
         let received = try XCTUnwrap(inbox.first)
         XCTAssertEqual(received.state(for: alice.uid, now: now()), .yourTurn)
         XCTAssertEqual(received.from.name, "Bob")
+        // What Alice's phone would notify in the background: Bob's challenge, once (a few reads, quick).
+        let clock = Date()
+        let recent = try await repo.recentChallenges(uid: alice.uid, nowMs: now())
+        XCTAssertLessThan(Date().timeIntervalSince(clock), 3)
+        let alerts = ChallengeAlerts.pending(recent, uid: alice.uid, now: now(), seen: [])
+        XCTAssertEqual(alerts.map(\.key), [challenge.id + ".new"])
+        XCTAssertEqual(alerts.first?.title, "Bob vous a défié !")
         let started = try await repo.startChallenge(received, uid: alice.uid)
         XCTAssertNotNil(started.to.startedMs)
         let friends = try await repo.friends(uid: alice.uid)
@@ -396,8 +412,12 @@ import CNSNNCore
         if let body { request.httpBody = Data(body.utf8); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         // The emulators can be slow to answer their first request on a busy CI runner: retry a timeout.
         var response: URLResponse?
+        // A 499 means the emulator dropped the request while busy: it is retried the same way.
         for attempt in 0..<3 where response == nil {
-            do { response = try await URLSession.shared.data(for: request).1 }
+            do {
+                response = try await URLSession.shared.data(for: request).1
+                if (response as? HTTPURLResponse)?.statusCode == 499, attempt < 2 { response = nil }
+            }
             catch let error as URLError where error.code == .timedOut && attempt < 2 { continue }
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0

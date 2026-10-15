@@ -32,6 +32,7 @@ import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.CloudProfile
 import com.poupoutch.cnsnn.data.CloudRepository
 import com.poupoutch.cnsnn.data.LocalStore
+import com.poupoutch.cnsnn.reminders.ChallengeWatch
 import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.widget.DailyWidget
 import kotlinx.coroutines.Job
@@ -224,6 +225,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun resetToGuest() {
         uid = null; isAnonymous = true; email = null; isAdmin = false; isSuspended = false; official = null; challenges = emptyList()
+        ChallengeWatch.setActive(getApplication(), false)
         progress = Progress(); cards = SeedCards.all + ExtraCards.all
         local.clearRuns()
         scope = null; local.activeScope = null; persist()
@@ -374,7 +376,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshChallengesSoon() { viewModelScope.launch { refreshChallenges() } }
     suspend fun refreshChallenges() {
         val user = uid ?: return
-        runCatching { cloud.challenges(user) }.getOrNull()?.let { if (uid == user) challenges = it }
+        val list = runCatching { cloud.challenges(user) }.getOrNull() ?: return
+        if (uid != user) return
+        challenges = list
+        ChallengeWatch.markSeen(getApplication(), list, user)
+        // Background checks only for players someone can challenge.
+        val active = list.isNotEmpty() || runCatching { cloud.hasFriends(user) }.getOrDefault(local.challengeWatch)
+        ChallengeWatch.setActive(getApplication(), active)
     }
     /**
      * The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
@@ -401,6 +409,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ids = ChallengeRules.draw(ModeRandom.seed(), progress.recentCards)
         val challenge = cloud.createChallenge(user, progress.username, friend, name, ids)
         challenges = listOf(challenge) + challenges
+        ChallengeWatch.setActive(getApplication(), true)
         return challenge
     }
     /** Starts (or resumes) my side of a challenge: the friend's clock starts on the server here. */
@@ -408,6 +417,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
         val fresh = if (challenge.to.uid == user) cloud.startChallenge(challenge, user) else challenge
         replace(fresh)
+        ChallengeWatch.setActive(getApplication(), true)
         return fresh
     }
     /** Stamps my finish on the server, then reads back the official times. */
