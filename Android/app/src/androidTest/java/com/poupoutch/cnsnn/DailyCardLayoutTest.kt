@@ -27,8 +27,9 @@ class DailyCardLayoutTest {
         return results.first()
     }
 
-    /** The text drawn wider than the space it was given (on one line, so cut on the right). */
-    private fun overflowsWidth(layout: TextLayoutResult) = layout.multiParagraph.width > layout.size.width + 0.5f
+    /** The line drawn wider than the space it was given, so cut on the right. Measured on the line itself:
+     *  without soft wrap the paragraph is laid out on an unbounded width, so its own width says nothing. */
+    private fun overflowsWidth(layout: TextLayoutResult) = layout.getLineRight(0) > layout.size.width + 0.5f
 
     private fun check(word: String, width: Int) {
         rule.setContent { Box(Modifier.width(width.dp)) { DailyFoundTitle(word, correct = true) } }
