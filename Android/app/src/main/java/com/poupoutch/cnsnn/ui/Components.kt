@@ -148,7 +148,8 @@ fun colorIndex(id: String): Int = id.sumOf { it.code }
 /** Main surface of a section: a softly lit card. */
 @Composable
 fun SectionCard(modifier: Modifier = Modifier, padding: Dp = 20.dp, radius: Dp = 28.dp, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(radius), color = Palette.surface.copy(alpha = 0.82f),
+    // A translucent card matches no theme color, so its text would fall back to black: set it.
+    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(radius), color = Palette.surface.copy(alpha = 0.82f), contentColor = Palette.foreground,
         border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Palette.border, Palette.line)))) {
         Column(Modifier.padding(padding), content = content)
     }
