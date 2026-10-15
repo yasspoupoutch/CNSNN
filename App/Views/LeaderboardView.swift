@@ -201,59 +201,18 @@ struct FriendsBoard: View {
     @Environment(AppState.self) private var state
     var refreshToken = 0
     @State private var seenToken = 0
-    private var code: String? { state.rankings.friendCode }
     private var rows: [FriendStanding] { state.rankings.friends }
-    @State private var friendCode = ""
     @State private var loading = false
-    @State private var busy = false
     @State private var message: String?
     @State private var failed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            codeCard
-            addCard
+            FriendCodeCards { Task { await refresh(force: true) } }
+            if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
             board
         }
         .task(id: (state.uid ?? "") + "-" + String(refreshToken)) { await refresh() }
-    }
-
-    private var codeCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Votre code ami").scaledFont(13).foregroundStyle(Palette.secondary)
-                Text(code ?? "······").scaledFont(26, .bold).monospaced().tracking(3)
-                    .textSelection(.enabled)
-            }
-            Spacer(minLength: 8)
-            if let code {
-                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.home.absoluteString) {
-                    Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
-                }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var addCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                TextField("Code d’un ami", text: $friendCode)
-                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                    .scaledFont(17, .semibold).monospaced()
-                    .padding(.horizontal, 14).frame(minHeight: 48)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Palette.fill1))
-                    .onChange(of: friendCode) { _, value in
-                        let clean = FirebaseRepository.normalizedFriendCode(value)
-                        if clean != value { friendCode = clean }
-                    }
-                    .submitLabel(.done).onSubmit(add)
-                Button("Ajouter", action: add).buttonStyle(PrimaryPillStyle(height: 48)).frame(width: 112)
-                    .disabled(friendCode.count != 6 || busy)
-            }
-            if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary) }
-        }.glassPanel(radius: 24, padding: 14)
     }
 
     @ViewBuilder private var board: some View {
@@ -315,37 +274,110 @@ struct FriendsBoard: View {
         let force = force || refreshToken != seenToken
         seenToken = refreshToken
         let key = "friends-" + DailySchedule.key()
-        guard state.rankingIsStale(key, force: force) else { return }
+        // A friend who typed my code since the last read: one count, then the list at once.
+        if !state.rankingIsStale(key, force: force) {
+            guard let count = try? await cloud.friendCount(uid: uid), count != state.rankings.friendCount else { return }
+        }
         loading = true; failed = false
         defer { loading = false }
         let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
         do {
-            if code == nil { state.rankings.friendCode = try await cloud.friendCode(uid: uid, username: name) }
             state.rankings.friends = try await cloud.friendsBoard(uid: uid, username: name, day: DailySchedule.key())
+            state.rankings.friendCount = try? await cloud.friendCount(uid: uid)
             state.rankings.readAt[key] = Date()
             await state.refreshChallenges(force: force)
         } catch { failed = true }
     }
-    private func add() {
-        guard let cloud = state.cloud, let uid = state.uid, friendCode.count == 6, !busy else { return }
-        busy = true; message = nil
-        Task {
-            defer { busy = false }
-            do {
-                let name = try await cloud.addFriend(code: friendCode, uid: uid)
-                friendCode = ""; message = name + " fait partie de vos amis."
-                ChallengeWatch.setActive(true)
-                Haptics.success()
-                state.rankings.readAt = [:]
-                await refresh(force: true)
-            } catch { message = CloudError.message(error); Haptics.retry() }
-        }
-    }
     private func remove(_ row: FriendStanding) {
         guard let cloud = state.cloud, let uid = state.uid else { return }
         Task {
-            do { try await cloud.removeFriend(uid: uid, friend: row.uid); state.rankings.friends.removeAll { $0.uid == row.uid } }
+            do {
+                try await cloud.removeFriend(uid: uid, friend: row.uid)
+                state.rankings.friends.removeAll { $0.uid == row.uid }
+                state.rankings.friendCount = state.rankings.friendCount.map { $0 - 1 }
+            }
             catch { message = CloudError.message(error) }
+        }
+    }
+}
+
+/// The player's friend code to share, and the field to type a friend's: in Stats > Amis and in Profil.
+struct FriendCodeCards: View {
+    @Environment(AppState.self) private var state
+    /// After a friend was added (the friends ranking is already marked to read again).
+    var added: () -> Void = {}
+    private var code: String? { state.rankings.friendCode }
+    @State private var friendCode = ""
+    @State private var busy = false
+    @State private var message: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            codeCard
+            addCard
+        }
+        .task(id: state.uid) { await loadCode() }
+    }
+
+    private var codeCard: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Votre code ami").scaledFont(13).foregroundStyle(Palette.secondary)
+                Text(code ?? "······").scaledFont(26, .bold).monospaced().tracking(3)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 8)
+            if let code {
+                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.home.absoluteString) {
+                    Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
+                }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var addCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                TextField("Code d’un ami", text: $friendCode)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled().focused($focused)
+                    .scaledFont(17, .semibold).monospaced()
+                    .padding(.horizontal, 14).frame(minHeight: 48)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Palette.fill1))
+                    .onChange(of: friendCode) { _, value in
+                        let clean = FirebaseRepository.normalizedFriendCode(value)
+                        if clean != value { friendCode = clean }
+                    }
+                    .submitLabel(.done).onSubmit(add)
+                Button("Ajouter", action: add).buttonStyle(PrimaryPillStyle(height: 48)).frame(width: 112)
+                    .disabled(friendCode.count != 6 || busy)
+            }
+            if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true) }
+        }.glassPanel(radius: 24, padding: 14)
+    }
+
+    /// One read the first time (the code is kept with the rankings), one write if the player has none yet.
+    private func loadCode() async {
+        guard code == nil, let cloud = state.cloud, let uid = state.uid else { return }
+        let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
+        state.rankings.friendCode = try? await cloud.friendCode(uid: uid, username: name)
+    }
+    private func add() {
+        guard let cloud = state.cloud, let uid = state.uid, friendCode.count == 6, !busy else { return }
+        busy = true; message = nil; focused = false
+        Task {
+            defer { busy = false }
+            do {
+                let me = state.progress.username.isEmpty ? "Joueur" : state.progress.username
+                let name = try await cloud.addFriend(code: friendCode, uid: uid, username: me)
+                friendCode = ""; message = name + " fait partie de vos amis."
+                ChallengeWatch.setActive(true)
+                Haptics.success()
+                state.forgetFriendsRanking()
+                added()
+            } catch { message = CloudError.message(error); Haptics.retry() }
         }
     }
 }

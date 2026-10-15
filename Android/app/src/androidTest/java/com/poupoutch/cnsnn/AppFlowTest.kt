@@ -2,6 +2,7 @@ package com.poupoutch.cnsnn
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -52,5 +53,11 @@ class AppFlowTest {
         rule.onNodeWithText("Mot suivant").assertIsDisplayed()
         rule.onNodeWithText("Retour à l’accueil").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("1 mots trouvés")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("0 mots trouvés")).fetchSemanticsNodes().isNotEmpty() }
+        // Profil > Ajouter un ami: the player's own code shows up, ready to share, with the field for a friend's.
+        rule.onNodeWithText("Profil").performClick()
+        rule.onNodeWithText("Ajouter un ami").performScrollTo().performClick()
+        rule.onNodeWithText("Votre code ami").assertIsDisplayed()
+        rule.onNodeWithText("Code d’un ami").assertIsDisplayed()
+        rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Partager mon code")).fetchSemanticsNodes().isNotEmpty() }
     }
 }

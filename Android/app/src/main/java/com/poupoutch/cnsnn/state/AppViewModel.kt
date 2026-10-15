@@ -417,6 +417,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val myRank: Pair<Int, Int>? = null,
         val friends: List<com.poupoutch.cnsnn.core.FriendStanding> = emptyList(),
         val friendCode: String? = null,
+        /** Friends in the list when it was last read, to notice one who typed my code since. */
+        val friendCount: Int? = null,
         val readAt: Map<String, Long> = emptyMap(),
     )
     var rankings by mutableStateOf(Rankings())
