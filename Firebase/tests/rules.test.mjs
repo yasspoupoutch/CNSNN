@@ -305,6 +305,31 @@ test('friends list is private to its owner',async()=>{
  await assertSucceeds(deleteDoc(doc(user('alice'),'users/alice/friends/bob')));
 });
 
+test('friends: typing a code adds both players, only with that code',async()=>{
+ await signUp(); await signUp('bob','Bob'); await signUp('carol','Carol');
+ await seed('friendCodes/ABC2Z9',{uid:'alice',username:'Alice',createdAt:new Date()});
+ await seed('friendCodes/CAR234',{uid:'carol',username:'Carol',createdAt:new Date()});
+ const bob=user('bob'),back={username:'Bob',addedAt:serverTimestamp(),code:'ABC2Z9'};
+ // Bob must have added Alice first.
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),back));
+ await assertSucceeds(setDoc(doc(bob,'users/bob/friends/alice'),{username:'Alice',addedAt:serverTimestamp()}));
+ // Another player's code, a missing code, someone else's place or extra fields: refused.
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),{...back,code:'CAR234'}));
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),{...back,code:'ZZZZZZ'}));
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));
+ await assertFails(setDoc(doc(bob,'users/alice/friends/carol'),back));
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),{...back,extra:1}));
+ await assertSucceeds(setDoc(doc(bob,'users/alice/friends/bob'),back));
+ // Bob still cannot read Alice's list; Alice sees him and may remove him.
+ await assertFails(getDoc(doc(bob,'users/alice/friends/bob')));
+ const list=await assertSucceeds(getDocs(collection(user('alice'),'users/alice/friends')));
+ assert.deepEqual(list.docs.map(d=>d.id),['bob']);
+ await assertSucceeds(deleteDoc(doc(user('alice'),'users/alice/friends/bob')));
+ // A suspended player cannot.
+ await seed('banned/bob',{username:'Bob',reason:'x',bannedAt:new Date(),bannedBy:'admin'});
+ await assertFails(setDoc(doc(bob,'users/alice/friends/bob'),back));
+});
+
 // ---------- Cards and moderation
 
 async function propose(uid='alice',id='CHOCOLAT',data=card('pending',uid),quota){

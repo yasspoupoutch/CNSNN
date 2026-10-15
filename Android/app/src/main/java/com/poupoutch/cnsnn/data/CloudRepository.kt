@@ -356,8 +356,11 @@ class CloudRepository(
         }
         throw CloudError(CloudError.Kind.OFFLINE)
     }
-    /** Adds the owner of a friend code to the player's friends. Returns the friend's pseudo. */
-    suspend fun addFriend(code: String, uid: String): String {
+    /**
+     * Adds the owner of a friend code to the player's friends, and the player to theirs, so both
+     * see each other at once. Returns the friend's pseudo.
+     */
+    suspend fun addFriendByCode(code: String, uid: String, username: String): String {
         val clean = FriendCode.normalize(code)
         if (clean.length != 6) throw CloudError(CloudError.Kind.FRIEND_NOT_FOUND)
         val doc = db.collection("friendCodes").document(clean).get(Source.SERVER).await()
@@ -367,8 +370,15 @@ class CloudRepository(
         val saved = awaitWrite(db.collection("users").document(uid).collection("friends").document(friend)
             .set(mapOf("username" to name, "addedAt" to FieldValue.serverTimestamp())))
         if (!saved) throw CloudError(CloudError.Kind.OFFLINE)
+        // Their side: the code proves they gave it (see firestore.rules). Best effort, theirs is a bonus.
+        runCatching {
+            awaitWrite(db.collection("users").document(friend).collection("friends").document(uid)
+                .set(mapOf("username" to username, "addedAt" to FieldValue.serverTimestamp(), "code" to clean)))
+        }
         return name
     }
+    /** One read: how many friends the player has, to notice one added from their phone. */
+    suspend fun friendCount(uid: String): Int = count(db.collection("users").document(uid).collection("friends"))
     suspend fun removeFriend(uid: String, friend: String) {
         db.collection("users").document(uid).collection("friends").document(friend).delete().await()
     }

@@ -125,18 +125,27 @@ class CloudRepositoryTest {
     }
 
     @Test fun friendsCodeAndBoard() = runBlocking<Unit> {
-        val alice = repo.bootstrap("Alice")
+        repo.bootstrap("Alice")
+        val alice = repo.createPermanentAccount("friends.alice@example.com", "motdepasse")
         val code = repo.friendCode(alice.uid, "Alice")
         assertEquals(6, code.length)
         assertEquals(code, repo.friendCode(alice.uid, "Alice"))
         auth.signOut()
         val bob = repo.bootstrap("Bob")
-        try { repo.addFriend("ZZZZZZ", bob.uid); fail() } catch (e: CloudError) { assertEquals(CloudError.Kind.FRIEND_NOT_FOUND, e.kind) }
-        assertEquals("Alice", repo.addFriend(code.lowercase(), bob.uid))
+        try { repo.addFriendByCode("ZZZZZZ", bob.uid, "Bob"); fail() } catch (e: CloudError) { assertEquals(CloudError.Kind.FRIEND_NOT_FOUND, e.kind) }
+        assertEquals("Alice", repo.addFriendByCode(code.lowercase(), bob.uid, "Bob"))
         val board = repo.friendsBoard(bob.uid, "Bob", DailySchedule.key())
         assertEquals(setOf("Alice", "Bob"), board.map { it.username }.toSet())
+        assertEquals(1, repo.friendCount(bob.uid))
         repo.removeFriend(bob.uid, alice.uid)
         assertEquals(1, repo.friendsBoard(bob.uid, "Bob", DailySchedule.key()).size)
+        assertEquals(0, repo.friendCount(bob.uid))
+        // Alice has Bob at once too, without typing his code.
+        auth.signOut()
+        repo.signIn("friends.alice@example.com", "motdepasse")
+        assertEquals(1, repo.friendCount(alice.uid))
+        assertEquals(listOf("Bob"), repo.friends(alice.uid).map { it.second })
+        assertEquals(setOf("Alice", "Bob"), repo.friendsBoard(alice.uid, "Alice", DailySchedule.key()).map { it.username }.toSet())
     }
 
     /** A friend challenge from end to end, on the same documents as the iPhone app. */
@@ -151,7 +160,7 @@ class CloudRepositoryTest {
         val ids = ChallengeRules.draw(42uL)
         // Only a friend can be challenged.
         expectDenied { repo.createChallenge(bob.uid, "Bob", alice.uid, "Alice", ids) }
-        repo.addFriend(aliceCode, bob.uid)
+        repo.addFriendByCode(aliceCode, bob.uid, "Bob")
         val challenge = repo.createChallenge(bob.uid, "Bob", alice.uid, "Alice", ids)
         assertEquals(ids, challenge.cardIds)
         assertTrue(challenge.from.startedMs != null && challenge.to.startedMs == null)

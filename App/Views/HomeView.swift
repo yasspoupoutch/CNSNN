@@ -137,32 +137,33 @@ struct HomeView: View {
         }
     }
 
+    /// Three rows so nothing sets the card wider than the screen: the kicker, the word on the whole
+    /// width (shrunk if long), then the time and countdown beside Classement and Partager.
     @ViewBuilder private func dailyDone(_ attempt: Attempt) -> some View {
         let card = state.card(id: attempt.cardID)
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                if attempt.correct { dailyKicker(done: true) } else {
-                    SectionKicker(text: "Mot du jour", color: Palette.foreground).fixedSize()
-                }
-                HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: Typo.serif(40)).tracking(1)
-                Text(attempt.correct ? "\(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois")
-                    .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.8)
+        VStack(alignment: .leading, spacing: 4) {
+            if attempt.correct { dailyKicker(done: true) } else {
+                SectionKicker(text: "Mot du jour", color: Palette.foreground).fixedSize()
             }
-            Spacer(minLength: 4)
-            VStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Button("Classement") { Haptics.selection(); state.leaderboardRequest += 1 }
-                        .buttonStyle(GlassPillStyle(height: 40)).frame(width: 118)
-                    ShareResultLink(attempt: attempt, card: card, mode: .daily) {
-                        Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.foreground)
-                            .frame(width: 40, height: 40).glassCapsule()
-                    }.buttonStyle(PressStyle()).accessibilityLabel("Partager")
+            HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: Typo.serif(40)).tracking(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attempt.correct ? "\(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois")
+                        .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text("Prochain mot dans " + countdown(from: context.date))
+                            .scaledFont(12).monospacedDigit().foregroundStyle(Palette.tertiary).lineLimit(2).minimumScaleFactor(0.8)
+                    }
                 }
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("Prochain mot\ndans " + countdown(from: context.date))
-                        .scaledFont(12).monospacedDigit().foregroundStyle(Palette.tertiary).multilineTextAlignment(.center)
-                }
-            }
+                Spacer(minLength: 0)
+                Button("Classement") { Haptics.selection(); state.leaderboardRequest += 1 }
+                    .buttonStyle(GlassPillStyle(height: 40)).frame(width: 118)
+                ShareResultLink(attempt: attempt, card: card, mode: .daily) {
+                    Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.foreground)
+                        .frame(width: 40, height: 40).glassCapsule()
+                }.buttonStyle(PressStyle()).accessibilityLabel("Partager")
+            }.padding(.top, 6)
         }
     }
 

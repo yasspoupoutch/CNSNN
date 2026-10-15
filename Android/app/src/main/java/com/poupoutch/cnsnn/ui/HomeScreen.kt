@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -245,26 +247,18 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
         if (attempt != null) {
             val card = state.card(attempt.cardID)
             val context = LocalContext.current
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Three rows: the kicker, the word on the whole width (smaller if long), then the time and
+            // the countdown beside Classement and Partager, so nothing gets squeezed into a column.
+            DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Kicker("Mot du jour", Palette.foreground)
-                        if (attempt.correct) Text("✓ trouvé", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint, modifier = Modifier.padding(start = 8.dp))
-                    }
-                    Text(highlighted((card?.wordFull ?: "").uppercase()), style = Type.serif(40), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
-                        modifier = Modifier.padding(top = 4.dp))
                     Text(if (attempt.correct) "${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "Raté cette fois",
-                        fontSize = 13.sp, color = Palette.secondary, maxLines = 1)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FilledTonalButton({ state.leaderboardRequest++ }, Modifier.height(40.dp), shape = RoundedCornerShape(20.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) { Text("Classement", fontWeight = FontWeight.SemiBold) }
-                        androidx.compose.material3.IconButton({ Share.result(context, attempt, card, GameMode.DAILY) }) { Icon(Icons.Filled.Share, "Partager") }
-                    }
-                    Text("Prochain mot", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
+                        fontSize = 13.sp, color = Palette.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Countdown()
                 }
+                FilledTonalButton({ state.leaderboardRequest++ }, Modifier.height(40.dp), shape = RoundedCornerShape(20.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) { Text("Classement", fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false) }
+                androidx.compose.material3.IconButton({ Share.result(context, attempt, card, GameMode.DAILY) }) { Icon(Icons.Filled.Share, "Partager") }
             }
         } else {
             val consonants = started?.wordNoVowels
@@ -291,12 +285,30 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
     }
 }
 
+/** The kicker with "✓ trouvé", then the word on the card's whole width. */
+@Composable
+internal fun DailyFoundTitle(word: String, correct: Boolean) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Kicker("Mot du jour", Palette.foreground)
+            if (correct) Text("✓ trouvé", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint, maxLines = 1, softWrap = false,
+                modifier = Modifier.padding(start = 8.dp).testTag("dailyFound"))
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            // About 0.68 em per serif capital (a margin): shrink so the whole word fits, never under 22 sp.
+            val size = with(LocalDensity.current) { (maxWidth.toPx() / (maxOf(word.length, 1) * 0.68f)).toSp().value }.coerceIn(22f, 40f)
+            Text(highlighted(word), style = Type.serif(40).copy(fontSize = size.sp, lineHeight = (size * 1.1f).sp), maxLines = 1, softWrap = false,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("dailyWord"))
+        }
+    }
+}
+
 @Composable
 private fun Countdown() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
     val seconds = Duration.between(Instant.ofEpochMilli(now), DailySchedule.nextDay(Instant.ofEpochMilli(now))).seconds
-    Text(Format.countdown(seconds), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Palette.secondary)
+    Text("Prochain mot dans " + Format.countdown(seconds), fontSize = 12.sp, color = Palette.tertiary, maxLines = 2)
 }
 
 @Composable

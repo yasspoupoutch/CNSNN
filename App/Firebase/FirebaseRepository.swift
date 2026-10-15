@@ -484,8 +484,9 @@ enum DailyGuesses {
         }
         throw CloudError.offline
     }
-    /// Adds the owner of a friend code to the player's friends. Returns the friend's pseudo.
-    func addFriend(code: String, uid: String) async throws -> String {
+    /// Adds the owner of a friend code to the player's friends, and the player to theirs, so both
+    /// see each other at once. Returns the friend's pseudo.
+    func addFriend(code: String, uid: String, username: String) async throws -> String {
         let code = Self.normalizedFriendCode(code)
         guard code.count == 6 else { throw CloudError.friendNotFound }
         let doc = try await db.collection("friendCodes").document(code).getDocument(source: .server)
@@ -497,7 +498,16 @@ enum DailyGuesses {
             ref.setData(["username": name, "addedAt": FieldValue.serverTimestamp()], completion: done)
         }
         guard saved else { throw CloudError.offline }
+        // Their side: the code proves they gave it (see firestore.rules). Best effort, theirs is a bonus.
+        let back = db.collection("users").document(friend).collection("friends").document(uid)
+        _ = try? await Self.awaitWrite { done in
+            back.setData(["username": username, "addedAt": FieldValue.serverTimestamp(), "code": code], completion: done)
+        }
         return name
+    }
+    /// One read: how many friends the player has, to notice one added from their phone.
+    func friendCount(uid: String) async throws -> Int {
+        try await Self.count(db.collection("users").document(uid).collection("friends"))
     }
     func removeFriend(uid: String, friend: String) async throws {
         try await db.collection("users").document(uid).collection("friends").document(friend).delete()
