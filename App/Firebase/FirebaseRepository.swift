@@ -121,13 +121,13 @@ enum DailyGuesses {
         settings.cacheSettings = MemoryCacheSettings()
         Firestore.firestore().settings = settings
     }
-    var currentUID: String? { auth.currentUser?.uid }
     /// Integration tests only: cuts or restores the connection, like a network outage.
     func setNetwork(enabled: Bool) async throws {
         if enabled { try await db.enableNetwork() } else { try await db.disableNetwork() }
     }
     #endif
     private var auth: Auth { Auth.auth() }
+    var currentUID: String? { auth.currentUser?.uid }
     var hasCurrentUser: Bool { auth.currentUser != nil }
     var currentEmail: String? { auth.currentUser?.email }
     private var db: Firestore { Firestore.firestore() }
