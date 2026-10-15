@@ -27,13 +27,16 @@ class DailyCardLayoutTest {
         return results.first()
     }
 
+    /** The text drawn wider than the space it was given (on one line, so cut on the right). */
+    private fun overflowsWidth(layout: TextLayoutResult) = layout.multiParagraph.width > layout.size.width + 0.5f
+
     private fun check(word: String, width: Int) {
         rule.setContent { Box(Modifier.width(width.dp)) { DailyFoundTitle(word, correct = true) } }
         val found = layout("dailyFound")
         assertEquals("✓ trouvé sur une ligne", 1, found.lineCount)
-        assertFalse("✓ trouvé coupé", found.hasVisualOverflow)
+        assertFalse("✓ trouvé coupé", overflowsWidth(found))
         val shown = layout("dailyWord")
-        assertFalse("$word coupé à ${width}dp", shown.hasVisualOverflow)
+        assertFalse("$word coupé à ${width}dp", overflowsWidth(shown))
         assertFalse("$word tronqué à ${width}dp", shown.isLineEllipsized(0))
     }
 
