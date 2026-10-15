@@ -7,17 +7,25 @@ public enum Scoring {
         return (difficulty.basePoints + bonus) / (usedHint ? 2 : 1)
     }
 }
+/// The Mot du jour calendar, keyed yyyy-MM-dd on the phone's own time zone: the word changes at the
+/// player's local midnight (firestore.rules accepts a day while it is that day somewhere on Earth).
 public enum DailySchedule {
     public static var calendar: Calendar {
         var value = Calendar(identifier: .gregorian)
-        value.timeZone = TimeZone(identifier: "Europe/Paris")!
+        value.timeZone = .current
         return value
     }
-    public static func key(_ date: Date = Date()) -> String {
+    public static func key(_ date: Date = Date(), in timeZone: TimeZone = .current) -> String {
+        var calendar = calendar
+        calendar.timeZone = timeZone
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
-    public static func previousDay(_ date: Date) -> Date { calendar.date(byAdding: .day, value: -1, to: date)! }
+    public static func previousDay(_ date: Date, in timeZone: TimeZone = .current) -> Date {
+        var calendar = calendar
+        calendar.timeZone = timeZone
+        return calendar.date(byAdding: .day, value: -1, to: date)!
+    }
     /// Monday-Tuesday easy, Wednesday-Friday medium, weekend hard (same table as firestore.rules).
     public static func difficulty(forKey key: String) -> Difficulty? {
         guard let day = dayNumber(forKey: key) else { return nil }
@@ -39,7 +47,7 @@ public enum DailySchedule {
         return pool[((occurrence % pool.count) + pool.count) % pool.count]
     }
     public static func dailyCard(for date: Date = Date()) -> Card? { dailyCard(forKey: key(date)) }
-    /// Days since Monday 2024-01-01, counted on the Paris calendar.
+    /// Days since Monday 2024-01-01.
     public static func dayNumber(forKey key: String) -> Int? {
         let parts = key.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }

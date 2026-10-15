@@ -29,6 +29,29 @@ public enum ChallengeRules {
     public static func newId(nowMs: Int, random: String) -> String { padded(max(0, nowMs)) + "-" + random }
     /// Ids above this one cover the challenges still open, with 2 h of slack for a wrong phone clock.
     public static func recentFromId(nowMs: Int) -> String { padded(max(0, nowMs - finishWindowMs - 2 * 3_600_000)) }
+    /// The whole list is read again once a week (to drop the challenges of deleted accounts);
+    /// otherwise only the recent ones, since a challenge never changes after its 50 hours.
+    public static let fullRefreshMs = 7 * 24 * 3_600_000
+    /// The list kept on the phone, brought up to date with the recent challenges just read.
+    public static func merge(cached: [Challenge], recent: [Challenge], nowMs: Int) -> [Challenge] {
+        let cursor = recentFromId(nowMs: nowMs)
+        let fresh = Set(recent.map(\.id))
+        let frozen = cached.filter { $0.id <= cursor && !fresh.contains($0.id) }
+        return (frozen + recent).sorted { $0.createdMs > $1.createdMs }
+    }
+    /// Background checks for notifications: every 30 minutes at most, none at night (midnight to
+    /// 7 am, local time), and none soon after the app itself read the challenges.
+    public static let checkEveryMs = 30 * 60_000
+    public static func nextCheck(after date: Date, calendar: Calendar = .current) -> Date {
+        let next = date.addingTimeInterval(TimeInterval(checkEveryMs / 1000))
+        guard calendar.component(.hour, from: next) < 7 else { return next }
+        return calendar.date(bySettingHour: 7, minute: 0, second: 0, of: next) ?? next
+    }
+    public static func shouldCheck(at date: Date, lastReadMs: Int?, calendar: Calendar = .current) -> Bool {
+        guard calendar.component(.hour, from: date) >= 7 else { return false }
+        guard let lastReadMs else { return true }
+        return Int(date.timeIntervalSince1970 * 1000) - lastReadMs >= checkEveryMs / 2
+    }
     private static func padded(_ ms: Int) -> String {
         let digits = String(ms)
         return String(repeating: "0", count: max(0, 13 - digits.count)) + digits

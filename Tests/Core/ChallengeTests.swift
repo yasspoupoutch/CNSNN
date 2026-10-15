@@ -136,4 +136,34 @@ final class ChallengeTests: XCTestCase {
         XCTAssertTrue(ChallengeAlerts.all([sent], uid: "bob", now: 49 * hour).isEmpty)
         XCTAssertTrue(ChallengeAlerts.all([sent], uid: "carol", now: hour).isEmpty)
     }
+
+    /// The phone keeps the old challenges (frozen after 50 h) and reads only the recent ones.
+    func testMergeKeepsFrozenChallengesAndTakesTheRecentOnes() {
+        let now = 1_800_000_000_000
+        func make(_ hoursAgo: Int, finished: Bool = false) -> Challenge {
+            let created = now - hoursAgo * hour
+            return Challenge(id: ChallengeRules.newId(nowMs: created, random: "r\(hoursAgo)"), cardIds: [], createdMs: created,
+                             from: .init(uid: "alice", name: "Alice", startedMs: created, finishedMs: finished ? created + 60_000 : nil), to: .init(uid: "bob", name: "Bob"))
+        }
+        let old = make(100, finished: true), recentStale = make(3), recentFresh = make(3, finished: true), gone = make(10), new = make(1)
+        let merged = ChallengeRules.merge(cached: [old, recentStale, gone], recent: [recentFresh, new], nowMs: now)
+        // The recent list replaces what was cached for that period (a deleted one disappears).
+        XCTAssertEqual(merged.map(\.id), [new.id, recentFresh.id, old.id])
+        XCTAssertTrue(merged[1].from.finished)
+    }
+    /// Background checks: every 30 minutes, none at night, none just after the app read the challenges.
+    func testBackgroundChecksArePaced() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        let evening = calendar.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 21))!
+        XCTAssertEqual(ChallengeRules.nextCheck(after: evening, calendar: calendar), evening.addingTimeInterval(1800))
+        let lateNight = calendar.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 23, minute: 45))!
+        XCTAssertEqual(ChallengeRules.nextCheck(after: lateNight, calendar: calendar), calendar.date(from: DateComponents(year: 2026, month: 10, day: 16, hour: 7))!)
+        let night = calendar.date(from: DateComponents(year: 2026, month: 10, day: 16, hour: 3))!
+        XCTAssertFalse(ChallengeRules.shouldCheck(at: night, lastReadMs: nil, calendar: calendar))
+        let ms = Int(evening.timeIntervalSince1970 * 1000)
+        XCTAssertTrue(ChallengeRules.shouldCheck(at: evening, lastReadMs: nil, calendar: calendar))
+        XCTAssertFalse(ChallengeRules.shouldCheck(at: evening, lastReadMs: ms - 5 * 60_000, calendar: calendar))
+        XCTAssertTrue(ChallengeRules.shouldCheck(at: evening, lastReadMs: ms - 20 * 60_000, calendar: calendar))
+    }
 }

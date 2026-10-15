@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeGame
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.ChallengeTally
 import com.poupoutch.cnsnn.core.ModeRandom
@@ -172,6 +173,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 activate(cloud.bootstrap(progress.username.ifEmpty { "Joueur" }), preservingGuest = true)
             } catch (e: Exception) {
+                if (e is CloudError && e.kind == CloudError.Kind.DELETION_PENDING) { resumeDeletion(); return }
                 // Offline launches stay quiet: Classique works and the home screen says it is offline.
                 val code = CloudError.code(e)
                 if (code != CloudError.Code.NETWORK && code != CloudError.Code.UNAVAILABLE && e !is CloudError) error = CloudError.message(e)
@@ -225,6 +227,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun resetToGuest() {
         uid = null; isAnonymous = true; email = null; isAdmin = false; isSuspended = false; official = null; challenges = emptyList()
+        challengesReadAt = 0L; rankings = Rankings()
         ChallengeWatch.setActive(getApplication(), false)
         progress = Progress(); cards = SeedCards.all + ExtraCards.all
         local.clearRuns()
@@ -243,7 +246,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val guestPractice = progress.copy(attempts = progress.attempts.filter { it.mode == GameMode.CLASSIC },
             dailyStarted = emptyMap(), dailyStartedAt = emptyMap(), submissions = emptyList())
         persist()
-        val profile = cloud.signIn(email, password)
+        val profile = try { cloud.signIn(email, password) } catch (e: CloudError) {
+            if (e.kind == CloudError.Kind.DELETION_PENDING) { resumeDeletion(); return } else throw e
+        }
         activate(profile, preservingGuest = false)
         progress = progress.merged(guestPractice).copy(username = profile.username)
         persist()
@@ -254,8 +259,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val user = uid ?: return
         cloudSave?.cancel()
         cloud.deleteAccount(user, password)
-        local.erase(user); local.erase(null)
+        local.erase(user); local.erase(null); local.clearChallenges(user)
         chooseAvatar(0)
+        resetToGuest()
+    }
+
+    /**
+     * Finishes a deletion that was cut off halfway (the profile is gone, the tombstone is there): at
+     * launch, or when the player signs in again. Nothing is brought back.
+     */
+    suspend fun resumeDeletion() {
+        val user = cloud.currentUid ?: return
+        try {
+            cloud.deleteAccount(user, null)
+            error = "La suppression de votre compte est terminée."
+        } catch (e: Exception) {
+            if (CloudError.code(e) != CloudError.Code.RECENT_LOGIN) {
+                // Offline: still signed in, so the next launch tries again.
+                error = "La suppression de votre compte n’est pas terminée. Elle reprendra au prochain lancement avec du réseau."
+                return
+            }
+            // The data is gone; only the sign-in remains, and Firebase wants a fresh password for it.
+            cloud.signOut()
+            error = "Vos données sont supprimées. Reconnectez-vous une fois avec votre email pour supprimer aussi le compte."
+        }
+        local.erase(user); local.clearChallenges(user)
         resetToGuest()
     }
 
@@ -328,6 +356,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun record(attempt: Attempt) {
         if (attempt.dailyKey != null && progress.attempts.any { it.dailyKey == attempt.dailyKey }) return
+        if (attempt.dailyKey != null) forgetRankings()
         update { p ->
             p.copy(attempts = p.attempts + attempt, recentCards = (p.recentCards.filter { it != attempt.cardID } + attempt.cardID).takeLast(20))
         }
@@ -335,6 +364,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The server's result replaces this phone's measurement for that day. */
     fun recordOfficial(attempt: Attempt) {
         val day = attempt.dailyKey ?: return
+        forgetRankings()
         val index = progress.attempts.indexOfFirst { it.dailyKey == day }
         if (index < 0) { record(attempt); return }
         update { p -> p.copy(attempts = p.attempts.toMutableList().also { it[index] = attempt.copy(id = p.attempts[index].id) }) }
@@ -374,15 +404,58 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Friend challenges
 
     fun refreshChallengesSoon() { viewModelScope.launch { refreshChallenges() } }
-    suspend fun refreshChallenges() {
+    /**
+     * The public rankings, kept a few minutes: everybody reads the same lines, so opening the page
+     * again (or switching tabs back and forth) costs nothing until they may have moved.
+     */
+    data class Rankings(
+        val today: List<com.poupoutch.cnsnn.data.DailyRank> = emptyList(),
+        val players: List<LeaderboardEntry> = emptyList(),
+        val fastest: List<LeaderboardEntry> = emptyList(),
+        val myRank: Pair<Int, Int>? = null,
+        val friends: List<com.poupoutch.cnsnn.core.FriendStanding> = emptyList(),
+        val friendCode: String? = null,
+        val readAt: Map<String, Long> = emptyMap(),
+    )
+    var rankings by mutableStateOf(Rankings())
+    /** Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh. */
+    fun rankingIsStale(key: String, force: Boolean): Boolean {
+        val at = rankings.readAt[key] ?: return true
+        return System.currentTimeMillis() - at > if (force) 30_000 else 300_000
+    }
+    fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
+    fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
+
+    private var challengesReadAt = 0L
+    /**
+     * Reads the challenges of the last two days only (a few documents) and keeps the older ones on
+     * the phone, since a challenge never changes after its 50 hours. The whole list is read on the
+     * first launch and then once a week. Back-to-back calls (home, return to the app) share one read.
+     */
+    suspend fun refreshChallenges(force: Boolean = false) {
         val user = uid ?: return
-        val list = runCatching { cloud.challenges(user) }.getOrNull() ?: return
+        val now = System.currentTimeMillis()
+        if (!force && now - challengesReadAt < 30_000) return
+        val cached = local.loadChallenges(user)
+        var fullAt = cached?.second ?: 0L
+        val list = if (cached != null && now - cached.second < ChallengeRules.FULL_REFRESH_MS) {
+            val recent = runCatching { cloud.recentChallenges(user, now) }.getOrNull() ?: return
+            ChallengeRules.merge(cached.first, recent, now)
+        } else {
+            val all = runCatching { cloud.challenges(user) }.getOrNull() ?: return
+            fullAt = now
+            all
+        }
         if (uid != user) return
+        challengesReadAt = now
+        local.challengesReadAt = now
+        local.saveChallenges(user, list, fullAt)
         challenges = list
         ChallengeWatch.markSeen(getApplication(), list, user)
-        // Background checks only for players someone can challenge.
-        val active = list.isNotEmpty() || runCatching { cloud.hasFriends(user) }.getOrDefault(local.challengeWatch)
-        ChallengeWatch.setActive(getApplication(), active)
+        sendPendingChallenges(list, user)
+        // Background checks only for players someone can challenge (one read, once a week at most).
+        if (list.isNotEmpty()) ChallengeWatch.setActive(getApplication(), true)
+        else if (fullAt == now) ChallengeWatch.setActive(getApplication(), runCatching { cloud.hasFriends(user) }.getOrDefault(local.challengeWatch))
     }
     /**
      * The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
@@ -421,12 +494,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return fresh
     }
     /** Stamps my finish on the server, then reads back the official times. */
-    suspend fun finishChallenge(challenge: Challenge, skips: Int, errors: Int): Challenge {
-        val user = uid ?: return challenge
-        runCatching { cloud.finishChallenge(challenge, user, skips, errors) }
-        val fresh = runCatching { cloud.challenge(challenge.id) }.getOrNull() ?: return challenge
+    /** What the server made of a finished challenge game. */
+    enum class ChallengeSend { CONFIRMED, PENDING, EXPIRED }
+    /**
+     * Sends the finish, then reads the challenge back: only the server's copy says it counts. Sending
+     * twice is harmless (the rules accept one finish), so a retry after a lost answer is safe.
+     */
+    suspend fun finishChallenge(challenge: Challenge, skips: Int, errors: Int): Pair<Challenge, ChallengeSend> {
+        val user = uid ?: return challenge to ChallengeSend.PENDING
+        val refused = runCatching { cloud.finishChallenge(challenge, user, skips, errors) }
+            .exceptionOrNull()?.let { CloudError.code(it) == CloudError.Code.PERMISSION_DENIED } ?: false
+        val fresh = runCatching { cloud.challenge(challenge.id) }.getOrNull() ?: return challenge to ChallengeSend.PENDING
         replace(fresh)
-        return fresh
+        return fresh to when {
+            fresh.mine(user).finished -> ChallengeSend.CONFIRMED
+            refused && System.currentTimeMillis() >= fresh.finishDeadlineMs -> ChallengeSend.EXPIRED
+            else -> ChallengeSend.PENDING
+        }
+    }
+    /** Finished games the server has not confirmed yet (network lost, app closed): sent again. */
+    private suspend fun sendPendingChallenges(list: List<Challenge>, user: String) {
+        for (challenge in list) {
+            if (challenge.mine(user).finished) continue
+            val saved = local.loadChallengeRun(challenge.id) ?: continue
+            val cards = ChallengeRules.cards(challenge.cardIds) ?: continue
+            val game = ChallengeGame.restore(cards, saved.first)?.takeIf { it.finished } ?: continue
+            if (finishChallenge(challenge, game.skips, game.errors).second != ChallengeSend.PENDING) local.clearChallengeRun(challenge.id)
+        }
     }
     private fun replace(challenge: Challenge) {
         challenges = if (challenges.any { it.id == challenge.id }) challenges.map { if (it.id == challenge.id) challenge else it } else listOf(challenge) + challenges

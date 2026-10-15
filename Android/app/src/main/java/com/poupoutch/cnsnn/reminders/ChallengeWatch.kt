@@ -19,6 +19,7 @@ import com.poupoutch.cnsnn.MainActivity
 import com.poupoutch.cnsnn.R
 import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeAlerts
+import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.data.CloudRepository
 import com.poupoutch.cnsnn.data.LocalStore
 import java.util.concurrent.TimeUnit
@@ -46,16 +47,21 @@ object ChallengeWatch {
         val work = WorkManager.getInstance(context)
         if (!active) { work.cancelUniqueWork(WORK); return }
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
-        val request = PeriodicWorkRequestBuilder<ChallengeWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build()
-        work.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+        val request = PeriodicWorkRequestBuilder<ChallengeWorker>(30, TimeUnit.MINUTES).setConstraints(constraints).build()
+        // UPDATE moves phones that still have the old 15-minute check to the new pace.
+        work.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     /** One check: returns the notifications it showed (or would show, without the permission). */
-    suspend fun check(context: Context, cloud: CloudRepository = CloudRepository(), now: Long = System.currentTimeMillis()): List<ChallengeAlerts.Alert> {
+    suspend fun check(context: Context, cloud: CloudRepository = CloudRepository(), now: Long = System.currentTimeMillis(), paced: Boolean = true): List<ChallengeAlerts.Alert> {
         val store = LocalStore(context)
         if (!store.challengeWatch) return emptyList()
+        // No reads at night, nor just after the app itself read the challenges.
+        if (paced && !ChallengeRules.shouldCheck(now, store.challengesReadAt.takeIf { it > 0 })) return emptyList()
         val uid = cloud.currentUid ?: return emptyList()
-        val alerts = ChallengeAlerts.pending(cloud.recentChallenges(uid, now), uid, now, store.seenChallengeAlerts)
+        val recent = cloud.recentChallenges(uid, now)
+        store.challengesReadAt = now
+        val alerts = ChallengeAlerts.pending(recent, uid, now, store.seenChallengeAlerts)
         store.rememberChallengeAlerts(alerts.map { it.key })
         alerts.forEach { show(context, it) }
         return alerts

@@ -2,6 +2,7 @@ package com.poupoutch.cnsnn.data
 
 import android.content.Context
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.DuoGame
 import com.poupoutch.cnsnn.core.Glance
 import com.poupoutch.cnsnn.core.PlayMode
@@ -88,6 +89,22 @@ class LocalStore(context: Context) {
     fun clearChallengeRun(id: String) {
         prefs.edit().remove("challenge.$id").remove("challenge.$id.elapsed").remove("challenge.$id.savedAt").apply()
     }
+
+    /** The challenges list kept on this phone, per player, and when it was last read whole. */
+    fun loadChallenges(uid: String): Pair<List<Challenge>, Long>? {
+        val json = prefs.getString("challenges.cache.$uid", null) ?: return null
+        val list = runCatching { ProgressJson.decodeFromString(ListSerializer(Challenge.serializer()), json) }.getOrNull() ?: return null
+        return list to prefs.getLong("challenges.cache.$uid.full", 0)
+    }
+    fun saveChallenges(uid: String, list: List<Challenge>, fullAtMs: Long) {
+        prefs.edit().putString("challenges.cache.$uid", ProgressJson.encodeToString(ListSerializer(Challenge.serializer()), list))
+            .putLong("challenges.cache.$uid.full", fullAtMs).apply()
+    }
+    fun clearChallenges(uid: String) { prefs.edit().remove("challenges.cache.$uid").remove("challenges.cache.$uid.full").apply() }
+    /** When the app last read the challenges itself: the background check then has nothing new to find. */
+    var challengesReadAt: Long
+        get() = prefs.getLong("challenges.readAt", 0)
+        set(value) { prefs.edit().putLong("challenges.readAt", value).apply() }
 
     /** Challenge notifications already shown (or seen in the app), newest last, at most 300. */
     val seenChallengeAlerts: Set<String> get() = prefs.getString("challenge.alerts.seen", "")!!.split("\n").filter { it.isNotEmpty() }.toSet()

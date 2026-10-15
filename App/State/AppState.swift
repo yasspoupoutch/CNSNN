@@ -108,6 +108,8 @@ import CNSNNCore
         do {
             let profile = try await cloud!.bootstrap(username: progress.username.isEmpty ? "Joueur" : progress.username)
             try activate(profile, preservingGuest: true)
+        } catch CloudError.deletionPending {
+            await resumeDeletion(); return
         } catch {
             // Offline launches stay quiet: Classique works and the home screen says it is offline.
             if ![CloudError.Code.network, .unavailable].contains(CloudError.code(error)), !(error is CloudError) { self.error = CloudError.message(error) }
@@ -149,7 +151,7 @@ import CNSNNCore
     }
     private func resetToGuest() {
         ModeRunStore.clearAll()
-        uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil; challenges = []
+        uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil; challenges = []; challengesReadAt = nil; rankings = Rankings()
         ChallengeWatch.setActive(false)
         progress = CNSNNCore.Progress(); cards = SeedCards.all + ExtraCards.all
         local = LocalRepository(); persist()
@@ -172,7 +174,9 @@ import CNSNNCore
         guestPractice.attempts = guestPractice.attempts.filter { $0.mode == .classic }
         guestPractice.dailyStarted = [:]; guestPractice.dailyStartedAt = [:]; guestPractice.submissions = []
         persist()
-        let profile = try await cloud.signIn(email: email, password: password)
+        let profile: CloudProfile
+        do { profile = try await cloud.signIn(email: email, password: password) }
+        catch CloudError.deletionPending { await resumeDeletion(); return }
         try activate(profile, preservingGuest: false)
         progress = progress.merged(with: guestPractice)
         progress.username = profile.username
@@ -186,6 +190,29 @@ import CNSNNCore
         try await cloud.deleteAccount(uid: uid, password: password)
         LocalRepository(scope: uid).erase()
         LocalRepository().erase()
+        ChallengeCache.clear(uid: uid)
+        UserDefaults.standard.removeObject(forKey: CNSNNTheme.avatarKey)
+        resetToGuest()
+    }
+
+    /// Finishes a deletion that was cut off halfway (the profile is gone, the tombstone is there):
+    /// at launch, or when the player signs in again. Nothing is brought back.
+    func resumeDeletion() async {
+        guard let cloud, let id = cloud.currentUID else { return }
+        do {
+            try await cloud.deleteAccount(uid: id, password: nil)
+            error = "La suppression de votre compte est terminée."
+        } catch where CloudError.code(error) == .requiresRecentLogin {
+            // The data is gone; only the sign-in remains, and Firebase wants a fresh password for it.
+            try? cloud.signOut()
+            self.error = "Vos données sont supprimées. Reconnectez-vous une fois avec votre email pour supprimer aussi le compte."
+        } catch {
+            // Offline: still signed in, so the next launch tries again.
+            self.error = "La suppression de votre compte n’est pas terminée. Elle reprendra au prochain lancement avec du réseau."
+            return
+        }
+        LocalRepository(scope: id).erase()
+        ChallengeCache.clear(uid: id)
         UserDefaults.standard.removeObject(forKey: CNSNNTheme.avatarKey)
         resetToGuest()
     }
@@ -271,10 +298,29 @@ import CNSNNCore
         if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry; refreshGlance() }
     }
 
+    /// The public rankings, kept a few minutes: everybody reads the same lines, so opening the page
+    /// again (or switching tabs back and forth) costs nothing until they may have moved.
+    struct Rankings {
+        var today: [DailyRank] = []
+        var players: [LeaderboardEntry] = []
+        var fastest: [LeaderboardEntry] = []
+        var myRank: (rank: Int, players: Int)?
+        var friends: [FriendStanding] = []
+        var friendCode: String?
+        var readAt: [String: Date] = [:]
+    }
+    var rankings = Rankings()
+    /// Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh.
+    func rankingIsStale(_ key: String, force: Bool) -> Bool {
+        guard let at = rankings.readAt[key] else { return true }
+        return Date().timeIntervalSince(at) > (force ? 30 : 300)
+    }
+
     // MARK: Results
 
     func record(_ attempt: Attempt) {
         guard attempt.dailyKey == nil || !progress.attempts.contains(where: { $0.dailyKey == attempt.dailyKey }) else { return }
+        if attempt.dailyKey != nil { rankings.readAt = [:] }
         progress.attempts.append(attempt)
         progress.recentCards.removeAll { $0 == attempt.cardID }
         progress.recentCards.append(attempt.cardID)
@@ -284,6 +330,7 @@ import CNSNNCore
     /// The server's result replaces this device's measurement for that day.
     func recordOfficial(_ attempt: Attempt) {
         guard let day = attempt.dailyKey else { return }
+        rankings.readAt = [:]
         if let index = progress.attempts.firstIndex(where: { $0.dailyKey == day }) {
             var official = attempt
             official.id = progress.attempts[index].id
@@ -313,14 +360,34 @@ import CNSNNCore
 
     // MARK: Friend challenges
 
-    func refreshChallenges() async {
+    private var challengesReadAt: Date?
+    /// Reads the challenges of the last two days only (a few documents) and keeps the older ones on
+    /// the phone, since a challenge never changes after its 50 hours. The whole list is read on the
+    /// first launch and then once a week. Back-to-back calls (home, return to the app) share one read.
+    func refreshChallenges(force: Bool = false) async {
         guard let cloud, let uid else { return }
-        guard let list = try? await cloud.challenges(uid: uid), self.uid == uid else { return }
+        if !force, let challengesReadAt, Date().timeIntervalSince(challengesReadAt) < 30 { return }
+        let now = Int(Date().timeIntervalSince1970 * 1000)
+        let cached = ChallengeCache.load(uid: uid)
+        let list: [Challenge]
+        var fullAt = cached?.fullAtMs ?? 0
+        if let cached, now - cached.fullAtMs < ChallengeRules.fullRefreshMs {
+            guard let recent = try? await cloud.recentChallenges(uid: uid, nowMs: now) else { return }
+            list = ChallengeRules.merge(cached: cached.challenges, recent: recent, nowMs: now)
+        } else {
+            guard let all = try? await cloud.challenges(uid: uid) else { return }
+            list = all; fullAt = now
+        }
+        guard self.uid == uid else { return }
+        challengesReadAt = Date()
+        ChallengeWatch.noteRead()
+        ChallengeCache.save(.init(challenges: list, fullAtMs: fullAt), uid: uid)
         challenges = list
         ChallengeWatch.markSeen(list, uid: uid)
-        // Background checks only for players someone can challenge.
-        let active = !list.isEmpty ? true : ((try? await cloud.hasFriends(uid: uid)) ?? ChallengeWatch.isActive)
-        ChallengeWatch.setActive(active)
+        await sendPendingChallenges(list, uid: uid)
+        // Background checks only for players someone can challenge (one read, once a week at most).
+        if !list.isEmpty { ChallengeWatch.setActive(true) }
+        else if fullAt == now { ChallengeWatch.setActive((try? await cloud.hasFriends(uid: uid)) ?? ChallengeWatch.isActive) }
     }
     /// The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
     /// then one of mine left unfinished, then the latest one waiting for the friend.
@@ -357,13 +424,28 @@ import CNSNNCore
         ChallengeWatch.setActive(true)
         return fresh
     }
-    /// Stamps my finish on the server, then reads back the official times.
-    func finishChallenge(_ challenge: Challenge, skips: Int, errors: Int) async -> Challenge {
-        guard let cloud, let uid else { return challenge }
-        _ = try? await cloud.finishChallenge(challenge, uid: uid, skips: skips, errors: errors)
-        guard let fresh = try? await cloud.challenge(id: challenge.id) else { return challenge }
+    /// What the server made of a finished challenge game.
+    enum ChallengeSend { case confirmed, pending, expired }
+    /// Sends the finish, then reads the challenge back: only the server's copy says it counts. Sending
+    /// twice is harmless (the rules accept one finish), so a retry after a lost answer is safe.
+    func finishChallenge(_ challenge: Challenge, skips: Int, errors: Int) async -> (Challenge, ChallengeSend) {
+        guard let cloud, let uid else { return (challenge, .pending) }
+        var refused = false
+        do { _ = try await cloud.finishChallenge(challenge, uid: uid, skips: skips, errors: errors) }
+        catch { refused = CloudError.code(error) == .permissionDenied }
+        guard let fresh = try? await cloud.challenge(id: challenge.id) else { return (challenge, .pending) }
         replace(fresh)
-        return fresh
+        if fresh.mine(uid).finished { return (fresh, .confirmed) }
+        if refused && Int(Date().timeIntervalSince1970 * 1000) >= fresh.finishDeadlineMs() { return (fresh, .expired) }
+        return (fresh, .pending)
+    }
+    /// Finished games the server has not confirmed yet (network lost, app closed): sent again.
+    private func sendPendingChallenges(_ list: [Challenge], uid: String) async {
+        for challenge in list where !challenge.mine(uid).finished {
+            guard let run = ChallengeStore.load(challenge.id), run.game.finished else { continue }
+            let (_, outcome) = await finishChallenge(challenge, skips: run.game.skips, errors: run.game.errors)
+            if outcome != .pending { ChallengeStore.clear(challenge.id) }
+        }
     }
     private func replace(_ challenge: Challenge) {
         if let index = challenges.firstIndex(where: { $0.id == challenge.id }) { challenges[index] = challenge } else { challenges.insert(challenge, at: 0) }

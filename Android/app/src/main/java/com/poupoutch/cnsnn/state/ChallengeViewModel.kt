@@ -56,10 +56,13 @@ class ChallengeViewModel : ViewModel() {
         val known = state.challenges.firstOrNull { it.id == id } ?: runCatching { state.cloud.challenge(id) }.getOrNull()
         if (uid == null || known == null) { phase = Phase.Failed(CloudError.Kind.OFFLINE.message); return@launch }
         challenge = known
-        if (known.mine(uid).finished) { phase = Phase.Done; return@launch }
+        if (known.mine(uid).finished) { state.local.clearChallengeRun(id); phase = Phase.Done; return@launch }
+        if (System.currentTimeMillis() >= known.finishDeadlineMs) { state.local.clearChallengeRun(id); phase = Phase.Failed(EXPIRED); return@launch }
         val cards = ChallengeRules.cards(known.cardIds) ?: run { phase = Phase.Failed(CloudError.Kind.CHALLENGE_UNAVAILABLE.message); return@launch }
         val started = try { state.startChallenge(known) } catch (e: Exception) { phase = Phase.Failed(CloudError.message(e)); return@launch }
         challenge = started
+        // A result sent earlier may have reached the server after all.
+        if (started.mine(uid).finished) { state.local.clearChallengeRun(id); phase = Phase.Done; return@launch }
         val saved = state.local.loadChallengeRun(id)
         val restored = saved?.let { ChallengeGame.restore(cards, it.first) }
         if (saved != null && restored != null) {
@@ -116,14 +119,28 @@ class ChallengeViewModel : ViewModel() {
         else state.local.saveChallengeRun(id, current.saved(), elapsedMs)
     }
 
+    /**
+     * The game is kept on the phone until the server confirms the finish: a lost connection never
+     * loses a result, and "Réessayer" (or the next launch) sends it again.
+     */
     private suspend fun finish(state: AppViewModel) {
         val current = game ?: return
         val playing = challenge ?: return
         if (phase != Phase.Playing) return
         phase = Phase.Sending
-        challenge = state.finishChallenge(playing, current.skips, current.errors)
-        state.local.clearChallengeRun(playing.id)
-        phase = Phase.Done
+        state.local.saveChallengeRun(playing.id, current.saved(), elapsedMs)
+        val (fresh, outcome) = state.finishChallenge(playing, current.skips, current.errors)
+        challenge = fresh
+        phase = when (outcome) {
+            AppViewModel.ChallengeSend.CONFIRMED -> { state.local.clearChallengeRun(playing.id); Phase.Done }
+            AppViewModel.ChallengeSend.EXPIRED -> { state.local.clearChallengeRun(playing.id); Phase.Failed(EXPIRED) }
+            AppViewModel.ChallengeSend.PENDING -> Phase.Failed(PENDING)
+        }
+    }
+
+    companion object {
+        const val PENDING = "Résultat en attente de validation. Votre partie est gardée sur ce téléphone : vérifiez le réseau puis réessayez. Le chrono officiel s’arrête quand le serveur reçoit votre résultat."
+        const val EXPIRED = "Le délai de ce défi est dépassé : ce résultat n’a pas pu être enregistré."
     }
 
     /** My time as the server measured it, or this phone's while the server has not confirmed. */

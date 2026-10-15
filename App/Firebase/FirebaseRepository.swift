@@ -143,6 +143,8 @@ enum DailyGuesses {
         let doc = try await ref.getDocument()
         if !doc.exists {
             guard !doc.metadata.isFromCache else { throw CloudError.offline }
+            // A deletion cut off halfway (network, app closed) must finish, never bring the profile back.
+            if try await db.collection("deletedUsers").document(user.uid).getDocument(source: .server).exists { throw CloudError.deletionPending }
             var data: [String: Any] = ["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0]
             if let rulesVersion { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
             try await ref.setData(data)
@@ -210,8 +212,12 @@ enum DailyGuesses {
         let live = authored.filter { $0.data()["status"] as? String == "approved" }.map(\.reference)
         // The profile goes first, with the tombstone that lets friends drop this account and the
         // suspension record: the rules only let the daily history and the rest go once it is gone.
-        var writes: [BatchWrite] = [.set(["deletedAt": FieldValue.serverTimestamp()], db.collection("deletedUsers").document(uid)),
-                                    .delete(db.collection("banned").document(uid))]
+        // The tombstone can only be created once, so a deletion cut off halfway resumes without it.
+        let tombstone = db.collection("deletedUsers").document(uid)
+        var writes: [BatchWrite] = [.delete(db.collection("banned").document(uid))]
+        if try await !tombstone.getDocument(source: .server).exists {
+            writes.insert(.set(["deletedAt": FieldValue.serverTimestamp()], tombstone), at: 0)
+        }
         writes += refs.map { BatchWrite.delete($0) }
         writes += live.map { BatchWrite.update(["createdBy": "deleted", "authorName": FieldValue.delete()], $0) }
         try await commit(writes)
@@ -854,6 +860,7 @@ enum CloudError: LocalizedError {
     case noGuessesLeft
     case suspended
     case challengeUnavailable
+    case deletionPending
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -902,6 +909,7 @@ enum CloudError: LocalizedError {
         case .noGuessesLeft: "Vous avez utilisé vos 20 essais pour aujourd’hui."
         case .suspended: "Votre compte est suspendu : les défis ne sont pas disponibles."
         case .challengeUnavailable: "Ce défi n’est plus disponible. Mettez l’application à jour si le problème continue."
+        case .deletionPending: "La suppression de votre compte n’était pas terminée. Elle reprend."
         }
     }
 }

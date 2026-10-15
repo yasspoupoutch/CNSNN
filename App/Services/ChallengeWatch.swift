@@ -18,11 +18,16 @@ import CNSNNCore
         if active { schedule() } else { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier) }
     }
 
-    /// Asks iOS for the next refresh, in 15 minutes at the earliest.
+    /// When the app last read the challenges itself: the background check then has nothing new to find.
+    static let readAtKey = "challenges.readAt"
+    static func noteRead() { UserDefaults.standard.set(Int(Date().timeIntervalSince1970 * 1000), forKey: readAtKey) }
+    private static var lastReadMs: Int? { UserDefaults.standard.object(forKey: readAtKey) as? Int }
+
+    /// Asks iOS for the next refresh, in 30 minutes at the earliest and never at night.
     static func schedule() {
         guard isActive, !RuntimeFlags.isTesting else { return }
         let request = BGAppRefreshTaskRequest(identifier: identifier)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        request.earliestBeginDate = ChallengeRules.nextCheck(after: Date())
         try? BGTaskScheduler.shared.submit(request)
     }
 
@@ -39,11 +44,12 @@ import CNSNNCore
     /// The background refresh: one small read, then a notification for each new event.
     static func run() async {
         schedule()
-        guard isActive, FirebaseRepository.hasSignedInUser else { return }
+        guard isActive, FirebaseRepository.hasSignedInUser, ChallengeRules.shouldCheck(at: Date(), lastReadMs: lastReadMs) else { return }
         let cloud = FirebaseRepository()
         guard let uid = cloud.currentUID else { return }
         let now = Int(Date().timeIntervalSince1970 * 1000)
         guard let recent = try? await cloud.recentChallenges(uid: uid, nowMs: now) else { return }
+        noteRead()
         let alerts = ChallengeAlerts.pending(recent, uid: uid, now: now, seen: seen)
         remember(alerts.map(\.key))
         guard !alerts.isEmpty, await allowed() else { return }

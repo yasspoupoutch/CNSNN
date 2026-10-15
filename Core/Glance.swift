@@ -6,7 +6,7 @@ public struct Glance: Codable, Equatable, Sendable {
     public static let appGroup = "group.com.mycompany.cnsnn"
     static let storageKey = "glance"
 
-    /// Paris day key of the last daily result, if any.
+    /// Day key (local calendar) of the last daily result, if any.
     public var lastDailyKey: String?
     public var lastDailyCorrect: Bool
     public var lastDailyTimeMs: Int
@@ -44,7 +44,7 @@ public struct Glance: Codable, Equatable, Sendable {
         UserDefaults(suiteName: Self.appGroup)?.set(data, forKey: Self.storageKey)
     }
 
-    /// The next Paris midnight, when the Mot du jour changes.
+    /// The next local midnight, when the Mot du jour changes.
     public static func nextDay(after date: Date = Date()) -> Date {
         let calendar = DailySchedule.calendar
         return calendar.nextDate(after: date, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime) ?? date.addingTimeInterval(3600)

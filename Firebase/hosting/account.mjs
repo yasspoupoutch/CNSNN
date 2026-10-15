@@ -26,8 +26,11 @@ export async function deleteAccountData(db, uid, fs) {
   const live = authored.filter((d) => d.data().status === 'approved').map((d) => d.ref);
   // The profile goes first, with the tombstone that lets friends drop this account and the
   // suspension record: the rules only let the daily history and the rest go once it is gone.
+  // The tombstone can only be created once, so a deletion cut off halfway resumes without it.
+  const tombstone = doc(db, 'deletedUsers', uid);
+  const resumed = (await fs.getDoc(tombstone)).exists();
   await commit(db, fs, [
-    (b) => b.set(doc(db, 'deletedUsers', uid), { deletedAt: fs.serverTimestamp() }),
+    ...(resumed ? [] : [(b) => b.set(tombstone, { deletedAt: fs.serverTimestamp() })]),
     (b) => b.delete(doc(db, 'banned', uid)),
     ...refs.map((ref) => (b) => b.delete(ref)),
     ...live.map((ref) => (b) => b.update(ref, { createdBy: 'deleted', authorName: fs.deleteField() })),
@@ -35,5 +38,5 @@ export async function deleteAccountData(db, uid, fs) {
   // Reports naming this player can only be read once the profile is gone.
   const about = await owned('playerReports', 'playerId');
   await commit(db, fs, about.map((d) => (b) => b.delete(d.ref)));
-  return { documents: refs.length + about.length + 2, anonymizedCards: live.length };
+  return { documents: refs.length + about.length + 2, anonymizedCards: live.length, resumed };
 }

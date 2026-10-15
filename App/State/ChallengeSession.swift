@@ -27,10 +27,15 @@ import CNSNNCore
     /// Starts the friend's clock on the server (the challenger's started with the challenge), then plays.
     func begin(state: AppState) async {
         guard let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
-        if challenge.mine(uid).finished { phase = .done; return }
+        if challenge.mine(uid).finished { ChallengeStore.clear(challenge.id); phase = .done; return }
+        if Int(Date().timeIntervalSince1970 * 1000) >= challenge.finishDeadlineMs() {
+            ChallengeStore.clear(challenge.id); phase = .failed(Self.expiredText); return
+        }
         guard let cards = ChallengeRules.cards(challenge.cardIds) else { phase = .failed(CloudError.challengeUnavailable.errorDescription ?? ""); return }
         do { challenge = try await state.startChallenge(challenge) }
         catch { phase = .failed(CloudError.message(error)); return }
+        // A result sent earlier may have reached the server after all.
+        if challenge.mine(uid).finished { ChallengeStore.clear(challenge.id); phase = .done; return }
         if let saved = ChallengeStore.load(challenge.id) {
             game = saved.game
             baseMs = saved.elapsedMs + max(0, Int(Date().timeIntervalSince(saved.savedAt) * 1000))
@@ -84,13 +89,22 @@ import CNSNNCore
         else { ChallengeStore.save(ChallengeStore.Run(game: game, elapsedMs: elapsedMs, savedAt: Date()), id: challenge.id) }
     }
 
+    /// The game is kept on the phone until the server confirms the finish: a lost connection never
+    /// loses a result, and "Réessayer" (or the next launch) sends it again.
     private func finish(state: AppState) async {
         guard phase == .playing, let game else { return }
         phase = .sending
-        challenge = await state.finishChallenge(challenge, skips: game.skips, errors: game.errors)
-        ChallengeStore.clear(challenge.id)
-        phase = .done
+        ChallengeStore.save(ChallengeStore.Run(game: game, elapsedMs: elapsedMs, savedAt: Date()), id: challenge.id)
+        let (fresh, outcome) = await state.finishChallenge(challenge, skips: game.skips, errors: game.errors)
+        challenge = fresh
+        switch outcome {
+        case .confirmed: ChallengeStore.clear(challenge.id); phase = .done
+        case .expired: ChallengeStore.clear(challenge.id); phase = .failed(Self.expiredText)
+        case .pending: phase = .failed(Self.pendingText)
+        }
     }
+    static let pendingText = "Résultat en attente de validation. Votre partie est gardée sur ce téléphone : vérifiez le réseau puis réessayez. Le chrono officiel s’arrête quand le serveur reçoit votre résultat."
+    static let expiredText = "Le délai de ce défi est dépassé : ce résultat n’a pas pu être enregistré."
 
     /// My time as the server measured it, or this iPhone's while the server has not confirmed.
     func myScoreMs(uid: String) -> Int {
@@ -109,4 +123,17 @@ enum ChallengeStore {
         UserDefaults.standard.data(forKey: key(id)).flatMap { try? JSONDecoder().decode(Run.self, from: $0) }
     }
     static func clear(_ id: String) { UserDefaults.standard.removeObject(forKey: key(id)) }
+}
+
+/// The challenges list kept on this device, per player: the app then reads only the recent ones.
+enum ChallengeCache {
+    struct Saved: Codable { var challenges: [Challenge]; var fullAtMs: Int }
+    private static func key(_ uid: String) -> String { "challenges.cache." + uid }
+    static func load(uid: String) -> Saved? {
+        UserDefaults.standard.data(forKey: key(uid)).flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
+    }
+    static func save(_ saved: Saved, uid: String) {
+        if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: key(uid)) }
+    }
+    static func clear(uid: String) { UserDefaults.standard.removeObject(forKey: key(uid)) }
 }
