@@ -72,6 +72,7 @@ import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Mistakes
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
+import com.poupoutch.cnsnn.reminders.ChallengeWatch
 import com.poupoutch.cnsnn.data.DailyRank
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.launch
@@ -214,27 +215,45 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         SectionCard { Text("Connectez-vous à Internet pour voir le classement.", color = Palette.secondary) }; return
     }
     var board by rememberSaveable { mutableStateOf(Board.TODAY) }
-    var today by remember { mutableStateOf<List<DailyRank>>(emptyList()) }
-    var players by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
-    var fastest by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
-    var myRank by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var seenToken by remember { mutableIntStateOf(refreshToken) }
+    val today = state.rankings.today
+    val players = state.rankings.players
+    val fastest = state.rankings.fastest
+    val myRank = state.rankings.myRank
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var suspending by remember { mutableStateOf<Line?>(null) }
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
+    /** Reads only the ranking on screen, and only when the kept copy is old (see AppViewModel.rankings). */
     suspend fun refresh() {
+        if (board == Board.FRIENDS) return
+        val force = refreshToken != seenToken
+        seenToken = refreshToken
+        val day = DailySchedule.key()
+        val key = if (board == Board.TODAY) "today-$day" else board.name
+        val summary = state.rankingIsStale("summary", force)
+        if (!summary && !state.rankingIsStale(key, force)) return
         loading = true; failed = false
-        state.refreshOfficial()
         try {
-            today = state.cloud.dailyRanking(DailySchedule.key())
-            players = state.cloud.topPlayers()
-            fastest = state.cloud.fastestPlayers()
-            state.official?.let { myRank = state.cloud.rank(it.points) }
+            if (summary) {
+                state.refreshOfficial()
+                state.official?.let { state.rankings = state.rankings.copy(myRank = state.cloud.rank(it.points)) }
+                state.rankingRead("summary")
+            }
+            if (state.rankingIsStale(key, force)) {
+                state.rankings = when (board) {
+                    Board.TODAY -> state.rankings.copy(today = state.cloud.dailyRanking(day))
+                    Board.POINTS -> state.rankings.copy(players = state.cloud.topPlayers())
+                    Board.FASTEST -> state.rankings.copy(fastest = state.cloud.fastestPlayers())
+                    Board.FRIENDS -> state.rankings
+                }
+                state.rankingRead(key)
+            }
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
-    LaunchedEffect(state.uid, refreshToken) { refresh() }
+    LaunchedEffect(state.uid, refreshToken, board) { refresh() }
 
     val entry = state.official
     if (entry != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -291,7 +310,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
             confirmButton = { TextButton({
                 suspending = null
                 scope.launch {
-                    message = try { state.cloud.suspend(row.id, row.name, "Depuis le classement"); refresh(); "${row.name} est suspendu." } catch (e: Exception) { CloudError.message(e) }
+                    message = try { state.cloud.suspend(row.id, row.name, "Depuis le classement"); state.forgetRankings(); refresh(); "${row.name} est suspendu." } catch (e: Exception) { CloudError.message(e) }
                 }
             }) { Text("Suspendre", color = Palette.red) } },
             dismissButton = { TextButton({ suspending = null }) { Text("Annuler") } })
@@ -330,8 +349,9 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
 /** The player and the friends added with a 6-character code, ranked on today's Mot du jour. */
 @Composable
 private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
-    var code by rememberSaveable { mutableStateOf<String?>(null) }
-    var rows by remember { mutableStateOf<List<FriendStanding>>(emptyList()) }
+    var seenToken by remember { mutableIntStateOf(refreshToken) }
+    val code = state.rankings.friendCode
+    val rows = state.rankings.friends
     var friendCode by rememberSaveable { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -342,12 +362,18 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     val haptics = rememberHaptics()
     val uid = state.uid ?: return
     val name = state.progress.username.ifEmpty { "Joueur" }
+    /** Two reads per friend: kept a few minutes like the other rankings (see AppViewModel.rankings). */
     suspend fun refresh() {
+        val force = refreshToken != seenToken
+        seenToken = refreshToken
+        val key = "friends-" + DailySchedule.key()
+        if (!state.rankingIsStale(key, force)) return
         loading = true; failed = false
         try {
-            if (code == null) code = state.cloud.friendCode(uid, name)
-            rows = state.cloud.friendsBoard(uid, name, DailySchedule.key())
-            state.refreshChallenges()
+            if (state.rankings.friendCode == null) state.rankings = state.rankings.copy(friendCode = state.cloud.friendCode(uid, name))
+            state.rankings = state.rankings.copy(friends = state.cloud.friendsBoard(uid, name, DailySchedule.key()))
+            state.rankingRead(key)
+            state.refreshChallenges(force)
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
     LaunchedEffect(uid, refreshToken) { refresh() }
@@ -357,7 +383,8 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
         scope.launch {
             try {
                 val friend = state.cloud.addFriend(friendCode, uid)
-                friendCode = ""; message = "$friend fait partie de vos amis."; haptics.success(); refresh()
+                friendCode = ""; message = "$friend fait partie de vos amis."; haptics.success()
+                ChallengeWatch.setActive(context, true); state.forgetRankings(); refresh()
             } catch (e: Exception) { message = CloudError.message(e); haptics.retry() } finally { busy = false }
         }
     }
@@ -404,7 +431,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
                     DropdownMenuItem({ Text("Retirer de mes amis", color = Palette.red) }, {
                         menu = false
                         scope.launch {
-                            try { state.cloud.removeFriend(uid, row.uid); rows = rows.filter { it.uid != row.uid } } catch (e: Exception) { message = CloudError.message(e) }
+                            try { state.cloud.removeFriend(uid, row.uid); state.rankings = state.rankings.copy(friends = rows.filter { it.uid != row.uid }) } catch (e: Exception) { message = CloudError.message(e) }
                         }
                     })
                 }

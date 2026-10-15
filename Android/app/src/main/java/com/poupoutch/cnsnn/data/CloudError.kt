@@ -27,6 +27,7 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         DAILY_FINISHED("Votre partie du jour est déjà terminée."),
         SUSPENDED("Votre compte est suspendu : les défis ne sont pas disponibles."),
         CHALLENGE_UNAVAILABLE("Ce défi n’est plus disponible. Mettez l’application à jour si le problème continue."),
+        DELETION_PENDING("La suppression de votre compte n’était pas terminée. Elle reprend."),
     }
 
     enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }

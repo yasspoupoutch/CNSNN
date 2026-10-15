@@ -54,3 +54,31 @@ test('web deletion refuses to act for someone else', async () => {
   let profile; await env.withSecurityRulesDisabled(async (c) => { profile = (await getDoc(doc(c.firestore(), 'users/alice'))).exists(); });
   assert.ok(profile);
 });
+
+// Cut off after the first batch (network lost, app closed): a second run must finish the job.
+test('web deletion cut off halfway resumes and finishes, without a second tombstone', async () => {
+  const now = Timestamp.now();
+  await seed('users/alice', { uid: 'alice', username: 'Alice' });
+  await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', points: 10 });
+  for (let i = 0; i < 900; i++) {
+    const day = new Date(Date.UTC(2024, 0, 1) + i * 86400000).toISOString().slice(0, 10);
+    await seed(`dailySessions/alice_${day}`, { userId: 'alice', day, cardId: 'x', startedAt: now, hintUsed: false });
+  }
+  let commits = 0;
+  const flaky = { ...fs, writeBatch: (db) => {
+    const batch = fs.writeBatch(db);
+    const commit = batch.commit.bind(batch);
+    batch.commit = async () => { if (++commits === 2) throw new Error('réseau coupé'); return commit(); };
+    return batch;
+  } };
+  const db = env.authenticatedContext('alice').firestore();
+  await assert.rejects(deleteAccountData(db, 'alice', flaky), /réseau coupé/);
+  assert.equal((await all('users')).length, 0);
+  assert.ok((await all('dailySessions')).length > 0, 'the cut left documents behind');
+
+  const result = await deleteAccountData(db, 'alice', fs);
+  assert.equal(result.resumed, true);
+  assert.equal((await all('dailySessions')).length, 0);
+  assert.equal((await all('leaderboard')).length, 0);
+  assert.equal((await all('deletedUsers')).length, 1);
+});

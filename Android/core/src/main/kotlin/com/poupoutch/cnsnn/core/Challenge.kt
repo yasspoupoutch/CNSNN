@@ -1,5 +1,9 @@
 package com.poupoutch.cnsnn.core
 
+import kotlinx.serialization.Serializable
+import java.time.Instant
+import java.time.ZoneId
+
 // Défi entre amis: the same 5 words for two friends, the best time wins. Firestore times both players
 // (challenges/{id}, see Firebase/firestore.rules); the same rules as Core/Challenge.swift.
 
@@ -31,6 +35,34 @@ object ChallengeRules {
     fun newId(nowMs: Long, random: String): String = nowMs.coerceAtLeast(0).toString().padStart(13, '0') + "-" + random
     /** Ids above this one cover the challenges still open, with 2 h of slack for a wrong phone clock. */
     fun recentFromId(nowMs: Long): String = (nowMs - FINISH_WINDOW_MS - 2 * 3_600_000L).coerceAtLeast(0).toString().padStart(13, '0')
+
+    /**
+     * The whole list is read again once a week (to drop the challenges of deleted accounts);
+     * otherwise only the recent ones, since a challenge never changes after its 50 hours.
+     */
+    const val FULL_REFRESH_MS = 7 * 24 * 3_600_000L
+    /** The list kept on the phone, brought up to date with the recent challenges just read. */
+    fun merge(cached: List<Challenge>, recent: List<Challenge>, nowMs: Long): List<Challenge> {
+        val cursor = recentFromId(nowMs)
+        val fresh = recent.map { it.id }.toSet()
+        val frozen = cached.filter { it.id <= cursor && it.id !in fresh }
+        return (frozen + recent).sortedByDescending { it.createdMs }
+    }
+
+    /**
+     * Background checks for notifications: every 30 minutes at most, none at night (midnight to
+     * 7 am, local time), and none soon after the app itself read the challenges.
+     */
+    const val CHECK_EVERY_MS = 30 * 60_000L
+    fun nextCheckMs(afterMs: Long, zone: ZoneId = ZoneId.systemDefault()): Long {
+        val next = Instant.ofEpochMilli(afterMs + CHECK_EVERY_MS).atZone(zone)
+        if (next.hour >= 7) return next.toInstant().toEpochMilli()
+        return next.withHour(7).withMinute(0).withSecond(0).withNano(0).toInstant().toEpochMilli()
+    }
+    fun shouldCheck(nowMs: Long, lastReadMs: Long?, zone: ZoneId = ZoneId.systemDefault()): Boolean {
+        if (Instant.ofEpochMilli(nowMs).atZone(zone).hour < 7) return false
+        return lastReadMs == null || nowMs - lastReadMs >= CHECK_EVERY_MS / 2
+    }
 
     fun cards(ids: List<String>): List<Card>? {
         val found = ids.mapNotNull { id -> ModeCatalogue.cards.firstOrNull { it.id == id } }
@@ -77,7 +109,9 @@ class ChallengeGame(val cards: List<Card>) {
 }
 
 /** A challenge as stored in Firestore, with times in milliseconds. */
+@Serializable
 data class Challenge(val id: String, val cardIds: List<String>, val createdMs: Long, val from: Side, val to: Side) {
+    @Serializable
     data class Side(
         val uid: String,
         val name: String,

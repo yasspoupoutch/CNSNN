@@ -11,6 +11,18 @@ final class DailyScheduleTests: XCTestCase {
         }
         XCTAssertNil(DailySchedule.dailyCard(forKey: "pas-une-date"))
     }
+    /// The word changes at each player's local midnight, through summer and winter time.
+    func testKeyFollowsTheLocalCalendar() {
+        let iso = ISO8601DateFormatter()
+        let paris = TimeZone(identifier: "Europe/Paris")!, newYork = TimeZone(identifier: "America/New_York")!
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-10-13T23:30:00Z")!, in: paris), "2026-10-14")
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-10-13T23:30:00Z")!, in: newYork), "2026-10-13")
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-10-24T22:30:00Z")!, in: paris), "2026-10-25") // UTC+2
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-10-25T22:59:00Z")!, in: paris), "2026-10-25") // UTC+1
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-10-25T23:00:00Z")!, in: paris), "2026-10-26")
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-03-29T21:59:00Z")!, in: paris), "2026-03-29")
+        XCTAssertEqual(DailySchedule.key(iso.date(from: "2026-03-29T22:00:00Z")!, in: paris), "2026-03-30")
+    }
     func testEveryWordOfAPoolComesBeforeAnyRepeat() {
         let calendar = DailySchedule.calendar
         let start = calendar.date(from: DateComponents(year: 2026, month: 10, day: 12, hour: 12))!

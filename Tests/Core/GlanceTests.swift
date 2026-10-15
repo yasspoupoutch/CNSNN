@@ -22,7 +22,7 @@ final class GlanceTests: XCTestCase {
         XCTAssertEqual(glance.currentStreak(date("2026-10-15")), 0)
     }
 
-    func testNextDayIsParisMidnight() {
+    func testNextDayIsLocalMidnight() {
         let next = Glance.nextDay(after: date("2026-10-13", hour: 23))
         XCTAssertEqual(DailySchedule.key(next), "2026-10-14")
         XCTAssertEqual(DailySchedule.calendar.component(.hour, from: next), 0)

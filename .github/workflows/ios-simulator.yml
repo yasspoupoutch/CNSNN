@@ -122,6 +122,22 @@ jobs:
             DEVELOPMENT_TEAM='' \
             2>&1 | tee "$CI_ROOT/logs/build.log"
 
+      # The IPA is built in Release: compile that configuration here too, so a Release-only error
+      # (code under #if DEBUG, optimizer) is caught before merging and not when building the IPA.
+      - name: Compiler aussi en Release pour iPhone (comme l'IPA)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project CNSNN.xcodeproj -scheme CNSNN -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedDataRelease" \
+            -disableAutomaticPackageResolution \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/build-release.log"
+
       - name: Vérifier que le widget s'installe et s'enregistre
         run: |
           set -euo pipefail

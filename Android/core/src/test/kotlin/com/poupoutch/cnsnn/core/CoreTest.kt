@@ -46,8 +46,18 @@ class GameRulesTest {
         assertEquals(Difficulty.EASY, DailySchedule.difficulty("2024-01-01"))   // Monday
         assertEquals(Difficulty.MEDIUM, DailySchedule.difficulty("2026-10-14")) // Wednesday
         assertEquals(Difficulty.HARD, DailySchedule.difficulty("2026-10-18"))   // Sunday
-        // 23:30 UTC on 13 October is already the 14th in Paris (UTC+2).
-        assertEquals("2026-10-14", DailySchedule.key(Instant.parse("2026-10-13T23:30:00Z")))
+        // The word changes at each player's local midnight: 23:30 UTC on 13 October is already the
+        // 14th in Paris (UTC+2), still the 13th in New York, and 1 hour of winter time later the same.
+        val paris = java.time.ZoneId.of("Europe/Paris")
+        assertEquals("2026-10-14", DailySchedule.key(Instant.parse("2026-10-13T23:30:00Z"), paris))
+        assertEquals("2026-10-13", DailySchedule.key(Instant.parse("2026-10-13T23:30:00Z"), java.time.ZoneId.of("America/New_York")))
+        assertEquals("2026-10-25", DailySchedule.key(Instant.parse("2026-10-24T22:30:00Z"), paris)) // summer time: UTC+2
+        assertEquals("2026-10-25", DailySchedule.key(Instant.parse("2026-10-25T22:59:00Z"), paris)) // winter time: UTC+1
+        assertEquals("2026-10-26", DailySchedule.key(Instant.parse("2026-10-25T23:00:00Z"), paris))
+        // Midnight on the day the clocks go back is still a single midnight, 25 hours after the previous one.
+        assertEquals(Instant.parse("2026-10-25T23:00:00Z"), DailySchedule.nextDay(Instant.parse("2026-10-25T12:00:00Z"), paris))
+        assertEquals(Instant.parse("2026-03-28T23:00:00Z"), DailySchedule.nextDay(Instant.parse("2026-03-28T12:00:00Z"), paris))
+        assertEquals(Instant.parse("2026-03-29T22:00:00Z"), DailySchedule.nextDay(Instant.parse("2026-03-29T12:00:00Z"), paris))
         assertEquals("2026-10-13", DailySchedule.shift("2026-10-14", -1))
     }
     @Test fun formats() {

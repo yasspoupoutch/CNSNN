@@ -123,4 +123,33 @@ class ChallengeTest {
         assertTrue(ChallengeAlerts.all(listOf(sent), "bob", 49 * hour).isEmpty())
         assertTrue(ChallengeAlerts.all(listOf(sent), "carol", hour).isEmpty())
     }
+
+    /** The phone keeps the old challenges (frozen after 50 h) and reads only the recent ones. */
+    @Test fun mergeKeepsFrozenChallengesAndTakesTheRecentOnes() {
+        val now = 1_800_000_000_000L
+        fun make(hoursAgo: Int, finished: Boolean = false): Challenge {
+            val created = now - hoursAgo * hour
+            return Challenge(ChallengeRules.newId(created, "r$hoursAgo"), emptyList(), created,
+                Challenge.Side("alice", "Alice", startedMs = created, finishedMs = if (finished) created + 60_000 else null), Challenge.Side("bob", "Bob"))
+        }
+        val old = make(100, true); val recentStale = make(3); val recentFresh = make(3, true); val gone = make(10); val new = make(1)
+        val merged = ChallengeRules.merge(listOf(old, recentStale, gone), listOf(recentFresh, new), now)
+        // The recent list replaces what was cached for that period (a deleted one disappears).
+        assertEquals(listOf(new.id, recentFresh.id, old.id), merged.map { it.id })
+        assertTrue(merged[1].from.finished)
+    }
+
+    /** Background checks: every 30 minutes, none at night, none just after the app read the challenges. */
+    @Test fun backgroundChecksArePaced() {
+        val paris = java.time.ZoneId.of("Europe/Paris")
+        val evening = java.time.ZonedDateTime.of(2026, 10, 15, 21, 0, 0, 0, paris).toInstant().toEpochMilli()
+        assertEquals(evening + 30 * 60_000, ChallengeRules.nextCheckMs(evening, paris))
+        val lateNight = java.time.ZonedDateTime.of(2026, 10, 15, 23, 45, 0, 0, paris).toInstant().toEpochMilli()
+        assertEquals(java.time.ZonedDateTime.of(2026, 10, 16, 7, 0, 0, 0, paris).toInstant().toEpochMilli(), ChallengeRules.nextCheckMs(lateNight, paris))
+        val night = java.time.ZonedDateTime.of(2026, 10, 16, 3, 0, 0, 0, paris).toInstant().toEpochMilli()
+        assertTrue(!ChallengeRules.shouldCheck(night, null, paris))
+        assertTrue(ChallengeRules.shouldCheck(evening, null, paris))
+        assertTrue(!ChallengeRules.shouldCheck(evening, evening - 5 * 60_000, paris))
+        assertTrue(ChallengeRules.shouldCheck(evening, evening - 20 * 60_000, paris))
+    }
 }

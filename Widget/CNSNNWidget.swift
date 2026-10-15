@@ -30,7 +30,7 @@ struct DailyProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (DailyEntry) -> Void) {
         completion(context.isPreview ? .sample : DailyEntry(date: Date(), glance: Glance.load()))
     }
-    /// One entry now and one at the next Paris midnight, when a new word arrives.
+    /// One entry now and one at the next local midnight, when a new word arrives.
     func getTimeline(in context: Context, completion: @escaping (Timeline<DailyEntry>) -> Void) {
         let now = Date(), glance = Glance.load(), midnight = Glance.nextDay(after: now)
         let entries = [DailyEntry(date: now, glance: glance), DailyEntry(date: midnight, glance: glance)]

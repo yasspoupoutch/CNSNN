@@ -172,10 +172,12 @@ class CloudRepositoryTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         LocalStore(context).challengeWatch = true
         val clock = System.currentTimeMillis()
-        val alerts = ChallengeWatch.check(context, repo)
+        val alerts = ChallengeWatch.check(context, repo, paced = false)
         assertTrue("vérification trop longue", System.currentTimeMillis() - clock < 3_000)
         assertEquals(listOf(challenge.id + ".new"), alerts.map { it.key })
         assertEquals("Bob vous a défié !", alerts.single().title)
+        assertTrue(ChallengeWatch.check(context, repo, paced = false).isEmpty())
+        // Paced like in the background: no new read right after the last one.
         assertTrue(ChallengeWatch.check(context, repo).isEmpty())
         val started = repo.startChallenge(received, alice.uid)
         assertTrue(started.to.startedMs != null)

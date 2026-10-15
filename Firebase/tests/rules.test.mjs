@@ -110,6 +110,34 @@ test('daily session: today only, server start time, single start',async()=>{
  await assertFails(setDoc(doc(db,`dailySessions/alice_${day}`),{userId:'alice',day,cardId:'x',startedAt:serverTimestamp(),hintUsed:false}));
  await assertFails(getDoc(doc(user('bob'),`dailySessions/alice_${day}`)));
 });
+// The word changes at each player's local midnight: a day is open from its midnight in UTC+14 to
+// its end in UTC-12, and its answer becomes public only after that. The cases below hold at any
+// hour, whatever the time zone of the machine running the tests.
+test('daily word at local midnight: open while it is that day somewhere, answer public after',async()=>{
+ await signUp();
+ const utcKey=(ms)=>new Date(ms).toISOString().slice(0,10),now=Date.now(),hour=3600000;
+ const open=[utcKey(now+14*hour),utcKey(now-12*hour)];   // always today somewhere
+ const closed=[utcKey(now+38*hour),utcKey(now-60*hour)]; // never today anywhere
+ for(const d of [...open,...closed]){
+  await seed(`dailyPuzzles/${d}`,{consonants:'CHCLT',category:'Général',difficulty:'Facile'});
+  await seed(`dailySecrets/${d}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un indice.',category:'Général',difficulty:'Facile'});
+ }
+ const start=(d)=>setDoc(doc(user(),`dailySessions/alice_${d}`),{userId:'alice',day:d,cardId:'x',startedAt:serverTimestamp(),hintUsed:false});
+ for(const d of open){
+  await assertSucceeds(getDoc(doc(user(),`dailyPuzzles/${d}`)));
+  // Still being played in some time zone: the answer stays secret.
+  await assertFails(getDoc(doc(user('bob'),`dailySecrets/${d}`)));
+ }
+ for(const d of open) if(!(await env.withSecurityRulesDisabled(async c=>(await getDoc(doc(c.firestore(),`dailySessions/alice_${d}`))).exists()))) await assertSucceeds(start(d));
+ // Too early everywhere: tomorrow's word cannot be read or started in advance.
+ await assertFails(getDoc(doc(user(),`dailyPuzzles/${closed[0]}`)));
+ await assertFails(start(closed[0]));
+ // Over everywhere: no new game, the answer is public.
+ await assertFails(start(closed[1]));
+ await assertSucceeds(getDoc(doc(user('bob'),`dailySecrets/${closed[1]}`)));
+ // A day already started cannot be started again.
+ await assertFails(start(open[0]));
+});
 // The app looks for today's session before starting it. A direct read of a missing session is
 // refused (the rule checks its owner), so the app queries its own sessions instead.
 test('a new player can look for a session that does not exist yet',async()=>{

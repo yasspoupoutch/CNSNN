@@ -11,10 +11,11 @@ struct LeaderboardView: View {
     /// Bumped by the Stats page's pull to refresh.
     var refreshToken = 0
     @State private var board: Board = .today
-    @State private var today: [DailyRank] = []
-    @State private var players: [LeaderboardEntry] = []
-    @State private var fastest: [LeaderboardEntry] = []
-    @State private var myRank: (rank: Int, players: Int)?
+    @State private var seenToken = 0
+    private var today: [DailyRank] { state.rankings.today }
+    private var players: [LeaderboardEntry] { state.rankings.players }
+    private var fastest: [LeaderboardEntry] { state.rankings.fastest }
+    private var myRank: (rank: Int, players: Int)? { state.rankings.myRank }
     @State private var loading = false
     @State private var failed = false
     @State private var message: String?
@@ -45,7 +46,7 @@ struct LeaderboardView: View {
                 }
             }
         }
-        .task(id: refreshKey) { await refresh() }
+        .task(id: refreshKey + board.rawValue) { await refresh() }
         .confirmationDialog("Suspendre " + (suspending?.name ?? "") + " ?", isPresented: Binding(get: { suspending != nil }, set: { if !$0 { suspending = nil } }), titleVisibility: .visible) {
             Button("Suspendre", role: .destructive) { if let row = suspending { suspend(row) } }
         } message: {
@@ -160,21 +161,37 @@ struct LeaderboardView: View {
     private func suspend(_ row: Row) {
         guard let cloud = state.cloud else { return }
         Task {
-            do { try await cloud.suspend(player: row.id, username: row.name, reason: "Depuis le classement"); message = row.name + " est suspendu."; await refresh() }
+            do { try await cloud.suspend(player: row.id, username: row.name, reason: "Depuis le classement"); message = row.name + " est suspendu."; state.rankings.readAt = [:]; await refresh() }
             catch { message = CloudError.message(error) }
         }
     }
 
-    private func refresh() async {
+    /// Reads only the ranking on screen, and only when the kept copy is old (see AppState.rankings).
+    private func refresh(force: Bool = false) async {
         guard let cloud = state.cloud, state.uid != nil else { return }
+        let force = force || refreshToken != seenToken
+        seenToken = refreshToken
+        let day = DailySchedule.key()
+        let key = board == .today ? "today-" + day : board.rawValue
+        guard board != .friends else { return }
+        let summary = state.rankingIsStale("summary", force: force)
+        guard summary || state.rankingIsStale(key, force: force) else { return }
         loading = true; failed = false
         defer { loading = false }
-        await state.refreshOfficial()
         do {
-            today = try await cloud.dailyRanking(day: DailySchedule.key())
-            players = try await cloud.topPlayers()
-            fastest = try await cloud.fastestPlayers()
-            if let entry = state.official { myRank = try await cloud.rank(points: entry.points) }
+            if summary {
+                await state.refreshOfficial()
+                if let entry = state.official { state.rankings.myRank = try await cloud.rank(points: entry.points) }
+                state.rankings.readAt["summary"] = Date()
+            }
+            guard state.rankingIsStale(key, force: force) else { return }
+            switch board {
+            case .today: state.rankings.today = try await cloud.dailyRanking(day: day)
+            case .points: state.rankings.players = try await cloud.topPlayers()
+            case .fastest: state.rankings.fastest = try await cloud.fastestPlayers()
+            case .friends: return
+            }
+            state.rankings.readAt[key] = Date()
         } catch { failed = true }
     }
 }
@@ -183,8 +200,9 @@ struct LeaderboardView: View {
 struct FriendsBoard: View {
     @Environment(AppState.self) private var state
     var refreshToken = 0
-    @State private var code: String?
-    @State private var rows: [FriendStanding] = []
+    @State private var seenToken = 0
+    private var code: String? { state.rankings.friendCode }
+    private var rows: [FriendStanding] { state.rankings.friends }
     @State private var friendCode = ""
     @State private var loading = false
     @State private var busy = false
@@ -291,15 +309,21 @@ struct FriendsBoard: View {
         return today.correct ? Format.clock(today.timeMs) : "raté"
     }
 
-    private func refresh() async {
+    /// Two reads per friend: kept a few minutes like the other rankings (see AppState.rankings).
+    private func refresh(force: Bool = false) async {
         guard let cloud = state.cloud, let uid = state.uid else { return }
+        let force = force || refreshToken != seenToken
+        seenToken = refreshToken
+        let key = "friends-" + DailySchedule.key()
+        guard state.rankingIsStale(key, force: force) else { return }
         loading = true; failed = false
         defer { loading = false }
         let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
         do {
-            if code == nil { code = try await cloud.friendCode(uid: uid, username: name) }
-            rows = try await cloud.friendsBoard(uid: uid, username: name, day: DailySchedule.key())
-            await state.refreshChallenges()
+            if code == nil { state.rankings.friendCode = try await cloud.friendCode(uid: uid, username: name) }
+            state.rankings.friends = try await cloud.friendsBoard(uid: uid, username: name, day: DailySchedule.key())
+            state.rankings.readAt[key] = Date()
+            await state.refreshChallenges(force: force)
         } catch { failed = true }
     }
     private func add() {
@@ -310,15 +334,17 @@ struct FriendsBoard: View {
             do {
                 let name = try await cloud.addFriend(code: friendCode, uid: uid)
                 friendCode = ""; message = name + " fait partie de vos amis."
+                ChallengeWatch.setActive(true)
                 Haptics.success()
-                await refresh()
+                state.rankings.readAt = [:]
+                await refresh(force: true)
             } catch { message = CloudError.message(error); Haptics.retry() }
         }
     }
     private func remove(_ row: FriendStanding) {
         guard let cloud = state.cloud, let uid = state.uid else { return }
         Task {
-            do { try await cloud.removeFriend(uid: uid, friend: row.uid); rows.removeAll { $0.uid == row.uid } }
+            do { try await cloud.removeFriend(uid: uid, friend: row.uid); state.rankings.friends.removeAll { $0.uid == row.uid } }
             catch { message = CloudError.message(error) }
         }
     }

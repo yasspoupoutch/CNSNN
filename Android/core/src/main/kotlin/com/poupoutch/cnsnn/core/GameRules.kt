@@ -14,12 +14,16 @@ object Scoring {
     }
 }
 
-/** The Mot du jour calendar: one word per day, keyed yyyy-MM-dd in Europe/Paris. */
+/**
+ * The Mot du jour calendar: one word per day, keyed yyyy-MM-dd on the phone's own time zone, so the
+ * word changes at the player's local midnight (firestore.rules accepts a day while it is that day
+ * somewhere on Earth).
+ */
 object DailySchedule {
-    val zone: ZoneId = ZoneId.of("Europe/Paris")
+    val zone: ZoneId get() = ZoneId.systemDefault()
     private val reference: LocalDate = LocalDate.of(2024, 1, 1)
 
-    fun key(at: Instant = Instant.now()): String = at.atZone(zone).toLocalDate().toString()
+    fun key(at: Instant = Instant.now(), zone: ZoneId = this.zone): String = at.atZone(zone).toLocalDate().toString()
     fun shift(key: String, days: Long): String = LocalDate.parse(key).plusDays(days).toString()
     /** Days since Monday 2024-01-01. */
     fun dayNumber(key: String): Int? = runCatching { ChronoUnit.DAYS.between(reference, LocalDate.parse(key)).toInt() }.getOrNull()
@@ -27,8 +31,8 @@ object DailySchedule {
     fun difficulty(key: String): Difficulty? = dayNumber(key)?.let {
         when (((it % 7) + 7) % 7) { 0, 1 -> Difficulty.EASY; 2, 3, 4 -> Difficulty.MEDIUM; else -> Difficulty.HARD }
     }
-    /** The next Paris midnight, when the Mot du jour changes. */
-    fun nextDay(at: Instant = Instant.now()): Instant =
+    /** The next local midnight, when the Mot du jour changes. */
+    fun nextDay(at: Instant = Instant.now(), zone: ZoneId = this.zone): Instant =
         at.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
 }
 

@@ -74,6 +74,8 @@ class CloudRepository(
         val doc = ref.get().await()
         if (!doc.exists()) {
             if (doc.metadata.isFromCache) throw CloudError(CloudError.Kind.OFFLINE)
+            // A deletion cut off halfway (network, app closed) must finish, never bring the profile back.
+            if (db.collection("deletedUsers").document(user.uid).get(Source.SERVER).await().exists()) throw CloudError(CloudError.Kind.DELETION_PENDING)
             val data = mutableMapOf<String, Any?>("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
                 "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)
             if (rulesVersion != null) { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
@@ -144,8 +146,11 @@ class CloudRepository(
         }
         // The profile goes first, with the tombstone that lets friends drop this account and any
         // suspension: the rules only let the daily history and the reports go once the profile is gone.
-        val tombstone: (WriteBatch) -> Unit = { it.set(db.collection("deletedUsers").document(uid), mapOf("deletedAt" to FieldValue.serverTimestamp())) }
-        val first = listOf(deleting(users), tombstone, deleting(db.collection("banned").document(uid)))
+        // The tombstone can only be created once, so a deletion cut off halfway resumes without it.
+        val tombstoneRef = db.collection("deletedUsers").document(uid)
+        val tombstone: (WriteBatch) -> Unit = { it.set(tombstoneRef, mapOf("deletedAt" to FieldValue.serverTimestamp())) }
+        val first = listOfNotNull(deleting(users), tombstone.takeUnless { tombstoneRef.get(Source.SERVER).await().exists() },
+            deleting(db.collection("banned").document(uid)))
         commitInBatches(first + writes)
         // Reports naming this player can only be read once the profile is gone.
         val aboutMe = db.collection("playerReports").whereEqualTo("playerId", uid).get(Source.SERVER).await().documents

@@ -40,10 +40,9 @@ export function difficultyOf(day) {
 export function shiftDay(day, offset) {
   const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + offset); return d.toISOString().slice(0, 10);
 }
-export function parisDay(date = new Date()) {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
-  const g = (t) => p.find((x) => x.type === t).value;
-  return `${g('year')}-${g('month')}-${g('day')}`;
+// The word changes at each player's local midnight: the furthest ahead (UTC+14) plays first.
+export function latestDay(date = new Date()) {
+  return new Date(date.getTime() + 14 * 3600000).toISOString().slice(0, 10);
 }
 
 export function parseList(tsv) {
@@ -137,11 +136,11 @@ async function seed(dry) {
   const { getFirestore, FieldPath } = await import('firebase-admin/firestore');
   initializeApp({ credential: applicationDefault(), projectId });
   const db = getFirestore();
-  const today = parisDay();
+  const today = latestDay();
   // Words already played (today included) wait for the others before coming back.
   const past = await db.collection('dailySecrets').where(FieldPath.documentId(), '<=', today).get();
   const played = new Map(past.docs.map((d) => [d.get('answer'), d.id]));
-  // Today and past days are never rewritten: someone may already be playing them.
+  // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
   const days = schedule(words, shiftDay(today, 1), scheduledDays, played);
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
   console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s) ignoré(s)), ${played.size} déjà joués.`);
