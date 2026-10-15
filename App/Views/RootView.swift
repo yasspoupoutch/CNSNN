@@ -77,6 +77,7 @@ struct MainShell: View {
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
+        .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
         .fullScreenCover(item: $game) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let play = route.play { ModeGameView(mode: play) }

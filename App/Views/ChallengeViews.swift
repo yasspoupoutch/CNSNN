@@ -70,7 +70,7 @@ struct ChallengeTile: View {
                 if let featured, featured.state != .waiting { play(featured.challenge) } else { open() }
             } label: {
                 HStack(spacing: 14) {
-                    if let featured, let uid = state.uid {
+                    if let featured, let uid = state.uid, !featured.challenge.isOpen {
                         let other = featured.challenge.theirs(uid)
                         AvatarView(name: other.name, colorIndex: avatarIndex(other.uid), size: 40)
                     } else {
@@ -108,8 +108,8 @@ struct ChallengeTile: View {
         let name = featured.challenge.theirs(uid).name
         switch featured.state {
         case .yourTurn: return "\(name) vous a défié !"
-        case .playing: return "Défi en cours contre \(name)"
-        default: return "En attente de \(name)"
+        case .playing: return featured.challenge.isOpen ? "Défi par lien en cours" : "Défi en cours contre \(name)"
+        default: return featured.challenge.isOpen ? "Défi par lien en attente" : "En attente de \(name)"
         }
     }
     private func subtitle(_ featured: (challenge: Challenge, state: Challenge.State)?) -> String {
@@ -139,6 +139,8 @@ struct ChallengeSheet: View {
     @State private var loading = true
     @State private var sending: String?
     @State private var message: String?
+    @State private var joinCode = ""
+    @FocusState private var joinFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -159,7 +161,9 @@ struct ChallengeSheet: View {
                     Text("Connectez-vous à Internet pour défier vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
                 } else {
                     openList
+                    joinBox
                     friendList
+                    linkBox
                     finishedList
                 }
                 if let message { Text(message).scaledFont(13).foregroundStyle(Palette.red) }
@@ -167,7 +171,11 @@ struct ChallengeSheet: View {
             }.padding(.horizontal, 22).padding(.vertical, 20)
         }
         .scrollIndicators(.hidden)
-        .task { await load() }
+        .task(id: state.uid) { await load() }
+        .onChange(of: state.inviteCode) { _, code in
+            guard let code else { return }
+            state.inviteCode = nil; joinCode = code; join()
+        }
         .environment(\.colorScheme, .dark)
     }
 
@@ -185,14 +193,16 @@ struct ChallengeSheet: View {
                     if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
                     let other = c.theirs(uid), status = c.state(for: uid, now: ChallengeClock.nowMs)
                     HStack(spacing: 12) {
-                        AvatarView(name: other.name, colorIndex: avatarIndex(other.uid), size: 34)
+                        if c.isOpen { DuelGlyph(size: 34) } else { AvatarView(name: other.name, colorIndex: avatarIndex(other.uid), size: 34) }
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(other.name).scaledFont(15, .semibold).lineLimit(1)
+                            Text(c.opponentName(uid)).scaledFont(15, .semibold).lineLimit(1)
                             Text(openLine(c, status: status, uid: uid)).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(2)
                         }
                         Spacer(minLength: 8)
                         if status == .yourTurn || status == .playing {
                             Button(status == .playing ? "Reprendre" : "Jouer") { start(c) }.buttonStyle(DuelButtonStyle(height: 38))
+                        } else if c.isOpen, let code = c.code {
+                            ShareLink(item: ChallengeInvite.shareText(code: code)) { Text("Partager") }.buttonStyle(DuelButtonStyle(height: 38))
                         }
                     }.padding(.horizontal, 14).frame(minHeight: 60)
                 }
@@ -206,6 +216,7 @@ struct ChallengeSheet: View {
         case .yourTurn: return "Vous a défié · plus que " + ChallengeFormat.left(c.startDeadlineMs() - now)
         case .playing: return "Votre chrono tourne"
         default:
+            if c.isOpen { return "Code " + (c.code ?? "") + " · personne n’a encore rejoint" }
             return "Votre chrono : " + ChallengeFormat.time(c.mine(uid).scoreMs ?? 0)
                 + (c.theirs(uid).startedMs == nil ? " · pas encore joué" : " · en train de jouer")
         }
@@ -243,6 +254,40 @@ struct ChallengeSheet: View {
         }.glassPanel(radius: 22, padding: 0)
     }
 
+    /// A code received from a friend (or the link the app was opened with).
+    private var joinBox: some View {
+        HStack(spacing: 10) {
+            TextField("", text: $joinCode, prompt: Text("Code d’un défi reçu").foregroundStyle(Palette.tertiary))
+                .scaledFont(16, .semibold).textInputAutocapitalization(.characters).autocorrectionDisabled()
+                .focused($joinFocused).submitLabel(.join).onSubmit { join() }
+                .onChange(of: joinCode) { _, text in
+                    let cleaned = String(text.uppercased().filter { ChallengeInvite.alphabet.contains($0) }.prefix(6))
+                    if cleaned != text { joinCode = cleaned }
+                }
+                .accessibilityIdentifier("joinCode")
+            Button { join() } label: {
+                if sending == "join" { ProgressView().tint(Palette.duelText) } else { Text("Rejoindre") }
+            }
+            .buttonStyle(DuelButtonStyle(height: 38)).disabled(joinCode.count != 6 || sending != nil)
+        }
+        .padding(.leading, 16).padding(.trailing, 10).frame(minHeight: 60).glassPanel(radius: 22, padding: 0)
+        .padding(.top, 6)
+    }
+
+    /// For someone who is not a friend yet: play first, then send the link with its code.
+    private var linkBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. Le premier qui l’ouvre a 48 h pour vous battre.")
+                .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+            Button { sendOpen() } label: {
+                if sending == "link" { ProgressView().tint(Palette.duelText) } else { Label("Défier par lien", systemImage: "link") }
+            }
+            .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity).disabled(sending != nil)
+            .accessibilityIdentifier("openChallenge")
+        }
+        .padding(16).modifier(DuelSurface(radius: 22)).padding(.top, 6)
+    }
+
     @ViewBuilder private var finishedList: some View {
         let done = finished
         if !done.isEmpty, let uid = state.uid {
@@ -252,7 +297,7 @@ struct ChallengeSheet: View {
                     if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
                     let (c, result) = item
                     HStack {
-                        Text(resultTitle(result) + " contre " + c.theirs(uid).name).scaledFont(14, .semibold)
+                        Text(c.isOpen ? resultTitle(result) + " · défi par lien" : resultTitle(result) + " contre " + c.theirs(uid).name).scaledFont(14, .semibold)
                             .foregroundStyle(result == .won ? Palette.mint : result == .lost ? Palette.red : Palette.secondary).lineLimit(1)
                         Spacer(minLength: 8)
                         Text(scoreLine(c, uid: uid)).scaledFont(13).monospacedDigit().foregroundStyle(Palette.tertiary)
@@ -287,6 +332,7 @@ struct ChallengeSheet: View {
     private func load() async {
         guard let cloud = state.cloud, let uid = state.uid else { loading = false; return }
         defer { loading = false }
+        if let invite = state.inviteCode { state.inviteCode = nil; joinCode = invite; join() }
         friends = (try? await cloud.friends(uid: uid)) ?? []
         loading = false
         await state.refreshChallenges()
@@ -301,6 +347,35 @@ struct ChallengeSheet: View {
             defer { sending = nil }
             do {
                 let challenge = try await state.sendChallenge(to: friend.uid, name: friend.name)
+                play(challenge)
+                dismiss()
+            } catch { message = CloudError.message(error); Haptics.retry() }
+        }
+    }
+
+    private func join() {
+        guard sending == nil, let code = ChallengeInvite.code(in: joinCode) else { return }
+        sending = "join"; message = nil; joinFocused = false
+        Haptics.selection()
+        Task {
+            defer { sending = nil }
+            do {
+                let challenge = try await state.joinChallenge(code: code)
+                joinCode = ""
+                play(challenge)
+                dismiss()
+            } catch { message = CloudError.message(error); Haptics.retry() }
+        }
+    }
+
+    private func sendOpen() {
+        guard sending == nil else { return }
+        sending = "link"; message = nil
+        Haptics.selection()
+        Task {
+            defer { sending = nil }
+            do {
+                let challenge = try await state.sendOpenChallenge()
                 play(challenge)
                 dismiss()
             } catch { message = CloudError.message(error); Haptics.retry() }
@@ -348,7 +423,7 @@ struct ChallengeGameView: View {
 
     init(challenge: Challenge) { _session = State(initialValue: ChallengeSession(challenge: challenge)) }
 
-    private var opponent: String { state.uid.map { session.challenge.theirs($0).name } ?? "" }
+    private var opponent: String { state.uid.map { session.challenge.opponentName($0) } ?? "" }
 
     var body: some View {
         ZStack {
@@ -411,7 +486,7 @@ struct ChallengeGameView: View {
         .overlay {
             VStack(spacing: 1) {
                 Text("Défi").scaledFont(16, .semibold)
-                Text("contre " + opponent).scaledFont(12).foregroundStyle(Palette.tertiary)
+                Text(session.challenge.isOpen ? opponent : "contre " + opponent).scaledFont(12).foregroundStyle(Palette.tertiary)
             }.lineLimit(1).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
         }
         .frame(minHeight: 48)
@@ -486,8 +561,9 @@ private struct ChallengeResultView: View {
         let uid = state.uid ?? ""
         let c = session.challenge, me = c.mine(uid), other = c.theirs(uid)
         let result = c.result(for: uid, now: ChallengeClock.nowMs)
+        let otherName = c.isOpen ? "Adversaire" : other.name
         VStack(spacing: 0) {
-            Text(kicker(result, other: other.name)).font(Typo.serifItalic(24))
+            Text(c.isOpen && result == nil ? "Défi prêt à partager" : kicker(result, other: other.name)).font(Typo.serifItalic(24))
                 .foregroundStyle(result == .won ? Palette.mint : result == .lost ? Palette.red : Palette.duelSoft)
                 .multilineTextAlignment(.center)
                 // After a challenge, the natural moment to ask: "tell me when my friend has played".
@@ -497,20 +573,23 @@ private struct ChallengeResultView: View {
                 .accessibilityLabel("Votre temps : " + ChallengeFormat.time(session.myScoreMs(uid: uid)))
             Text(me.skips > 0 ? "votre temps, dont \(me.skips * 20) s de pénalité" : "votre temps").scaledFont(13).foregroundStyle(Palette.tertiary)
             HStack(spacing: 10) {
-                tile(other.scoreMs.map(ChallengeFormat.time) ?? (result == nil ? "caché" : "—"), other.name)
+                tile(other.scoreMs.map(ChallengeFormat.time) ?? (result == nil ? "caché" : "—"), otherName)
                 tile("\(ChallengeRules.words - me.skips)/\(ChallengeRules.words)", "mots trouvés")
                 tile(Mistakes.text(me.errors), "réponses")
             }.padding(.top, 18)
-            Text(footer(result, other: other)).scaledFont(13).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 14)
+            Text(c.isOpen && result == nil ? "Envoyez le lien : le premier qui l’ouvre a 48 h pour battre votre temps, qui reste caché jusque-là." : footer(result, other: other)).scaledFont(13).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 14)
             HStack(spacing: 10) {
-                if result == nil {
+                if result == nil, c.isOpen, let code = c.code {
+                    ShareLink(item: ChallengeInvite.shareText(code: code)) { Text("Envoyer le lien") }
+                        .buttonStyle(GlassPillStyle(height: 54)).accessibilityIdentifier("shareChallengeLink")
+                } else if result == nil {
                     ShareLink(item: "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! " + Site.home.absoluteString) {
                         Text("Prévenir \(other.name)")
                     }.buttonStyle(GlassPillStyle(height: 54))
                 }
                 Button("Terminer", action: close).buttonStyle(PrimaryPillStyle(height: 54))
             }.padding(.top, 20)
-            if let label = state.challengeTally(friend: other.uid).label {
+            if !c.isOpen, let label = state.challengeTally(friend: other.uid).label {
                 Text("Contre \(other.name) : " + label).scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 12)
             }
         }

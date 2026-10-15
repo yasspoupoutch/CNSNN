@@ -18,6 +18,7 @@ import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
@@ -130,6 +131,7 @@ class CloudRepository(
         val refs = mutableListOf<DocumentReference>(users.collection("private").document("progress"), db.collection("leaderboard").document(uid))
         refs += users.collection("friends").get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
+        refs += db.collection("challengeInvites").whereEqualTo("from", uid).get(Source.SERVER).await().documents.map { it.reference }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }
         }
@@ -410,15 +412,60 @@ class CloudRepository(
         if (!awaitWrite(ref.set(data))) throw CloudError(CloudError.Kind.OFFLINE)
         return challenge(ref.id) ?: throw CloudError(CloudError.Kind.OFFLINE)
     }
+    /**
+     * A challenge by link: nobody named yet, a 6-character code to share. The challenger's clock starts
+     * at once, as for a friend. The code is the invite's id, so a code already taken is refused: new one.
+     */
+    suspend fun createOpenChallenge(uid: String, username: String, cardIds: List<String>): Challenge {
+        val random = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        val ref = db.collection("challenges").document(ChallengeRules.newId(System.currentTimeMillis(), random))
+        for (attempt in 1..3) {
+            val code = ChallengeInvite.newCode()
+            val batch = db.batch()
+            batch.set(ref, mapOf("from" to uid, "fromName" to username, "to" to "", "toName" to "", "code" to code, "cardIds" to cardIds,
+                "createdAt" to FieldValue.serverTimestamp(), "fromStartedAt" to FieldValue.serverTimestamp()))
+            batch.set(db.collection("challengeInvites").document(code),
+                mapOf("challenge" to ref.id, "from" to uid, "createdAt" to FieldValue.serverTimestamp()))
+            val written = try { awaitWrite(batch.commit()) } catch (e: Exception) {
+                if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED && attempt < 3) continue
+                throw e
+            }
+            if (!written) throw CloudError(CloudError.Kind.OFFLINE)
+            return challenge(ref.id) ?: throw CloudError(CloudError.Kind.OFFLINE)
+        }
+        throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** Takes the empty place of a challenge by link, then adds its author to the player's friends. */
+    suspend fun joinChallenge(code: String, uid: String, username: String): Challenge {
+        val id = db.collection("challengeInvites").document(code).get(Source.SERVER).await().getString("challenge")
+            ?: throw CloudError(CloudError.Kind.INVITE_NOT_FOUND)
+        // Once someone joined, only the two players may read it.
+        val open = try { challenge(id) } catch (e: Exception) {
+            if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED) throw CloudError(CloudError.Kind.INVITE_TAKEN)
+            throw e
+        } ?: throw CloudError(CloudError.Kind.INVITE_NOT_FOUND)
+        if (open.to.uid == uid) return open
+        if (open.from.uid == uid) throw CloudError(CloudError.Kind.INVITE_IS_YOURS)
+        if (!open.isOpen) throw CloudError(CloudError.Kind.INVITE_TAKEN)
+        if (System.currentTimeMillis() >= open.startDeadlineMs) throw CloudError(CloudError.Kind.INVITE_EXPIRED)
+        val ref = db.collection("challenges").document(id)
+        if (!awaitWrite(ref.update(mapOf("to" to uid, "toName" to username)))) throw CloudError(CloudError.Kind.OFFLINE)
+        runCatching { addFriend(uid, open.from.uid, open.from.name) }
+        return challenge(id) ?: throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** Adds a player met through a challenge to the friends, once (no write when already there). */
+    suspend fun addFriend(uid: String, friend: String, name: String) {
+        val ref = db.collection("users").document(uid).collection("friends").document(friend)
+        if (!ref.get(Source.SERVER).await().exists()) {
+            ref.set(mapOf("username" to name, "addedAt" to FieldValue.serverTimestamp())).await()
+        }
+    }
     /** Starts the friend's clock (once), and adds the challenger to their friends so the scores show up. */
     suspend fun startChallenge(challenge: Challenge, uid: String): Challenge {
         if (challenge.to.startedMs == null) {
             val ref = db.collection("challenges").document(challenge.id)
             if (!awaitWrite(ref.update("toStartedAt", FieldValue.serverTimestamp()))) throw CloudError(CloudError.Kind.OFFLINE)
-            val friend = db.collection("users").document(uid).collection("friends").document(challenge.from.uid)
-            if (!friend.get(Source.SERVER).await().exists()) {
-                runCatching { friend.set(mapOf("username" to challenge.from.name, "addedAt" to FieldValue.serverTimestamp())).await() }
-            }
+            runCatching { addFriend(uid, challenge.from.uid, challenge.from.name) }
         }
         return challenge(challenge.id) ?: throw CloudError(CloudError.Kind.OFFLINE)
     }
@@ -657,7 +704,8 @@ class CloudRepository(
             fun int(key: String) = (d[key] as? Number)?.toInt() ?: 0
             return Challenge(id, ids, millis(created),
                 Challenge.Side(from, d["fromName"] as? String ?: "Joueur", ms("fromStartedAt"), ms("fromFinishedAt"), int("fromSkips"), int("fromErrors")),
-                Challenge.Side(to, d["toName"] as? String ?: "Joueur", ms("toStartedAt"), ms("toFinishedAt"), int("toSkips"), int("toErrors")))
+                Challenge.Side(to, d["toName"] as? String ?: "Joueur", ms("toStartedAt"), ms("toFinishedAt"), int("toSkips"), int("toErrors")),
+                d["code"] as? String)
         }
 
         /** Milliseconds exactly as the rules' `timestamp.toMillis()`. */

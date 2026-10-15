@@ -1,4 +1,5 @@
 import SwiftUI
+import CNSNNCore
 
 @main struct CNSNNApp: App {
     @State private var state: AppState
@@ -14,6 +15,10 @@ import SwiftUI
                 // Above this size the glass cards stop fitting on a phone screen.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .tint(CNSNNTheme.accent).task { await state.connectIfConfigured() }
+                // A challenge link (cnsnn://d/CODE, opened from the web page): join it from the challenge sheet.
+                .onOpenURL { url in
+                    if let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             // A new day may have started: refresh the widget and the next reminders.

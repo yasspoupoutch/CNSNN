@@ -178,6 +178,8 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
     // "Classement" on the home page.
     var seenRequest by rememberSaveable { mutableStateOf(state.leaderboardRequest) }
     LaunchedEffect(state.leaderboardRequest) { if (state.leaderboardRequest != seenRequest) { seenRequest = state.leaderboardRequest; tab = Tab.STATS } }
+    // A challenge link opened the app: back to the home page, whose sheet joins it.
+    LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) tab = Tab.PLAY }
     val holder = rememberSaveableStateHolder()
     val haptics = rememberHaptics()
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, bottomBar = {

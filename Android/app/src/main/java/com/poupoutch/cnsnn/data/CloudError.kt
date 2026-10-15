@@ -28,6 +28,10 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         SUSPENDED("Votre compte est suspendu : les défis ne sont pas disponibles."),
         CHALLENGE_UNAVAILABLE("Ce défi n’est plus disponible. Mettez l’application à jour si le problème continue."),
         DELETION_PENDING("La suppression de votre compte n’était pas terminée. Elle reprend."),
+        INVITE_NOT_FOUND("Aucun défi n’a ce code. Vérifiez les 6 caractères."),
+        INVITE_IS_YOURS("C’est votre propre défi. Envoyez le lien à un ami !"),
+        INVITE_TAKEN("Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."),
+        INVITE_EXPIRED("Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."),
     }
 
     enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }

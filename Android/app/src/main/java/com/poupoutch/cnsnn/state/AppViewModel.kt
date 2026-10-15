@@ -66,6 +66,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var challenges by mutableStateOf<List<Challenge>>(emptyList()); private set
     /** Asks the home page to open the challenge sheet (from the daily result). */
     var challengeRequest by mutableStateOf(0)
+    /** The code of a challenge link the app was opened with, waiting for the challenge sheet to join it. */
+    var inviteCode by mutableStateOf<String?>(null)
     /** Asks the shell to show the leaderboard (from the home page). */
     var leaderboardRequest by mutableStateOf(0)
 
@@ -425,6 +427,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
+    /** A new friend: the friends ranking is read again next time it shows. */
+    fun forgetFriendsRanking() { rankings = rankings.copy(readAt = rankings.readAt.filterKeys { !it.startsWith("friends-") }) }
 
     private var challengesReadAt = 0L
     /**
@@ -453,6 +457,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         challenges = list
         ChallengeWatch.markSeen(getApplication(), list, user)
         sendPendingChallenges(list, user)
+        befriendJoiners(list, user)
         // Background checks only for players someone can challenge (one read, once a week at most).
         if (list.isNotEmpty()) ChallengeWatch.setActive(getApplication(), true)
         else if (fullAt == now) ChallengeWatch.setActive(getApplication(), runCatching { cloud.hasFriends(user) }.getOrDefault(local.challengeWatch))
@@ -484,6 +489,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         challenges = listOf(challenge) + challenges
         ChallengeWatch.setActive(getApplication(), true)
         return challenge
+    }
+    /** A challenge by link: same words and clock as for a friend, but anyone with the code can join. */
+    suspend fun sendOpenChallenge(): Challenge {
+        val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
+        if (isSuspended) throw CloudError(CloudError.Kind.SUSPENDED)
+        val ids = ChallengeRules.draw(ModeRandom.seed(), progress.recentCards)
+        val challenge = cloud.createOpenChallenge(user, progress.username, ids)
+        challenges = listOf(challenge) + challenges
+        ChallengeWatch.setActive(getApplication(), true)
+        return challenge
+    }
+    /** Joins a challenge by its code (typed, or from an opened link); its author becomes a friend. */
+    suspend fun joinChallenge(code: String): Challenge {
+        val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
+        if (isSuspended) throw CloudError(CloudError.Kind.SUSPENDED)
+        val challenge = cloud.joinChallenge(code, user, progress.username)
+        replace(challenge)
+        forgetFriendsRanking()
+        ChallengeWatch.setActive(getApplication(), true)
+        return challenge
+    }
+    /** Whoever joined my challenges by link becomes a friend too, once (remembered on the phone). */
+    private suspend fun befriendJoiners(list: List<Challenge>, user: String) {
+        val done = local.befriended(user).toMutableSet()
+        val before = done.size
+        for (c in list) {
+            if (c.code == null || c.from.uid != user || c.isOpen || c.id in done) continue
+            if (runCatching { cloud.addFriend(user, c.to.uid, c.to.name) }.isSuccess) done += c.id
+        }
+        if (done.size != before) { local.setBefriended(user, done); forgetFriendsRanking() }
     }
     /** Starts (or resumes) my side of a challenge: the friend's clock starts on the server here. */
     suspend fun startChallenge(challenge: Challenge): Challenge {

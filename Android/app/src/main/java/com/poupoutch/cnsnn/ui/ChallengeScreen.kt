@@ -47,6 +47,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +70,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeFormat
+import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.Mistakes
 import com.poupoutch.cnsnn.core.Site
@@ -134,7 +142,7 @@ fun ChallengeTile(state: AppViewModel, open: () -> Unit, play: (Challenge) -> Un
         Modifier.fillMaxWidth().testTag("challengeTile"), shape = RoundedCornerShape(26.dp), color = Color.Transparent, border = Duel.border) {
         Row(Modifier.background(Duel.surface).padding(horizontal = 16.dp, vertical = 14.dp).semantics(mergeDescendants = true) { contentDescription = "$title. $subtitle" },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (featured != null && uid != null) {
+            if (featured != null && uid != null && !featured.first.isOpen) {
                 val other = featured.first.theirs(uid)
                 Avatar(other.name, colorIndex(other.uid), 42.dp)
             } else DuelGlyph()
@@ -161,10 +169,10 @@ private fun tileText(state: AppViewModel, featured: Pair<Challenge, Challenge.St
     val name = c.theirs(uid).name
     return when (status) {
         Challenge.State.YourTurn -> "$name vous a défié !" to ("Son chrono : caché · plus que " + ChallengeFormat.left(c.startDeadlineMs - now))
-        Challenge.State.Playing -> "Défi en cours contre $name" to "Votre chrono tourne · 5 mots"
+        Challenge.State.Playing -> (if (c.isOpen) "Défi par lien en cours" else "Défi en cours contre $name") to "Votre chrono tourne · 5 mots"
         else -> {
             val left = if (c.theirs(uid).startedMs == null) c.startDeadlineMs else c.finishDeadlineMs
-            "En attente de $name" to ("Votre chrono : " + ChallengeFormat.time(c.mine(uid).scoreMs ?: 0) + " · encore " + ChallengeFormat.left(left - now))
+            (if (c.isOpen) "Défi par lien en attente" else "En attente de $name") to ("Votre chrono : " + ChallengeFormat.time(c.mine(uid).scoreMs ?: 0) + " · encore " + ChallengeFormat.left(left - now))
         }
     }
 }
@@ -179,9 +187,26 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
     var code by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    var joinCode by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val haptics = rememberHaptics()
+    val focus = LocalFocusManager.current
+    // A code received from a friend, or the link the app was opened with.
+    fun join(text: String) {
+        val clean = ChallengeInvite.code(text) ?: return
+        if (sending != null) return
+        haptics.selection(); sending = "join"; message = null; focus.clearFocus()
+        scope.launch {
+            try { val c = state.joinChallenge(clean); joinCode = ""; play(c) }
+            catch (e: Exception) { message = CloudError.message(e); haptics.retry() }
+            finally { sending = null }
+        }
+    }
+    LaunchedEffect(uid, state.inviteCode) {
+        val invite = state.inviteCode
+        if (uid != null && invite != null) { state.inviteCode = null; joinCode = invite; join(invite) }
+    }
     LaunchedEffect(uid) {
         if (uid == null) { loading = false; return@LaunchedEffect }
         friends = runCatching { state.cloud.friends(uid) }.getOrDefault(emptyList())
@@ -212,11 +237,25 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
                         if (index > 0) Divider()
                         val other = c.theirs(uid)
                         val status = c.state(uid, now)
-                        PersonRow(other.name, other.uid, openLine(c, status, uid, now)) {
+                        val code = c.code
+                        PersonRow(c.opponentName(uid), other.uid, openLine(c, status, uid, now), link = c.isOpen) {
                             if (status == Challenge.State.YourTurn || status == Challenge.State.Playing)
                                 DuelButton(if (status == Challenge.State.Playing) "Reprendre" else "Jouer") { play(c) }
+                            else if (c.isOpen && code != null) DuelButton("Partager") { Share.plain(context, ChallengeInvite.shareText(code)) }
                         }
                     }
+                }
+            }
+            SectionCard(Modifier.padding(top = 6.dp), padding = 0.dp, radius = 22.dp) {
+                Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(joinCode, { text -> joinCode = text.uppercase().filter { it in ChallengeInvite.ALPHABET }.take(6) },
+                        Modifier.weight(1f).testTag("joinCode"), singleLine = true,
+                        placeholder = { Text("Code d’un défi reçu", color = Palette.tertiary) },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = { join(joinCode) }),
+                        colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent))
+                    DuelButton("Rejoindre", enabled = joinCode.length == 6 && sending == null, busy = sending == "join") { join(joinCode) }
                 }
             }
             Kicker("Défier un ami", Palette.tertiary, Modifier.padding(top = 6.dp))
@@ -240,6 +279,21 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
                     }
                 }
             }
+            // For someone who is not a friend yet: play first, then send the link with its code.
+            Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
+                Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. Le premier qui l’ouvre a 48 h pour vous battre.",
+                        fontSize = 13.sp, color = Palette.secondary)
+                    DuelButton("Défier par lien", Modifier.fillMaxWidth().testTag("openChallenge"), enabled = sending == null, busy = sending == "link") {
+                        haptics.selection(); sending = "link"; message = null
+                        scope.launch {
+                            try { play(state.sendOpenChallenge()) }
+                            catch (e: Exception) { message = CloudError.message(e); haptics.retry() }
+                            finally { sending = null }
+                        }
+                    }
+                }
+            }
             val done = state.challenges.mapNotNull { c -> c.result(uid, now)?.let { c to it } }.take(5)
             if (done.isNotEmpty()) {
                 Kicker("Derniers défis", Palette.tertiary, Modifier.padding(top = 6.dp))
@@ -247,7 +301,7 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
                     done.forEachIndexed { index, (c, result) ->
                         if (index > 0) Divider()
                         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(resultTitle(result) + " contre " + c.theirs(uid).name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                            Text(if (c.isOpen) resultTitle(result) + " · défi par lien" else resultTitle(result) + " contre " + c.theirs(uid).name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                                 color = when (result) { Challenge.Result.WON -> Palette.mint; Challenge.Result.LOST -> Palette.red; else -> Palette.secondary },
                                 modifier = Modifier.weight(1f))
                             Text((c.mine(uid).scoreMs?.let(ChallengeFormat::time) ?: "—") + " / " + (c.theirs(uid).scoreMs?.let(ChallengeFormat::time) ?: "—"),
@@ -267,10 +321,10 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
 }
 
 @Composable
-private fun PersonRow(name: String, id: String, detail: String, detailColor: Color = Palette.tertiary, action: @Composable () -> Unit) {
+private fun PersonRow(name: String, id: String, detail: String, detailColor: Color = Palette.tertiary, link: Boolean = false, action: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Avatar(name, colorIndex(id), 34.dp)
+        if (link) DuelGlyph(34) else Avatar(name, colorIndex(id), 34.dp)
         Column(Modifier.weight(1f)) {
             Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Text(detail, fontSize = 12.sp, color = detailColor, maxLines = 2)
@@ -282,7 +336,8 @@ private fun PersonRow(name: String, id: String, detail: String, detailColor: Col
 private fun openLine(c: Challenge, status: Challenge.State, uid: String, now: Long): String = when (status) {
     Challenge.State.YourTurn -> "Vous a défié · plus que " + ChallengeFormat.left(c.startDeadlineMs - now)
     Challenge.State.Playing -> "Votre chrono tourne"
-    else -> "Votre chrono : " + ChallengeFormat.time(c.mine(uid).scoreMs ?: 0) + if (c.theirs(uid).startedMs == null) " · pas encore joué" else " · en train de jouer"
+    else -> if (c.isOpen) "Code ${c.code ?: ""} · personne n’a encore rejoint"
+        else "Votre chrono : " + ChallengeFormat.time(c.mine(uid).scoreMs ?: 0) + if (c.theirs(uid).startedMs == null) " · pas encore joué" else " · en train de jouer"
 }
 
 private fun resultTitle(result: Challenge.Result) = when (result) {
@@ -321,7 +376,8 @@ fun ChallengeScreen(state: AppViewModel, id: String, close: () -> Unit) {
     LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(game.successTick) { if (game.successTick > 0) haptics.success() }
     val uid = state.uid ?: ""
-    val opponent = game.challenge?.theirs(uid)?.name ?: ""
+    val opponent = game.challenge?.opponentName(uid) ?: ""
+    val byLink = game.challenge?.isOpen == true
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = phase == ChallengeViewModel.Phase.Playing)
@@ -330,7 +386,7 @@ fun ChallengeScreen(state: AppViewModel, id: String, close: () -> Unit) {
                 IconButton(leave, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Quitter") }
                 Column(Modifier.align(Alignment.Center).semantics(mergeDescendants = true) { heading() }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Défi", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text("contre $opponent", fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)
+                    Text(if (byLink) opponent else "contre $opponent", fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)
                 }
                 if (phase == ChallengeViewModel.Phase.Playing) Box(Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
                     var tick by remember { mutableIntStateOf(0) }
@@ -401,6 +457,8 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
     val c = game.challenge ?: return
     val me = c.mine(uid); val other = c.theirs(uid)
     val result = c.result(uid, nowMs())
+    val byLink = c.isOpen
+    val otherName = if (byLink) "Adversaire" else other.name
     val context = LocalContext.current
     val haptics = rememberHaptics()
     LaunchedEffect(result) { if (result == Challenge.Result.WON) haptics.success() }
@@ -418,7 +476,7 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                 Challenge.Result.LOST -> "${other.name} a été plus rapide…"
                 Challenge.Result.DRAW -> "Égalité parfaite !"
                 Challenge.Result.EXPIRED -> "Défi expiré"
-                null -> "Défi envoyé à ${other.name}"
+                null -> if (byLink) "Défi prêt à partager" else "Défi envoyé à ${other.name}"
             }, style = Type.serifItalic(24), textAlign = TextAlign.Center,
                 color = when (result) { Challenge.Result.WON -> Palette.mint; Challenge.Result.LOST -> Palette.red; else -> Duel.soft })
             val mine = ChallengeFormat.time(game.myScoreMs(uid))
@@ -426,7 +484,7 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                 .semantics { contentDescription = "Votre temps : $mine" })
             Text(if (me.skips > 0) "votre temps, dont ${me.skips * 20} s de pénalité" else "votre temps", fontSize = 13.sp, color = Palette.tertiary)
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf((other.scoreMs?.let(ChallengeFormat::time) ?: if (result == null) "caché" else "—") to other.name,
+                listOf((other.scoreMs?.let(ChallengeFormat::time) ?: if (result == null) "caché" else "—") to otherName,
                     "${ChallengeRules.WORDS - me.skips}/${ChallengeRules.WORDS}" to "mots trouvés",
                     Mistakes.text(me.errors) to "réponses").forEach { (v, l) ->
                     Surface(Modifier.weight(1f), shape = RoundedCornerShape(20.dp), color = Palette.fill1) {
@@ -439,16 +497,20 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
             }
             Text(when {
                 result != null -> "Le temps officiel est mesuré par le serveur."
+                byLink -> "Envoyez le lien : le premier qui l’ouvre a 48 h pour battre votre temps, qui reste caché jusque-là."
                 other.startedMs == null -> "Votre chrono reste caché jusqu’à ce que ${other.name} joue. Il a 48 h pour relever le défi."
                 else -> "${other.name} est en train de jouer. Le résultat apparaîtra sur l’accueil."
             }, fontSize = 13.sp, color = Palette.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (result == null) TonalButton("Prévenir ${other.name}", Modifier.weight(1f)) {
+                val code = c.code
+                if (result == null && byLink && code != null) TonalButton("Envoyer le lien", Modifier.weight(1f).testTag("shareChallengeLink")) {
+                    Share.plain(context, ChallengeInvite.shareText(code))
+                } else if (result == null) TonalButton("Prévenir ${other.name}", Modifier.weight(1f)) {
                     Share.plain(context, "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! ${Site.URL}")
                 }
                 PrimaryButton("Terminer", Modifier.weight(1f), onClick = close)
             }
-            state.challengeTally(other.uid).label?.let {
+            if (!byLink) state.challengeTally(other.uid).label?.let {
                 Text("Contre ${other.name} : $it", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 12.dp))
             }
         }

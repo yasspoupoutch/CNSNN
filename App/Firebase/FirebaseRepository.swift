@@ -202,6 +202,7 @@ enum DailyGuesses {
         ]
         refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
+        refs += try await db.collection("challengeInvites").whereField("from", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId"),
                                     ("challenges", "from"), ("challenges", "to")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
@@ -543,16 +544,57 @@ enum DailyGuesses {
         guard try await Self.awaitWrite({ done in ref.setData(data, completion: done) }), let challenge = try await self.challenge(id: ref.documentID) else { throw CloudError.offline }
         return challenge
     }
+    /// A challenge by link: nobody named yet, a 6-character code to share. The challenger's clock starts
+    /// at once, as for a friend. The code is the invite's id, so a code already taken is refused: new one.
+    func createOpenChallenge(uid: String, username: String, cardIDs: [String]) async throws -> Challenge {
+        let random = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
+        let ref = db.collection("challenges").document(ChallengeRules.newId(nowMs: Int(Date().timeIntervalSince1970 * 1000), random: random))
+        for attempt in 1...3 {
+            let code = ChallengeInvite.newCode()
+            let batch = db.batch()
+            batch.setData(["from": uid, "fromName": username, "to": "", "toName": "", "code": code, "cardIds": cardIDs,
+                           "createdAt": FieldValue.serverTimestamp(), "fromStartedAt": FieldValue.serverTimestamp()], forDocument: ref)
+            batch.setData(["challenge": ref.documentID, "from": uid, "createdAt": FieldValue.serverTimestamp()],
+                          forDocument: db.collection("challengeInvites").document(code))
+            do {
+                guard try await Self.awaitWrite({ done in batch.commit(completion: done) }) else { throw CloudError.offline }
+            } catch where CloudError.code(error) == .permissionDenied && attempt < 3 { continue }
+            guard let challenge = try await self.challenge(id: ref.documentID) else { throw CloudError.offline }
+            return challenge
+        }
+        throw CloudError.offline
+    }
+    /// Takes the empty place of a challenge by link, then adds its author to the player's friends.
+    func joinChallenge(code: String, uid: String, username: String) async throws -> Challenge {
+        let invite = try await db.collection("challengeInvites").document(code).getDocument(source: .server)
+        guard let id = invite.data()?["challenge"] as? String else { throw CloudError.inviteNotFound }
+        // Once someone joined, only the two players may read it.
+        let found: Challenge?
+        do { found = try await challenge(id: id) } catch where CloudError.code(error) == .permissionDenied { throw CloudError.inviteTaken }
+        guard let open = found else { throw CloudError.inviteNotFound }
+        if open.to.uid == uid { return open }
+        guard open.from.uid != uid else { throw CloudError.inviteIsYours }
+        guard open.isOpen else { throw CloudError.inviteTaken }
+        guard Int(Date().timeIntervalSince1970 * 1000) < open.startDeadlineMs() else { throw CloudError.inviteExpired }
+        let ref = db.collection("challenges").document(id)
+        guard try await Self.awaitWrite({ done in ref.updateData(["to": uid, "toName": username], completion: done) }) else { throw CloudError.offline }
+        try? await addFriend(uid: uid, friend: open.from.uid, name: open.from.name)
+        guard let joined = try await challenge(id: id) else { throw CloudError.offline }
+        return joined
+    }
+    /// Adds a player met through a challenge to the friends, once (no write when already there).
+    func addFriend(uid: String, friend: String, name: String) async throws {
+        let ref = db.collection("users").document(uid).collection("friends").document(friend)
+        if try await !ref.getDocument(source: .server).exists {
+            try await ref.setData(["username": name, "addedAt": FieldValue.serverTimestamp()])
+        }
+    }
     /// Starts the friend's clock (once), and adds the challenger to their friends so the scores show up.
     func startChallenge(_ challenge: Challenge, uid: String) async throws -> Challenge {
         let ref = db.collection("challenges").document(challenge.id)
         if challenge.to.startedMs == nil {
             guard try await Self.awaitWrite({ done in ref.updateData(["toStartedAt": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
-            let friend = db.collection("users").document(uid).collection("friends").document(challenge.from.uid)
-            let known = try await friend.getDocument(source: .server).exists
-            if !known {
-                try? await friend.setData(["username": challenge.from.name, "addedAt": FieldValue.serverTimestamp()])
-            }
+            try? await addFriend(uid: uid, friend: challenge.from.uid, name: challenge.from.name)
         }
         guard let fresh = try await self.challenge(id: challenge.id) else { throw CloudError.offline }
         return fresh
@@ -601,7 +643,8 @@ enum DailyGuesses {
                          from: .init(uid: from, name: d["fromName"] as? String ?? "Joueur", startedMs: ms("fromStartedAt"), finishedMs: ms("fromFinishedAt"),
                                      skips: d["fromSkips"] as? Int ?? 0, errors: d["fromErrors"] as? Int ?? 0),
                          to: .init(uid: to, name: d["toName"] as? String ?? "Joueur", startedMs: ms("toStartedAt"), finishedMs: ms("toFinishedAt"),
-                                   skips: d["toSkips"] as? Int ?? 0, errors: d["toErrors"] as? Int ?? 0))
+                                   skips: d["toSkips"] as? Int ?? 0, errors: d["toErrors"] as? Int ?? 0),
+                         code: d["code"] as? String)
     }
 
     // MARK: Cards
@@ -861,6 +904,10 @@ enum CloudError: LocalizedError {
     case suspended
     case challengeUnavailable
     case deletionPending
+    case inviteNotFound
+    case inviteIsYours
+    case inviteTaken
+    case inviteExpired
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -910,6 +957,10 @@ enum CloudError: LocalizedError {
         case .suspended: "Votre compte est suspendu : les défis ne sont pas disponibles."
         case .challengeUnavailable: "Ce défi n’est plus disponible. Mettez l’application à jour si le problème continue."
         case .deletionPending: "La suppression de votre compte n’était pas terminée. Elle reprend."
+        case .inviteNotFound: "Aucun défi n’a ce code. Vérifiez les 6 caractères."
+        case .inviteIsYours: "C’est votre propre défi. Envoyez le lien à un ami !"
+        case .inviteTaken: "Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."
+        case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
         }
     }
 }
