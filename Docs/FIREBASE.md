@@ -1,6 +1,6 @@
 # Connexion au projet Firebase existant
 
-Le fichier iOS fourni a été inspecté et intégré : projet `cnsnn-9ctosy`, bundle `com.mycompany.cnsnn`. Aucune identité administrateur Firebase n’est disponible dans cet environnement. Aucune ressource distante n’a été inspectée ou modifiée. La base `(default)` sera conservée ; les fichiers de règles proposés doivent être comparés aux règles existantes avant déploiement.
+Le fichier iOS fourni a été inspecté et intégré : projet `cnsnn-9ctosy`, bundle `com.poupoutch.cnsnn` (avant le 2026-10-16 : `com.mycompany.cnsnn`, app Firebase « CNSNN iOS » gardée pour les anciennes versions). Aucune identité administrateur Firebase n’est disponible dans cet environnement. Aucune ressource distante n’a été inspectée ou modifiée. La base `(default)` sera conservée ; les fichiers de règles proposés doivent être comparés aux règles existantes avant déploiement.
 
 ## Configuration iOS reçue
 
@@ -21,7 +21,7 @@ Prochaine étape : créer l’index composite `cards` : `createdBy` croissant, `
 3. Dans **Général → Vos applications**, choisir l’application iOS si elle existe, puis **Télécharger GoogleService-Info.plist**.
 4. Joindre ce fichier dans la conversation.
 
-Si aucune application iOS n’est enregistrée, cliquer sur l’icône **iOS** dans « Vos applications », saisir `com.mycompany.cnsnn` comme identifiant de bundle et `CNSNN` comme nom. L’ID App Store peut rester vide. Cliquer sur **Enregistrer l’application**, puis télécharger le fichier. Ne créez pas un second projet Firebase et n’activez pas de plan facturable.
+Si aucune application iOS n’est enregistrée, cliquer sur l’icône **iOS** dans « Vos applications », saisir `com.poupoutch.cnsnn` comme identifiant de bundle et `CNSNN` comme nom. L’ID App Store peut rester vide. Cliquer sur **Enregistrer l’application**, puis télécharger le fichier. Ne créez pas un second projet Firebase et n’activez pas de plan facturable.
 
 Si l’application iOS existante utilise un autre identifiant de bundle, fournir le fichier existant : l’identifiant du projet Xcode sera adapté après inspection. Ne supprimez pas l’application existante.
 

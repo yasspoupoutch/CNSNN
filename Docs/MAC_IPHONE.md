@@ -10,7 +10,7 @@ Ouvrir `CNSNN.xcodeproj` avec **Xcode 26 ou plus récent**. Le schéma partagé 
 
 Lancer sur un simulateur iPhone, puis Product → Test. Les tests Core sont aussi exécutables avec `swift test` indépendamment de Firebase. La suite UI repart de zéro en mémoire.
 
-Pour l’installation physique : sélectionner la cible CNSNN, Signing & Capabilities, une Team Apple personnelle ou développeur et un identifiant de bundle disponible. Le bundle proposé est `com.mycompany.cnsnn`. Si l’identifiant change, l’enregistrement Firebase doit correspondre. Brancher l’iPhone, le choisir comme destination, activer Developer Mode quand iOS le demande, puis Run. Un compte personnel permet certains essais sur appareil avec des limites Apple ; TestFlight/App Store requiert le programme développeur adapté.
+Pour l’installation physique : sélectionner la cible CNSNN, Signing & Capabilities, une Team Apple personnelle ou développeur et un identifiant de bundle disponible. Le bundle proposé est `com.poupoutch.cnsnn`. Si l’identifiant change, l’enregistrement Firebase doit correspondre. Brancher l’iPhone, le choisir comme destination, activer Developer Mode quand iOS le demande, puis Run. Un compte personnel permet certains essais sur appareil avec des limites Apple ; TestFlight/App Store requiert le programme développeur adapté.
 
 Ces opérations ne doivent pas toutes être demandées en une fois à l’utilisateur : l’assistant guidera uniquement l’étape actuellement bloquante.
 

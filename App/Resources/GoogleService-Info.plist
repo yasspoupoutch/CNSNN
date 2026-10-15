@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.mycompany.cnsnn</string>
+	<string>com.poupoutch.cnsnn</string>
 	<key>PROJECT_ID</key>
 	<string>cnsnn-9ctosy</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:552154693596:ios:5345fee21ca92844afd919</string>
+	<string>1:552154693596:ios:3507d1b5888f5706afd919</string>
 </dict>
 </plist>

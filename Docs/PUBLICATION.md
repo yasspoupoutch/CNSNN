@@ -2,6 +2,8 @@
 
 Ce qui est prêt dans le dépôt, et ce qu'il restera à faire le jour où les comptes développeur seront payés (99 € par an chez Apple, 25 $ une fois chez Google).
 
+Guide pas à pas et textes des fiches : dans les notes du projet (`notes/publication/`). Ordre conseillé : Google Play d'abord, à cause du test fermé de 14 jours, et l'iPhone en parallèle.
+
 ## Déjà en place
 
 | Exigence des stores | Où |
@@ -17,9 +19,12 @@ Ce qui est prêt dans le dépôt, et ce qu'il restera à faire le jour où les c
 
 ## À faire avant la première soumission iPhone
 
-1. **Identifiant de l'app.** Il vaut encore `com.mycompany.cnsnn` (et `group.com.mycompany.cnsnn` pour le widget). Choisir le définitif (par exemple `com.poupoutch.cnsnn`, comme Android), le changer dans `Scripts/generate_project.py`, `App/CNSNN.entitlements`, `Widget/CNSNNWidget.entitlements` et `Core/Glance.swift`, puis enregistrer une nouvelle app iOS dans la console Firebase et remplacer `App/Resources/GoogleService-Info.plist`. À faire seulement à ce moment-là : avec Sideloadly, un nouvel identifiant installe une autre app, et un compte invité resterait sur l'ancienne.
-2. **Version.** `MARKETING_VERSION` passe de `0.1.0` à `1.0` dans `Scripts/generate_project.py`.
-3. **Signature.** Compte Apple Developer, certificat de distribution et profils (app et widget, avec l'App Group). Le workflow `ios-unsigned-ipa.yml` deviendra un workflow d'archive signée vers TestFlight.
+1. **Identifiant de l'app** : `com.poupoutch.cnsnn` (comme Android), App Group `group.com.poupoutch.cnsnn`, app Firebase « CNSNN iPhone ». L'ancienne app Firebase `com.mycompany.cnsnn` reste en place pour les versions déjà installées avec Sideloadly.
+2. **Version** : `MARKETING_VERSION = 1.0` ; le numéro de build vient du numéro d'exécution du workflow TestFlight.
+3. **Signature et envoi, sans Mac.** Le workflow **CNSNN - iPhone TestFlight** (`ios-testflight.yml`, lancé à la main) archive l'app, laisse Xcode créer le certificat de distribution et les profils (app et widget, avec l'App Group) grâce à une clé API App Store Connect, puis envoie le build sur App Store Connect. Secrets du dépôt à créer :
+   - `APPLE_TEAM_ID` : l'identifiant d'équipe (Membership details sur developer.apple.com) ;
+   - `ASC_KEY_ID` et `ASC_ISSUER_ID` : App Store Connect > Utilisateurs et accès > Intégrations > Clés de l'équipe, clé avec le rôle **Admin** (nécessaire pour créer le certificat) ;
+   - `ASC_KEY_P8` : le contenu du fichier `.p8` téléchargé (une seule fois possible).
 4. **App Store Connect :**
    - Catégorie : Jeux > Mots. Classification : 4+ (pas de contenu choquant ; contenu des joueurs modéré).
    - Confidentialité de l'app : Identifiants (ID utilisateur), Coordonnées (email), Contenu utilisateur (contenu de jeu, autre contenu), Diagnostics (données de plantage). Tout « lié à l'utilisateur » sauf les plantages, rien pour le suivi publicitaire.
@@ -27,12 +32,14 @@ Ce qui est prêt dans le dépôt, et ce qu'il restera à faire le jour où les c
    - Compte de démonstration pour la revue : un compte email de test (la revue doit pouvoir jouer et voir la modération si on la mentionne).
    - Captures : iPhone 6,9 pouces et 6,5 pouces (accueil, partie, résultat, classement, amis).
 5. **Connexion avec Apple** : pas obligatoire, l'app ne propose aucune connexion tierce (Google, Facebook).
+6. **Statut de commerçant (DSA)** : à déclarer dans App Store Connect pour être distribué dans l'Union européenne. App gratuite sans revenus : « pas commerçant », sinon l'adresse et le téléphone sont publiés.
+7. **SDK** : Apple exige au moins Xcode 26 et le SDK iOS 26 ; la CI utilise Xcode 27.
 
 ## À faire avant la première soumission Android
 
-1. **Niveau d'API cible.** `targetSdk = 35` dans `Android/app/build.gradle.kts` : Google Play exige chaque année un niveau plus récent pour les nouvelles apps (vérifier la règle en vigueur le jour de la soumission, probablement 36).
+1. **Niveau d'API cible.** `targetSdk = 36`, le niveau exigé pour les nouvelles apps depuis le 31 août 2026 (Google le relève chaque année).
 2. **Clé de signature.** La clé actuelle (`Android/signing/release.enc.json`) peut devenir la clé d'importation de Play App Signing. Ne jamais la régénérer, sinon les APK déjà installés ne pourront plus se mettre à jour.
-3. **Format.** Le Play Store demande un AAB : ajouter `bundleRelease` au workflow Android.
+3. **Format.** Le Play Store demande un AAB : le workflow Android le produit (artefact **CNSNN-Android-AAB**). Le premier AAB s'envoie à la main dans la Play Console.
 4. **Compte personnel récent** : test fermé obligatoire avec au moins 12 testeurs pendant 14 jours avant la production.
 5. **Play Console :**
    - Sécurité des données : identifiant, email, contenu de jeu, contenu des joueurs, journaux de plantage. Collectés, non partagés, chiffrés en transit, suppression possible (lien web ci-dessus). Pas de publicité.

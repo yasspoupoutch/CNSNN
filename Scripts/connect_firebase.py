@@ -6,7 +6,7 @@ parser=argparse.ArgumentParser();parser.add_argument('plist',type=Path);args=par
 root=Path(__file__).resolve().parents[1]
 data=plistlib.loads(args.plist.read_bytes())
 for key in ['PROJECT_ID','GOOGLE_APP_ID','API_KEY','BUNDLE_ID']:assert data.get(key),f'Missing {key}'
-assert data['BUNDLE_ID']=='com.mycompany.cnsnn','Bundle ID differs. Inspect the existing iOS registration before changing the app identifier.'
+assert data['BUNDLE_ID']=='com.poupoutch.cnsnn','Bundle ID differs. Inspect the existing iOS registration before changing the app identifier.'
 assert data['GOOGLE_APP_ID'].find(':ios:')>=0,'This is not an iOS Firebase configuration.'
 dest=root/'App/Resources/GoogleService-Info.plist'
 if dest.exists():assert dest.read_bytes()==args.plist.read_bytes(),'Existing Firebase configuration differs. Refusing to overwrite.'
