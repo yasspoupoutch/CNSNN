@@ -409,8 +409,12 @@ import CNSNNCore
         if let body { request.httpBody = Data(body.utf8); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         // The emulators can be slow to answer their first request on a busy CI runner: retry a timeout.
         var response: URLResponse?
+        // A 499 means the emulator dropped the request while busy: it is retried the same way.
         for attempt in 0..<3 where response == nil {
-            do { response = try await URLSession.shared.data(for: request).1 }
+            do {
+                response = try await URLSession.shared.data(for: request).1
+                if (response as? HTTPURLResponse)?.statusCode == 499, attempt < 2 { response = nil }
+            }
             catch let error as URLError where error.code == .timedOut && attempt < 2 { continue }
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
