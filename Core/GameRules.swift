@@ -21,7 +21,11 @@ public enum DailySchedule {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
-    public static func previousDay(_ date: Date) -> Date { calendar.date(byAdding: .day, value: -1, to: date)! }
+    public static func previousDay(_ date: Date, in timeZone: TimeZone = .current) -> Date {
+        var calendar = calendar
+        calendar.timeZone = timeZone
+        return calendar.date(byAdding: .day, value: -1, to: date)!
+    }
     /// Monday-Tuesday easy, Wednesday-Friday medium, weekend hard (same table as firestore.rules).
     public static func difficulty(forKey key: String) -> Difficulty? {
         guard let day = dayNumber(forKey: key) else { return nil }

@@ -8,16 +8,19 @@ final class GameRulesTests: XCTestCase {
   XCTAssertEqual(Scoring.points(difficulty:.hard,timeMs:999999,usedHint:false,correct:true),150)
   XCTAssertEqual(Scoring.points(difficulty:.easy,timeMs:-1000,usedHint:false,correct:true),100)
  }
+ private let paris=TimeZone(identifier:"Europe/Paris")!
  func testDailyDeterminismAndTimezone() throws {
   let date=try XCTUnwrap(ISO8601DateFormatter().date(from:"2026-10-05T22:30:00Z"))
-  XCTAssertEqual(DailySchedule.key(date),"2026-10-06")
+  // The word follows the phone's time zone: these dates are checked on the Paris calendar.
+  XCTAssertEqual(DailySchedule.key(date,in:paris),"2026-10-06")
+  XCTAssertEqual(DailySchedule.key(date,in:TimeZone(identifier:"UTC")!),"2026-10-05")
   XCTAssertEqual(DailySchedule.card(for:date,cards:SeedCards.all),DailySchedule.card(for:date,cards:Array(SeedCards.all.reversed())))
   XCTAssertNil(DailySchedule.card(for:date,cards:[]))
  }
  func testDST() throws {
   let date=try XCTUnwrap(ISO8601DateFormatter().date(from:"2026-03-29T22:30:00Z"))
-  XCTAssertEqual(DailySchedule.key(date),"2026-03-30")
-  XCTAssertEqual(DailySchedule.key(DailySchedule.previousDay(date)),"2026-03-29")
+  XCTAssertEqual(DailySchedule.key(date,in:paris),"2026-03-30")
+  XCTAssertEqual(DailySchedule.key(DailySchedule.previousDay(date,in:paris),in:paris),"2026-03-29")
  }
  func testNoImmediateRepeat() {
   let cards=Array(SeedCards.all.prefix(3))
