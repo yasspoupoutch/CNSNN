@@ -158,7 +158,8 @@ import CNSNNCore
         XCTAssertNil(challenge.to.startedMs)
         // Too fast for 5 words: refused. Bob skips all 5 (+100 s).
         await assertThrows { _ = try await self.repo.finishChallenge(challenge, uid: bob.uid, skips: 0, errors: 0) }
-        XCTAssertTrue(try await repo.finishChallenge(challenge, uid: bob.uid, skips: 5, errors: 2))
+        let bobFinished = try await repo.finishChallenge(challenge, uid: bob.uid, skips: 5, errors: 2)
+        XCTAssertTrue(bobFinished)
         let sent = try await repo.challenges(uid: bob.uid)
         XCTAssertEqual(sent.map(\.id), [challenge.id])
         XCTAssertEqual(sent.first?.state(for: bob.uid, now: now()), .waiting)
@@ -176,7 +177,8 @@ import CNSNNCore
         XCTAssertEqual(friends.map(\.uid), [bob.uid])
         await assertThrows { _ = try await self.repo.finishChallenge(started, uid: alice.uid, skips: 3, errors: 0) }
         try await Task.sleep(for: .milliseconds(4300))
-        XCTAssertTrue(try await repo.finishChallenge(started, uid: alice.uid, skips: 3, errors: 1))
+        let aliceFinished = try await repo.finishChallenge(started, uid: alice.uid, skips: 3, errors: 1)
+        XCTAssertTrue(aliceFinished)
         let over = try await XCTUnwrapAsync(try await repo.challenge(id: challenge.id))
         XCTAssertEqual(over.result(for: alice.uid, now: now()), .won)
         XCTAssertEqual(over.result(for: bob.uid, now: now()), .lost)
