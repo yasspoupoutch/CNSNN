@@ -163,6 +163,12 @@ import CNSNNCore
         let sent = try await repo.challenges(uid: bob.uid)
         XCTAssertEqual(sent.map(\.id), [challenge.id])
         XCTAssertEqual(sent.first?.state(for: bob.uid, now: now()), .waiting)
+        // Ids start with the time: the background check finds it with a cursor, and only while it is recent.
+        XCTAssertTrue(challenge.id.prefix(13).allSatisfy(\.isNumber))
+        let recentForBob = try await repo.recentChallenges(uid: bob.uid, nowMs: now())
+        XCTAssertEqual(recentForBob.map(\.id), [challenge.id])
+        let later = try await repo.recentChallenges(uid: bob.uid, nowMs: now() + 60 * 3_600_000)
+        XCTAssertTrue(later.isEmpty)
 
         // Alice sees it, starts her clock (and gets Bob as a friend), then finds 2 words and skips 3.
         try repo.signOut()
@@ -171,6 +177,13 @@ import CNSNNCore
         let received = try XCTUnwrap(inbox.first)
         XCTAssertEqual(received.state(for: alice.uid, now: now()), .yourTurn)
         XCTAssertEqual(received.from.name, "Bob")
+        // What Alice's phone would notify in the background: Bob's challenge, once (a few reads, quick).
+        let clock = Date()
+        let recent = try await repo.recentChallenges(uid: alice.uid, nowMs: now())
+        XCTAssertLessThan(Date().timeIntervalSince(clock), 3)
+        let alerts = ChallengeAlerts.pending(recent, uid: alice.uid, now: now(), seen: [])
+        XCTAssertEqual(alerts.map(\.key), [challenge.id + ".new"])
+        XCTAssertEqual(alerts.first?.title, "Bob vous a défié !")
         let started = try await repo.startChallenge(received, uid: alice.uid)
         XCTAssertNotNil(started.to.startedMs)
         let friends = try await repo.friends(uid: alice.uid)

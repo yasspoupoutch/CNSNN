@@ -94,17 +94,24 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
     LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
     LaunchedEffect(state.uid) { state.refreshChallenges() }
+    // The day on screen, moved on at midnight and whenever the app comes back (a notification tap
+    // the next morning), so yesterday's found word never stays up.
+    var today by remember { mutableStateOf(DailySchedule.key()) }
+    LaunchedEffect(today) {
+        kotlinx.coroutines.delay(maxOf(1_000L, DailySchedule.nextDay().toEpochMilli() - System.currentTimeMillis() + 1_000L))
+        today = DailySchedule.key()
+    }
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     androidx.compose.runtime.DisposableEffect(lifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) state.refreshChallengesSoon()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon() }
         }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Header(state)
-        DailyCard(state) { play(GameMode.DAILY, null, null) }
+        DailyCard(state, today) { play(GameMode.DAILY, null, null) }
         Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
@@ -227,8 +234,7 @@ private fun Header(state: AppViewModel) {
 }
 
 @Composable
-private fun DailyCard(state: AppViewModel, play: () -> Unit) {
-    val today = DailySchedule.key()
+private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
     val attempt = state.progress.attempts.firstOrNull { it.dailyKey == today }
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }

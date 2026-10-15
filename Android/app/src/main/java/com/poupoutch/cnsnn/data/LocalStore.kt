@@ -89,6 +89,19 @@ class LocalStore(context: Context) {
         prefs.edit().remove("challenge.$id").remove("challenge.$id.elapsed").remove("challenge.$id.savedAt").apply()
     }
 
+    /** Challenge notifications already shown (or seen in the app), newest last, at most 300. */
+    val seenChallengeAlerts: Set<String> get() = prefs.getString("challenge.alerts.seen", "")!!.split("\n").filter { it.isNotEmpty() }.toSet()
+    fun rememberChallengeAlerts(keys: List<String>) {
+        val list = prefs.getString("challenge.alerts.seen", "")!!.split("\n").filter { it.isNotEmpty() }
+        val fresh = keys.filter { it !in list }
+        if (fresh.isEmpty()) return
+        prefs.edit().putString("challenge.alerts.seen", (list + fresh).takeLast(300).joinToString("\n")).apply()
+    }
+    /** Set while the player has friends or challenges: nobody to hear from means no background work. */
+    var challengeWatch: Boolean
+        get() = prefs.getBoolean("challenge.watch", false)
+        set(value) { prefs.edit().putBoolean("challenge.watch", value).apply() }
+
     /** Cards (Sprint, Survie) or duos (Double sens) played lately, so a new game draws other ones. */
     fun recent(mode: PlayMode): List<String> =
         prefs.getString(recentKey(mode), null)?.let { json -> runCatching { ProgressJson.decodeFromString(ListSerializer(String.serializer()), json) }.getOrNull() } ?: emptyList()

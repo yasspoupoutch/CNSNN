@@ -6,6 +6,7 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -17,6 +18,7 @@ import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
@@ -393,7 +395,8 @@ class CloudRepository(
 
     /** Sends a challenge to a friend and starts the challenger's clock on the server at once. */
     suspend fun createChallenge(uid: String, username: String, friend: String, friendName: String, cardIds: List<String>): Challenge {
-        val ref = db.collection("challenges").document()
+        val random = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        val ref = db.collection("challenges").document(ChallengeRules.newId(System.currentTimeMillis(), random))
         val data = mapOf("from" to uid, "fromName" to username, "to" to friend, "toName" to friendName, "cardIds" to cardIds,
             "createdAt" to FieldValue.serverTimestamp(), "fromStartedAt" to FieldValue.serverTimestamp())
         if (!awaitWrite(ref.set(data))) throw CloudError(CloudError.Kind.OFFLINE)
@@ -419,6 +422,23 @@ class CloudRepository(
     }
     suspend fun challenge(id: String): Challenge? =
         db.collection("challenges").document(id).get(Source.SERVER).await().data?.let { challenge(id, it) }
+    /**
+     * The challenges of the last ~52 hours, the only ones a notification can be about. The ids start
+     * with the time, so a cursor on the id keeps this to a few reads (no composite index needed).
+     */
+    suspend fun recentChallenges(uid: String, nowMs: Long): List<Challenge> {
+        val all = mutableListOf<Challenge>()
+        for (field in listOf("from", "to")) {
+            all += db.collection("challenges").whereEqualTo(field, uid).orderBy(FieldPath.documentId())
+                .startAfter(ChallengeRules.recentFromId(nowMs)).limit(50).get(Source.SERVER).await().documents
+                .mapNotNull { doc -> doc.data?.let { challenge(doc.id, it) } }
+        }
+        return all
+    }
+    /** One read: whether this player has at least one friend to be challenged by. */
+    suspend fun hasFriends(uid: String): Boolean =
+        !db.collection("users").document(uid).collection("friends").limit(1).get(Source.SERVER).await().isEmpty
+
     /** The challenges sent and received, newest first (equality queries only: no composite index needed). */
     suspend fun challenges(uid: String): List<Challenge> {
         val all = mutableListOf<Challenge>()

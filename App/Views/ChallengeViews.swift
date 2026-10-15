@@ -490,6 +490,8 @@ private struct ChallengeResultView: View {
             Text(kicker(result, other: other.name)).font(Typo.serifItalic(24))
                 .foregroundStyle(result == .won ? Palette.mint : result == .lost ? Palette.red : Palette.duelSoft)
                 .multilineTextAlignment(.center)
+                // After a challenge, the natural moment to ask: "tell me when my friend has played".
+                .task { await ChallengeWatch.requestPermission() }
             Text(ChallengeFormat.time(session.myScoreMs(uid: uid))).font(.system(size: 64, weight: .heavy)).tracking(-1.5).monospacedDigit()
                 .padding(.top, 6)
                 .accessibilityLabel("Votre temps : " + ChallengeFormat.time(session.myScoreMs(uid: uid)))

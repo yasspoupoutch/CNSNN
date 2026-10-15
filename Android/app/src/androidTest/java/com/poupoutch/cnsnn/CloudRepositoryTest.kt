@@ -1,5 +1,7 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.reminders.ChallengeWatch
+import com.poupoutch.cnsnn.data.LocalStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.firebase.auth.FirebaseAuth
@@ -154,12 +156,25 @@ class CloudRepositoryTest {
         expectDenied { repo.finishChallenge(challenge, bob.uid, 0, 0) }
         assertTrue(repo.finishChallenge(challenge, bob.uid, 5, 2))
         assertEquals(Challenge.State.Waiting, repo.challenges(bob.uid).single().state(bob.uid, System.currentTimeMillis()))
+        // Ids start with the time: the background check finds it with a cursor, and only while it is recent.
+        assertTrue(challenge.id.take(13).all { it.isDigit() })
+        assertEquals(listOf(challenge.id), repo.recentChallenges(bob.uid, System.currentTimeMillis()).map { it.id })
+        assertTrue(repo.recentChallenges(bob.uid, System.currentTimeMillis() + 60 * 3_600_000L).isEmpty())
 
         // Alice starts her clock (and gets Bob as a friend), finds 2 words and skips 3.
         auth.signOut()
         repo.signIn("alice@example.com", "motdepasse")
         val received = repo.challenges(alice.uid).single()
         assertEquals(Challenge.State.YourTurn, received.state(alice.uid, System.currentTimeMillis()))
+        // The background check on Alice's phone: Bob's challenge once, in a few reads and well under a second or two.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LocalStore(context).challengeWatch = true
+        val clock = System.currentTimeMillis()
+        val alerts = ChallengeWatch.check(context, repo)
+        assertTrue("vérification trop longue", System.currentTimeMillis() - clock < 3_000)
+        assertEquals(listOf(challenge.id + ".new"), alerts.map { it.key })
+        assertEquals("Bob vous a défié !", alerts.single().title)
+        assertTrue(ChallengeWatch.check(context, repo).isEmpty())
         val started = repo.startChallenge(received, alice.uid)
         assertTrue(started.to.startedMs != null)
         assertEquals(listOf(bob.uid), repo.friends(alice.uid).map { it.first })

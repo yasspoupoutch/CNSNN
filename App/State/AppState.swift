@@ -150,6 +150,7 @@ import CNSNNCore
     private func resetToGuest() {
         ModeRunStore.clearAll()
         uid = nil; isAnonymous = true; email = nil; isAdmin = false; isSuspended = false; official = nil; challenges = []
+        ChallengeWatch.setActive(false)
         progress = CNSNNCore.Progress(); cards = SeedCards.all + ExtraCards.all
         local = LocalRepository(); persist()
     }
@@ -314,7 +315,12 @@ import CNSNNCore
 
     func refreshChallenges() async {
         guard let cloud, let uid else { return }
-        if let list = try? await cloud.challenges(uid: uid), self.uid == uid { challenges = list }
+        guard let list = try? await cloud.challenges(uid: uid), self.uid == uid else { return }
+        challenges = list
+        ChallengeWatch.markSeen(list, uid: uid)
+        // Background checks only for players someone can challenge.
+        let active = !list.isEmpty ? true : ((try? await cloud.hasFriends(uid: uid)) ?? ChallengeWatch.isActive)
+        ChallengeWatch.setActive(active)
     }
     /// The challenge the home tile shows: a friend's challenge to play first (the closest deadline),
     /// then one of mine left unfinished, then the latest one waiting for the friend.
@@ -340,6 +346,7 @@ import CNSNNCore
         let ids = ChallengeRules.draw(seed: ModeRandom.seed(), recent: progress.recentCards)
         let challenge = try await cloud.createChallenge(uid: uid, username: progress.username, friend: friend, friendName: name, cardIDs: ids)
         challenges.insert(challenge, at: 0)
+        ChallengeWatch.setActive(true)
         return challenge
     }
     /// Starts (or resumes) my side of a challenge: the friend's clock starts on the server here.
@@ -347,6 +354,7 @@ import CNSNNCore
         guard let cloud, let uid else { throw CloudError.offline }
         let fresh = challenge.to.uid == uid ? try await cloud.startChallenge(challenge, uid: uid) : challenge
         replace(fresh)
+        ChallengeWatch.setActive(true)
         return fresh
     }
     /// Stamps my finish on the server, then reads back the official times.

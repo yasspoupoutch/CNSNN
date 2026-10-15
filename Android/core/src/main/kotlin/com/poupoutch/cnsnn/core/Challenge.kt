@@ -24,6 +24,14 @@ object ChallengeRules {
         return used
     }
 
+    /**
+     * Document ids start with the sending phone's clock (13 digits, then a random part), so the
+     * background check can ask for the latest challenges with a cursor on the id: no composite index.
+     */
+    fun newId(nowMs: Long, random: String): String = nowMs.coerceAtLeast(0).toString().padStart(13, '0') + "-" + random
+    /** Ids above this one cover the challenges still open, with 2 h of slack for a wrong phone clock. */
+    fun recentFromId(nowMs: Long): String = (nowMs - FINISH_WINDOW_MS - 2 * 3_600_000L).coerceAtLeast(0).toString().padStart(13, '0')
+
     fun cards(ids: List<String>): List<Card>? {
         val found = ids.mapNotNull { id -> ModeCatalogue.cards.firstOrNull { it.id == id } }
         return if (found.size == ids.size && found.size == WORDS) found else null
@@ -172,5 +180,37 @@ object ChallengeFormat {
     fun left(ms: Long): String {
         val minutes = maxOf(0L, ms) / 60_000
         return if (minutes >= 60) "${minutes / 60} h" else "${maxOf(1L, minutes)} min"
+    }
+}
+
+/**
+ * The notifications a background check shows: a friend's new challenge, and the result once the
+ * friend finished after you. Each one has a key, remembered so it is shown only once.
+ */
+object ChallengeAlerts {
+    data class Alert(val key: String, val challengeId: String, val title: String, val body: String)
+
+    fun all(challenges: List<Challenge>, uid: String, now: Long): List<Alert> = challenges.mapNotNull { c -> alert(c, uid, now) }
+
+    fun pending(challenges: List<Challenge>, uid: String, now: Long, seen: Set<String>): List<Alert> =
+        all(challenges, uid, now).filter { it.key !in seen }
+
+    private fun alert(c: Challenge, uid: String, now: Long): Alert? {
+        if (!c.involves(uid)) return null
+        val mine = c.mine(uid); val theirs = c.theirs(uid)
+        if (c.state(uid, now) == Challenge.State.YourTurn && c.to.uid == uid)
+            return Alert("${c.id}.new", c.id, "${theirs.name} vous a défié !",
+                "Mêmes 5 mots, le plus rapide gagne. Plus que ${ChallengeFormat.left(c.startDeadlineMs - now)} pour jouer.")
+        val result = c.result(uid, now) ?: return null
+        val mineAt = mine.finishedMs ?: return null
+        val theirsAt = theirs.finishedMs ?: return null
+        if (theirsAt <= mineAt || result == Challenge.Result.EXPIRED) return null
+        val title = when (result) {
+            Challenge.Result.WON -> "Victoire contre ${theirs.name} !"
+            Challenge.Result.LOST -> "Défaite contre ${theirs.name}"
+            else -> "Égalité avec ${theirs.name}"
+        }
+        val body = "Votre chrono : ${ChallengeFormat.time(mine.scoreMs ?: 0)} · ${theirs.name} : ${ChallengeFormat.time(theirs.scoreMs ?: 0)}"
+        return Alert("${c.id}.done", c.id, title, body)
     }
 }
