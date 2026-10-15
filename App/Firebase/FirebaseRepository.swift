@@ -316,9 +316,13 @@ enum DailyGuesses {
         try await db.collection("dailyChallenges").document(day).setData(["cardId":card.id,"wordFull":card.wordFull,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"publishedBy":uid,"publishedAt":FieldValue.serverTimestamp()])
     }
 
+    /// A query, not a direct read: the rules refuse to read a session that does not exist yet
+    /// (they check its owner), so the first game of the day would be refused.
     func dailySession(uid: String, day: String) async throws -> DailySessionState? {
-        let doc = try await sessionRef(uid, day).getDocument(source: .server)
-        return doc.data().flatMap { Self.session(day: day, $0) }
+        let docs = try await db.collection("dailySessions").whereField("userId", isEqualTo: uid)
+            .whereField("day", isEqualTo: day).limit(to: 1).getDocuments(source: .server).documents
+        guard let doc = docs.first else { return nil }
+        return Self.session(day: day, doc.data())
     }
     /// Starts today's clock on the server. Only returns once the server has recorded the start,
     /// so the consonants are never shown before the official timer runs.

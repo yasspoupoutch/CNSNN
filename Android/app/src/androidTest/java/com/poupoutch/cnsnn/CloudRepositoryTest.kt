@@ -72,6 +72,8 @@ class CloudRepositoryTest {
         // The word and the hint stay closed before the game.
         expectDenied { repo.dailySecret(day) }
         expectDenied { repo.dailyHint(day) }
+        // The game asks for today's session first: a brand-new player gets "none", not a refusal.
+        assertNull(repo.dailySession(alice.uid, day))
         val session = repo.startDaily(alice.uid, day, SecretDaily.cardId(day))
         assertFalse(session.finished)
         // A second start would reset the clock: refused.

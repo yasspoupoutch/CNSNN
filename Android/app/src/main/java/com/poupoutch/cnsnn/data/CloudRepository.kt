@@ -202,7 +202,10 @@ class CloudRepository(
         return Card(SecretDaily.cardId(day), word, hint, category, difficulty)
     }
     suspend fun dailySession(uid: String, day: String): DailySession? {
-        val d = sessionRef(uid, day).get(Source.SERVER).await()
+        // A query, not a direct read: the rules refuse to read a session that does not exist yet
+        // (they check its owner), so the first game of the day would be refused.
+        val d = db.collection("dailySessions").whereEqualTo("userId", uid).whereEqualTo("day", day).limit(1)
+            .get(Source.SERVER).await().documents.firstOrNull() ?: return null
         val cardId = d.getString("cardId") ?: return null
         val started = d.getTimestamp("startedAt") ?: return null
         return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"),

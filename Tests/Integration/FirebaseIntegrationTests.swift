@@ -88,6 +88,9 @@ import CNSNNCore
         // Before playing, neither the hint nor the word can be read.
         await assertThrows { _ = try await self.repo.dailySecret(day: day) }
         await assertThrows { _ = try await self.repo.dailyHint(day: day) }
+        // The game asks for today's session first: a brand-new player gets "none", not a refusal.
+        let none = try await repo.dailySession(uid: alice.uid, day: day)
+        XCTAssertNil(none)
         _ = try await repo.startDaily(uid: alice.uid, day: day, cardID: puzzle.id)
         let hint = try await repo.revealSecretHint(uid: alice.uid, day: day)
         XCTAssertEqual(hint, "Un carré gourmand.")

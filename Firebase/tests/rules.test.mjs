@@ -110,6 +110,17 @@ test('daily session: today only, server start time, single start',async()=>{
  await assertFails(setDoc(doc(db,`dailySessions/alice_${day}`),{userId:'alice',day,cardId:'x',startedAt:serverTimestamp(),hintUsed:false}));
  await assertFails(getDoc(doc(user('bob'),`dailySessions/alice_${day}`)));
 });
+// The app looks for today's session before starting it. A direct read of a missing session is
+// refused (the rule checks its owner), so the app queries its own sessions instead.
+test('a new player can look for a session that does not exist yet',async()=>{
+ await signUp(); const day=parisKey();
+ await assertFails(getDoc(doc(user(),`dailySessions/alice_${day}`)));
+ const mine=await assertSucceeds(getDocs(query(collection(user(),'dailySessions'),where('userId','==','alice'),where('day','==',day))));
+ assert.equal(mine.size,0);
+ await startDaily('alice',day,{backdate:false});
+ assert.equal((await getDocs(query(collection(user(),'dailySessions'),where('userId','==','alice'),where('day','==',day)))).size,1);
+ await assertFails(getDocs(query(collection(user('bob'),'dailySessions'),where('userId','==','alice'),where('day','==',day))));
+});
 test('daily session needs a profile',async()=>{ await assertFails(setDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{userId:'alice',day:parisKey(),cardId:'x',startedAt:serverTimestamp(),hintUsed:false})); });
 test('hint cannot be hidden and finish happens once',async()=>{
  await signUp(); await startDaily();
