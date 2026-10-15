@@ -9,6 +9,11 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { applicationDefault } from 'firebase-admin/app';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { decrypt } from './daily.mjs';
 
 const projectId = 'cnsnn-9ctosy';
 const site = projectId;
@@ -51,6 +56,37 @@ const root = new URL('../hosting/', import.meta.url);
 const fonts = new URL('../../App/Resources/Fonts/', import.meta.url);
 const apk = process.argv[2];
 const files = new Map();
+// Android App Links: a challenge link (/d/CODE) opens the app directly once Android has checked this
+// file, which names the app and the certificate it is signed with. The release key lives in the
+// repository only encrypted (Android/signing); its fingerprint is read here. When Google Play signs
+// the app (Play App Signing), add the fingerprint it shows in the Play Console to this list.
+const playSigningSha256 = [];
+function releaseSha256() {
+  const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!credentials) return [];
+  const dir = mkdtempSync(join(tmpdir(), 'cnsnn-'));
+  try {
+    const { private_key: privateKey } = JSON.parse(readFileSync(credentials, 'utf8'));
+    const box = JSON.parse(readFileSync(new URL('../../Android/signing/release.enc.json', import.meta.url), 'utf8'));
+    const [{ keystore, password }] = decrypt(box, privateKey);
+    const file = join(dir, 'release.p12');
+    writeFileSync(file, Buffer.from(keystore, 'base64'), { mode: 0o600 });
+    const listing = execFileSync('keytool', ['-list', '-v', '-keystore', file, '-storetype', 'PKCS12', '-alias', 'cnsnn', '-storepass:env', 'CNSNN_STOREPASS'],
+      { env: { ...process.env, CNSNN_STOREPASS: password, LC_ALL: 'C' } }).toString();
+    const sha = listing.match(/SHA256:\s*([0-9A-F:]{95})/)?.[1];
+    if (!sha) throw new Error('Empreinte SHA-256 introuvable');
+    return [sha];
+  } catch (error) {
+    console.log(`::warning::Clé Android illisible (${error.message}) : les liens de défi ouvriront la page web au lieu de l’app.`);
+    return [];
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+const fingerprints = [...releaseSha256(), ...playSigningSha256];
+const assetLinks = [{
+  relation: ['delegate_permission/common.handle_all_urls'],
+  target: { namespace: 'android_app', package_name: 'com.poupoutch.cnsnn', sha256_cert_fingerprints: fingerprints },
+}];
+
 for (const name of await readdir(root)) {
   let content = await readFile(new URL(name, root));
   if (name === 'index.html' && !apk) content = Buffer.from(content.toString('utf8').replace(/<!--ANDROID-->[\s\S]*<!--\/ANDROID-->\n?/, ''));
@@ -58,6 +94,7 @@ for (const name of await readdir(root)) {
 }
 for (const name of ['Fraunces-Black.ttf', 'InstrumentSerif-Italic.ttf']) files.set('/fonts/' + name, await readFile(new URL(name, fonts)));
 if (apk) files.set('/cnsnn.apk', await readFile(apk));
+if (fingerprints.length) files.set('/.well-known/assetlinks.json', Buffer.from(JSON.stringify(assetLinks, null, 1) + '\n'));
 
 await ensureWebApp();
 await ensureSite();
@@ -65,10 +102,13 @@ const version = await call('POST', `${api}/sites/${site}/versions`, {
   config: {
     cleanUrls: true,
     trailingSlashBehavior: 'REMOVE',
+    // Challenge links: one page reads the code from the address.
+    rewrites: [{ glob: '/d/**', path: '/defi.html' }],
     headers: [
       { glob: '**', headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY' } },
       { glob: '/cnsnn.apk', headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Cache-Control': 'no-cache' } },
       { glob: '/fonts/**', headers: { 'Cache-Control': 'public, max-age=31536000' } },
+      { glob: '/.well-known/assetlinks.json', headers: { 'Content-Type': 'application/json' } },
     ],
   },
 });

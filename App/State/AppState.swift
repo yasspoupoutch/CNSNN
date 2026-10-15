@@ -24,6 +24,8 @@ import CNSNNCore
     var challenges: [Challenge] = []
     /// Asks the home page to open the challenge sheet (from the daily result).
     var challengeRequest = 0
+    /// The code of a challenge link the app was opened with, waiting for the challenge sheet to join it.
+    var inviteCode: String?
     /// Asks the shell to show the leaderboard (from the home page).
     var leaderboardRequest = 0
     private var local: any ProgressRepository
@@ -310,6 +312,8 @@ import CNSNNCore
         var readAt: [String: Date] = [:]
     }
     var rankings = Rankings()
+    /// A new friend: the friends ranking is read again next time it shows.
+    func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
     /// Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh.
     func rankingIsStale(_ key: String, force: Bool) -> Bool {
         guard let at = rankings.readAt[key] else { return true }
@@ -385,6 +389,7 @@ import CNSNNCore
         challenges = list
         ChallengeWatch.markSeen(list, uid: uid)
         await sendPendingChallenges(list, uid: uid)
+        await befriendJoiners(list, uid: uid)
         // Background checks only for players someone can challenge (one read, once a week at most).
         if !list.isEmpty { ChallengeWatch.setActive(true) }
         else if fullAt == now { ChallengeWatch.setActive((try? await cloud.hasFriends(uid: uid)) ?? ChallengeWatch.isActive) }
@@ -415,6 +420,38 @@ import CNSNNCore
         challenges.insert(challenge, at: 0)
         ChallengeWatch.setActive(true)
         return challenge
+    }
+    /// A challenge by link: same words and clock as for a friend, but anyone with the code can join.
+    func sendOpenChallenge() async throws -> Challenge {
+        guard let cloud, let uid else { throw CloudError.offline }
+        if isSuspended { throw CloudError.suspended }
+        let ids = ChallengeRules.draw(seed: ModeRandom.seed(), recent: progress.recentCards)
+        let challenge = try await cloud.createOpenChallenge(uid: uid, username: progress.username, cardIDs: ids)
+        challenges.insert(challenge, at: 0)
+        ChallengeWatch.setActive(true)
+        return challenge
+    }
+    /// Joins a challenge by its code (typed, or from an opened link); its author becomes a friend.
+    func joinChallenge(code: String) async throws -> Challenge {
+        guard let cloud, let uid else { throw CloudError.offline }
+        if isSuspended { throw CloudError.suspended }
+        let challenge = try await cloud.joinChallenge(code: code, uid: uid, username: progress.username)
+        replace(challenge)
+        forgetFriendsRanking()
+        ChallengeWatch.setActive(true)
+        return challenge
+    }
+    /// Whoever joined my challenges by link becomes a friend too, once (remembered on the phone).
+    private func befriendJoiners(_ list: [Challenge], uid: String) async {
+        guard let cloud else { return }
+        let key = "challenge.befriended." + uid
+        var done = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        for c in list where c.code != nil && c.from.uid == uid && !c.isOpen && !done.contains(c.id) {
+            guard (try? await cloud.addFriend(uid: uid, friend: c.to.uid, name: c.to.name)) != nil else { continue }
+            done.insert(c.id)
+            forgetFriendsRanking()
+        }
+        UserDefaults.standard.set(Array(done), forKey: key)
     }
     /// Starts (or resumes) my side of a challenge: the friend's clock starts on the server here.
     func startChallenge(_ challenge: Challenge) async throws -> Challenge {

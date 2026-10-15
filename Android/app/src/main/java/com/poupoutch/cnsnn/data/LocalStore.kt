@@ -40,6 +40,10 @@ class LocalStore(context: Context) {
         get() = prefs.getInt("avatar", 0)
         set(value) { prefs.edit().putInt("avatar", value).apply() }
     /** Players this phone chose to hide from the leaderboards. */
+    /** Challenges by link whose joiner was added to the friends (so it is done once). */
+    fun befriended(uid: String): Set<String> = prefs.getStringSet("challenge.befriended.$uid", emptySet())!!.toSet()
+    fun setBefriended(uid: String, ids: Set<String>) { prefs.edit().putStringSet("challenge.befriended.$uid", ids).apply() }
+
     var hiddenPlayers: Set<String>
         get() = prefs.getStringSet("hiddenPlayers", emptySet())!!.toSet()
         set(value) { prefs.edit().putStringSet("hiddenPlayers", value).apply() }

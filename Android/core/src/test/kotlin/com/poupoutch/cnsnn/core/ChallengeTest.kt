@@ -152,4 +152,29 @@ class ChallengeTest {
         assertTrue(!ChallengeRules.shouldCheck(evening, evening - 5 * 60_000, paris))
         assertTrue(ChallengeRules.shouldCheck(evening, evening - 20 * 60_000, paris))
     }
+
+    @Test fun inviteCodesFromTextsAndLinks() {
+        assertEquals("ABC234", ChallengeInvite.code("abc234"))
+        assertEquals("ABC234", ChallengeInvite.code(" ABC 234 "))
+        assertEquals("ABC234", ChallengeInvite.code("https://cnsnn-9ctosy.web.app/d/ABC234"))
+        assertEquals("ABC234", ChallengeInvite.code("cnsnn://d/abc234?x=1"))
+        assertEquals("XYZ789", ChallengeInvite.code(ChallengeInvite.shareText("XYZ789")))
+        assertNull(ChallengeInvite.code("ABC23"))
+        assertNull(ChallengeInvite.code("ABO234"))
+        assertNull(ChallengeInvite.code("Bonjour"))
+        val code = ChallengeInvite.newCode()
+        assertEquals(code, ChallengeInvite.code(code))
+    }
+
+    @Test fun openChallengeWaitsForSomeoneThenPlaysAsUsual() {
+        val open = challenge(Challenge.Side("alice", "Alice", startedMs = 0, finishedMs = 90_000), Challenge.Side("", "")).copy(code = "ABC234")
+        assertTrue(open.isOpen)
+        assertEquals("Défi par lien", open.opponentName("alice"))
+        assertEquals(Challenge.State.Waiting, open.state("alice", hour))
+        assertEquals(Challenge.Result.EXPIRED, open.result("alice", 49 * hour))
+        val joined = open.copy(to = Challenge.Side("carol", "Carol"))
+        assertTrue(!joined.isOpen)
+        assertEquals("Carol", joined.opponentName("alice"))
+        assertEquals(Challenge.State.YourTurn, joined.state("carol", hour))
+    }
 }

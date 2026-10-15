@@ -119,14 +119,20 @@ public struct Challenge: Codable, Sendable, Equatable, Identifiable {
     public var createdMs: Int
     public var from: Side
     public var to: Side
+    /// The invite code of a challenge by link (nil for a challenge sent to a friend).
+    public var code: String?
 
-    public init(id: String, cardIds: [String], createdMs: Int, from: Side, to: Side) {
-        self.id = id; self.cardIds = cardIds; self.createdMs = createdMs; self.from = from; self.to = to
+    public init(id: String, cardIds: [String], createdMs: Int, from: Side, to: Side, code: String? = nil) {
+        self.id = id; self.cardIds = cardIds; self.createdMs = createdMs; self.from = from; self.to = to; self.code = code
     }
 
     public func involves(_ uid: String) -> Bool { from.uid == uid || to.uid == uid }
     public func mine(_ uid: String) -> Side { from.uid == uid ? from : to }
     public func theirs(_ uid: String) -> Side { from.uid == uid ? to : from }
+    /// A challenge by link that nobody has joined yet.
+    public var isOpen: Bool { to.uid.isEmpty }
+    /// The other player's name, or what stands for it while nobody has joined.
+    public func opponentName(_ uid: String) -> String { isOpen && from.uid == uid ? "Défi par lien" : theirs(uid).name }
 
     /// Time left for the friend to start, then for everyone to finish.
     public func startDeadlineMs() -> Int { createdMs + ChallengeRules.startWindowMs }
@@ -195,6 +201,27 @@ public struct ChallengeTally: Equatable, Sendable {
             }
         }
         return tally
+    }
+}
+
+/// Challenges by link: a 6-character code (the friend-code alphabet, no 0/O or 1/I) and its web page,
+/// which opens the app (cnsnn://d/CODE) or tells how to get it.
+public enum ChallengeInvite {
+    public static let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    public static let host = "cnsnn-9ctosy.web.app"
+    public static func link(_ code: String) -> String { "https://\(host)/d/\(code)" }
+    public static func newCode() -> String { String((0..<6).map { _ in alphabet.randomElement()! }) }
+    /// The code in a typed text, a pasted link or an opened URL; nil when there is none.
+    public static func code(in text: String) -> String? {
+        var part = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let range = part.range(of: "/d/", options: .backwards) { part = String(part[range.upperBound...]) }
+        else if part.lowercased().hasPrefix("cnsnn://") { part = String(part.dropFirst("cnsnn://".count)) }
+        let letters = part.uppercased().prefix { $0 != "?" && $0 != "#" && $0 != "/" }.filter { $0.isLetter || $0.isNumber }
+        guard letters.count == 6, letters.allSatisfy({ alphabet.contains($0) }) else { return nil }
+        return String(letters)
+    }
+    public static func shareText(code: String) -> String {
+        "Je te défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne ! Rejoins mon défi avec le code \(code) : \(link(code))"
     }
 }
 

@@ -206,6 +206,54 @@ import CNSNNCore
         let left = try await repo.challenges(uid: bob.uid)
         XCTAssertTrue(left.isEmpty)
     }
+    /// A challenge by link: Bob plays first, then Carol, who is not his friend, joins with the code.
+    /// The first to join takes the place; both become friends; the code then leads nowhere else.
+    func testChallengeByLinkFlow() async throws {
+        let bob = try await repo.bootstrap(username: "Bob")
+        _ = try await repo.createPermanentAccount(email: "bob@cnsnn.test", password: "motdepasse2")
+        let open = try await repo.createOpenChallenge(uid: bob.uid, username: "Bob", cardIDs: ChallengeRules.draw(seed: 7))
+        let code = try XCTUnwrap(open.code)
+        XCTAssertTrue(open.isOpen)
+        XCTAssertEqual(ChallengeInvite.code(in: ChallengeInvite.link(code)), code)
+        await assertThrows(CloudError.inviteIsYours) { _ = try await self.repo.joinChallenge(code: code, uid: bob.uid, username: "Bob") }
+        let bobFinished = try await repo.finishChallenge(open, uid: bob.uid, skips: 5, errors: 0)
+        XCTAssertTrue(bobFinished)
+
+        try repo.signOut()
+        let carol = try await repo.bootstrap(username: "Carol")
+        await assertThrows(CloudError.inviteNotFound) { _ = try await self.repo.joinChallenge(code: "ZZZZZZ", uid: carol.uid, username: "Carol") }
+        let joined = try await repo.joinChallenge(code: code, uid: carol.uid, username: "Carol")
+        XCTAssertEqual(joined.to.uid, carol.uid)
+        XCTAssertEqual(joined.state(for: carol.uid, now: now()), .yourTurn)
+        // Joining again is harmless; Bob is now Carol's friend, and the challenge is in her list.
+        let again = try await repo.joinChallenge(code: code, uid: carol.uid, username: "Carol")
+        XCTAssertEqual(again.id, open.id)
+        let carolFriends = try await repo.friends(uid: carol.uid)
+        XCTAssertEqual(carolFriends.map(\.uid), [bob.uid])
+        let carolRecent = try await repo.recentChallenges(uid: carol.uid, nowMs: now())
+        XCTAssertEqual(carolRecent.map(\.id), [open.id])
+        let started = try await repo.startChallenge(joined, uid: carol.uid)
+        XCTAssertNotNil(started.to.startedMs)
+
+        // Someone else is too late.
+        try repo.signOut()
+        let dan = try await repo.bootstrap(username: "Dan")
+        await assertThrows(CloudError.inviteTaken) { _ = try await self.repo.joinChallenge(code: code, uid: dan.uid, username: "Dan") }
+
+        // Bob sees who joined and adds Carol back.
+        try repo.signOut()
+        _ = try await repo.signIn(email: "bob@cnsnn.test", password: "motdepasse2")
+        let mine = try await XCTUnwrapAsync(try await repo.challenge(id: open.id))
+        XCTAssertEqual(mine.opponentName(bob.uid), "Carol")
+        try await repo.addFriend(uid: bob.uid, friend: carol.uid, name: "Carol")
+        let bobFriends = try await repo.friends(uid: bob.uid)
+        XCTAssertEqual(bobFriends.map(\.uid), [carol.uid])
+        // Deleting Bob's account removes the invite too.
+        try await repo.deleteAccount(uid: bob.uid, password: "motdepasse2")
+        try repo.signOut()
+        let erin = try await repo.bootstrap(username: "Erin")
+        await assertThrows(CloudError.inviteNotFound) { _ = try await self.repo.joinChallenge(code: code, uid: erin.uid, username: "Erin") }
+    }
     private func now() -> Int { Int(Date().timeIntervalSince1970 * 1000) }
 
     /// Sprint, Survie and Double sens records follow the account: two devices that never saw each

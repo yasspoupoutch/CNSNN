@@ -93,6 +93,7 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     // "Défier un ami" on the daily result opens the sheet once back here.
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
     LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
+    LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) challenges = true }
     LaunchedEffect(state.uid) { state.refreshChallenges() }
     // The day on screen, moved on at midnight and whenever the app comes back (a notification tap
     // the next morning), so yesterday's found word never stays up.

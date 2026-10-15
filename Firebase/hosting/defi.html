@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Un défi vous attend · CNSNN</title>
+<meta name="description" content="On vous défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne.">
+<meta property="og:title" content="On vous défie sur CNSNN">
+<meta property="og:description" content="5 mots sans leurs voyelles, le plus rapide gagne. Vous avez 48 h pour relever le défi.">
+<meta name="theme-color" content="#06070c">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .code { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 6px 0 0; }
+  .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
+</style>
+</head>
+<body>
+<main>
+<nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a></nav>
+<h1>On vous défie !</h1>
+<p class="lead">5 mots sans leurs voyelles, le même chrono pour tous les deux. Le plus rapide gagne.</p>
+<section class="card" id="invite">
+  <div class="small">Code du défi</div>
+  <div class="code" id="code" aria-live="polite">······</div>
+  <p class="muted" id="hint">Vous avez 48 h pour le relever. Le premier qui utilise ce code prend la place.</p>
+  <div class="buttons">
+    <a class="button" id="open" href="/">Ouvrir dans CNSNN</a>
+    <button class="button ghost" id="copy" type="button">Copier le code</button>
+  </div>
+  <p class="status" id="status" role="status"></p>
+</section>
+<h2>Vous n’avez pas encore l’application ?</h2>
+<ol>
+  <li>Installez CNSNN sur votre téléphone.</li>
+  <li>Ouvrez-la, choisissez un pseudo, puis touchez « Défier un ami » sur l’accueil.</li>
+  <li>Tapez le code ci-dessus dans « Code d’un défi reçu », puis « Rejoindre ».</li>
+</ol>
+<!--STORES-->
+<section class="card">
+  <p class="muted" style="margin:0">CNSNN arrive bientôt sur l’App Store et Google Play. En attendant, demandez l’application à la personne qui vous a défié.</p>
+</section>
+<!--/STORES-->
+<footer>CNSNN, une application créée par Poupoutch. Contact : <a href="mailto:jeucnsnn@gmail.com">jeucnsnn@gmail.com</a></footer>
+</main>
+<script>
+  // The code is the end of the address: /d/ABC234. Same alphabet as the apps (no 0/O, no 1/I).
+  const raw = decodeURIComponent(location.pathname.split('/d/')[1] || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = /^[A-HJ-NP-Z2-9]{6}$/.test(raw) ? raw : null;
+  const status = document.getElementById('status');
+  if (code) {
+    document.getElementById('code').textContent = code;
+    document.getElementById('open').href = 'cnsnn://d/' + code;
+    document.title = 'Défi ' + code + ' · CNSNN';
+  } else {
+    document.getElementById('code').textContent = '?';
+    document.getElementById('hint').textContent = 'Ce lien est incomplet. Demandez le code de 6 caractères à la personne qui vous a défié.';
+    document.getElementById('open').hidden = true;
+    document.getElementById('copy').hidden = true;
+  }
+  document.getElementById('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
+    catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }
+  });
+</script>
+</body>
+</html>

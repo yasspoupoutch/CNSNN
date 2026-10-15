@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.ChallengeTally
 import com.poupoutch.cnsnn.core.DailySchedule
@@ -195,6 +196,50 @@ class CloudRepositoryTest {
         repo.deleteAccount(alice.uid, "motdepasse")
         repo.signIn("bob@example.com", "motdepasse")
         assertTrue(repo.challenges(bob.uid).isEmpty())
+    }
+
+    /** A challenge by link: Bob plays first, then Carol, who is not his friend, joins with the code. */
+    @Test fun challengeByLinkFlow() = runBlocking<Unit> {
+        repo.bootstrap("Bob")
+        val bob = repo.createPermanentAccount("bob@example.com", "motdepasse")
+        val open = repo.createOpenChallenge(bob.uid, "Bob", ChallengeRules.draw(7uL))
+        val code = open.code!!
+        assertTrue(open.isOpen)
+        assertEquals(code, ChallengeInvite.code(ChallengeInvite.link(code)))
+        expectKind(CloudError.Kind.INVITE_IS_YOURS) { repo.joinChallenge(code, bob.uid, "Bob") }
+        assertTrue(repo.finishChallenge(open, bob.uid, 5, 0))
+
+        auth.signOut()
+        val carol = repo.bootstrap("Carol")
+        expectKind(CloudError.Kind.INVITE_NOT_FOUND) { repo.joinChallenge("ZZZZZZ", carol.uid, "Carol") }
+        val joined = repo.joinChallenge(code, carol.uid, "Carol")
+        assertEquals(carol.uid, joined.to.uid)
+        assertEquals(Challenge.State.YourTurn, joined.state(carol.uid, System.currentTimeMillis()))
+        // Joining again is harmless; Bob is now Carol's friend, and the challenge is in her list.
+        assertEquals(open.id, repo.joinChallenge(code, carol.uid, "Carol").id)
+        assertEquals(listOf(bob.uid), repo.friends(carol.uid).map { it.first })
+        assertEquals(listOf(open.id), repo.recentChallenges(carol.uid, System.currentTimeMillis()).map { it.id })
+        assertTrue(repo.startChallenge(joined, carol.uid).to.startedMs != null)
+
+        // Someone else is too late.
+        auth.signOut()
+        val dan = repo.bootstrap("Dan")
+        expectKind(CloudError.Kind.INVITE_TAKEN) { repo.joinChallenge(code, dan.uid, "Dan") }
+
+        // Bob sees who joined and adds Carol back; deleting his account removes the invite too.
+        auth.signOut()
+        repo.signIn("bob@example.com", "motdepasse")
+        assertEquals("Carol", repo.challenge(open.id)!!.opponentName(bob.uid))
+        repo.addFriend(bob.uid, carol.uid, "Carol")
+        assertEquals(listOf(carol.uid), repo.friends(bob.uid).map { it.first })
+        repo.deleteAccount(bob.uid, "motdepasse")
+        auth.signOut()
+        val erin = repo.bootstrap("Erin")
+        expectKind(CloudError.Kind.INVITE_NOT_FOUND) { repo.joinChallenge(code, erin.uid, "Erin") }
+    }
+
+    private suspend fun expectKind(kind: CloudError.Kind, work: suspend () -> Unit) {
+        try { work(); fail("Une erreur était attendue.") } catch (e: CloudError) { assertEquals(kind, e.kind) }
     }
 
     @Test fun proposalsAreUniqueAndRateLimited() = runBlocking<Unit> {

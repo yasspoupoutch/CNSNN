@@ -18,10 +18,25 @@
             android:exported="true"
             android:theme="@style/Theme.Cnsnn.Starting"
             android:screenOrientation="portrait"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Challenge links: https://cnsnn-9ctosy.web.app/d/CODE opens the app directly (App Link,
+                 checked against /.well-known/assetlinks.json), and cnsnn://d/CODE from the web page. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="cnsnn-9ctosy.web.app" android:pathPrefix="/d/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cnsnn" android:host="d" />
             </intent-filter>
         </activity>
 

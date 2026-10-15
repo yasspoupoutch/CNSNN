@@ -115,6 +115,18 @@ service cloud.firestore {
     && request.resource.data.createdAt == request.time;
    allow delete: if signedIn() && resource.data.uid == request.auth.uid;
   }
+  // Invite codes of challenges by link: 6 characters naming one challenge, looked up like friend codes.
+  match /challengeInvites/{code} {
+   allow get: if signedIn();
+   allow list: if signedIn() && resource.data.from == request.auth.uid;
+   allow create: if active() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
+    && request.resource.data.keys().hasOnly(['challenge','from','createdAt'])
+    && request.resource.data.from == request.auth.uid && request.resource.data.createdAt == request.time
+    && request.resource.data.challenge is string
+    && getAfter(at('challenges/' + request.resource.data.challenge)).data.from == request.auth.uid
+    && getAfter(at('challenges/' + request.resource.data.challenge)).data.code == code;
+   allow delete: if signedIn() && resource.data.from == request.auth.uid;
+  }
   // Suspensions, decided by moderators from the leaderboard or a report.
   match /banned/{uid} {
    allow get: if owner(uid) || admin();
@@ -358,10 +370,15 @@ service cloud.firestore {
 
   // ---- Friend challenges: the same 5 public Classique words for two friends, timed by the server.
   // The challenger starts at creation; the friend has 48 h to start; both finish before the 50th hour.
+  // A challenge by link has no friend yet (to == ''): anyone signed in may open it by its id (only
+  // the invite code leads to it, and ids are not guessable) and the first one to join takes the place.
   match /challenges/{id} {
-   allow read: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || admin());
-   allow create: if active() && createsChallenge(request.resource.data);
+   allow get: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid
+    || resource.data.to == '' || admin());
+   allow list: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || admin());
+   allow create: if active() && (createsChallenge(request.resource.data) || createsOpenChallenge(id, request.resource.data));
    allow update: if active() && (finishesChallenge('from', resource.data, request.resource.data)
+    || joinsChallenge(resource.data, request.resource.data)
     || startsChallenge(resource.data, request.resource.data)
     || finishesChallenge('to', resource.data, request.resource.data));
    allow delete: if admin() || (signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid) && leaving());
@@ -380,6 +397,22 @@ service cloud.firestore {
     && exists(at('users/' + request.auth.uid + '/friends/' + c.to))
     && c.toName == get(at('users/' + request.auth.uid + '/friends/' + c.to)).data.username
     && challengeCards(c.cardIds) && c.createdAt == request.time && c.fromStartedAt == request.time;
+  }
+  // A challenge by link: no friend named, a code to share, created with its invite in the same batch.
+  function createsOpenChallenge(id, c) {
+   return c.keys().hasOnly(['from','fromName','to','toName','code','cardIds','createdAt','fromStartedAt'])
+    && c.from == request.auth.uid && c.to == '' && c.toName == ''
+    && c.fromName == get(at('users/' + request.auth.uid)).data.username
+    && c.code is string && c.code.matches('^[A-HJ-NP-Z2-9]{6}$')
+    && getAfter(at('challengeInvites/' + c.code)).data.challenge == id
+    && challengeCards(c.cardIds) && c.createdAt == request.time && c.fromStartedAt == request.time;
+  }
+  // The first player to join takes the empty place, under their own name, while it can still be started.
+  function joinsChallenge(old, c) {
+   return old.to == '' && old.from != request.auth.uid
+    && c.diff(old).affectedKeys().hasOnly(['to','toName'])
+    && c.to == request.auth.uid && c.toName == get(at('users/' + request.auth.uid)).data.username
+    && request.time < old.createdAt + duration.value(48, 'h');
   }
   function startsChallenge(old, c) {
    return old.to == request.auth.uid && !('toStartedAt' in old)

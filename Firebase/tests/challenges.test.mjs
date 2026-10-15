@@ -110,3 +110,70 @@ test('web deletion removes the challenges sent and received', async () => {
   await env.withSecurityRulesDisabled(async (c) => { left = (await getDocs(collection(c.firestore(), 'challenges'))).docs.map((d) => d.id); });
   assert.deepEqual(left, ['other']);
 });
+
+// ---- Challenges by link: no friend named, a 6-character code that the first player to join uses.
+const open = (code = 'ABC234', over = {}) => ({ ...challenge({ to: '', toName: '', code }), ...over });
+async function createOpen(db, id = 'o1', code = 'ABC234', over = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `challenges/${id}`), open(code, over));
+  batch.set(doc(db, `challengeInvites/${code}`), { challenge: id, from: 'alice', createdAt: serverTimestamp() });
+  return batch.commit();
+}
+
+test('a challenge by link is created with its invite code, by anyone, under their real name', async () => {
+  await players();
+  const a = user('alice');
+  await assertSucceeds(createOpen(a));
+  // The code is taken; one without its invite, or an invite pointing elsewhere, is refused.
+  await assertFails(createOpen(a, 'o2'));
+  await assertFails(setDoc(doc(a, 'challenges/o3'), open('XYZ234')));
+  await assertFails(setDoc(doc(a, 'challengeInvites/QQQ234'), { challenge: 'o1', from: 'alice', createdAt: serverTimestamp() }));
+  await assertFails(createOpen(a, 'o4', 'abc234'));
+  await assertFails(createOpen(a, 'o5', 'DEF234', { fromName: 'Alicia' }));
+  await assertFails(createOpen(a, 'o6', 'GHJ234', { toName: 'Bob' }));
+  // Bob cannot create one in Alice's name.
+  const b = user('bob'), batch = writeBatch(b);
+  batch.set(doc(b, 'challenges/o7'), open('KLM234'));
+  batch.set(doc(b, 'challengeInvites/KLM234'), { challenge: 'o7', from: 'alice', createdAt: serverTimestamp() });
+  await assertFails(batch.commit());
+  await seed('banned/alice', { username: 'Alice', reason: 'Test' });
+  await assertFails(createOpen(a, 'o8', 'NPQ234'));
+});
+
+test('the first player with the code joins under their own name, then plays as usual', async () => {
+  await players();
+  await assertSucceeds(createOpen(user('alice')));
+  const c = user('carol');
+  // Anyone signed in reads the invite and the challenge, but cannot list the open ones.
+  assert.equal((await getDoc(doc(c, 'challengeInvites/ABC234'))).data().challenge, 'o1');
+  await assertSucceeds(getDoc(doc(c, 'challenges/o1')));
+  await assertFails(getDocs(query(collection(c, 'challenges'), where('to', '==', ''))));
+  await assertFails(getDocs(collection(c, 'challengeInvites')));
+  await assertFails(updateDoc(doc(c, 'challenges/o1'), { to: 'carol', toName: 'Caro' }));
+  await assertFails(updateDoc(doc(c, 'challenges/o1'), { to: 'bob', toName: 'Bob' }));
+  await assertFails(updateDoc(doc(c, 'challenges/o1'), { to: 'carol', toName: 'Carol', toStartedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(user('alice'), 'challenges/o1'), { to: 'alice', toName: 'Alice' }));
+  await assertSucceeds(updateDoc(doc(c, 'challenges/o1'), { to: 'carol', toName: 'Carol' }));
+  // Taken: nobody else joins, and it is now private to the two players.
+  await assertFails(updateDoc(doc(user('bob'), 'challenges/o1'), { to: 'bob', toName: 'Bob' }));
+  await assertFails(getDoc(doc(user('bob'), 'challenges/o1')));
+  assert.equal((await getDocs(query(collection(c, 'challenges'), where('to', '==', 'carol')))).size, 1);
+  await assertSucceeds(updateDoc(doc(c, 'challenges/o1'), { toStartedAt: serverTimestamp() }));
+  await patch('challenges/o1', { toStartedAt: ago(30000) });
+  await assertSucceeds(updateDoc(doc(c, 'challenges/o1'), finish('to', 0, 2)));
+});
+
+test('a challenge by link can no longer be joined after 48 h', async () => {
+  await players();
+  await seed('challenges/late', { ...open('LAT234'), createdAt: ago(49 * 3600e3), fromStartedAt: ago(49 * 3600e3) });
+  await assertFails(updateDoc(doc(user('carol'), 'challenges/late'), { to: 'carol', toName: 'Carol' }));
+});
+
+test('deleting the account removes the invite codes too', async () => {
+  await players();
+  await assertSucceeds(createOpen(user('alice')));
+  await assertFails(deleteDoc(doc(user('bob'), 'challengeInvites/ABC234')));
+  await deleteAccountData(user('alice'), 'alice', fs);
+  assert.equal(await read('challengeInvites/ABC234'), undefined);
+  assert.equal(await read('challenges/o1'), undefined);
+});

@@ -110,7 +110,15 @@ class ChallengeGame(val cards: List<Card>) {
 
 /** A challenge as stored in Firestore, with times in milliseconds. */
 @Serializable
-data class Challenge(val id: String, val cardIds: List<String>, val createdMs: Long, val from: Side, val to: Side) {
+data class Challenge(
+    val id: String,
+    val cardIds: List<String>,
+    val createdMs: Long,
+    val from: Side,
+    val to: Side,
+    /** The invite code of a challenge by link (null for a challenge sent to a friend). */
+    val code: String? = null,
+) {
     @Serializable
     data class Side(
         val uid: String,
@@ -128,6 +136,10 @@ data class Challenge(val id: String, val cardIds: List<String>, val createdMs: L
     fun involves(uid: String) = from.uid == uid || to.uid == uid
     fun mine(uid: String) = if (from.uid == uid) from else to
     fun theirs(uid: String) = if (from.uid == uid) to else from
+    /** A challenge by link that nobody has joined yet. */
+    val isOpen: Boolean get() = to.uid.isEmpty()
+    /** The other player's name, or what stands for it while nobody has joined. */
+    fun opponentName(uid: String): String = if (isOpen && from.uid == uid) "Défi par lien" else theirs(uid).name
     val startDeadlineMs: Long get() = createdMs + ChallengeRules.START_WINDOW_MS
     val finishDeadlineMs: Long get() = createdMs + ChallengeRules.FINISH_WINDOW_MS
 
@@ -174,6 +186,29 @@ data class Challenge(val id: String, val cardIds: List<String>, val createdMs: L
             else -> Result.EXPIRED
         }
     }
+}
+
+/**
+ * Challenges by link: a 6-character code (the friend-code alphabet, no 0/O or 1/I) and its web page,
+ * which opens the app (App Link, or cnsnn://d/CODE) or tells how to get it. Same as Challenge.swift.
+ */
+object ChallengeInvite {
+    const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    const val HOST = "cnsnn-9ctosy.web.app"
+    fun link(code: String) = "https://$HOST/d/$code"
+    fun newCode(random: java.util.Random = java.security.SecureRandom()): String =
+        (1..6).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
+    /** The code in a typed text, a pasted link or an opened URL; null when there is none. */
+    fun code(text: String): String? {
+        var part = text.trim()
+        val slash = part.lastIndexOf("/d/")
+        if (slash >= 0) part = part.substring(slash + 3)
+        else if (part.lowercase().startsWith("cnsnn://")) part = part.substring("cnsnn://".length)
+        val letters = part.uppercase().takeWhile { it != '?' && it != '#' && it != '/' }.filter { it.isLetterOrDigit() }
+        return letters.takeIf { it.length == 6 && it.all { c -> c in ALPHABET } }
+    }
+    fun shareText(code: String) =
+        "Je te défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne ! Rejoins mon défi avec le code $code : ${link(code)}"
 }
 
 data class ChallengeTally(val wins: Int = 0, val losses: Int = 0, val draws: Int = 0) {

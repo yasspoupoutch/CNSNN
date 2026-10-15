@@ -56,7 +56,12 @@ struct HomeView: View {
         .onChange(of: state.challengeRequest) { _, _ in
             Task { try? await Task.sleep(for: .seconds(0.7)); showChallenges = true }
         }
-        .task(id: state.uid) { await state.refreshChallenges() }
+        // A challenge link opened the app: the sheet joins it as soon as the player is connected.
+        .onChange(of: state.inviteCode) { _, code in if code != nil { showChallenges = true } }
+        .task(id: state.uid) {
+            if state.inviteCode != nil { showChallenges = true }
+            await state.refreshChallenges()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             todayKey = DailySchedule.key()

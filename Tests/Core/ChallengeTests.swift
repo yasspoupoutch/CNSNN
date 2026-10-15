@@ -166,4 +166,31 @@ final class ChallengeTests: XCTestCase {
         XCTAssertFalse(ChallengeRules.shouldCheck(at: evening, lastReadMs: ms - 5 * 60_000, calendar: calendar))
         XCTAssertTrue(ChallengeRules.shouldCheck(at: evening, lastReadMs: ms - 20 * 60_000, calendar: calendar))
     }
+
+    func testInviteCodesFromTextsAndLinks() {
+        XCTAssertEqual(ChallengeInvite.code(in: "abc234"), "ABC234")
+        XCTAssertEqual(ChallengeInvite.code(in: " ABC 234 "), "ABC234")
+        XCTAssertEqual(ChallengeInvite.code(in: "https://cnsnn-9ctosy.web.app/d/ABC234"), "ABC234")
+        XCTAssertEqual(ChallengeInvite.code(in: "cnsnn://d/abc234?x=1"), "ABC234")
+        XCTAssertEqual(ChallengeInvite.code(in: ChallengeInvite.shareText(code: "XYZ789")), "XYZ789")
+        XCTAssertNil(ChallengeInvite.code(in: "ABC23"))
+        XCTAssertNil(ChallengeInvite.code(in: "ABO234"))
+        XCTAssertNil(ChallengeInvite.code(in: "Bonjour"))
+        let code = ChallengeInvite.newCode()
+        XCTAssertEqual(ChallengeInvite.code(in: code), code)
+    }
+
+    func testOpenChallengeWaitsForSomeoneThenPlaysAsUsual() {
+        var c = challenge(to: .init(uid: "", name: ""))
+        c.code = "ABC234"
+        XCTAssertTrue(c.isOpen)
+        XCTAssertEqual(c.opponentName("alice"), "Défi par lien")
+        c.from.finishedMs = 90_000
+        XCTAssertEqual(c.state(for: "alice", now: hour), .waiting)
+        XCTAssertEqual(c.result(for: "alice", now: 49 * hour), .expired)
+        c.to = .init(uid: "carol", name: "Carol")
+        XCTAssertFalse(c.isOpen)
+        XCTAssertEqual(c.opponentName("alice"), "Carol")
+        XCTAssertEqual(c.state(for: "carol", now: hour), .yourTurn)
+    }
 }
