@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.filled.Close
@@ -89,6 +90,7 @@ const val SUPPORT_EMAIL = "jeucnsnn@gmail.com"
 fun ProfileScreen(state: AppViewModel) {
     var editingName by remember { mutableStateOf(false) }
     var account by rememberSaveable { mutableStateOf(false) }
+    var addFriend by rememberSaveable { mutableStateOf(false) }
     var moderation by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
     var rules by rememberSaveable { mutableStateOf(false) }
@@ -109,6 +111,8 @@ fun ProfileScreen(state: AppViewModel) {
         }
         SectionCard(padding = 0.dp, radius = 24.dp) {
             NavRow(if (state.isAnonymous) "Sauvegarder mon compte" else "Mon compte", Icons.Outlined.AccountCircle) { account = true }
+            Divider()
+            NavRow("Ajouter un ami", Icons.Outlined.PersonAdd) { addFriend = true }
             if (state.isAdmin) { Divider(); NavRow("Modération", Icons.Outlined.Shield) { moderation = true } }
         }
         if (state.isSuspended) SectionCard(radius = 24.dp) { Text(AppViewModel.SUSPENDED_TEXT, color = Palette.red, fontSize = 14.sp) }
@@ -136,6 +140,7 @@ fun ProfileScreen(state: AppViewModel) {
 
     if (editingName) RenameDialog(state.progress.username, { editingName = false }) { state.rename(it); editingName = false }
     if (account) FullScreen("Votre compte", { account = false }) { AccountContent(state) { account = false } }
+    if (addFriend) FullScreen("Ajouter un ami", { addFriend = false }) { AddFriendContent(state) }
     if (moderation) FullScreen("Modération", { moderation = false }) { ModerationContent(state) }
     if (privacy) FullScreen("Confidentialité", { privacy = false }) { PrivacyContent() }
     if (rules) FullScreen(CommunityRules.TITLE, { rules = false }) {
@@ -143,6 +148,18 @@ fun ProfileScreen(state: AppViewModel) {
             CommunityRulesList()
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/** Profil > Ajouter un ami: the player's code to share and the field for a friend's, as in Stats > Amis. */
+@Composable
+private fun AddFriendContent(state: AppViewModel) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Donnez votre code à un ami ou entrez le sien : vous apparaissez aussitôt dans les amis l’un de l’autre, pour comparer vos temps et vous défier.",
+            fontSize = 14.sp, color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
+        if (state.uid == null) SectionCard(radius = 22.dp) { Text("Connectez-vous à Internet pour ajouter vos amis.", color = Palette.secondary) }
+        else FriendCodeCards(state)
+        Spacer(Modifier.height(24.dp))
     }
 }
 

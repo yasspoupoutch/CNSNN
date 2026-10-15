@@ -97,11 +97,20 @@ service cloud.firestore {
      && request.resource.data.schema is int && request.resource.data.updatedAt == request.time;
    }
    // Friends the player added with a friend code: private to the player. Their results are public anyway.
+   // Friendship goes both ways: whoever types this player's code, and has just added them, also puts
+   // themself in this list (the code proves the player gave it to them).
    match /friends/{friendId} {
     allow read, delete: if owner(uid);
     allow create, update: if owner(uid) && friendId != uid
      && request.resource.data.keys().hasOnly(['username','addedAt'])
      && validName(request.resource.data.username) && request.resource.data.addedAt == request.time;
+    allow create, update: if active() && friendId == request.auth.uid && friendId != uid
+     && request.resource.data.keys().hasOnly(['username','addedAt','code'])
+     && validName(request.resource.data.username) && request.resource.data.addedAt == request.time
+     && request.resource.data.code is string && request.resource.data.code.matches('^[A-HJ-NP-Z2-9]{6}$')
+     && exists(at('friendCodes/' + request.resource.data.code))
+     && get(at('friendCodes/' + request.resource.data.code)).data.uid == uid
+     && exists(at('users/' + friendId + '/friends/' + uid));
    }
   }
   // Friend codes: 6 unambiguous characters naming one player. Anyone signed in may look up a code,

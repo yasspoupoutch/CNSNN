@@ -118,11 +118,12 @@ import CNSNNCore
 
     func testFriendsCodeAndBoard() async throws {
         let alice = try await repo.bootstrap(username: "Alice")
+        _ = try await repo.createPermanentAccount(email: "friends.alice@cnsnn.test", password: "motdepasse1")
         let code = try await repo.friendCode(uid: alice.uid, username: "Alice")
         XCTAssertEqual(code.count, 6)
         let same = try await repo.friendCode(uid: alice.uid, username: "Alice")
         XCTAssertEqual(same, code)
-        await assertThrows(CloudError.friendIsYou) { _ = try await self.repo.addFriend(code: code, uid: alice.uid) }
+        await assertThrows(CloudError.friendIsYou) { _ = try await self.repo.addFriend(code: code, uid: alice.uid, username: "Alice") }
         // Alice finds today's word.
         let day = DailySchedule.key()
         let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
@@ -130,16 +131,28 @@ import CNSNNCore
 
         try repo.signOut()
         let bob = try await repo.bootstrap(username: "Bob")
-        await assertThrows(CloudError.friendNotFound) { _ = try await self.repo.addFriend(code: "ZZZZZZ", uid: bob.uid) }
-        let name = try await repo.addFriend(code: code.lowercased(), uid: bob.uid)
+        await assertThrows(CloudError.friendNotFound) { _ = try await self.repo.addFriend(code: "ZZZZZZ", uid: bob.uid, username: "Bob") }
+        let name = try await repo.addFriend(code: code.lowercased(), uid: bob.uid, username: "Bob")
         XCTAssertEqual(name, "Alice")
         let board = try await repo.friendsBoard(uid: bob.uid, username: "Bob", day: day)
         XCTAssertEqual(board.map(\.username), ["Alice", "Bob"])
         XCTAssertEqual(board.first?.today?.correct, true)
         XCTAssertNil(board.last?.today)
-        try await repo.removeFriend(uid: bob.uid, friend: alice.uid)
-        let alone = try await repo.friendsBoard(uid: bob.uid, username: "Bob", day: day)
-        XCTAssertEqual(alone.map(\.uid), [bob.uid])
+        let bobCount = try await repo.friendCount(uid: bob.uid)
+        XCTAssertEqual(bobCount, 1)
+
+        // Alice has Bob at once too, without typing his code.
+        try repo.signOut()
+        _ = try await repo.signIn(email: "friends.alice@cnsnn.test", password: "motdepasse1")
+        let aliceCount = try await repo.friendCount(uid: alice.uid)
+        XCTAssertEqual(aliceCount, 1)
+        let aliceBoard = try await repo.friendsBoard(uid: alice.uid, username: "Alice", day: day)
+        XCTAssertEqual(aliceBoard.map(\.username), ["Alice", "Bob"])
+        let aliceFriends = try await repo.friends(uid: alice.uid)
+        XCTAssertEqual(aliceFriends.map(\.name), ["Bob"])
+        try await repo.removeFriend(uid: alice.uid, friend: bob.uid)
+        let alone = try await repo.friendsBoard(uid: alice.uid, username: "Alice", day: day)
+        XCTAssertEqual(alone.map(\.uid), [alice.uid])
     }
 
     /// A friend challenge from end to end: sent to a friend only, both clocks kept by the server,
@@ -154,7 +167,7 @@ import CNSNNCore
         let ids = ChallengeRules.draw(seed: 42)
         // Only a friend can be challenged.
         await assertThrows { _ = try await self.repo.createChallenge(uid: bob.uid, username: "Bob", friend: alice.uid, friendName: "Alice", cardIDs: ids) }
-        _ = try await repo.addFriend(code: aliceCode, uid: bob.uid)
+        _ = try await repo.addFriend(code: aliceCode, uid: bob.uid, username: "Bob")
         let challenge = try await repo.createChallenge(uid: bob.uid, username: "Bob", friend: alice.uid, friendName: "Alice", cardIDs: ids)
         XCTAssertEqual(challenge.cardIds, ids)
         XCTAssertNotNil(challenge.from.startedMs)

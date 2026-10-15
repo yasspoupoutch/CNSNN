@@ -315,6 +315,8 @@ import CNSNNCore
         var myRank: (rank: Int, players: Int)?
         var friends: [FriendStanding] = []
         var friendCode: String?
+        /// Friends in the list when it was last read, to notice one who typed my code since.
+        var friendCount: Int?
         var readAt: [String: Date] = [:]
     }
     var rankings = Rankings()

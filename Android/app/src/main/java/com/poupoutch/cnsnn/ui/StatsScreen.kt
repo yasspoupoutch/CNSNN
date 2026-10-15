@@ -79,6 +79,10 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardActions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -350,16 +354,12 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
 @Composable
 private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     var seenToken by remember { mutableIntStateOf(refreshToken) }
-    val code = state.rankings.friendCode
+    var reload by remember { mutableIntStateOf(0) }
     val rows = state.rankings.friends
-    var friendCode by rememberSaveable { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val haptics = rememberHaptics()
     val uid = state.uid ?: return
     val name = state.progress.username.ifEmpty { "Joueur" }
     /** Two reads per friend: kept a few minutes like the other rankings (see AppViewModel.rankings). */
@@ -367,24 +367,77 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
         val force = refreshToken != seenToken
         seenToken = refreshToken
         val key = "friends-" + DailySchedule.key()
-        if (!state.rankingIsStale(key, force)) return
+        // A friend who typed my code since the last read: one count, then the list at once.
+        if (!state.rankingIsStale(key, force)) {
+            val count = runCatching { state.cloud.friendCount(uid) }.getOrNull()
+            if (count == null || count == state.rankings.friendCount) return
+        }
         loading = true; failed = false
         try {
-            if (state.rankings.friendCode == null) state.rankings = state.rankings.copy(friendCode = state.cloud.friendCode(uid, name))
             state.rankings = state.rankings.copy(friends = state.cloud.friendsBoard(uid, name, DailySchedule.key()))
+            state.rankings = state.rankings.copy(friendCount = runCatching { state.cloud.friendCount(uid) }.getOrNull())
             state.rankingRead(key)
             state.refreshChallenges(force)
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
-    LaunchedEffect(uid, refreshToken) { refresh() }
+    // A friend added here: the ranking was marked to read again, so this reads it at once.
+    LaunchedEffect(uid, refreshToken, reload) { refresh() }
+
+    FriendCodeCards(state) { reload++ }
+    message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp)) }
+    SectionCard(padding = 0.dp, radius = 24.dp) {
+        if (rows.size <= 1) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else "Ajoutez un ami avec son code pour comparer vos temps chaque jour.")
+        else rows.forEachIndexed { index, row ->
+            if (index > 0) Divider()
+            val mine = row.uid == uid
+            var menu by remember(row.uid) { mutableStateOf(false) }
+            val today = row.today
+            Box {
+                RankRow(index, row.username, row.uid, mine,
+                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else "")
+,
+                    when { today == null -> "pas joué"; today.correct -> Format.clock(today.timeMs); else -> "raté" },
+                    if (today?.correct == true) Palette.foreground else Palette.tertiary,
+                    // Friend challenges: "2 victoires · 1 défaite" against this friend.
+                    extra = if (mine) null else state.challengeTally(row.uid).label) { if (!mine) menu = true }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem({ Text("Retirer de mes amis", color = Palette.red) }, {
+                        menu = false
+                        scope.launch {
+                            try { state.cloud.removeFriend(uid, row.uid); state.rankings = state.rankings.copy(friends = rows.filter { it.uid != row.uid }, friendCount = state.rankings.friendCount?.minus(1)) } catch (e: Exception) { message = CloudError.message(e) }
+                        }
+                    })
+                }
+            }
+        }
+    }
+}
+
+/** The player's friend code to share, and the field to type a friend's: in Stats > Amis and in Profil. */
+@Composable
+fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
+    val code = state.rankings.friendCode
+    var friendCode by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val haptics = rememberHaptics()
+    val focus = LocalFocusManager.current
+    val uid = state.uid ?: return
+    val name = state.progress.username.ifEmpty { "Joueur" }
+    // One read the first time (the code is kept with the rankings), one write if the player has none yet.
+    LaunchedEffect(uid) {
+        if (state.rankings.friendCode == null) runCatching { state.cloud.friendCode(uid, name) }.onSuccess { state.rankings = state.rankings.copy(friendCode = it) }
+    }
     fun add() {
         if (friendCode.length != 6 || busy) return
-        busy = true; message = null
+        busy = true; message = null; focus.clearFocus()
         scope.launch {
             try {
-                val friend = state.cloud.addFriend(friendCode, uid)
+                val friend = state.cloud.addFriendByCode(friendCode, uid, name)
                 friendCode = ""; message = "$friend fait partie de vos amis."; haptics.success()
-                ChallengeWatch.setActive(context, true); state.forgetRankings(); refresh()
+                ChallengeWatch.setActive(context, true); state.forgetFriendsRanking(); added()
             } catch (e: Exception) { message = CloudError.message(e); haptics.retry() } finally { busy = false }
         }
     }
@@ -405,38 +458,12 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     }
     SectionCard(radius = 24.dp, padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(friendCode, { friendCode = FriendCode.normalize(it) }, Modifier.weight(1f), singleLine = true,
+            OutlinedTextField(friendCode, { friendCode = FriendCode.normalize(it) }, Modifier.weight(1f).testTag("friend-code-field"), singleLine = true,
                 placeholder = { Text("Code d’un ami") }, textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false), shape = RoundedCornerShape(14.dp))
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { add() }), shape = RoundedCornerShape(14.dp))
             Button(::add, enabled = friendCode.length == 6 && !busy, shape = RoundedCornerShape(24.dp)) { Text("Ajouter") }
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)) }
     }
-    SectionCard(padding = 0.dp, radius = 24.dp) {
-        if (rows.size <= 1) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else "Ajoutez un ami avec son code pour comparer vos temps chaque jour.")
-        else rows.forEachIndexed { index, row ->
-            if (index > 0) Divider()
-            val mine = row.uid == uid
-            var menu by remember(row.uid) { mutableStateOf(false) }
-            val today = row.today
-            Box {
-                RankRow(index, row.username, row.uid, mine,
-                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else "")
-,
-                    when { today == null -> "pas joué"; today.correct -> Format.clock(today.timeMs); else -> "raté" },
-                    if (today?.correct == true) Palette.foreground else Palette.tertiary,
-                    // Friend challenges: "2 victoires · 1 défaite" against this friend.
-                    extra = if (mine) null else state.challengeTally(row.uid).label) { if (!mine) menu = true }
-                DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem({ Text("Retirer de mes amis", color = Palette.red) }, {
-                        menu = false
-                        scope.launch {
-                            try { state.cloud.removeFriend(uid, row.uid); state.rankings = state.rankings.copy(friends = rows.filter { it.uid != row.uid }) } catch (e: Exception) { message = CloudError.message(e) }
-                        }
-                    })
-                }
-            }
-        }
-    }
 }
-
