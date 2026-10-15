@@ -3,7 +3,7 @@ import Foundation
 /// What the home screen widget shows, written by the app into the shared App Group.
 /// Without the App Group (some sideloading setups), the widget falls back to the day's difficulty.
 public struct Glance: Codable, Equatable, Sendable {
-    public static let appGroup = "group.com.mycompany.cnsnn"
+    public static let appGroup = "group.com.poupoutch.cnsnn"
     static let storageKey = "glance"
 
     /// Day key (local calendar) of the last daily result, if any.

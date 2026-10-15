@@ -5,10 +5,10 @@
 <plist version="1.0">
 <dict>
 	<key>application-identifier</key>
-	<string>com.mycompany.cnsnn</string>
+	<string>com.poupoutch.cnsnn</string>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>com.mycompany.cnsnn</string>
+		<string>com.poupoutch.cnsnn</string>
 	</array>
 </dict>
 </plist>

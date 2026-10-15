@@ -43,11 +43,6 @@ jobs:
           for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
             if [ -z "${!name}" ]; then echo "::error::Secret $name manquant (voir Docs/PUBLICATION.md)."; exit 1; fi
           done
-          # Automatic signing would register the placeholder identifier in the Apple account.
-          if grep -q 'com.mycompany.cnsnn' Scripts/generate_project.py; then
-            echo "::error::L'identifiant iOS est encore com.mycompany.cnsnn : le passer à l'identifiant définitif d'abord."
-            exit 1
-          fi
           xcodebuild -version
           python3 Scripts/verify_project.py
           root="$RUNNER_TEMP/cnsnn-tf"

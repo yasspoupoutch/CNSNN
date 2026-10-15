@@ -30,7 +30,7 @@ TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne s
 
 ## Firebase
 
-- Projet `cnsnn-9ctosy`, bundle `com.mycompany.cnsnn`, connexions Anonyme et E-mail/mot de passe.
+- Projet `cnsnn-9ctosy`, bundle `com.poupoutch.cnsnn`, connexions Anonyme et E-mail/mot de passe.
 - La sécurité repose sur `Firebase/firestore.rules`. Pour publier les règles, lancer le workflow **CNSNN - Firebase** sur `main` avec `deploy` coché. Il utilise le secret `FIREBASE_SERVICE_ACCOUNT` et `Firebase/tools/deploy.mjs`.
 - Index composites : voir `Firebase/firestore.indexes.json`. La clé du compte de service ne peut pas les créer : ils se créent dans la console Firebase.
 - Nommer un administrateur : même workflow, champ `admin_uid` rempli avec l'UID du joueur.

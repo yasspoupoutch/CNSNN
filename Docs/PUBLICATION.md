@@ -19,9 +19,9 @@ Guide pas à pas et textes des fiches : dans les notes du projet (`notes/publica
 
 ## À faire avant la première soumission iPhone
 
-1. **Identifiant de l'app.** Il vaut encore `com.mycompany.cnsnn` (et `group.com.mycompany.cnsnn` pour le widget). Choisir le définitif (par exemple `com.poupoutch.cnsnn`, comme Android), le changer dans `Scripts/generate_project.py`, `App/CNSNN.entitlements`, `Widget/CNSNNWidget.entitlements` et `Core/Glance.swift`, puis enregistrer une nouvelle app iOS dans la console Firebase et remplacer `App/Resources/GoogleService-Info.plist`. À faire seulement à ce moment-là : avec Sideloadly, un nouvel identifiant installe une autre app, et un compte invité resterait sur l'ancienne.
-2. **Version.** `MARKETING_VERSION` passe de `0.1.0` à `1.0` dans `Scripts/generate_project.py`.
-3. **Signature et envoi, sans Mac.** Le workflow **CNSNN - iPhone TestFlight** (`ios-testflight.yml`, lancé à la main) archive l'app, laisse Xcode créer le certificat de distribution et les profils (app et widget, avec l'App Group) grâce à une clé API App Store Connect, puis envoie le build sur App Store Connect. Il refuse de tourner tant que l'identifiant vaut `com.mycompany.cnsnn`. Secrets du dépôt à créer :
+1. **Identifiant de l'app** : `com.poupoutch.cnsnn` (comme Android), App Group `group.com.poupoutch.cnsnn`, app Firebase « CNSNN iPhone ». L'ancienne app Firebase `com.mycompany.cnsnn` reste en place pour les versions déjà installées avec Sideloadly.
+2. **Version** : `MARKETING_VERSION = 1.0` ; le numéro de build vient du numéro d'exécution du workflow TestFlight.
+3. **Signature et envoi, sans Mac.** Le workflow **CNSNN - iPhone TestFlight** (`ios-testflight.yml`, lancé à la main) archive l'app, laisse Xcode créer le certificat de distribution et les profils (app et widget, avec l'App Group) grâce à une clé API App Store Connect, puis envoie le build sur App Store Connect. Secrets du dépôt à créer :
    - `APPLE_TEAM_ID` : l'identifiant d'équipe (Membership details sur developer.apple.com) ;
    - `ASC_KEY_ID` et `ASC_ISSUER_ID` : App Store Connect > Utilisateurs et accès > Intégrations > Clés de l'équipe, clé avec le rôle **Admin** (nécessaire pour créer le certificat) ;
    - `ASC_KEY_P8` : le contenu du fichier `.p8` téléchargé (une seule fois possible).

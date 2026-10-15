@@ -149,9 +149,9 @@ jobs:
           xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIMULATOR_ID" -b
           xcrun simctl install "$SIMULATOR_ID" "$app"
-          xcrun simctl launch "$SIMULATOR_ID" com.mycompany.cnsnn || true
+          xcrun simctl launch "$SIMULATOR_ID" com.poupoutch.cnsnn || true
           for attempt in 1 2 3 4 5 6; do
-            if xcrun simctl spawn "$SIMULATOR_ID" pluginkit -m -p com.apple.widgetkit-extension -v | tee "$CI_ROOT/logs/widget.log" | grep -q 'com.mycompany.cnsnn.widget'; then
+            if xcrun simctl spawn "$SIMULATOR_ID" pluginkit -m -p com.apple.widgetkit-extension -v | tee "$CI_ROOT/logs/widget.log" | grep -q 'com.poupoutch.cnsnn.widget'; then
               echo 'Widget enregistré par iOS.'; exit 0
             fi
             sleep 5

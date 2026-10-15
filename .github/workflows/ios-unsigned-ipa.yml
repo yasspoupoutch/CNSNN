@@ -81,7 +81,7 @@ jobs:
           fi
           codesign --force --sign - --timestamp=none --entitlements Widget/CNSNNWidget.entitlements "$app/PlugIns/CNSNNWidget.appex"
           codesign --force --sign - --timestamp=none --entitlements App/CNSNN.entitlements "$app"
-          codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.mycompany.cnsnn'
+          codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.poupoutch.cnsnn'
           # Preserve the complete bundle, including embedded frameworks and resource bundles.
           ditto -c -k --keepParent "$IPA_ROOT/staging/Payload" \
             "$IPA_ROOT/download/CNSNN-unsigned.ipa"
