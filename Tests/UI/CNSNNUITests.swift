@@ -89,7 +89,8 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Records personnels"].waitForExistence(timeout: 5))
     }
 
-    /// The home page with today's word found (the longest word, found in hours) stays inside the screen.
+    /// The whole home page (greeting, daily card, challenge, mode tiles) stays inside the screen once today's
+    /// word is found, even with the longest word and a time in hours.
     @MainActor func testHomeFitsScreenWithDailyFound() {
         let app = XCUIApplication()
         app.launchArguments = ["--uitesting", "--daily-found"]
@@ -110,7 +111,9 @@ final class CNSNNUITests: XCTestCase {
         let elements: [(String, XCUIElement)] = [
             ("Bonjour", app.staticTexts["Bonjour,"]), ("Classement", ranking), ("Partager", app.buttons["Partager"]),
             ("Jouer aussi", app.staticTexts["JOUER AUSSI"]), ("Défier un ami", app.buttons["challengeTile"]),
-        ]
+        ] + ["Classique", "Sprint"].map { title in
+            (title, app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title + ".")).firstMatch)
+        }
         for (name, element) in elements {
             XCTAssertTrue(element.exists, name)
             XCTAssertGreaterThanOrEqual(element.frame.minX, screen.minX, "\(name) dépasse à gauche")
