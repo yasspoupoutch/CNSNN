@@ -96,6 +96,12 @@ import CNSNNCore
             } catch { self.error = "Connexion impossible : " + CloudError.message(error); return }
         }
         if cloud == nil { progress.username = name }
+        // Interface tests: today's word already found, the longest one and in hours, to check the home card fits.
+        if RuntimeFlags.isTesting, ProcessInfo.processInfo.arguments.contains("--daily-found"),
+           let card = ModeCatalogue.cards.max(by: { $0.wordFull.count < $1.wordFull.count }) {
+            progress.attempts.append(Attempt(cardID: card.id, mode: .daily, correct: true, timeMs: 71_485_000, points: 50,
+                                             date: Date(), dailyKey: DailySchedule.key()))
+        }
         persist()
         await refreshAll()
     }

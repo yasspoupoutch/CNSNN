@@ -422,8 +422,10 @@ struct Toast: View {
 }
 
 enum Format {
+    /// 1:05, then 1:02:05 past an hour (a daily word opened the night before and found the next evening).
     static func clock(_ ms: Int) -> String {
         let total = max(0, ms / 1000)
+        if total >= 3600 { return "\(total / 3600):" + String(format: "%02d:%02d", total % 3600 / 60, total % 60) }
         return "\(total / 60):" + String(format: "%02d", total % 60)
     }
     static func number(_ value: Int) -> String {

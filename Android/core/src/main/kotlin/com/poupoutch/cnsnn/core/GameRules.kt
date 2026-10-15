@@ -62,7 +62,12 @@ object Mistakes {
 }
 
 object Format {
-    fun clock(ms: Int): String { val total = maxOf(0, ms / 1000); return "${total / 60}:" + "%02d".format(total % 60) }
+    /** 1:05, then 1:02:05 past an hour (a daily word opened the night before and found the next evening). */
+    fun clock(ms: Int): String {
+        val total = maxOf(0, ms / 1000)
+        if (total >= 3600) return "${total / 3600}:" + "%02d:%02d".format(total % 3600 / 60, total % 60)
+        return "${total / 60}:" + "%02d".format(total % 60)
+    }
     /** French grouping with a narrow no-break space: 12 345. */
     fun number(value: Int): String = "%,d".format(java.util.Locale.US, value).replace(',', ' ')
     /** 1er, 2e, 3e… */

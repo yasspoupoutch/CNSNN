@@ -88,4 +88,36 @@ final class CNSNNUITests: XCTestCase {
         app.buttons["Stats"].tap()
         XCTAssertTrue(app.staticTexts["Records personnels"].waitForExistence(timeout: 5))
     }
+
+    /// The whole home page (greeting, daily card, challenge, mode tiles) stays inside the screen once today's
+    /// word is found, even with the longest word and a time in hours.
+    @MainActor func testHomeFitsScreenWithDailyFound() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--daily-found"]
+        app.launch()
+        let next = app.buttons["Continuer"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        next.tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+
+        let ranking = app.buttons["Classement"]
+        XCTAssertTrue(ranking.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["19:51:25 · +50 pts"].exists, "Un temps de plus d’une heure s’affiche en h:mm:ss")
+        let screen = app.windows.firstMatch.frame
+        let elements: [(String, XCUIElement)] = [
+            ("Bonjour", app.staticTexts["Bonjour,"]), ("Classement", ranking), ("Partager", app.buttons["Partager"]),
+            ("Jouer aussi", app.staticTexts["JOUER AUSSI"]), ("Défier un ami", app.buttons["challengeTile"]),
+        ] + ["Classique", "Sprint"].map { title in
+            (title, app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title + ".")).firstMatch)
+        }
+        for (name, element) in elements {
+            XCTAssertTrue(element.exists, name)
+            XCTAssertGreaterThanOrEqual(element.frame.minX, screen.minX, "\(name) dépasse à gauche")
+            XCTAssertLessThanOrEqual(element.frame.maxX, screen.maxX, "\(name) dépasse à droite")
+        }
+    }
 }
