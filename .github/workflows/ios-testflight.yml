@@ -51,11 +51,11 @@ jobs:
           chmod 600 "$root/key/AuthKey_$ASC_KEY_ID.p8"
           printf 'TF_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
 
-      - name: Archiver l'app signee
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - name: Archiver l'app
+        # Archiving with automatic signing needs a development profile, which the API key cannot
+        # create without a registered device. So archive unsigned, give the bundle an ad hoc
+        # signature that carries the entitlements (App Group for the widget), and let the export
+        # step sign it for the App Store with the distribution certificate and profiles.
         run: |
           set -euo pipefail
           xcodebuild archive \
@@ -63,15 +63,17 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$TF_ROOT/CNSNN.xcarchive" \
             -derivedDataPath "$TF_ROOT/DerivedData" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             2>&1 | tee "$TF_ROOT/logs/archive.log"
-          test -d "$TF_ROOT/CNSNN.xcarchive/Products/Applications/CNSNN.app/PlugIns/CNSNNWidget.appex" \
-            || { echo '::error::Widget absent de l archive.'; exit 1; }
+          app="$TF_ROOT/CNSNN.xcarchive/Products/Applications/CNSNN.app"
+          test -d "$app/PlugIns/CNSNNWidget.appex" || { echo '::error::Widget absent de l archive.'; exit 1; }
+          if [ -d "$app/Frameworks" ]; then
+            find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -exec codesign --force --sign - --timestamp=none {} \;
+          fi
+          codesign --force --sign - --timestamp=none --entitlements Widget/CNSNNWidget.entitlements "$app/PlugIns/CNSNNWidget.appex"
+          codesign --force --sign - --timestamp=none --entitlements App/CNSNN.entitlements "$app"
+          codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.poupoutch.cnsnn'
 
       - name: Envoyer sur App Store Connect
         env:
