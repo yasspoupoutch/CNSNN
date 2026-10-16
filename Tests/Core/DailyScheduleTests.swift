@@ -66,7 +66,7 @@ final class DailyScheduleTests: XCTestCase {
         let merged = phone.merged(with: cloud)
         XCTAssertEqual(merged.attempts.count, 3)
         XCTAssertEqual(merged.attempts.first?.cardID, "b")
-        XCTAssertEqual(merged.score, 230)
+        XCTAssertEqual(merged.correctAnswers, 2)
         XCTAssertEqual(merged.attempts.filter { $0.dailyKey == "2026-10-12" }.first?.points, 140)
         XCTAssertEqual(cloud.merged(with: phone).attempts.count, 3)
     }
@@ -79,7 +79,7 @@ final class DailyScheduleTests: XCTestCase {
         cloud = phone.merged(with: cloud)
         cloud = tablet.merged(with: cloud)
         XCTAssertEqual(Set(cloud.attempts.map(\.cardID)), ["a", "b"])
-        XCTAssertEqual(phone.merged(with: cloud).score, 170)
+        XCTAssertEqual(phone.merged(with: cloud).correctAnswers, 2)
     }
     func testMergeUnitesProposalsByWordAndKeepsTheVerdict() {
         var pending = Card(id: "local-id", wordFull: "Chocolat", hint: "Un carré gourmand.", category: .general, difficulty: .easy, status: .pending)

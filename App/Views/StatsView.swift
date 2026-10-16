@@ -27,7 +27,7 @@ struct StatsView: View {
 
     @ViewBuilder private var mine: some View {
         if let entry = state.official { officialCard(entry) }
-        pointsCard
+        levelCard
         LazyVGrid(columns: columns, spacing: 12) {
             tile("\(progress.attempts.count)", "Cartes jouées")
             tile("\(Int(progress.successRate * 100)) %", "Réussite · \(progress.correctAnswers) trouvés")
@@ -48,8 +48,12 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionKicker(text: "Mot du jour · officiel", color: Palette.secondary)
             HStack(alignment: .firstTextBaseline) {
-                Text(Format.number(entry.points)).scaledFont(34, .heavy).monospacedDigit()
-                Text("points").scaledFont(15).foregroundStyle(Palette.secondary)
+                if let total = entry.monthTotal() {
+                    Text(Format.clock(total)).scaledFont(34, .heavy).monospacedDigit()
+                    Text("au total ce mois-ci").scaledFont(15).foregroundStyle(Palette.secondary)
+                } else {
+                    Text("Pas encore joué ce mois-ci").scaledFont(17, .semibold).foregroundStyle(Palette.secondary)
+                }
                 Spacer()
             }
             HStack(spacing: 0) {
@@ -70,18 +74,18 @@ struct StatsView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var pointsCard: some View {
-        let level = progress.score / 1000 + 1, into = progress.score % 1000
+    private var levelCard: some View {
+        let level = progress.level, into = progress.levelInto
         return VStack(alignment: .leading, spacing: 0) {
-            Text(state.official == nil ? "Vos points" : "Tous vos points, entraînement compris").scaledFont(13).foregroundStyle(Palette.secondary)
-            Text(Format.number(progress.score)).font(.system(size: 54, weight: .heavy)).tracking(-1.6).monospacedDigit()
+            Text("Mots trouvés, entraînement compris").scaledFont(13).foregroundStyle(Palette.secondary)
+            Text(Format.number(progress.correctAnswers)).font(.system(size: 54, weight: .heavy)).tracking(-1.6).monospacedDigit()
                 .foregroundStyle(Palette.foreground).lineLimit(1).minimumScaleFactor(0.5)
             HStack {
                 Text("Niveau \(level)")
                 Spacer()
-                Text("\(1000 - into) pts avant le niveau \(level + 1)")
+                Text("\(ClassicLevel.wordsPerLevel - into) mots avant le niveau \(level + 1)")
             }.scaledFont(13).foregroundStyle(Palette.secondary).padding(.top, 12)
-            ProgressBar(value: Double(into) / 1000, color: Palette.foreground).padding(.top, 8)
+            ProgressBar(value: Double(into) / Double(ClassicLevel.wordsPerLevel), color: Palette.foreground).padding(.top, 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(radius: 32, padding: 22)
@@ -127,14 +131,16 @@ struct StatsView: View {
         let games = records.total(ModeStat.games)
         switch mode {
         case .sprint:
-            return [(Format.number(records.best(ModeStat.score)), "meilleur score"), ("\(records.best(ModeStat.words))", "mots max"),
+            return [("\(records.best(ModeStat.words))", "mots max"),
                     ("\(records.best(ModeStat.combo))", "meilleur combo"), ("\(games)", games > 1 ? "parties" : "partie")]
         case .survival:
-            return [("\(records.best(ModeStat.words))", "meilleur parcours"), ("\(records.best(ModeStat.level))", "niveau max"), ("\(games)", games > 1 ? "parties" : "partie")]
+            return [("\(max(1, records.best(ModeStat.level)))", "niveau max"), ("\(records.best(ModeStat.words))", "meilleur parcours"), ("\(games)", games > 1 ? "parties" : "partie")]
         case .duo:
             let played = records.total(ModeStat.duosPlayed)
             let rate = played == 0 ? 0 : records.total(ModeStat.duosSolved) * 100 / played
-            return [(Format.number(records.best(ModeStat.score)), "meilleur score"), ("\(records.total(ModeStat.perfect))", "parfaites"), ("\(rate) %", "duos résolus"), ("\(games)", games > 1 ? "parties" : "partie")]
+            let best = records.best(ModeStat.duo)
+            let top = best > 0 ? "\(DuoRecord.solved(best))/\(DuoGame.rounds) · " + Format.clock(DuoRecord.seconds(best) * 1000) : "—"
+            return [(top, "meilleure partie"), ("\(records.total(ModeStat.perfect))", "parfaites"), ("\(rate) %", "duos résolus"), ("\(games)", games > 1 ? "parties" : "partie")]
         }
     }
 

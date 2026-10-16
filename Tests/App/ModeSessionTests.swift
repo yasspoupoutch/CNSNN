@@ -13,11 +13,10 @@ import CNSNNCore
         let card = try XCTUnwrap(session.sprint?.card)
         session.answer = card.wordFull
         session.submit(state: state)
-        let points = SprintGame.basePoints(card.difficulty)
-        XCTAssertEqual(session.sprint?.score, points)
-        XCTAssertEqual(session.sprint?.multiplier, 2)
+        XCTAssertEqual(session.sprint?.found, 1)
+        XCTAssertEqual(session.sprint?.streak, 1)
         session.answer = "XQ"; session.submit(state: state)
-        XCTAssertEqual(session.sprint?.multiplier, 1)
+        XCTAssertEqual(session.sprint?.streak, 0)
         XCTAssertEqual(session.mistakeTick, 1)
         session.skip(state: state)
         XCTAssertEqual(session.sprint?.penaltyMs, SprintGame.skipPenaltyMs)
@@ -26,14 +25,13 @@ import CNSNNCore
         XCTAssertTrue(session.over)
         XCTAssertNil(ModeRunStore.load(.sprint))
         let records = state.progress.records(.sprint)
-        XCTAssertEqual(records.best(ModeStat.score), points)
         XCTAssertEqual(records.best(ModeStat.words), 1)
         XCTAssertEqual(records.total(ModeStat.games), 1)
-        XCTAssertTrue(session.beaten.contains(ModeStat.score))
-        XCTAssertFalse(session.improved(ModeStat.score), "The first game sets the record without a celebration")
+        XCTAssertTrue(session.beaten.contains(ModeStat.words))
+        XCTAssertFalse(session.improved(ModeStat.words), "The first game sets the record without a celebration")
         // Records stay out of the official numbers.
         XCTAssertTrue(state.progress.attempts.isEmpty)
-        XCTAssertEqual(state.progress.score, 0)
+        XCTAssertEqual(state.progress.level, 1)
     }
 
     func testSprintClosedDuringPlayCountsAtNextLaunch() {
@@ -118,16 +116,16 @@ import CNSNNCore
         XCTAssertEqual(records.total(ModeStat.duosSolved), 1)
         XCTAssertEqual(records.total(ModeStat.duosPlayed), DuoGame.rounds)
         XCTAssertEqual(records.total(ModeStat.perfect), 0)
-        XCTAssertGreaterThan(records.best(ModeStat.score), 0)
+        XCTAssertEqual(DuoRecord.solved(records.best(ModeStat.duo)), 1)
     }
 
     func testRecordsFromTwoDevicesMergeWithoutLoss() {
         var phone = CNSNNCore.Progress(), tablet = CNSNNCore.Progress()
-        phone.recordMode(.sprint, best: [ModeStat.score: 120], add: [ModeStat.games: 1], device: "phone")
-        phone.recordMode(.sprint, best: [ModeStat.score: 80], add: [ModeStat.games: 1], device: "phone")
-        tablet.recordMode(.sprint, best: [ModeStat.score: 150], add: [ModeStat.games: 1], device: "tablet")
+        phone.recordMode(.sprint, best: [ModeStat.words: 12], add: [ModeStat.games: 1], device: "phone")
+        phone.recordMode(.sprint, best: [ModeStat.words: 8], add: [ModeStat.games: 1], device: "phone")
+        tablet.recordMode(.sprint, best: [ModeStat.words: 15], add: [ModeStat.games: 1], device: "tablet")
         let merged = phone.merged(with: tablet)
-        XCTAssertEqual(merged.records(.sprint).best(ModeStat.score), 150)
+        XCTAssertEqual(merged.records(.sprint).best(ModeStat.words), 15)
         XCTAssertEqual(merged.records(.sprint).total(ModeStat.games), 3)
         // Merging again (the cloud copy coming back) adds nothing.
         XCTAssertEqual(merged.merged(with: tablet).merged(with: phone).modes, merged.modes)

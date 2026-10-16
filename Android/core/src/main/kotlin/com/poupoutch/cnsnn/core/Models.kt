@@ -29,10 +29,10 @@ enum class Category(val label: String) {
 }
 
 @Serializable
-enum class Difficulty(val label: String, val basePoints: Int) {
-    @SerialName("Facile") EASY("Facile", 50),
-    @SerialName("Moyen") MEDIUM("Moyen", 100),
-    @SerialName("Difficile") HARD("Difficile", 150);
+enum class Difficulty(val label: String) {
+    @SerialName("Facile") EASY("Facile"),
+    @SerialName("Moyen") MEDIUM("Moyen"),
+    @SerialName("Difficile") HARD("Difficile");
 
     companion object {
         fun of(label: String?): Difficulty? = entries.firstOrNull { it.label == label }
@@ -78,7 +78,8 @@ data class Attempt(
     val mode: GameMode,
     val correct: Boolean,
     val timeMs: Int,
-    val points: Int,
+    /** Points of the old scoring, kept to read old saves; new attempts store 0 and nothing shows them. */
+    val points: Int = 0,
     @Serializable(with = AppleDateSerializer::class) val date: Instant,
     val dailyKey: String? = null,
 )
@@ -108,8 +109,10 @@ data class Progress(
     /** Personal records of Sprint, Survie and Double sens (by PlayMode key). Never official. */
     val modes: Map<String, ModeRecords>? = null,
 ) {
-    val score: Int get() = attempts.sumOf { it.points }
     val correctAnswers: Int get() = attempts.count { it.correct }
+    /** Level from the words found (no more points): 20 words per level. */
+    val level: Int get() = ClassicLevel.level(correctAnswers)
+    val levelInto: Int get() = ClassicLevel.into(correctAnswers)
     val successRate: Double get() = if (attempts.isEmpty()) 0.0 else correctAnswers.toDouble() / attempts.size
     val bestTimeMs: Int? get() = attempts.filter { it.correct }.minOfOrNull { it.timeMs }
     val averageTimeMs: Int? get() = attempts.filter { it.correct }.takeIf { it.isNotEmpty() }?.let { wins -> wins.sumOf { it.timeMs } / wins.size }

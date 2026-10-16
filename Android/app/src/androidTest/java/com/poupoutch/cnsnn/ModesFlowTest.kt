@@ -13,7 +13,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.poupoutch.cnsnn.core.DuoGame
-import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.SprintGame
 import com.poupoutch.cnsnn.core.SurvivalGame
@@ -87,24 +86,26 @@ class ModesFlowTest {
         val expected = SprintGame(seed, store.recent(PlayMode.SPRINT))
         open("Sprint")
         waitFor("90 secondes")
-        // A right answer scores the card's points at ×1 and raises the combo.
+        // Right answers count the words found and raise the combo.
         val first = expected.card!!
         type(first.wordFull)
-        val points = SprintGame.basePoints(first.difficulty)
-        waitForDescription("Score : ${Format.number(points)}")
+        waitForDescription("Mots : 1")
+        expected.answer(first.wordFull, 0)
+        type(expected.card!!.wordFull)
+        waitForDescription("Mots : 2")
         waitFor("×2")
         // A wrong answer keeps the word and resets the combo.
         type("XQ")
         waitFor("×1")
         rule.onNodeWithText("Passer · −5 s").performClick()
-        // Stopping counts the game with its score.
+        // Stopping counts the game with its words.
         rule.onNodeWithContentDescription("Quitter").performClick()
         rule.onNodeWithText("Arrêter").performClick()
         waitFor("Sprint arrêté")
         waitFor("Premier record établi")
         rule.onNodeWithText("Rejouer").assertIsDisplayed()
         rule.onNodeWithText("Accueil").performClick()
-        waitFor("Record $points pts", substring = true)
+        waitFor("Record 2 mots", substring = true)
     }
 
     @Test fun survivalLivesAndEnd() {
@@ -123,7 +124,7 @@ class ModesFlowTest {
         waitFor("Plus de vies…")
         waitFor("Le dernier mot était", substring = true)
         rule.onNodeWithText("Accueil").performClick()
-        waitFor("Record 1 mots", substring = true)
+        waitFor("Record niveau 1", substring = true)
     }
 
     @Test fun survivalResumesAfterLeaving() {
@@ -166,7 +167,7 @@ class ModesFlowTest {
             rule.onNodeWithText(if (index == 3) "Voir le résultat" else "Manche suivante").performClick()
         }
         waitFor("Partie terminée")
-        rule.onNodeWithText("1/5").assertIsDisplayed()
+        rule.onNodeWithText("paire trouvée").assertIsDisplayed()
         rule.onNodeWithText("2/10").assertIsDisplayed()
         rule.onNodeWithText("Accueil").performClick()
         waitFor("Bonjour,")

@@ -23,9 +23,9 @@ test('web deletion: every document, 120 live cards anonymized, reports and suspe
   await seed('users/alice/friends/bob', { username: 'Bob', addedAt: now });
   await seed('friendCodes/ABC234', { uid: 'alice', username: 'Alice', createdAt: now });
   await seed('usernames/alice', { uid: 'alice', createdAt: now });
-  await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', points: 10 });
+  await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', played: 1 });
   await seed(`dailySessions/alice_${day}`, { userId: 'alice', day, cardId: 'x', startedAt: now, hintUsed: false });
-  await seed(`dailyResults/alice_${day}`, { userId: 'alice', username: 'Alice', day, correct: true, timeMs: 9000, points: 100 });
+  await seed(`dailyResults/alice_${day}`, { userId: 'alice', username: 'Alice', day, correct: true, timeMs: 9000, scoreMs: 9000 });
   await seed('reports/alice_CHOCOLAT', { userId: 'alice', cardId: 'CHOCOLAT', reason: 'Indice faux.', status: 'pending' });
   await seed('playerReports/alice_bob', { userId: 'alice', playerId: 'bob', username: 'Bob', status: 'pending' });
   await seed('playerReports/bob_alice', { userId: 'bob', playerId: 'alice', username: 'Alice', status: 'pending' });
@@ -60,7 +60,7 @@ test('web deletion refuses to act for someone else', async () => {
 test('web deletion cut off halfway resumes and finishes, without a second tombstone', async () => {
   const now = Timestamp.now();
   await seed('users/alice', { uid: 'alice', username: 'Alice' });
-  await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', points: 10 });
+  await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', played: 1 });
   for (let i = 0; i < 900; i++) {
     const day = new Date(Date.UTC(2024, 0, 1) + i * 86400000).toISOString().slice(0, 10);
     await seed(`dailySessions/alice_${day}`, { userId: 'alice', day, cardId: 'x', startedAt: now, hintUsed: false });

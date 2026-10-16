@@ -25,7 +25,11 @@ function parisKey(date=new Date()){
 }
 function shiftKey(key,days){const d=new Date(`${key}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
 function base(key){const w=new Date(`${key}T12:00:00Z`).getUTCDay();const iso=w===0?7:w;return iso<=2?50:iso<=5?100:150;}
-function points(key,timeMs,usedHint,correct){if(!correct)return 0;const raw=base(key)+Math.max(0,50-Math.floor(timeMs/1000));return usedHint?Math.floor(raw/2):raw;}
+// Same as Core/GameRules.swift DailyScore: time, +1 min with the hint, 10 min for a lost day (and at most).
+function score(timeMs,usedHint,correct){return correct?Math.min(timeMs+(usedHint?60000:0),600000):600000;}
+const dayIndex=key=>Math.round(Date.parse(`${key}T00:00:00Z`)/86400000);
+const dailyRank=(key,s,correct)=>dayIndex(key)*1000000+(correct?s:999999);
+const monthIndex=key=>Number(key.slice(0,4))*12+Number(key.slice(5,7))-1;
 
 // Creates the profile and reserves its pseudo in the same batch, as the apps do.
 function signUpBatch(uid='alice',username='Alice',data=profile(uid,username)){
@@ -66,15 +70,18 @@ async function resultFor(uid,day,overrides={}){
  const s=(await getDoc(doc(user(uid),`dailySessions/${uid}_${day}`))).data();
  const timeMs=s.finishedAt.toMillis()-s.startedAt.toMillis();
  return {userId:uid,username:(await read(`users/${uid}`)).username,day,cardId:s.cardId,correct:s.correct,usedHint:s.hintUsed,wrongAnswers:s.wrongAnswers,
-  timeMs,points:points(day,timeMs,s.hintUsed,s.correct),startedAt:s.startedAt,finishedAt:s.finishedAt,...overrides};
+  timeMs,scoreMs:score(timeMs,s.hintUsed,s.correct),rank:dailyRank(day,score(timeMs,s.hintUsed,s.correct),s.correct),startedAt:s.startedAt,finishedAt:s.finishedAt,...overrides};
 }
 function tally(old,r,uid='alice'){
  const laterWin=r.correct&&r.day>old.lastWinDay;
  const streak=laterWin?(old.lastWinDay===shiftKey(r.day,-1)?old.streak+1:1):(!r.correct&&r.day>old.lastWinDay?0:old.streak);
- return {uid,username:r.username,points:old.points+r.points,played:old.played+1,wins:old.wins+(r.correct?1:0),streak,bestStreak:Math.max(old.bestStreak,streak),
+ const m=monthIndex(r.day),om=old.month??0,same=m===om,saved=(same?old.monthSaved:0)+600000-r.scoreMs;
+ const month=m<om?{month:om,monthSaved:old.monthSaved,monthPlayed:old.monthPlayed,monthRank:old.monthRank}
+  :{month:m,monthSaved:saved,monthPlayed:(same?old.monthPlayed:0)+1,monthRank:m*100000000+saved};
+ return {uid,username:r.username,...month,played:old.played+1,wins:old.wins+(r.correct?1:0),streak,bestStreak:Math.max(old.bestStreak,streak),
   bestTimeMs:r.correct?(old.bestTimeMs==null?r.timeMs:Math.min(old.bestTimeMs,r.timeMs)):old.bestTimeMs,lastWinDay:laterWin?r.day:old.lastWinDay,lastResult:r.day,updatedAt:serverTimestamp()};
 }
-const zero={points:0,played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:''};
+const zero={played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',month:0,monthSaved:0,monthPlayed:0};
 async function publish(uid,r,old=zero,forged={}){
  const db=user(uid),b=writeBatch(db);
  b.set(doc(db,`dailyResults/${uid}_${r.day}`),r);b.set(doc(db,`leaderboard/${uid}`),{...tally(old,r,uid),...forged});
@@ -250,65 +257,107 @@ test('giving up on a secret daily word needs no answer',async()=>{
  await assertSucceeds(getDoc(doc(user(),`dailySecrets/${day}`)));
  await assertSucceeds(getDoc(doc(user(),`dailyHints/${day}`)));
 });
-test('official result: server time and recomputed points, once',async()=>{
+test('official result: server time and recomputed score, once',async()=>{
  await signUp(); await startDaily(); await finishDaily();
  const day=parisKey(),r=await resultFor('alice',day);
  await assertFails(publish('alice',{...r,timeMs:Math.max(0,r.timeMs-1)}));
- await assertFails(publish('alice',{...r,points:r.points+1}));
- await assertFails(publish('alice',{...r,usedHint:true,points:points(day,r.timeMs,true,true)}));
+ await assertFails(publish('alice',{...r,scoreMs:r.scoreMs-1}));
+ await assertFails(publish('alice',{...r,rank:r.rank-1}));
+ await assertFails(publish('alice',{...r,points:100}));
+ // The hint must be the session's: hiding it to dodge the minute fails.
+ await assertFails(publish('alice',{...r,usedHint:true,scoreMs:score(r.timeMs,true,true),rank:dailyRank(day,score(r.timeMs,true,true),true)}));
  await assertFails(publish('alice',{...r,username:'Someone'}));
  // A result without the matching leaderboard tally is refused, and the reverse too.
  await assertFails(setDoc(doc(user(),`dailyResults/alice_${day}`),r));
  await assertFails(setDoc(doc(user(),'leaderboard/alice'),tally(zero,r)));
  await assertSucceeds(publish('alice',r));
  const board=await read('leaderboard/alice');
- assert.equal(board.points,r.points); assert.equal(board.wins,1); assert.equal(board.streak,1); assert.equal(board.bestTimeMs,r.timeMs);
+ assert.equal(board.monthSaved,600000-r.scoreMs); assert.equal(board.monthPlayed,1); assert.equal(board.month,monthIndex(day));
+ assert.equal(board.monthRank,monthIndex(day)*100000000+600000-r.scoreMs); assert.equal(board.wins,1); assert.equal(board.streak,1); assert.equal(board.bestTimeMs,r.timeMs);
  // Replays and edits are impossible.
  await assertFails(publish('alice',r,{...zero,...board}));
  await assertFails(updateDoc(doc(user(),`dailyResults/alice_${day}`),{timeMs:1}));
  await assertFails(deleteDoc(doc(user(),`dailyResults/alice_${day}`)));
- await assertFails(updateDoc(doc(user(),'leaderboard/alice'),{points:99999,updatedAt:serverTimestamp()}));
+ await assertFails(updateDoc(doc(user(),'leaderboard/alice'),{monthSaved:99999999,updatedAt:serverTimestamp()}));
 });
-test('a lost daily scores zero and resets the streak',async()=>{
+test('a lost daily counts 10 minutes and resets the streak',async()=>{
  await signUp();
  const day=parisKey(),yesterday=shiftKey(day,-1);
+ // An old line, from before the time-only scoring, still has its points: the next result drops them.
  await seed('leaderboard/alice',{uid:'alice',username:'Alice',points:120,played:3,wins:3,streak:3,bestStreak:3,bestTimeMs:4000,lastWinDay:yesterday,lastResult:yesterday,updatedAt:Timestamp.now()});
  await startDaily(); await finishDaily('alice',day,false);
  const r=await resultFor('alice',day);
- assert.equal(r.points,0);
+ assert.equal(r.scoreMs,600000);
  const old=await read('leaderboard/alice');
  await assertFails(publish('alice',r,old,{streak:4,bestStreak:4}));
- await assertFails(publish('alice',r,old,{points:old.points+50}));
+ await assertFails(publish('alice',r,old,{points:old.points}));
+ await assertFails(publish('alice',r,old,{monthSaved:1000}));
  await assertSucceeds(publish('alice',r,old));
  const board=await read('leaderboard/alice');
- assert.equal(board.streak,0); assert.equal(board.bestStreak,3); assert.equal(board.played,4); assert.equal(board.points,120);
+ assert.equal(board.streak,0); assert.equal(board.bestStreak,3); assert.equal(board.played,4); assert.equal(board.points,undefined);
+ assert.equal(board.monthSaved,0); assert.equal(board.monthPlayed,1);
 });
 test('a win after yesterday extends the streak',async()=>{
  await signUp();
  const day=parisKey(),yesterday=shiftKey(day,-1);
- await seed('leaderboard/alice',{uid:'alice',username:'Alice',points:100,played:1,wins:1,streak:1,bestStreak:1,bestTimeMs:9000,lastWinDay:yesterday,lastResult:yesterday,updatedAt:Timestamp.now()});
+ const m=monthIndex(day);
+ await seed('leaderboard/alice',{uid:'alice',username:'Alice',played:1,wins:1,streak:1,bestStreak:1,bestTimeMs:9000,lastWinDay:yesterday,lastResult:yesterday,
+  month:m,monthSaved:591000,monthPlayed:1,monthRank:m*100000000+591000,updatedAt:Timestamp.now()});
  await startDaily(); await finishDaily();
  const r=await resultFor('alice',day),old=await read('leaderboard/alice');
  await assertSucceeds(publish('alice',r,old));
- assert.equal((await read('leaderboard/alice')).streak,2);
+ const board=await read('leaderboard/alice');
+ assert.equal(board.streak,2); assert.equal(board.monthPlayed,2); assert.equal(board.monthSaved,591000+600000-r.scoreMs);
+});
+test('the month total starts again each month and ignores a late day from an older month',async()=>{
+ await signUp();
+ const day=parisKey(),yesterday=shiftKey(day,-1),m=monthIndex(day);
+ const line=month=>({uid:'alice',username:'Alice',played:5,wins:5,streak:0,bestStreak:2,bestTimeMs:9000,lastWinDay:'',lastResult:yesterday,
+  month,monthSaved:2000000,monthPlayed:5,monthRank:month*100000000+2000000,updatedAt:Timestamp.now()});
+ await seed('leaderboard/alice',line(m-1));
+ await startDaily(); await finishDaily();
+ const r=await resultFor('alice',day),old=await read('leaderboard/alice');
+ // Carrying last month's total over is refused.
+ await assertFails(publish('alice',r,old,{month:m,monthSaved:2000000+600000-r.scoreMs,monthPlayed:6,monthRank:m*100000000+2000000+600000-r.scoreMs}));
+ await assertSucceeds(publish('alice',r,old));
+ let board=await read('leaderboard/alice');
+ assert.equal(board.month,m); assert.equal(board.monthSaved,600000-r.scoreMs); assert.equal(board.monthPlayed,1);
+ await env.clearFirestore();
+ await signUp();
+ await seed('leaderboard/alice',line(m+1));
+ await startDaily(); await finishDaily();
+ const late=await resultFor('alice',day),newer=await read('leaderboard/alice');
+ await assertFails(publish('alice',late,newer,{month:m,monthSaved:600000-late.scoreMs,monthPlayed:1,monthRank:m*100000000+600000-late.scoreMs}));
+ await assertSucceeds(publish('alice',late,newer));
+ board=await read('leaderboard/alice');
+ assert.equal(board.month,m+1); assert.equal(board.monthSaved,2000000); assert.equal(board.monthPlayed,5);
 });
 test('leaderboard rename follows the profile only',async()=>{
  await signUp();
- await seed('leaderboard/alice',{uid:'alice',username:'Alice',points:0,played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',lastResult:'',updatedAt:Timestamp.now()});
+ await seed('leaderboard/alice',{uid:'alice',username:'Alice',played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',lastResult:'',updatedAt:Timestamp.now()});
  const db=user(),b=renameBatch('alice','Alice','Alicia',db);
  b.update(doc(db,'leaderboard/alice'),{username:'Alicia',updatedAt:serverTimestamp()});
  await assertSucceeds(b.commit());
  await assertFails(updateDoc(doc(db,'leaderboard/alice'),{username:'Zorro',updatedAt:serverTimestamp()}));
 });
-test('ranking and percentile queries are public to players',async()=>{
- const day=parisKey();
- for(const [uid,timeMs] of [['a',4000],['b',9000],['c',15000]]) await seed(`dailyResults/${uid}_${day}`,{userId:uid,username:uid,day,correct:true,timeMs,points:100});
- const db=user('bob');
- const top=await assertSucceeds(getDocs(query(collection(db,'dailyResults'),where('day','==',day),where('correct','==',true),orderBy('timeMs'))));
- assert.deepEqual(top.docs.map(d=>d.data().timeMs),[4000,9000,15000]);
- const slower=await assertSucceeds(getCountFromServer(query(collection(db,'dailyResults'),where('day','==',day),where('correct','==',true),where('timeMs','>',4000))));
- assert.equal(slower.data().count,2);
- await assertSucceeds(getDocs(query(collection(db,'leaderboard'),orderBy('points','desc'))));
+test('ranking and percentile queries are public to players, on single fields',async()=>{
+ const day=parisKey(),base=dailyRank(day,0,true);
+ // b took the hint: 9 s + 1 min puts them behind c. d lost, yesterday's player is another day.
+ for(const [uid,timeMs,hint,correct] of [['a',4000,false,true],['b',9000,true,true],['c',15000,false,true],['d',30000,false,false]]){
+  const s=score(timeMs,hint,correct);
+  await seed(`dailyResults/${uid}_${day}`,{userId:uid,username:uid,day,correct,usedHint:hint,timeMs,scoreMs:s,rank:dailyRank(day,s,correct)});
+ }
+ await seed(`dailyResults/e_${shiftKey(day,-1)}`,{userId:'e',username:'e',day:shiftKey(day,-1),correct:true,timeMs:1000,scoreMs:1000,rank:dailyRank(shiftKey(day,-1),1000,true)});
+ const db=user('bob'),results=collection(db,'dailyResults');
+ const top=await assertSucceeds(getDocs(query(results,where('rank','>=',base),where('rank','<=',base+600000),orderBy('rank'))));
+ assert.deepEqual(top.docs.map(d=>d.data().userId),['a','c','b']);
+ const behind=await assertSucceeds(getCountFromServer(query(results,where('rank','>',base+4000),where('rank','<=',base+999999))));
+ assert.equal(behind.data().count,3);
+ const m=monthIndex(day);
+ await seed('leaderboard/a',{uid:'a',username:'a',month:m,monthSaved:1000,monthRank:m*100000000+1000});
+ await seed('leaderboard/b',{uid:'b',username:'b',month:m-1,monthSaved:9000,monthRank:(m-1)*100000000+9000});
+ const month=await assertSucceeds(getDocs(query(collection(db,'leaderboard'),where('monthRank','>=',m*100000000),where('monthRank','<',(m+1)*100000000),orderBy('monthRank','desc'))));
+ assert.deepEqual(month.docs.map(d=>d.id),['a']);
  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(),'leaderboard')));
 });
 
@@ -513,7 +562,7 @@ test('a suspended player keeps reading but can no longer play ranked, propose, r
  await startDaily();
 });
 test('player reports: one per reporter and player, name checked, admin resolves',async()=>{
- await seed('leaderboard/bob',{uid:'bob',username:'Bob',points:10});
+ await seed('leaderboard/bob',{uid:'bob',username:'Bob',played:1});
  const r={userId:'alice',playerId:'bob',username:'Bob',reason:'Pseudo inapproprié',createdAt:serverTimestamp(),status:'pending'};
  await assertFails(setDoc(doc(user(),'playerReports/alice_bob'),{...r,username:'Autre'}));
  await assertFails(setDoc(doc(user(),'playerReports/whatever'),r));
@@ -582,7 +631,7 @@ test('a suspension hides results and totals without deleting them, and is revers
  b.update(doc(mod,`dailyResults/alice_${day}`),{suspended:true});
  await assertSucceeds(b.commit());
  // Only the flag can change, and only by a moderator.
- await assertFails(updateDoc(doc(mod,'leaderboard/alice'),{points:0}));
+ await assertFails(updateDoc(doc(mod,'leaderboard/alice'),{monthSaved:0}));
  await assertFails(updateDoc(doc(mod,`dailyResults/alice_${day}`),{timeMs:1}));
  await assertFails(updateDoc(doc(user(),'leaderboard/alice'),{suspended:deleteField()}));
  await assertFails(updateDoc(doc(user(),`dailyResults/alice_${day}`),{suspended:deleteField()}));

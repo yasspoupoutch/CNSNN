@@ -36,21 +36,23 @@ import CNSNNCore
         XCTAssertTrue(confirmed)
         let official = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
         XCTAssertGreaterThanOrEqual(official.timeMs, 2000)
-        XCTAssertEqual(official.points, Scoring.points(difficulty: card.difficulty, timeMs: official.timeMs, usedHint: true, correct: true))
+        let aliceScore = DailyScore.scoreMs(timeMs: official.timeMs, usedHint: true, correct: true)
+        XCTAssertEqual(aliceScore, official.timeMs + 60_000, "The hint adds one minute")
         // Publishing again returns the same result and does not count twice.
         let again = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: alice.uid, day: day))
         XCTAssertEqual(again.timeMs, official.timeMs)
         let entry = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: alice.uid, source: .server))
-        XCTAssertEqual(entry.points, official.points)
         XCTAssertEqual(entry.played, 1)
+        XCTAssertEqual(entry.monthPlayed, 1)
+        XCTAssertEqual(entry.monthTotal(on: day), DailyScore.monthTotal(saved: 600_000 - aliceScore, days: DailyScore.dayOfMonth(day)))
         XCTAssertEqual(entry.streak, 1)
         XCTAssertEqual(entry.bestTimeMs, official.timeMs)
-        let alone = try await repo.standing(day: day, timeMs: official.timeMs, correct: true)
+        let alone = try await repo.standing(day: day, scoreMs: aliceScore, correct: true)
         XCTAssertEqual(alone.players, 1)
         XCTAssertEqual(alone.rank, 1)
         XCTAssertNil(alone.beatenPercent)
 
-        // A slower second player: real rank and percentile for both.
+        // A second player, slower on the clock but without the hint: the hint minute puts them first.
         try repo.signOut()
         let bob = try await repo.bootstrap(username: "Bob")
         _ = try await repo.startDaily(uid: bob.uid, day: day, cardID: card.id)
@@ -59,19 +61,23 @@ import CNSNNCore
         _ = try await repo.finishDaily(uid: bob.uid, day: day, correct: true, wrongAnswers: 0, answer: WordEngine.normalize(card.wordFull))
         let bobResult = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: bob.uid, day: day))
         XCTAssertGreaterThan(bobResult.timeMs, official.timeMs)
-        let bobStanding = try await repo.standing(day: day, timeMs: bobResult.timeMs, correct: true)
-        XCTAssertEqual(bobStanding.rank, 2)
-        XCTAssertEqual(bobStanding.beatenPercent, 0)
-        let aliceStanding = try await repo.standing(day: day, timeMs: official.timeMs, correct: true)
-        XCTAssertEqual(aliceStanding.rank, 1)
-        XCTAssertEqual(aliceStanding.beatenPercent, 100)
+        let bobStanding = try await repo.standing(day: day, scoreMs: bobResult.timeMs, correct: true)
+        XCTAssertEqual(bobStanding.rank, 1)
+        XCTAssertEqual(bobStanding.beatenPercent, 100)
+        let aliceStanding = try await repo.standing(day: day, scoreMs: aliceScore, correct: true)
+        XCTAssertEqual(aliceStanding.rank, 2)
+        XCTAssertEqual(aliceStanding.beatenPercent, 0)
         let ranking = try await repo.dailyRanking(day: day)
-        XCTAssertEqual(ranking.map(\.username), ["Alice", "Bob"])
-        let top = try await repo.topPlayers()
-        XCTAssertEqual(top.count, 2)
+        XCTAssertEqual(ranking.map(\.username), ["Bob", "Alice"])
+        XCTAssertEqual(ranking.last?.scoreMs, aliceScore)
+        let month = try await repo.monthPlayers(day: day)
+        XCTAssertEqual(month.map(\.username), ["Bob", "Alice"])
+        // Records stay on the raw clock.
         let fastest = try await repo.fastestPlayers()
         XCTAssertEqual(fastest.first?.username, "Alice")
-        let rank = try await repo.rank(points: bobResult.points)
+        let bobEntry = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: bob.uid, source: .server))
+        let rank = try await XCTUnwrapAsync(try await repo.monthRank(bobEntry, day: day))
+        XCTAssertEqual(rank.rank, 1)
         XCTAssertEqual(rank.players, 2)
     }
 
@@ -274,14 +280,13 @@ import CNSNNCore
     func testModeRecordsSyncAcrossDevices() async throws {
         let player = try await repo.bootstrap(username: "Lou")
         var phone = CNSNNCore.Progress(); phone.username = "Lou"
-        phone.recordMode(.sprint, best: [ModeStat.score: 240, ModeStat.words: 9, ModeStat.combo: 6], add: [ModeStat.games: 1], device: "phone")
-        phone.recordMode(.duo, best: [ModeStat.score: 900], add: [ModeStat.games: 1, ModeStat.perfect: 1, ModeStat.duosSolved: 5, ModeStat.duosPlayed: 5], device: "phone")
+        phone.recordMode(.sprint, best: [ModeStat.words: 9, ModeStat.combo: 6], add: [ModeStat.games: 1], device: "phone")
+        phone.recordMode(.duo, best: [ModeStat.duo: 500_042], add: [ModeStat.games: 1, ModeStat.perfect: 1, ModeStat.duosSolved: 5, ModeStat.duosPlayed: 5], device: "phone")
         _ = try await repo.saveCloudProgress(phone, uid: player.uid)
         var tablet = CNSNNCore.Progress(); tablet.username = "Lou"
-        tablet.recordMode(.sprint, best: [ModeStat.score: 300, ModeStat.words: 7], add: [ModeStat.games: 1], device: "tablet")
+        tablet.recordMode(.sprint, best: [ModeStat.words: 7], add: [ModeStat.games: 1], device: "tablet")
         tablet.recordMode(.survival, best: [ModeStat.words: 23, ModeStat.level: 5], add: [ModeStat.games: 1], device: "tablet")
         let merged = try await repo.saveCloudProgress(tablet, uid: player.uid)
-        XCTAssertEqual(merged.records(.sprint).best(ModeStat.score), 300)
         XCTAssertEqual(merged.records(.sprint).best(ModeStat.words), 9)
         XCTAssertEqual(merged.records(.sprint).best(ModeStat.combo), 6)
         XCTAssertEqual(merged.records(.sprint).total(ModeStat.games), 2)
@@ -292,17 +297,17 @@ import CNSNNCore
         XCTAssertEqual(again.records(.sprint).total(ModeStat.games), 2)
         // Offline, the phone plays on; back online, its new game joins without erasing the tablet's.
         try await setNetwork(enabled: false)
-        phone.recordMode(.sprint, best: [ModeStat.score: 50], add: [ModeStat.games: 1], device: "phone")
+        phone.recordMode(.sprint, best: [ModeStat.words: 3], add: [ModeStat.games: 1], device: "phone")
         try await setNetwork(enabled: true)
         _ = try await repo.saveCloudProgress(phone, uid: player.uid)
         // A reinstall (empty phone) gets everything back.
         let restored = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
         XCTAssertEqual(restored.records(.sprint).total(ModeStat.games), 3)
-        XCTAssertEqual(restored.records(.sprint).best(ModeStat.score), 300)
+        XCTAssertEqual(restored.records(.sprint).best(ModeStat.words), 9)
         XCTAssertEqual(restored.records(.survival).total(ModeStat.games), 1)
-        XCTAssertEqual(restored.records(.duo).best(ModeStat.score), 900)
+        XCTAssertEqual(restored.records(.duo).best(ModeStat.duo), 500_042)
         // Records never touch the official numbers.
-        XCTAssertEqual(restored.score, 0)
+        XCTAssertEqual(restored.correctAnswers, 0)
         XCTAssertTrue(restored.attempts.isEmpty)
     }
 
@@ -312,29 +317,31 @@ import CNSNNCore
         progress.attempts = [Attempt(cardID: "seed-001", mode: .classic, correct: true, timeMs: 3000, points: 97, date: Date())]
         _ = try await repo.saveCloudProgress(progress, uid: player.uid)
         let restored = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
-        XCTAssertEqual(restored.score, 97)
+        XCTAssertEqual(restored.correctAnswers, 1)
         XCTAssertEqual(restored.attempts.first?.id, progress.attempts.first?.id)
         // A second device that never saw this game saves its own: both are kept.
         var tablet = CNSNNCore.Progress(); tablet.username = "Camille"
         tablet.attempts = [Attempt(cardID: "seed-002", mode: .classic, correct: true, timeMs: 4000, points: 96, date: Date())]
         let merged = try await repo.saveCloudProgress(tablet, uid: player.uid)
-        XCTAssertEqual(merged.score, 193)
+        XCTAssertEqual(merged.correctAnswers, 2)
         let both = try await XCTUnwrapAsync(try await repo.cloudProgress(uid: player.uid))
         XCTAssertEqual(Set(both.attempts.map(\.cardID)), ["seed-001", "seed-002"])
         // A cut connection overwrites nothing either. (Transactions bypass disableNetwork and still
         // reach the emulator; a real outage makes the save fail.) The next sync merges again.
         try await setNetwork(enabled: false)
-        if let during = try? await repo.saveCloudProgress(progress, uid: player.uid) { XCTAssertEqual(during.score, 193) }
+        if let during = try? await repo.saveCloudProgress(progress, uid: player.uid) { XCTAssertEqual(during.correctAnswers, 2) }
         try await setNetwork(enabled: true)
         let afterOutage = try await repo.saveCloudProgress(progress, uid: player.uid)
-        XCTAssertEqual(afterOutage.score, 193)
+        XCTAssertEqual(afterOutage.correctAnswers, 2)
 
         // Rename reaches the leaderboard line once it exists.
         let day = DailySchedule.key()
         _ = try await repo.startDaily(uid: player.uid, day: day, cardID: "x")
         _ = try await repo.finishDaily(uid: player.uid, day: day, correct: false, wrongAnswers: 0)
         let lost = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: player.uid, day: day))
-        XCTAssertEqual(lost.points, 0)
+        XCTAssertFalse(lost.correct)
+        // A lost day counts the full ten minutes: nothing saved this month.
+        XCTAssertEqual(try await repo.leaderboardEntry(uid: player.uid, source: .server)?.monthSaved, 0)
         try await repo.rename(uid: player.uid, username: "Camilla")
         let renamed = try await repo.leaderboardEntry(uid: player.uid, source: .server)
         XCTAssertEqual(renamed?.username, "Camilla")
@@ -416,7 +423,7 @@ import CNSNNCore
         let card = try XCTUnwrap(DailySchedule.dailyCard(forKey: day))
         let cheater = try await repo.bootstrap(username: "Rapide")
         try await win(uid: cheater.uid, day: day, card: card)
-        let points = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: cheater.uid, source: .server)).points
+        let saved = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: cheater.uid, source: .server)).monthSaved
 
         try repo.signOut()
         let mod = try await repo.bootstrap(username: "Modo")
@@ -424,19 +431,19 @@ import CNSNNCore
         let suspicious = try await repo.suspiciousResults(day: day)
         XCTAssertTrue(suspicious.allSatisfy { $0.timeMs < 5000 })
         try await repo.suspend(player: cheater.uid, username: "Rapide", reason: "Temps suspect")
-        let hiddenTop = try await repo.topPlayers()
+        let hiddenTop = try await repo.monthPlayers(day: day)
         XCTAssertFalse(hiddenTop.contains { $0.uid == cheater.uid })
         let hiddenToday = try await repo.dailyRanking(day: day)
         XCTAssertFalse(hiddenToday.contains { $0.uid == cheater.uid })
         // Nothing was deleted.
         let kept = try await repo.leaderboardEntry(uid: cheater.uid, source: .server)
-        XCTAssertEqual(kept?.points, points)
+        XCTAssertEqual(kept?.monthSaved, saved)
         let result = try await repo.dailyResult(uid: cheater.uid, day: day)
         XCTAssertNotNil(result)
 
         try await repo.unsuspend(player: cheater.uid)
-        let back = try await repo.topPlayers()
-        XCTAssertEqual(back.first { $0.uid == cheater.uid }?.points, points)
+        let back = try await repo.monthPlayers(day: day)
+        XCTAssertEqual(back.first { $0.uid == cheater.uid }?.monthSaved, saved)
         let today = try await repo.dailyRanking(day: day)
         XCTAssertTrue(today.contains { $0.uid == cheater.uid })
     }

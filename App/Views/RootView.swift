@@ -197,7 +197,7 @@ struct OnboardingView: View {
                     }.glassCard(radius: 30, padding: 22).padding(.top, 38)
                     VStack(alignment: .leading, spacing: 14) {
                         bullet("Tapez le mot complet, les accents sont ignorés")
-                        bullet("Un chrono tourne. Un indice si vous séchez, contre la moitié des points")
+                        bullet("Un chrono tourne. Un indice si vous séchez, contre 1 minute de plus")
                         bullet("Un mot du jour commun, et le mode Classique sans limite")
                     }.padding(.horizontal, 6).padding(.top, 28)
                 }.padding(.horizontal, 26)
@@ -310,7 +310,7 @@ struct SignInSheet: View {
                         Button("Se connecter") { signIn() }.disabled(busy || trimmedEmail.isEmpty || password.isEmpty)
                         Button("Mot de passe oublié ?") { resetPassword() }.disabled(busy || trimmedEmail.isEmpty)
                     } footer: {
-                        Text("Retrouvez votre pseudo, vos points et votre série, comme sur votre ancien téléphone.")
+                        Text("Retrouvez votre pseudo, vos stats et votre série, comme sur votre ancien téléphone.")
                     }
                 }
                 if let message { Section { Text(message).foregroundStyle(.secondary) } }

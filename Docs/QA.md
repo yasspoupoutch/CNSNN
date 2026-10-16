@@ -22,7 +22,7 @@ UI : onboarding et navigation Home → Stats → Profil → Home en mode mémoir
 
 Firestore : droits propriétaires, champs sensibles, admin non falsifiable, soumission pending privée, refus de l’auto-approbation, requête approved, refus d’énumération globale, refus des résultats forgés, signalement unique et résolution admin.
 
-Backend : normalisation, points, jours Paris/DST, mauvais essais sans points, temps serveur et abandon.
+Backend : normalisation, score au temps (indice +1 min, raté 10 min), total du mois, jours Paris/DST, temps serveur et abandon.
 
 ## Matrice iPhone à exécuter sur Mac
 

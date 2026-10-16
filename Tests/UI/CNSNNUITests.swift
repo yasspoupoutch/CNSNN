@@ -111,7 +111,7 @@ final class CNSNNUITests: XCTestCase {
 
         let ranking = app.buttons["Classement"]
         XCTAssertTrue(ranking.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["19:51:25 · +50 pts"].exists, "Un temps de plus d’une heure s’affiche en h:mm:ss")
+        XCTAssertTrue(app.staticTexts["19:51:25"].exists, "Un temps de plus d’une heure s’affiche en h:mm:ss")
         let screen = app.windows.firstMatch.frame
         let elements: [(String, XCUIElement)] = [
             ("Bonjour", app.staticTexts["Bonjour,"]), ("Classement", ranking), ("Partager", app.buttons["Partager"]),

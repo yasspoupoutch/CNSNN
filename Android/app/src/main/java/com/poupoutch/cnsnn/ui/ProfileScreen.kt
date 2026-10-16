@@ -104,7 +104,7 @@ fun ProfileScreen(state: AppViewModel) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Avatar(state.progress.username, state.avatar, 96.dp)
                 Text(state.progress.username, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp))
-                Text("Niveau ${state.progress.score / 1000 + 1} · ${Format.number(state.progress.score)} points", color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
+                Text("Niveau ${state.progress.level} · ${Format.number(state.progress.correctAnswers)} mot${if (state.progress.correctAnswers > 1) "s" else ""} trouvé${if (state.progress.correctAnswers > 1) "s" else ""}", color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
                 AvatarPicker(state.avatar, state::chooseAvatar, Modifier.padding(top = 14.dp))
                 TonalButton("Modifier le pseudo", Modifier.fillMaxWidth().padding(top = 14.dp)) { editingName = true }
             }
@@ -287,7 +287,7 @@ private fun AccountContent(state: AppViewModel, close: () -> Unit) {
                     message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
                 } }, enabled = !busy && trimmed.isNotEmpty()) { Text("Mot de passe oublié ?") }
                 Text(if (login) "Vos parties d’entraînement de ce téléphone rejoignent ce compte. Les Mots du jour joués en invité restent sur le profil invité."
-                     else "Votre compte invité devient permanent : même profil, mêmes points, mêmes propositions. Vous pourrez le retrouver sur un autre appareil (Android ou iPhone) ou après une réinstallation.",
+                     else "Votre compte invité devient permanent : même profil, mêmes stats, mêmes propositions. Vous pourrez le retrouver sur un autre appareil (Android ou iPhone) ou après une réinstallation.",
                     fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 8.dp))
             }
             else -> SectionCard {
@@ -325,7 +325,7 @@ private fun AccountContent(state: AppViewModel, close: () -> Unit) {
 @Composable
 private fun PrivacyContent() {
     val sections = listOf(
-        "Ce que nous enregistrons" to "Votre pseudo, vos parties (mots du jour, temps, points, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter.",
+        "Ce que nous enregistrons" to "Votre pseudo, vos parties (mots du jour, temps, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter.",
         "Ce qui est public" to "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché.",
         "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et Crashlytics), et sur votre téléphone. Aucune publicité, aucun traceur, aucune revente de données.",
         "Rapports de plantage" to "Si l’application plante, un rapport technique (modèle et version du téléphone, version de l’app, détail de l’erreur) est envoyé à Firebase Crashlytics pour corriger le problème. Il ne contient ni votre pseudo ni votre email et ne sert jamais à la publicité ni au suivi.",

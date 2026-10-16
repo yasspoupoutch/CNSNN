@@ -7,7 +7,7 @@
 
 Les deux applications lisent les mêmes listes (Shared/cards.tsv, Shared/duos.tsv). Les règles des
 modes Sprint, Survie et Double sens sont réécrites ici en Python : les vecteurs produits sont rejoués
-par les tests Swift et Kotlin, qui doivent trouver exactement les mêmes mots, points et vies.
+par les tests Swift et Kotlin, qui doivent trouver exactement les mêmes mots, records et vies.
 """
 import re
 import sys
@@ -173,13 +173,12 @@ def pick(pool, weights, used, recent, rng):
 
 
 class Sprint:
-    DURATION, PENALTY, MAX_MULTIPLIER, WEIGHTS = 90_000, 5_000, 5, (40, 40, 20)
-    BASE = {'easy': 10, 'medium': 20, 'hard': 30}
+    DURATION, PENALTY, WEIGHTS = 90_000, 5_000, (40, 40, 20)
 
     def __init__(self, pool, seed, recent=()):
         self.pool, self.rng, self.recent = pool, Random(seed), set(recent)
         self.used, self.card = [], None
-        self.found = self.score = self.streak = self.best_combo = self.wrong = self.skips = self.penalty = 0
+        self.found = self.streak = self.best_combo = self.wrong = self.skips = self.penalty = 0
         self.finished = False
         self.draw()
 
@@ -199,7 +198,6 @@ class Sprint:
             return
         if normalize(text) == normalize(self.card['word']):
             self.streak += 1
-            self.score += self.BASE[self.card['difficulty']] * min(self.MAX_MULTIPLIER, self.streak)
             self.found += 1
             self.best_combo = max(self.best_combo, self.streak)
             self.draw()
@@ -330,10 +328,9 @@ class DuoGame:
     def solved(self):
         return sum(1 for a, b in self.found if a and b)
 
-    def score(self, t):
-        found = self.words_found()
-        bonus = max(0, 300 - self.play_ms(t) // 1000) * found // 10
-        return max(0, found * 100 + self.solved() * 50 - self.errors * 20 + bonus)
+    def record(self, t):
+        # Pairs found first, then the time (DuoRecord in Core/Modes.swift).
+        return self.solved() * 100_000 + max(0, 99_999 - max(0, self.play_ms(t)) // 1000)
 
 
 # ---- Scenarios replayed by both test suites
@@ -370,7 +367,7 @@ def scenarios(pool, duos):
                 game.answer('ZZZ', t)
             else:
                 game.skip(t)
-            steps.append((action, game.card['id'] if game.card else '', game.score, game.streak, game.found, game.wrong, game.skips, game.remaining(t), game.finished))
+            steps.append((action, game.card['id'] if game.card else '', game.streak, game.found, game.wrong, game.skips, game.remaining(t), game.finished))
         out['sprint'].append((seed, Sprint(pool, seed).card['id'], steps, game.best_combo))
 
     sprint_case(42, ['ok@3000', 'ok@6000', 'ok@9000', 'ok@12000', 'ok@15000', 'ok@18000', 'ko@20000', 'ok@22000', 'skip@25000', 'ok@26000', 'ok@27000'])
@@ -408,7 +405,7 @@ def scenarios(pool, duos):
                 game.skip(t)
             else:
                 game.next(t)
-            steps.append((action, game.round, game.words_found(), game.solved(), game.errors, game.play_ms(t), game.score(t), game.finished))
+            steps.append((action, game.round, game.words_found(), game.solved(), game.errors, game.play_ms(t), game.record(t), game.finished))
         out['duo'].append((seed, [d['id'] for d in game.duos], steps))
 
     duo_case(42, ['a@4000', 'ko@6000', 'b@9000', 'next@15000', 'b@20000', 'a@21000', 'next@22000', 'a@30000', 'skip@40000', 'next@41000',
@@ -475,9 +472,9 @@ def vector_rows(s, lang):
     out['random'] = [f'RandomCase(seed: {u(seed)}, values: {lst([u(v) for v in values])}, mod97: {mod})' if lang == 'swift' else
                      f'RandomCase({u(seed)}, {lst([u(v) for v in values])}, {mod})' for seed, values, mod in s['random']]
     def sprint_step(st):
-        a, card, score, streak, found, wrong, skips, remaining, fin = st
-        return (f'SprintStep(action: {q(a)}, card: {q(card)}, score: {score}, streak: {streak}, found: {found}, wrong: {wrong}, skips: {skips}, remainingMs: {remaining}, finished: {b(fin)})' if lang == 'swift'
-                else f'SprintStep({q(a)}, {q(card)}, {score}, {streak}, {found}, {wrong}, {skips}, {remaining}, {b(fin)})')
+        a, card, streak, found, wrong, skips, remaining, fin = st
+        return (f'SprintStep(action: {q(a)}, card: {q(card)}, streak: {streak}, found: {found}, wrong: {wrong}, skips: {skips}, remainingMs: {remaining}, finished: {b(fin)})' if lang == 'swift'
+                else f'SprintStep({q(a)}, {q(card)}, {streak}, {found}, {wrong}, {skips}, {remaining}, {b(fin)})')
     out['sprint'] = [(f'SprintCase(seed: {u(seed)}, first: {q(first)}, steps: {lst([sprint_step(x) for x in steps])}, bestCombo: {best})' if lang == 'swift'
                       else f'SprintCase({u(seed)}, {q(first)}, {lst([sprint_step(x) for x in steps])}, {best})') for seed, first, steps, best in s['sprint']]
     def survival_step(st):
@@ -487,9 +484,9 @@ def vector_rows(s, lang):
     out['survival'] = [(f'SurvivalCase(seed: {u(seed)}, steps: {lst([survival_step(x) for x in steps])})' if lang == 'swift'
                         else f'SurvivalCase({u(seed)}, {lst([survival_step(x) for x in steps])})') for seed, steps in s['survival']]
     def duo_step(st):
-        a, rnd, found, solved, errors, ms, score, fin = st
-        return (f'DuoStep(action: {q(a)}, round: {rnd}, found: {found}, solved: {solved}, errors: {errors}, playMs: {ms}, score: {score}, finished: {b(fin)})' if lang == 'swift'
-                else f'DuoStep({q(a)}, {rnd}, {found}, {solved}, {errors}, {ms}, {score}, {b(fin)})')
+        a, rnd, found, solved, errors, ms, record, fin = st
+        return (f'DuoStep(action: {q(a)}, round: {rnd}, found: {found}, solved: {solved}, errors: {errors}, playMs: {ms}, record: {record}, finished: {b(fin)})' if lang == 'swift'
+                else f'DuoStep({q(a)}, {rnd}, {found}, {solved}, {errors}, {ms}, {record}, {b(fin)})')
     out['challenge'] = [(f'ChallengeCase(seed: {u(seed)}, recent: {lst([q(i) for i in recent])}, cards: {lst([q(i) for i in ids])})' if lang == 'swift'
                          else f'ChallengeCase({u(seed)}, {lst([q(i) for i in recent])}, {lst([q(i) for i in ids])})') for seed, recent, ids in s['challenge']]
     out['duo'] = [(f'DuoCase(seed: {u(seed)}, duos: {lst([q(i) for i in ids])}, steps: {lst([duo_step(x) for x in steps])})' if lang == 'swift'
@@ -505,11 +502,11 @@ def swift_vectors(s):
 import Foundation
 
 struct RandomCase {{ let seed: UInt64; let values: [UInt64]; let mod97: Int }}
-struct SprintStep {{ let action: String; let card: String; let score: Int; let streak: Int; let found: Int; let wrong: Int; let skips: Int; let remainingMs: Int; let finished: Bool }}
+struct SprintStep {{ let action: String; let card: String; let streak: Int; let found: Int; let wrong: Int; let skips: Int; let remainingMs: Int; let finished: Bool }}
 struct SprintCase {{ let seed: UInt64; let first: String; let steps: [SprintStep]; let bestCombo: Int }}
 struct SurvivalStep {{ let action: String; let card: String; let difficulty: String; let lives: Int; let found: Int; let level: Int; let gained: Int; let finished: Bool }}
 struct SurvivalCase {{ let seed: UInt64; let steps: [SurvivalStep] }}
-struct DuoStep {{ let action: String; let round: Int; let found: Int; let solved: Int; let errors: Int; let playMs: Int; let score: Int; let finished: Bool }}
+struct DuoStep {{ let action: String; let round: Int; let found: Int; let solved: Int; let errors: Int; let playMs: Int; let record: Int; let finished: Bool }}
 struct DuoCase {{ let seed: UInt64; let duos: [String]; let steps: [DuoStep] }}
 struct ChallengeCase {{ let seed: UInt64; let recent: [String]; let cards: [String] }}
 
@@ -541,11 +538,11 @@ def kotlin_vectors(s):
 package com.poupoutch.cnsnn.core
 
 data class RandomCase(val seed: ULong, val values: List<ULong>, val mod97: Int)
-data class SprintStep(val action: String, val card: String, val score: Int, val streak: Int, val found: Int, val wrong: Int, val skips: Int, val remainingMs: Int, val finished: Boolean)
+data class SprintStep(val action: String, val card: String, val streak: Int, val found: Int, val wrong: Int, val skips: Int, val remainingMs: Int, val finished: Boolean)
 data class SprintCase(val seed: ULong, val first: String, val steps: List<SprintStep>, val bestCombo: Int)
 data class SurvivalStep(val action: String, val card: String, val difficulty: String, val lives: Int, val found: Int, val level: Int, val gained: Int, val finished: Boolean)
 data class SurvivalCase(val seed: ULong, val steps: List<SurvivalStep>)
-data class DuoStep(val action: String, val round: Int, val found: Int, val solved: Int, val errors: Int, val playMs: Int, val score: Int, val finished: Boolean)
+data class DuoStep(val action: String, val round: Int, val found: Int, val solved: Int, val errors: Int, val playMs: Int, val record: Int, val finished: Boolean)
 data class DuoCase(val seed: ULong, val duos: List<String>, val steps: List<DuoStep>)
 data class ChallengeCase(val seed: ULong, val recent: List<String>, val cards: List<String>)
 

@@ -1,11 +1,12 @@
 import SwiftUI
 import CNSNNCore
 
-/// Real rankings from Firestore: today's Mot du jour by time, and all-time points and best times.
+/// Real rankings from Firestore, all on time: today's Mot du jour, the month's total (a day lost or not
+/// played counts ten minutes) and the best times ever.
 struct LeaderboardView: View {
     @Environment(AppState.self) private var state
     enum Board: String, CaseIterable, Identifiable {
-        case today = "Aujourd’hui", friends = "Amis", points = "Points", fastest = "Records"
+        case today = "Aujourd’hui", friends = "Amis", month = "Mois", fastest = "Records"
         var id: String { rawValue }
     }
     /// Bumped by the Stats page's pull to refresh.
@@ -57,8 +58,8 @@ struct LeaderboardView: View {
     @ViewBuilder private var summary: some View {
         if let entry = state.official {
             HStack(spacing: 12) {
-                stat(myRank.map { Format.ordinal($0.rank) } ?? "—", myRank.map { "sur \(Format.number($0.players)) joueurs" } ?? "Rang")
-                stat(Format.number(entry.points), "points officiels")
+                stat(myRank.map { Format.ordinal($0.rank) } ?? "—", myRank.map { "du mois sur \(Format.number($0.players))" } ?? "Rang du mois")
+                stat(entry.monthTotal().map(Format.clock) ?? "—", "total du mois")
                 stat("\(entry.currentStreak())", "série en cours")
             }
         } else {
@@ -128,7 +129,8 @@ struct LeaderboardView: View {
     private var emptyText: String {
         switch board {
         case .today: "Personne n’a encore trouvé le mot du jour."
-        case .points, .fastest, .friends: "Aucun résultat pour le moment."
+        case .month: "Personne n’a encore joué ce mois-ci."
+        case .fastest, .friends: "Aucun résultat pour le moment."
         }
     }
 
@@ -143,9 +145,10 @@ struct LeaderboardView: View {
     private var rows: [Row] { allRows.filter { !hidden.contains($0.id) } }
     private var allRows: [Row] {
         switch board {
-        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.timeMs),
-                                     detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice" : "")) }
-        case .points: players.map { Row(id: $0.uid, name: $0.username, value: Format.number($0.points) + " pts") }
+        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.scoreMs),
+                                     detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice +1 min" : "")) }
+        case .month: players.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.monthTotal() ?? 0),
+                                       detail: $0.monthPlayed > 1 ? "\($0.monthPlayed) jours joués" : "1 jour joué") }
         case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
         case .friends: []
         }
@@ -172,7 +175,8 @@ struct LeaderboardView: View {
         let force = force || refreshToken != seenToken
         seenToken = refreshToken
         let day = DailySchedule.key()
-        let key = board == .today ? "today-" + day : board.rawValue
+        // Today's and the month's rankings change with the day.
+        let key = board == .today || board == .month ? board.rawValue + "-" + day : board.rawValue
         guard board != .friends else { return }
         let summary = state.rankingIsStale("summary", force: force)
         guard summary || state.rankingIsStale(key, force: force) else { return }
@@ -181,13 +185,13 @@ struct LeaderboardView: View {
         do {
             if summary {
                 await state.refreshOfficial()
-                if let entry = state.official { state.rankings.myRank = try await cloud.rank(points: entry.points) }
+                if let entry = state.official { state.rankings.myRank = try await cloud.monthRank(entry, day: day) }
                 state.rankings.readAt["summary"] = Date()
             }
             guard state.rankingIsStale(key, force: force) else { return }
             switch board {
             case .today: state.rankings.today = try await cloud.dailyRanking(day: day)
-            case .points: state.rankings.players = try await cloud.topPlayers()
+            case .month: state.rankings.players = try await cloud.monthPlayers(day: day)
             case .fastest: state.rankings.fastest = try await cloud.fastestPlayers()
             case .friends: return
             }
@@ -237,8 +241,8 @@ struct FriendsBoard: View {
                                 Text(row.username).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
                                 if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
                             }
-                            Text(Format.number(row.points) + " pts" + (row.streak > 0 ? " · série \(row.streak)" : "")
-                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) : ""))
+                            Text((row.monthMs.map { "mois " + Format.clock($0) } ?? "pas joué ce mois") + (row.streak > 0 ? " · série \(row.streak)" : "")
+                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) + (row.todayHint ? " · indice" : "") : ""))
                                 .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
                             // Friend challenges: "2 victoires · 1 défaite" against this friend.
                             if !mine, let tally = state.challengeTally(friend: row.uid).label {
@@ -265,7 +269,7 @@ struct FriendsBoard: View {
 
     private func todayText(_ row: FriendStanding) -> String {
         guard let today = row.today else { return "pas joué" }
-        return today.correct ? Format.clock(today.timeMs) : "raté"
+        return today.correct ? Format.clock(row.todayScoreMs ?? today.timeMs) : "raté"
     }
 
     /// Two reads per friend: kept a few minutes like the other rankings (see AppState.rankings).

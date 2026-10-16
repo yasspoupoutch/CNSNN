@@ -81,8 +81,8 @@ import CNSNNCore
         switch mode {
         case .sprint:
             switch sprint?.answer(text, elapsed: now) {
-            case .right(let points, let multiplier)?:
-                answer = ""; successTick += 1; gain = "+\(points)" + (multiplier > 1 ? " · ×\(multiplier)" : ""); Haptics.success()
+            case .right?:
+                answer = ""; successTick += 1; gain = "+1"; Haptics.success()
             case .wrong?: wrong()
             default: break
             }

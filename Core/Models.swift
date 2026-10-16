@@ -7,7 +7,6 @@ public enum Category: String, CaseIterable, Codable, Hashable, Sendable, Identif
 public enum Difficulty: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
     case easy = "Facile", medium = "Moyen", hard = "Difficile"
     public var id: String { rawValue }
-    public var basePoints: Int { switch self { case .easy: 50; case .medium: 100; case .hard: 150 } }
 }
 public enum GameMode: String, Codable, Sendable { case classic, daily }
 public enum ReviewStatus: String, Codable, Hashable, Sendable { case pending, approved, rejected }
@@ -33,6 +32,7 @@ public struct Attempt: Identifiable, Codable, Sendable {
     public var mode: GameMode
     public var correct: Bool
     public var timeMs: Int
+    /// Points of the old scoring, kept to read old saves; new attempts store 0 and nothing shows them.
     public var points: Int
     public var date: Date
     public var dailyKey: String?
@@ -60,8 +60,19 @@ public struct Progress: Codable, Sendable {
     /// Personal records of Sprint, Survie and Double sens (by PlayMode raw value). Never official.
     public var modes: [String: ModeRecords]?
     public init() {}
-    public var score: Int { attempts.reduce(0) { $0 + $1.points } }
     public var correctAnswers: Int { attempts.filter(\.correct).count }
+    /// Level from the words found (no more points): 20 words per level.
+    public var level: Int { ClassicLevel.level(words: correctAnswers) }
+    public var levelInto: Int { ClassicLevel.into(words: correctAnswers) }
+    /// Classique words found in a row, up to the last game.
+    public var classicStreak: Int {
+        var count = 0
+        for attempt in attempts.reversed() where attempt.mode == .classic {
+            guard attempt.correct else { break }
+            count += 1
+        }
+        return count
+    }
     public var successRate: Double { attempts.isEmpty ? 0 : Double(correctAnswers) / Double(attempts.count) }
     public var bestTimeMs: Int? { attempts.filter(\.correct).map(\.timeMs).min() }
     public var averageTimeMs: Int? {

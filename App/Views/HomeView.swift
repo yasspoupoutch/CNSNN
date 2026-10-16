@@ -23,7 +23,7 @@ struct HomeView: View {
     private var startedDailyCard: Card? {
         state.progress.dailyStarted[todayKey].flatMap { state.card(id: $0) }
     }
-    private var level: (number: Int, into: Int) { (state.progress.score / 1000 + 1, state.progress.score % 1000) }
+    private var level: (number: Int, into: Int) { (state.progress.level, state.progress.levelInto) }
 
     var body: some View {
         ScrollView {
@@ -149,7 +149,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(attempt.correct ? "\(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois")
+                    Text(attempt.correct ? "\(Format.clock(attempt.timeMs))" : "Raté cette fois")
                         .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.7)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         Text("Prochain mot dans " + countdown(from: context.date))
@@ -193,11 +193,7 @@ struct HomeView: View {
     private func recordLine(_ mode: PlayMode) -> String {
         let records = state.progress.records(mode)
         guard records.total(ModeStat.games) > 0 else { return "Première partie" }
-        switch mode {
-        case .sprint: return "Record \(Format.number(records.best(ModeStat.score))) pts"
-        case .survival: return "Record \(records.best(ModeStat.words)) mots"
-        case .duo: return "Record \(Format.number(records.best(ModeStat.score))) pts"
-        }
+        return "Record " + ModeRecordText.main(mode, records)
     }
 
     private var classicSheet: some View {
@@ -211,9 +207,9 @@ struct HomeView: View {
             HStack {
                 Text("Niveau \(level.number)")
                 Spacer()
-                Text("\(1000 - level.into) pts avant le niveau \(level.number + 1)")
+                Text("\(ClassicLevel.wordsPerLevel - level.into) mots avant le niveau \(level.number + 1)")
             }.scaledFont(13).foregroundStyle(Palette.secondary).padding(.top, 16)
-            ProgressBar(value: Double(level.into) / 1000, color: Palette.foreground).padding(.top, 8)
+            ProgressBar(value: Double(level.into) / Double(ClassicLevel.wordsPerLevel), color: Palette.foreground).padding(.top, 8)
             HStack(spacing: 8) {
                 FilterMenu(title: category?.rawValue ?? "Toutes catégories") {
                     Button("Toutes catégories") { category = nil }
@@ -350,11 +346,11 @@ struct ProgressBar: View {
 enum ShareText {
     static func daily(_ attempt: Attempt, card: Card?) -> String {
         let day = attempt.dailyKey ?? DailySchedule.key(attempt.date)
-        let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "raté"
+        let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs))" : "raté"
         return "CNSNN · Mot du jour \(day) : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "") + invitation
     }
     static func classic(_ attempt: Attempt, card: Card?) -> String {
-        let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "raté"
+        let outcome = attempt.correct ? "trouvé en \(Format.clock(attempt.timeMs))" : "raté"
         return "CNSNN · Classique : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "") + invitation
     }
     /// Every share says where to get the game.
@@ -387,7 +383,7 @@ struct ShareCard: View {
     @MainActor static func image(_ attempt: Attempt, card: Card?, mode: GameMode) -> Image? {
         guard let card else { return nil }
         let title = mode == .daily ? "Mot du jour · " + (attempt.dailyKey ?? DailySchedule.key(attempt.date)) : "Classique"
-        let outcome = attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs)) · +\(attempt.points) pts" : "Raté cette fois"
+        let outcome = attempt.correct ? "Trouvé en \(Format.clock(attempt.timeMs))" : "Raté cette fois"
         let renderer = ImageRenderer(content: ShareCard(title: title, consonants: card.wordNoVowels, outcome: outcome, correct: attempt.correct))
         renderer.scale = 3
         return renderer.uiImage.map { Image(uiImage: $0) }

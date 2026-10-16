@@ -244,7 +244,7 @@ private fun Rules(next: () -> Unit) {
             }
             Column(Modifier.padding(top = 28.dp, start = 6.dp, end = 6.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Bullet("Tapez le mot complet, les accents sont ignorés")
-                Bullet("Un chrono tourne. Un indice si vous séchez, contre la moitié des points")
+                Bullet("Un chrono tourne. Un indice si vous séchez, contre 1 minute de pénalité")
                 Bullet("Un mot du jour commun, et le mode Classique sans limite")
             }
             Spacer(Modifier.height(16.dp))
@@ -333,7 +333,7 @@ private fun SignInDialog(state: AppViewModel, close: () -> Unit) {
         title = { Text("J’ai déjà un compte") },
         text = {
             Column {
-                Text("Retrouvez votre pseudo, vos points et votre série, comme sur votre ancien téléphone.", fontSize = 14.sp, color = Palette.secondary)
+                Text("Retrouvez votre pseudo, vos stats et votre série, comme sur votre ancien téléphone.", fontSize = 14.sp, color = Palette.secondary)
                 OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = { Text("Email") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false))
                 OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth().padding(top = 8.dp), label = { Text("Mot de passe") }, singleLine = true,

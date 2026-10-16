@@ -29,7 +29,6 @@ class ModeVectorsTest {
                 }
                 val label = "graine ${case.seed}, ${step.action}"
                 assertEquals(label, step.card, game.card?.id ?: "")
-                assertEquals(label, step.score, game.score)
                 assertEquals(label, step.streak, game.streak)
                 assertEquals(label, step.found, game.found)
                 assertEquals(label, step.wrong, game.wrong)
@@ -82,7 +81,7 @@ class ModeVectorsTest {
                 assertEquals(label, step.solved, game.solved)
                 assertEquals(label, step.errors, game.errors)
                 assertEquals(label, step.playMs, game.playMs(at))
-                assertEquals(label, step.score, game.score(at))
+                assertEquals(label, step.record, game.record(at))
                 assertEquals(label, step.finished, game.finished)
             }
         }
@@ -92,26 +91,20 @@ class ModeVectorsTest {
 class SprintTest {
     private fun right(game: SprintGame, at: Int) = game.answer(game.card!!.wordFull, at)
 
-    @Test fun comboGrowsToFiveThenWrongAnswerResetsIt() {
+    @Test fun comboGrowsThenWrongAnswerResetsIt() {
         val game = SprintGame(11uL)
-        val multipliers = (1..7).map { (right(game, it * 1000) as SprintGame.Outcome.Right).multiplier }
-        assertEquals(listOf(1, 2, 3, 4, 5, 5, 5), multipliers)
-        assertEquals(7, game.bestCombo)
+        val combos = (1..7).map { (right(game, it * 1000) as SprintGame.Outcome.Right).combo }
+        assertEquals(listOf(1, 2, 3, 4, 5, 6, 7), combos)
+        assertEquals(7, game.bestCombo); assertEquals(7, game.found)
         assertEquals(SprintGame.Outcome.Wrong, game.answer("PASLEMOT", 8000))
-        assertEquals(0, game.streak); assertEquals(1, game.multiplier)
-        assertEquals(1, (right(game, 9000) as SprintGame.Outcome.Right).multiplier)
+        assertEquals(0, game.streak)
+        assertEquals(1, (right(game, 9000) as SprintGame.Outcome.Right).combo)
     }
 
-    @Test fun pointsAreDifficultyTimesCombo() {
+    @Test fun theRecordIsTheWordsFound() {
         val game = SprintGame(3uL)
-        var expected = 0
-        repeat(12) { index ->
-            val card = game.card!!
-            val outcome = right(game, index * 500) as SprintGame.Outcome.Right
-            assertEquals(SprintGame.basePoints(card.difficulty) * minOf(5, index + 1), outcome.points)
-            expected += outcome.points
-        }
-        assertEquals(expected, game.score)
+        repeat(12) { index -> right(game, index * 500) }
+        assertEquals(mapOf(ModeStat.WORDS to 12, ModeStat.COMBO to 12), game.best)
     }
 
     @Test fun passingCostsFiveSecondsAndTheCombo() {
@@ -158,7 +151,7 @@ class SprintTest {
         val game = SprintGame(31uL)
         right(game, 1000); game.answer("NON", 2000)
         val copy = ProgressJson.decodeFromString(SprintGame.serializer(), ProgressJson.encodeToString(SprintGame.serializer(), game))
-        assertEquals(game.card, copy.card); assertEquals(game.score, copy.score); assertEquals(game.used, copy.used)
+        assertEquals(game.card, copy.card); assertEquals(game.found, copy.found); assertEquals(game.bestCombo, copy.bestCombo); assertEquals(game.used, copy.used)
         right(game, 3000); right(copy, 3000)
         assertEquals(game.card, copy.card)
     }
@@ -257,7 +250,7 @@ class DuoTest {
         assertEquals(1, game.wordsFound); assertEquals(0, game.solved)
     }
 
-    @Test fun aPerfectGameScoresEveryBonus() {
+    @Test fun aPerfectGameIsFivePairsAndItsTime() {
         val game = DuoGame(14uL)
         repeat(DuoGame.ROUNDS) { index ->
             val duo = game.duo!!
@@ -267,17 +260,22 @@ class DuoTest {
         }
         assertTrue(game.finished); assertTrue(game.perfect)
         assertEquals(5, game.solved); assertEquals(10, game.wordsFound)
-        // 42 s of play: 1 000 + 250 + (300 − 42) × 10 / 10.
+        // 42 s of play: 5 pairs, then 99 999 − 42.
         assertEquals(42_000, game.playMs(99_000))
-        assertEquals(1000 + 250 + 258, game.score(99_000))
+        assertEquals(5 * 100_000 + 99_957, game.record(99_000))
+        assertEquals(mapOf(ModeStat.DUO to 599_957), game.best(99_000))
+        assertEquals(5, DuoRecord.solved(599_957)); assertEquals(42, DuoRecord.seconds(599_957))
         assertEquals(1, game.add[ModeStat.PERFECT])
         assertEquals(5, game.add[ModeStat.DUOS_PLAYED])
     }
 
-    @Test fun theScoreNeverGoesNegativeAndAbandonCountsEveryRound() {
+    @Test fun moreSolvedPairsBeatAFasterGameAndAbandonCountsEveryRound() {
+        assertTrue(DuoRecord.value(3, 400_000) > DuoRecord.value(2, 10_000))
+        assertTrue(DuoRecord.value(3, 40_000) > DuoRecord.value(3, 41_000))
+        assertEquals(0, DuoRecord.solved(DuoRecord.value(0, 5_000))); assertEquals(5, DuoRecord.seconds(DuoRecord.value(0, 5_000)))
         val game = DuoGame(15uL)
         repeat(20) { game.answer("FAUX", 1000) }
-        assertEquals(0, game.score(2000))
+        assertEquals(20, game.errors); assertEquals(99_997, game.record(2000))
         game.abandon(3000)
         assertTrue(game.finished)
         assertEquals(5, game.add[ModeStat.DUOS_PLAYED]); assertEquals(0, game.add[ModeStat.DUOS_SOLVED])
@@ -315,13 +313,13 @@ class CatalogueTest {
 class ModeRecordsTest {
     @Test fun recordsOnlyGrowAndReportWhatWasBeaten() {
         var progress = Progress()
-        val (first, beaten) = progress.recordingMode(PlayMode.SPRINT, mapOf("score" to 120, "words" to 6, "combo" to 4), mapOf("games" to 1), "A")
-        assertEquals(setOf("score", "words", "combo"), beaten)
+        val (first, beaten) = progress.recordingMode(PlayMode.SPRINT, mapOf("words" to 6, "combo" to 4), mapOf("games" to 1), "A")
+        assertEquals(setOf("words", "combo"), beaten)
         progress = first
-        val (second, again) = progress.recordingMode(PlayMode.SPRINT, mapOf("score" to 90, "words" to 8, "combo" to 2), mapOf("games" to 1), "A")
+        val (second, again) = progress.recordingMode(PlayMode.SPRINT, mapOf("words" to 8, "combo" to 2), mapOf("games" to 1), "A")
         assertEquals(setOf("words"), again)
         val records = second.records(PlayMode.SPRINT)
-        assertEquals(120, records.best("score")); assertEquals(8, records.best("words")); assertEquals(2, records.total("games"))
+        assertEquals(4, records.best("combo")); assertEquals(8, records.best("words")); assertEquals(2, records.total("games"))
     }
 
     @Test fun twoPhonesPlayingOfflineKeepEveryGame() {
@@ -338,19 +336,19 @@ class ModeRecordsTest {
     }
 
     @Test fun recordsTravelInTheIphoneFormat() {
-        val progress = Progress(username = "Lou").recordingMode(PlayMode.DUO, mapOf("score" to 900), mapOf("games" to 1, "perfect" to 0, "duosSolved" to 3, "duosPlayed" to 5), "d1").first
+        val progress = Progress(username = "Lou").recordingMode(PlayMode.DUO, mapOf("duo" to 300_900), mapOf("games" to 1, "perfect" to 0, "duosSolved" to 3, "duosPlayed" to 5), "d1").first
         val json = progress.toJson()
-        assertTrue(json.contains("\"modes\":{\"duo\":{\"best\":{\"score\":900},\"counts\":{\"games\":{\"d1\":1}"))
+        assertTrue(json.contains("\"modes\":{\"duo\":{\"best\":{\"duo\":300900},\"counts\":{\"games\":{\"d1\":1}"))
         assertEquals(progress, Progress.fromJson(json))
         // An older copy without records still reads, and the records survive a merge with it.
         val old = Progress.fromJson("{\"username\":\"Lou\",\"attempts\":[],\"recentCards\":[],\"submissions\":[],\"dailyStarted\":{},\"dailyStartedAt\":{}}")
         assertEquals(null, old.modes)
-        assertEquals(900, old.merged(progress).records(PlayMode.DUO).best("score"))
-        assertEquals(900, progress.merged(old).records(PlayMode.DUO).best("score"))
+        assertEquals(300_900, old.merged(progress).records(PlayMode.DUO).best("duo"))
+        assertEquals(300_900, progress.merged(old).records(PlayMode.DUO).best("duo"))
     }
 
     @Test fun modeGamesNeverTouchTheOfficialScore() {
-        val progress = Progress().recordingMode(PlayMode.SPRINT, mapOf("score" to 5000), mapOf("games" to 1), "A").first
-        assertEquals(0, progress.score); assertTrue(progress.attempts.isEmpty()); assertEquals(0, progress.dailyWins)
+        val progress = Progress().recordingMode(PlayMode.SPRINT, mapOf("words" to 50), mapOf("games" to 1), "A").first
+        assertEquals(0, progress.correctAnswers); assertTrue(progress.attempts.isEmpty()); assertEquals(0, progress.dailyWins)
     }
 }

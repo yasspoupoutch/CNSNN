@@ -63,24 +63,18 @@ public enum ModePicker {
 
 // MARK: - Sprint
 
-/// 90 seconds to find as many words as possible. Each right answer scores its difficulty times the
-/// combo (consecutive right answers, up to ×5). A wrong answer or a pass breaks the combo, and a pass
-/// costs 5 seconds. The clock never stops, even in the background.
+/// 90 seconds to find as many words as possible. Right answers in a row make a combo; a wrong answer
+/// or a pass breaks it, and a pass costs 5 seconds. The clock never stops, even in the background.
 public struct SprintGame: Codable, Sendable {
     public static let durationMs = 90_000
     public static let skipPenaltyMs = 5_000
-    public static let maxMultiplier = 5
     public static let weights = [40, 40, 20]
-    public static func basePoints(_ difficulty: Difficulty) -> Int {
-        switch difficulty { case .easy: 10; case .medium: 20; case .hard: 30 }
-    }
 
     public var random: ModeRandom
     public var card: Card?
     public var used: [String] = []
     public var recent: [String]
     public var found = 0
-    public var score = 0
     /// Right answers in a row.
     public var streak = 0
     public var bestCombo = 0
@@ -94,23 +88,18 @@ public struct SprintGame: Codable, Sendable {
         draw()
     }
 
-    /// What the next right answer is worth: ×1, ×2… up to ×5.
-    public var multiplier: Int { min(Self.maxMultiplier, streak + 1) }
     public func remainingMs(elapsed: Int) -> Int { max(0, Self.durationMs - elapsed - penaltyMs) }
     /// Right answers out of all the answers checked, in percent.
     public var accuracy: Int { found + wrong == 0 ? 0 : found * 100 / (found + wrong) }
 
-    public enum Outcome: Equatable, Sendable { case right(points: Int, multiplier: Int), wrong, over }
+    public enum Outcome: Equatable, Sendable { case right(combo: Int), wrong, over }
 
     @discardableResult public mutating func answer(_ text: String, elapsed: Int) -> Outcome {
         guard !finished, remainingMs(elapsed: elapsed) > 0, let card else { finished = true; return .over }
         guard WordEngine.matches(text, word: card.wordFull) else { wrong += 1; streak = 0; return .wrong }
-        streak += 1
-        let multiplier = min(Self.maxMultiplier, streak)
-        let points = Self.basePoints(card.difficulty) * multiplier
-        score += points; found += 1; bestCombo = max(bestCombo, streak)
+        streak += 1; found += 1; bestCombo = max(bestCombo, streak)
         draw()
-        return .right(points: points, multiplier: multiplier)
+        return .right(combo: streak)
     }
 
     public mutating func skip(elapsed: Int) {
@@ -134,7 +123,7 @@ public struct SprintGame: Codable, Sendable {
     }
 
     public var records: (best: [String: Int], add: [String: Int]) {
-        ([ModeStat.score: score, ModeStat.words: found, ModeStat.combo: bestCombo], [ModeStat.games: 1])
+        ([ModeStat.words: found, ModeStat.combo: bestCombo], [ModeStat.games: 1])
     }
 }
 
@@ -227,11 +216,6 @@ public struct Duo: Codable, Hashable, Sendable, Identifiable {
 /// counts while a round is open, not while its answer is shown.
 public struct DuoGame: Codable, Sendable {
     public static let rounds = 5
-    public static let wordPoints = 100
-    public static let duoBonus = 50
-    public static let errorPenalty = 20
-    /// Seconds under which the remaining time adds a bonus, shared by the words found.
-    public static let timeBonusSeconds = 300
 
     public var random: ModeRandom
     public var duos: [Duo] = []
@@ -307,22 +291,25 @@ public struct DuoGame: Codable, Sendable {
     public var wordsFound: Int { found.reduce(0) { $0 + $1.filter { $0 }.count } }
     public var solved: Int { found.filter { $0[0] && $0[1] }.count }
     public var perfect: Bool { wordsFound == duos.count * 2 && errors == 0 }
-    /// 100 per word, 50 per complete duo, −20 per error, plus a time bonus that grows with the words found.
-    public func score(elapsed: Int) -> Int {
-        let bonus = max(0, Self.timeBonusSeconds - playMs(elapsed: elapsed) / 1000) * wordsFound / 10
-        return max(0, wordsFound * Self.wordPoints + solved * Self.duoBonus - errors * Self.errorPenalty + bonus)
-    }
-
     public func records(elapsed: Int) -> (best: [String: Int], add: [String: Int]) {
-        ([ModeStat.score: score(elapsed: elapsed)],
+        ([ModeStat.duo: DuoRecord.value(solved: solved, ms: playMs(elapsed: elapsed))],
          [ModeStat.games: 1, ModeStat.perfect: perfect ? 1 : 0, ModeStat.duosSolved: solved, ModeStat.duosPlayed: duos.count])
     }
 }
 
 // MARK: - Personal records
 
+/// A Double sens game in one number that only grows with a better game: more pairs found, then less time.
+public enum DuoRecord {
+    public static func value(solved: Int, ms: Int) -> Int { solved * 100_000 + max(0, 99_999 - max(0, ms) / 1000) }
+    public static func solved(_ value: Int) -> Int { value / 100_000 }
+    public static func seconds(_ value: Int) -> Int { 99_999 - value % 100_000 }
+}
+
 public enum ModeStat {
-    public static let score = "score", words = "words", combo = "combo", level = "level"
+    public static let words = "words", combo = "combo", level = "level"
+    /// Double sens best: pairs found first, then the time (see DuoRecord).
+    public static let duo = "duo"
     public static let games = "games", perfect = "perfect", duosSolved = "duosSolved", duosPlayed = "duosPlayed"
 }
 

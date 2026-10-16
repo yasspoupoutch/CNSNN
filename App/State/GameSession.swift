@@ -244,8 +244,7 @@ import CNSNNCore
         }
         guard let card else { return }
         let ms = elapsedMs
-        let points = Scoring.points(difficulty: card.difficulty, timeMs: ms, usedHint: usedHint, correct: correct)
-        let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: points, date: Date(), dailyKey: dailyKey)
+        let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: 0, date: Date(), dailyKey: dailyKey)
         result = attempt; state.record(attempt)
         if correct { Haptics.success() }
         if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey {
@@ -253,7 +252,7 @@ import CNSNNCore
             Task { await makeOfficial(cloud: cloud, uid: uid, day: dailyKey, correct: correct, state: state, finished: alreadyFinished) }
         }
     }
-    /// Stamps the finish on the server, then shows the server's time and points instead of the local ones.
+    /// Stamps the finish on the server, then shows the server's time instead of the local ones.
     private func makeOfficial(cloud: FirebaseRepository, uid: String, day: String, correct: Bool, state: AppState, finished: Bool = false) async {
         do {
             if !finished { guard try await cloud.finishDaily(uid: uid, day: day, correct: correct, wrongAnswers: wrongAnswers) else { return } }
@@ -269,6 +268,6 @@ import CNSNNCore
     }
     private func loadStanding(cloud: FirebaseRepository, attempt: Attempt) async {
         guard let day = attempt.dailyKey else { return }
-        standing = try? await cloud.standing(day: day, timeMs: attempt.timeMs, correct: attempt.correct)
+        standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, correct: attempt.correct), correct: attempt.correct)
     }
 }

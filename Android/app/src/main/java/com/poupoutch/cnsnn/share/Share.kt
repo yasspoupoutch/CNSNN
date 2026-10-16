@@ -25,7 +25,7 @@ import java.io.File
 /** Shares a result as a picture (only the consonants, no spoiler) with its text, or as text alone. */
 object Share {
     fun text(attempt: Attempt, card: Card?, mode: GameMode): String {
-        val outcome = if (attempt.correct) "trouvé en ${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "raté"
+        val outcome = if (attempt.correct) "trouvé en ${Format.clock(attempt.timeMs)}" else "raté"
         val title = if (mode == GameMode.DAILY) "Mot du jour ${attempt.dailyKey ?: DailySchedule.key(attempt.date)}" else "Classique"
         return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "") + "\nJouez aussi : ${Site.URL}"
     }
@@ -77,7 +77,7 @@ object Share {
         centered(card.wordNoVowels, 690f, 230f, serif, white, 0.08f)
         paint.color = gold
         canvas.drawRoundRect(RectF(w / 2f - 66, 760f, w / 2f + 66, 772f), 6f, 6f, paint)
-        val outcome = if (attempt.correct) "Trouvé en ${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "Raté cette fois"
+        val outcome = if (attempt.correct) "Trouvé en ${Format.clock(attempt.timeMs)}" else "Raté cette fois"
         centered(outcome, 880f, 62f, Typeface.create(Typeface.DEFAULT, Typeface.BOLD), if (attempt.correct) mint else grey)
         centered("Trouverez-vous les voyelles ?", 1200f, 66f, italic, gold)
 
