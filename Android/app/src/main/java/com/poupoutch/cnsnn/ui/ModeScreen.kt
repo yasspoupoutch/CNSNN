@@ -206,10 +206,7 @@ private fun Hearts(lives: Int, lost: Int, gained: Int) {
 @Composable
 private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sprint: SprintGame) {
     game.version // The core games are plain objects: each part re-reads them after every move.
-    var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { while (true) { delay(200); tick++ } }
-    tick
-    SprintClock(sprint.remainingMs(game.elapsedMs))
+    SprintClock { sprint.remainingMs(game.elapsedMs) }
     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Stat("${sprint.found}", if (sprint.found > 1) "mots" else "mot", Modifier.weight(1f))
         Stat("×${maxOf(1, sprint.streak)}", "combo", Modifier.weight(1f), highlight = sprint.streak > 1)
@@ -222,7 +219,12 @@ private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sp
 }
 
 @Composable
-private fun SprintClock(remainingMs: Int) {
+private fun SprintClock(remaining: () -> Int) {
+    // Only the clock re-reads the time five times a second, not the whole board and keyboard.
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(200); tick++ } }
+    tick
+    val remainingMs = remaining()
     val seconds = (remainingMs + 999) / 1000
     val low = remainingMs <= 10_000
     val haptics = rememberHaptics()
