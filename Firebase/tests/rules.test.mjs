@@ -27,7 +27,20 @@ function shiftKey(key,days){const d=new Date(`${key}T12:00:00Z`);d.setUTCDate(d.
 function base(key){const w=new Date(`${key}T12:00:00Z`).getUTCDay();const iso=w===0?7:w;return iso<=2?50:iso<=5?100:150;}
 function points(key,timeMs,usedHint,correct){if(!correct)return 0;const raw=base(key)+Math.max(0,50-Math.floor(timeMs/1000));return usedHint?Math.floor(raw/2):raw;}
 
-async function signUp(uid='alice',username='Alice'){ await assertSucceeds(setDoc(doc(user(uid),`users/${uid}`),profile(uid,username))); }
+// Creates the profile and reserves its pseudo in the same batch, as the apps do.
+function signUpBatch(uid='alice',username='Alice',data=profile(uid,username)){
+ const db=user(uid),b=writeBatch(db);
+ b.set(doc(db,`usernames/${username.toLowerCase()}`),{uid,createdAt:serverTimestamp()});b.set(doc(db,`users/${uid}`),data);
+ return b.commit();
+}
+async function signUp(uid='alice',username='Alice'){ await assertSucceeds(signUpBatch(uid,username)); }
+// Renames the profile, taking the new pseudo and freeing the old one.
+function renameBatch(uid,from,to,db=user(uid)){
+ const b=writeBatch(db);
+ b.set(doc(db,`usernames/${to.toLowerCase()}`),{uid,createdAt:serverTimestamp()});b.delete(doc(db,`usernames/${from.toLowerCase()}`));
+ b.update(doc(db,`users/${uid}`),{username:to,updatedAt:serverTimestamp()});
+ return b;
+}
 const patch=async(path,data)=>env.withSecurityRulesDisabled(async c=>{await updateDoc(doc(c.firestore(),path),data);});
 // Starts the clock, then moves the start 10 s back: a win needs at least 2 s of play.
 async function startDaily(uid='alice',day=parisKey(),{backdate=true}={}){
@@ -72,12 +85,35 @@ async function publish(uid,r,old=zero,forged={}){
 
 test('profile ownership, rename, immutable stats',async()=>{
  const db=user(); await signUp();
- await assertSucceeds(updateDoc(doc(db,'users/alice'),{username:'Alicia',updatedAt:serverTimestamp()}));
+ await assertSucceeds(renameBatch('alice','Alice','Alicia').commit());
  await assertFails(updateDoc(doc(db,'users/alice'),{score:999}));
  await assertFails(updateDoc(doc(db,'users/alice'),{admin:true}));
  await assertFails(getDoc(doc(user('bob'),'users/alice')));
 });
-test('forged statistics at creation rejected',async()=>{ await assertFails(setDoc(doc(user(),'users/alice'),{...profile(),score:100})); });
+test('forged statistics at creation rejected',async()=>{ await assertFails(signUpBatch('alice','Alice',{...profile(),score:100})); });
+test('pseudos are unique, whatever the case',async()=>{
+ await signUp('alice','Poupoutch');
+ // Taken, in any case, or without a reservation at all.
+ await assertFails(signUpBatch('bob','Poupoutch'));
+ await assertFails(signUpBatch('bob','POUPOUTCH'));
+ await assertFails(setDoc(doc(user('bob'),'users/bob'),profile('bob','Bob')));
+ // A reservation must name the pseudo the profile takes, for oneself only.
+ const db=user('bob');let b=writeBatch(db);
+ b.set(doc(db,'usernames/zorro'),{uid:'bob',createdAt:serverTimestamp()});b.set(doc(db,'users/bob'),profile('bob','Bob'));
+ await assertFails(b.commit());
+ await assertFails(setDoc(doc(db,'usernames/bob'),{uid:'alice',createdAt:serverTimestamp()}));
+ await signUp('bob','Bob');
+ // Anyone signed in may check a pseudo; nobody can take or free someone else's.
+ assert.equal((await assertSucceeds(getDoc(doc(db,'usernames/poupoutch')))).data().uid,'alice');
+ await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),'usernames/poupoutch')));
+ await assertFails(deleteDoc(doc(db,'usernames/poupoutch')));
+ await assertFails(renameBatch('bob','Bob','poupoutch').commit());
+ await assertFails(updateDoc(doc(db,'users/bob'),{username:'Robert',updatedAt:serverTimestamp()}));
+ // Renaming frees the old pseudo for others; the case of one's own pseudo can change.
+ await assertSucceeds(renameBatch('alice','Poupoutch','Alicia').commit());
+ await signUp('carol','poupoutch');
+ await assertSucceeds(updateDoc(doc(db,'users/bob'),{username:'BOB',updatedAt:serverTimestamp()}));
+});
 test('synced progress is private to its owner and bounded',async()=>{
  await signUp();
  const ref=p=>doc(p,'users/alice/private/progress');
@@ -259,8 +295,7 @@ test('a win after yesterday extends the streak',async()=>{
 test('leaderboard rename follows the profile only',async()=>{
  await signUp();
  await seed('leaderboard/alice',{uid:'alice',username:'Alice',points:0,played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',lastResult:'',updatedAt:Timestamp.now()});
- const db=user(),b=writeBatch(db);
- b.update(doc(db,'users/alice'),{username:'Alicia',updatedAt:serverTimestamp()});
+ const db=user(),b=renameBatch('alice','Alice','Alicia',db);
  b.update(doc(db,'leaderboard/alice'),{username:'Alicia',updatedAt:serverTimestamp()});
  await assertSucceeds(b.commit());
  await assertFails(updateDoc(doc(db,'leaderboard/alice'),{username:'Zorro',updatedAt:serverTimestamp()}));
@@ -457,10 +492,10 @@ test('account deletion leaves a tombstone and anonymizes live cards',async()=>{
 // ---------- Pseudos, suspensions and player reports
 
 test('offensive pseudos are refused, ordinary ones pass',async()=>{
- for(const name of ['Connard','gros c0nnard','Bâtard 93','pute','P.U.T.A.I.N']) await assertFails(setDoc(doc(user(),'users/alice'),profile('alice',name)));
+ for(const name of ['Connard','gros c0nnard','Bâtard 93','pute','P.U.T.A.I.N']) await assertFails(signUpBatch('alice',name));
  for(const [uid,name] of [['m','Monique'],['c','Computer'],['n','Nazim']]) await signUp(uid,name);
  await signUp();
- await assertFails(updateDoc(doc(user(),'users/alice'),{username:'Salope',updatedAt:serverTimestamp()}));
+ await assertFails(renameBatch('alice','Alice','Salope').commit());
 });
 test('a suspended player keeps reading but can no longer play ranked, propose, report or rename',async()=>{
  await signUp(); await seed('cards/CHOCOLAT',card('approved','bob'));
@@ -471,7 +506,7 @@ test('a suspended player keeps reading but can no longer play ranked, propose, r
  await assertFails(setDoc(doc(user(),`dailySessions/alice_${parisKey()}`),{userId:'alice',day:parisKey(),cardId:'x',startedAt:serverTimestamp(),hintUsed:false}));
  await assertFails(propose());
  await assertFails(setDoc(doc(user(),'reports/alice_CHOCOLAT'),{userId:'alice',cardId:'CHOCOLAT',reason:'Indice incorrect.',createdAt:serverTimestamp(),status:'pending'}));
- await assertFails(updateDoc(doc(user(),'users/alice'),{username:'Alicia',updatedAt:serverTimestamp()}));
+ await assertFails(renameBatch('alice','Alice','Alicia').commit());
  await assertSucceeds(getDoc(doc(user(),'cards/CHOCOLAT')));
  // Lifting the suspension gives everything back.
  await assertSucceeds(deleteDoc(doc(user('mod',{admin:true}),'banned/alice')));
@@ -565,8 +600,8 @@ test('a suspension hides results and totals without deleting them, and is revers
 // ---------- Community rules, card catalogue version
 
 test('community rules are accepted at sign-up or later, with the server time',async()=>{
- await assertFails(setDoc(doc(user(),'users/alice'),{...profile(),rulesVersion:1,rulesAcceptedAt:Timestamp.fromMillis(0)}));
- await assertSucceeds(setDoc(doc(user(),'users/alice'),{...profile(),rulesVersion:1,rulesAcceptedAt:serverTimestamp()}));
+ await assertFails(signUpBatch('alice','Alice',{...profile(),rulesVersion:1,rulesAcceptedAt:Timestamp.fromMillis(0)}));
+ await assertSucceeds(signUpBatch('alice','Alice',{...profile(),rulesVersion:1,rulesAcceptedAt:serverTimestamp()}));
  await signUp('bob','Bob');
  await assertSucceeds(updateDoc(doc(user('bob'),'users/bob'),{rulesVersion:1,rulesAcceptedAt:serverTimestamp()}));
  await assertFails(updateDoc(doc(user('bob'),'users/bob'),{rulesVersion:'1',rulesAcceptedAt:serverTimestamp()}));

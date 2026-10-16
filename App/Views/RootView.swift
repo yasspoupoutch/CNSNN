@@ -167,6 +167,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var username = ""
     @State private var accepted = false
+    @State private var signingIn = false
     @FocusState private var fieldFocused: Bool
     private var trimmed: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var valid: Bool { (2...20).contains(trimmed.count) }
@@ -246,8 +247,13 @@ struct OnboardingView: View {
                     .buttonStyle(PrimaryPillStyle())
                     .disabled(state.isBusy || !valid || !accepted)
                 Text("Modifiable à tout moment depuis votre profil.").scaledFont(12).foregroundStyle(Palette.tertiary)
+                Button("J’ai déjà un compte") { fieldFocused = false; signingIn = true }
+                    .scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("existing-account")
             }.padding(.horizontal, 26).padding(.bottom, 12)
         }
+        .sheet(isPresented: $signingIn) { SignInSheet() }
     }
 
     /// Community rules and privacy policy, accepted before the first game.
@@ -279,6 +285,61 @@ struct OnboardingView: View {
         Haptics.success()
         state.progress.rulesVersion = CommunityRules.version
         Task { await state.start(username: username) }
+    }
+}
+
+/// Signs in to an existing account from the first launch, so a returning player (new phone,
+/// reinstall) finds their profile instead of creating a second one.
+struct SignInSheet: View {
+    @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    @State private var busy = false
+    @State private var message: String?
+    private var trimmedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var body: some View {
+        NavigationStack {
+            Form {
+                if state.cloud == nil {
+                    Section { Text("Le serveur est injoignable pour le moment. Réessayez une fois connecté à Internet.") }
+                } else {
+                    Section {
+                        TextField("Email", text: $email).keyboardType(.emailAddress).textContentType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        SecureField("Mot de passe", text: $password).textContentType(.password)
+                        Button("Se connecter") { signIn() }.disabled(busy || trimmedEmail.isEmpty || password.isEmpty)
+                        Button("Mot de passe oublié ?") { resetPassword() }.disabled(busy || trimmedEmail.isEmpty)
+                    } footer: {
+                        Text("Retrouvez votre pseudo, vos points et votre série, comme sur votre ancien téléphone.")
+                    }
+                }
+                if let message { Section { Text(message).foregroundStyle(.secondary) } }
+            }
+            .navigationTitle("J’ai déjà un compte")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Fermer") { dismiss() } } }
+        }
+    }
+    private func signIn() {
+        run {
+            try await state.signIn(email: trimmedEmail, password: password)
+            Haptics.success()
+            dismiss()
+        }
+    }
+    private func resetPassword() {
+        run {
+            try await state.cloud?.resetPassword(email: trimmedEmail)
+            message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
+        }
+    }
+    private func run(_ work: @escaping () async throws -> Void) {
+        guard !busy else { return }
+        busy = true; message = nil
+        Task {
+            defer { busy = false }
+            do { try await work() } catch { message = CloudError.message(error) }
+        }
     }
 }
 

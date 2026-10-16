@@ -93,6 +93,8 @@ import CNSNNCore
             do {
                 let profile = try await cloud.bootstrap(username: name, rulesVersion: progress.rulesVersion)
                 try activate(profile, preservingGuest: true)
+            } catch let error as CloudError where [.usernameTaken, .usernameInvalid].contains(error) {
+                self.error = CloudError.message(error); return
             } catch { self.error = "Connexion impossible : " + CloudError.message(error); return }
         }
         if cloud == nil { progress.username = name }
@@ -114,7 +116,7 @@ import CNSNNCore
         cloud = FirebaseRepository()
         guard !progress.username.isEmpty || cloud!.hasCurrentUser else { return }
         do {
-            let profile = try await cloud!.bootstrap(username: progress.username.isEmpty ? "Joueur" : progress.username)
+            let profile = try await cloud!.bootstrap(username: progress.username.isEmpty ? FirebaseRepository.fallbackName() : progress.username)
             try activate(profile, preservingGuest: true)
         } catch CloudError.deletionPending {
             await resumeDeletion(); return

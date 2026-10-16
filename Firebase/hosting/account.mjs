@@ -17,6 +17,7 @@ export async function deleteAccountData(db, uid, fs) {
   const refs = [doc(db, 'users', uid), doc(db, 'users', uid, 'private', 'progress'), doc(db, 'leaderboard', uid)];
   refs.push(...(await getDocs(collection(db, 'users', uid, 'friends'))).docs.map((d) => d.ref));
   refs.push(...(await owned('friendCodes', 'uid')).map((d) => d.ref));
+  refs.push(...(await owned('usernames', 'uid')).map((d) => d.ref));
   for (const name of ['dailyResults', 'dailySessions', 'reports', 'playerReports']) refs.push(...(await owned(name)).map((d) => d.ref));
   // Friend challenges, sent or received: they carry the player's name.
   for (const field of ['from', 'to']) refs.push(...(await owned('challenges', field)).map((d) => d.ref));

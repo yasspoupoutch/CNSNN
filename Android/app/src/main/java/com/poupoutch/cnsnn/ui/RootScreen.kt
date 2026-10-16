@@ -93,6 +93,11 @@ import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.poupoutch.cnsnn.data.CloudError
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.rememberCoroutineScope
 
 private const val LAUNCH_WORD = "CONSONNE"
 
@@ -260,6 +265,7 @@ private fun Bullet(text: String) {
 private fun Pseudo(state: AppViewModel, back: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var accepted by rememberSaveable { mutableStateOf(false) }
+    var signingIn by rememberSaveable { mutableStateOf(false) }
     val trimmed = name.trim()
     val valid = trimmed.length in 2..20
     val haptics = rememberHaptics()
@@ -300,8 +306,52 @@ private fun Pseudo(state: AppViewModel, back: () -> Unit) {
             PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", enabled = valid && accepted && !state.isBusy, onClick = start)
             Text("Modifiable à tout moment depuis votre profil.", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary,
                 modifier = Modifier.padding(top = 12.dp))
+            TextButton({ signingIn = true }, Modifier.padding(top = 4.dp)) { Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold) }
         }
     }
+    if (signingIn) SignInDialog(state) { signingIn = false }
+}
+
+/** Signs in to an existing account from the first launch, so a returning player (new phone, reinstall) finds their profile instead of creating a second one. */
+@Composable
+private fun SignInDialog(state: AppViewModel, close: () -> Unit) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val trimmed = email.trim()
+    fun perform(work: suspend () -> Unit) {
+        if (busy) return
+        busy = true; message = null
+        scope.launch {
+            try { work() } catch (e: Exception) { message = CloudError.message(e) } finally { busy = false }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("J’ai déjà un compte") },
+        text = {
+            Column {
+                Text("Retrouvez votre pseudo, vos points et votre série, comme sur votre ancien téléphone.", fontSize = 14.sp, color = Palette.secondary)
+                OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = { Text("Email") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false))
+                OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth().padding(top = 8.dp), label = { Text("Mot de passe") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                TextButton({ perform {
+                    state.cloud.resetPassword(trimmed)
+                    message = "Si cette adresse correspond à un compte, vous recevrez un lien pour choisir un nouveau mot de passe."
+                } }, enabled = !busy && trimmed.isNotEmpty()) { Text("Mot de passe oublié ?") }
+                message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
+            }
+        },
+        confirmButton = {
+            TextButton({ perform { state.signIn(trimmed, password); close() } }, enabled = !busy && trimmed.isNotEmpty() && password.isNotEmpty()) {
+                Text(if (busy) "Un instant…" else "Se connecter")
+            }
+        },
+        dismissButton = { TextButton(close) { Text("Fermer") } },
+    )
 }
 
 /** Blocking sheet: the rules, and a single way on. */

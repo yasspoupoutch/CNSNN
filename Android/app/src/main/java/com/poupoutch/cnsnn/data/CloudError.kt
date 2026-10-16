@@ -32,6 +32,8 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         INVITE_IS_YOURS("C’est votre propre défi. Envoyez le lien à un ami !"),
         INVITE_TAKEN("Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."),
         INVITE_EXPIRED("Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."),
+        USERNAME_TAKEN("Ce pseudo est déjà pris. Choisissez-en un autre."),
+        USERNAME_INVALID("Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."),
     }
 
     enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }

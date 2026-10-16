@@ -5,10 +5,27 @@
 import { readFile } from 'node:fs/promises';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getSecurityRules } from 'firebase-admin/security-rules';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const projectId = 'cnsnn-9ctosy';
 const credential = applicationDefault();
 initializeApp({ credential, projectId });
+
+// Pseudos already taken before they were unique: each one is reserved for its oldest holder, before the
+// rules start requiring reservations. Later duplicates keep their pseudo until they change it.
+const db = getFirestore();
+const reserved = new Set((await db.collection('usernames').select().get()).docs.map((d) => d.id));
+const profiles = (await db.collection('users').select('username', 'createdAt').get()).docs
+  .sort((a, b) => (a.get('createdAt')?.toMillis() ?? 0) - (b.get('createdAt')?.toMillis() ?? 0));
+let added = 0;
+for (const profile of profiles) {
+  const name = profile.get('username');
+  const key = typeof name === 'string' ? name.toLowerCase() : '';
+  if (!key || key.includes('/') || key === '.' || key === '..' || /^__.*__$/.test(key) || reserved.has(key)) continue;
+  await db.collection('usernames').doc(key).create({ uid: profile.id, createdAt: FieldValue.serverTimestamp() });
+  reserved.add(key); added++;
+}
+console.log(`Pseudos réservés : ${added} nouveaux, ${reserved.size} au total`);
 
 const source = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 const ruleset = await getSecurityRules().releaseFirestoreRulesetFromSource(source);
