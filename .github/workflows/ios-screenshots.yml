@@ -6,6 +6,9 @@ name: CNSNN - Captures App Store
 # Classique, jamais un mot du jour secret. Les PNG sont publiés en artefact et sur la branche
 # `store-screenshots` (dossier ios/<apparence>/).
 on:
+  # TEMPORAIRE : lancement sur la branche de travail tant que le workflow n'est pas sur main.
+  push:
+    branches: [claude/project-thread-3kudsw]
   workflow_dispatch:
     inputs:
       appearance:
@@ -13,9 +16,9 @@ on:
         required: false
         type: choice
         options:
-          - light
           - dark
-        default: light
+          - light
+        default: dark
 
 permissions:
   contents: read
@@ -37,7 +40,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       CI: 'true'
       NSUnbufferedIO: 'YES'
-      APPEARANCE: ${{ inputs.appearance || 'light' }}
+      APPEARANCE: ${{ inputs.appearance || 'dark' }}
 
     steps:
       - name: Récupérer le dépôt
@@ -277,7 +280,7 @@ jobs:
       run:
         shell: bash
     env:
-      APPEARANCE: ${{ inputs.appearance || 'light' }}
+      APPEARANCE: ${{ inputs.appearance || 'dark' }}
 
     steps:
       - name: Récupérer le dépôt (avec droit d'écriture)
