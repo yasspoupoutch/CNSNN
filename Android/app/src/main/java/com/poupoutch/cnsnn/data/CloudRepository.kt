@@ -57,6 +57,16 @@ data class DailySession(val day: String, val cardId: String, val startedAt: Inst
  * Everything the app reads and writes on Firebase. The documents and fields are exactly those of
  * the iPhone app (App/Firebase/FirebaseRepository.swift): Firebase/firestore.rules checks both.
  */
+/** Pseudos are unique whatever the case: the same key as the iPhone app and the server rules (`lower()`). */
+fun nameKey(name: String): String = name.lowercase()
+/** A pseudo that cannot name a Firestore document (a slash, ".." or __x__) cannot be reserved. */
+fun reservable(name: String): Boolean {
+    val key = nameKey(name)
+    return '/' !in key && key != "." && key != ".." && !(key.startsWith("__") && key.endsWith("__"))
+}
+/** The pseudo given to an account that signs in without a profile yet (made on the web, say). */
+fun fallbackName(): String = "Joueur" + (1000..9999).random()
+
 class CloudRepository(
     private val auth: FirebaseAuth = com.poupoutch.cnsnn.Cloud.auth,
     private val db: FirebaseFirestore = com.poupoutch.cnsnn.Cloud.db,
@@ -80,7 +90,11 @@ class CloudRepository(
             val data = mutableMapOf<String, Any?>("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
                 "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)
             if (rulesVersion != null) { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
-            ref.set(data).await()
+            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
+            val batch = db.batch()
+            reserve(username, user.uid, batch)
+            batch.set(ref, data)
+            batch.commit().await()
             return CloudProfile(user.uid, user.isAnonymous, username, user.email, rulesVersion)
         }
         return CloudProfile(user.uid, user.isAnonymous, doc.getString("username") ?: username, user.email, doc.getLong("rulesVersion")?.toInt())
@@ -91,14 +105,31 @@ class CloudRepository(
         db.collection("users").document(uid).update(mapOf("rulesVersion" to version, "rulesAcceptedAt" to FieldValue.serverTimestamp())).await()
     }
 
-    /** Renames the profile and, in the same batch, the public leaderboard line. */
+    /** Renames the profile and, in the same batch, the public leaderboard line. The new pseudo is reserved and the player's other reservations freed. */
     suspend fun rename(uid: String, username: String) {
         val batch = db.batch()
+        reserve(username, uid, batch)
+        db.collection("usernames").whereEqualTo("uid", uid).get(Source.SERVER).await().documents
+            .filter { it.id != nameKey(username) }.forEach { batch.delete(it.reference) }
         batch.update(db.collection("users").document(uid), mapOf("username" to username, "updatedAt" to FieldValue.serverTimestamp()))
         if (leaderboardEntry(uid) != null) {
             batch.update(db.collection("leaderboard").document(uid), mapOf("username" to username, "updatedAt" to FieldValue.serverTimestamp()))
         }
         batch.commit().await()
+    }
+
+    // ---- Unique pseudos: usernames/{pseudo in lower case} names the player holding it, whatever the case.
+
+    /** Adds the reservation of `name` to the batch, unless the player already holds it. */
+    private suspend fun reserve(name: String, uid: String, batch: WriteBatch) {
+        if (!reservable(name)) throw CloudError(CloudError.Kind.USERNAME_INVALID)
+        val ref = db.collection("usernames").document(nameKey(name))
+        val held = ref.get(Source.SERVER).await()
+        if (held.exists()) {
+            if (held.getString("uid") != uid) throw CloudError(CloudError.Kind.USERNAME_TAKEN)
+        } else {
+            batch.set(ref, mapOf("uid" to uid, "createdAt" to FieldValue.serverTimestamp()))
+        }
     }
 
     // ---- Accounts
@@ -113,11 +144,11 @@ class CloudRepository(
         } else {
             auth.createUserWithEmailAndPassword(address, password).await()
         }
-        return bootstrap("Joueur")
+        return bootstrap(fallbackName())
     }
     suspend fun signIn(email: String, password: String): CloudProfile {
         auth.signInWithEmailAndPassword(email.trim(), password).await()
-        return bootstrap("Joueur")
+        return bootstrap(fallbackName())
     }
     suspend fun resetPassword(email: String) { auth.sendPasswordResetEmail(email.trim()).await() }
     fun signOut() = auth.signOut()
@@ -131,6 +162,7 @@ class CloudRepository(
         val refs = mutableListOf<DocumentReference>(users.collection("private").document("progress"), db.collection("leaderboard").document(uid))
         refs += users.collection("friends").get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
+        refs += db.collection("usernames").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("challengeInvites").whereEqualTo("from", uid).get(Source.SERVER).await().documents.map { it.reference }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }

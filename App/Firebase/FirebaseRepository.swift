@@ -147,19 +147,50 @@ enum DailyGuesses {
             if try await db.collection("deletedUsers").document(user.uid).getDocument(source: .server).exists { throw CloudError.deletionPending }
             var data: [String: Any] = ["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0]
             if let rulesVersion { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
-            try await ref.setData(data)
+            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
+            let batch = db.batch()
+            try await reserve(username, uid: user.uid, in: batch)
+            batch.setData(data, forDocument: ref)
+            try await batch.commit()
         }
         return CloudProfile(uid:user.uid,anonymous:user.isAnonymous,username:doc.data()?["username"] as? String ?? username,email:user.email)
     }
-    /// Renames the profile and, in the same batch, the public leaderboard line.
+    /// Renames the profile and, in the same batch, the public leaderboard line. The new pseudo is
+    /// reserved and the player's other reservations freed.
     func rename(uid: String, username: String) async throws {
         let batch = db.batch()
+        try await reserve(username, uid: uid, in: batch)
+        for held in try await db.collection("usernames").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents
+        where held.documentID != Self.nameKey(username) { batch.deleteDocument(held.reference) }
         batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("users").document(uid))
         if try await leaderboardEntry(uid: uid) != nil {
             batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("leaderboard").document(uid))
         }
         try await batch.commit()
     }
+
+    // MARK: Unique pseudos
+
+    /// Pseudos are unique whatever the case: usernames/{pseudo in lower case} names the player holding it.
+    static func nameKey(_ name: String) -> String { name.lowercased() }
+    /// A pseudo that cannot name a Firestore document (a slash, ".." or __x__) cannot be reserved.
+    static func reservable(_ name: String) -> Bool {
+        let key = nameKey(name)
+        return !key.contains("/") && key != "." && key != ".." && !(key.hasPrefix("__") && key.hasSuffix("__"))
+    }
+    /// Adds the reservation of `name` to the batch, unless the player already holds it.
+    private func reserve(_ name: String, uid: String, in batch: WriteBatch) async throws {
+        guard Self.reservable(name) else { throw CloudError.usernameInvalid }
+        let ref = db.collection("usernames").document(Self.nameKey(name))
+        let held = try await ref.getDocument(source: .server)
+        if held.exists {
+            guard held.data()?["uid"] as? String == uid else { throw CloudError.usernameTaken }
+        } else {
+            batch.setData(["uid": uid, "createdAt": FieldValue.serverTimestamp()], forDocument: ref)
+        }
+    }
+    /// The pseudo given to an account that signs in without a profile yet (made on the web, say).
+    static func fallbackName() -> String { "Joueur\(Int.random(in: 1000...9999))" }
 
     /// Records that the player accepted the community rules (best effort: the app keeps its own copy).
     func acceptRules(uid: String, version: Int) {
@@ -177,11 +208,11 @@ enum DailyGuesses {
         } else {
             _ = try await auth.createUser(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
         }
-        return try await bootstrap(username: "Joueur")
+        return try await bootstrap(username: Self.fallbackName())
     }
     func signIn(email: String, password: String) async throws -> CloudProfile {
         _ = try await auth.signIn(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
-        return try await bootstrap(username: "Joueur")
+        return try await bootstrap(username: Self.fallbackName())
     }
     func resetPassword(email: String) async throws {
         try await auth.sendPasswordReset(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -202,6 +233,7 @@ enum DailyGuesses {
         ]
         refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
+        refs += try await db.collection("usernames").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("challengeInvites").whereField("from", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId"),
                                     ("challenges", "from"), ("challenges", "to")] {
@@ -918,6 +950,8 @@ enum CloudError: LocalizedError {
     case inviteIsYours
     case inviteTaken
     case inviteExpired
+    case usernameTaken
+    case usernameInvalid
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -971,6 +1005,8 @@ enum CloudError: LocalizedError {
         case .inviteIsYours: "C’est votre propre défi. Envoyez le lien à un ami !"
         case .inviteTaken: "Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."
         case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
+        case .usernameTaken: "Ce pseudo est déjà pris. Choisissez-en un autre."
+        case .usernameInvalid: "Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."
         }
     }
 }

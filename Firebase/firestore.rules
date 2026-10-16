@@ -19,6 +19,10 @@ service cloud.firestore {
    return !k.matches('.*(putain|salope|salaud|encul|niquer|niquetamere|niktamer|connard|connasse|conasse|b[aâ]tard|merde|couille|p[eé]do|hitler|n[eèé]gre|bougnoul|youpin|bicot|tapette|tafiole|gouine|porno|sexe|fuck|shit|bitch|cunt|nigg|whore|slut|enfoir|filsdepute|fdp|daech).*')
     && !k.matches('(pute|lapute|con|lecon|nazi|bite|pd|ntm|nique|p[eé]d[eé]|viol|suce|sucemoi)');
   }
+  // Pseudos are unique, whatever the case: usernames/{pseudo in lower case} names the player holding it,
+  // and a profile can only take a pseudo reserved for it in the same batch.
+  function nameKey(n) { return n.lower(); }
+  function holdsName(n) { return getAfter(at('usernames/' + nameKey(n))).data.uid == request.auth.uid; }
   // Suspended players keep reading, but can no longer play ranked, propose, report or rename.
   function acceptsRules(d) { return d.rulesVersion is int && d.rulesVersion >= 1 && d.rulesVersion <= 100 && d.rulesAcceptedAt == request.time; }
   // While deleting the whole account: the profile is gone (or goes in the same batch).
@@ -72,7 +76,7 @@ service cloud.firestore {
    allow create: if owner(uid)
     && request.resource.data.keys().hasOnly(['uid','username','createdAt','updatedAt','score','gamesPlayed','correctAnswers','bestTimeMs','currentStreak','rulesVersion','rulesAcceptedAt'])
     && (!('rulesVersion' in request.resource.data) || acceptsRules(request.resource.data))
-    && request.resource.data.uid == uid && validName(request.resource.data.username)
+    && request.resource.data.uid == uid && validName(request.resource.data.username) && holdsName(request.resource.data.username)
     && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
     && request.resource.data.score == 0 && request.resource.data.gamesPlayed == 0
     && request.resource.data.correctAnswers == 0 && request.resource.data.bestTimeMs == null && request.resource.data.currentStreak == 0;
@@ -80,6 +84,7 @@ service cloud.firestore {
    allow update: if owner(uid) && active()
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt','lastProposalAt','proposalWindowAt','proposalCount'])
     && validName(request.resource.data.username) && request.resource.data.updatedAt == request.time
+    && (request.resource.data.username == resource.data.username || holdsName(request.resource.data.username))
     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastProposalAt','proposalWindowAt','proposalCount'])
      || consumesProposalQuota(resource.data, request.resource.data));
    // Accepting the community rules (a newer version is accepted again), even while suspended.
@@ -112,6 +117,16 @@ service cloud.firestore {
      && get(at('friendCodes/' + request.resource.data.code)).data.uid == uid
      && exists(at('users/' + friendId + '/friends/' + uid));
    }
+  }
+  // Pseudo reservations (see holdsName). Anyone signed in may check a pseudo; a player reserves the one
+  // their profile takes in the same batch, and frees their own (renaming, deleting the account).
+  match /usernames/{key} {
+   allow get: if signedIn();
+   allow list: if signedIn() && resource.data.uid == request.auth.uid;
+   allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid','createdAt'])
+    && request.resource.data.uid == request.auth.uid && request.resource.data.createdAt == request.time
+    && nameKey(getAfter(at('users/' + request.auth.uid)).data.username) == key;
+   allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || admin();
   }
   // Friend codes: 6 unambiguous characters naming one player. Anyone signed in may look up a code,
   // but only list their own, so codes cannot be enumerated.

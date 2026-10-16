@@ -33,6 +33,7 @@ import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.CloudProfile
 import com.poupoutch.cnsnn.data.CloudRepository
 import com.poupoutch.cnsnn.data.LocalStore
+import com.poupoutch.cnsnn.data.fallbackName
 import com.poupoutch.cnsnn.reminders.ChallengeWatch
 import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.widget.DailyWidget
@@ -164,7 +165,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             progress = progress.copy(rulesVersion = maxOf(progress.rulesVersion ?: 0, CommunityRules.VERSION))
             activate(cloud.bootstrap(name, CommunityRules.VERSION), preservingGuest = true)
         } catch (e: Exception) {
-            error = "Connexion impossible : " + CloudError.message(e); return@launch
+            val pseudo = e is CloudError && e.kind in listOf(CloudError.Kind.USERNAME_TAKEN, CloudError.Kind.USERNAME_INVALID)
+            error = (if (pseudo) "" else "Connexion impossible : ") + CloudError.message(e); return@launch
         } finally { isBusy = false }
         refreshAll()
     }
@@ -173,7 +175,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (progress.username.isEmpty() && !cloud.hasCurrentUser) return
             isBusy = true
             try {
-                activate(cloud.bootstrap(progress.username.ifEmpty { "Joueur" }), preservingGuest = true)
+                activate(cloud.bootstrap(progress.username.ifEmpty { fallbackName() }), preservingGuest = true)
             } catch (e: Exception) {
                 if (e is CloudError && e.kind == CloudError.Kind.DELETION_PENDING) { resumeDeletion(); return }
                 // Offline launches stay quiet: Classique works and the home screen says it is offline.
