@@ -1,0 +1,62 @@
+name: CNSNN - Fiche App Store
+
+# Lancement manuel : remplit la fiche App Store de la version en préparation (textes de
+# Store/app-store-fr.json, catégorie, copyright, captures 6,9 pouces de la branche
+# `store-screenshots`). Ne soumet jamais rien à la revue d'Apple ; relancer remplace tout.
+on:
+  # TEMPORAIRE : lancement sur la branche de travail tant que le workflow n'est pas sur main.
+  push:
+    branches: [claude/project-thread-3kudsw]
+    paths: [Store/**, Scripts/asc_listing.py, .github/workflows/appstore-listing.yml]
+  workflow_dispatch:
+    inputs:
+      appearance:
+        description: Captures à utiliser
+        required: false
+        type: choice
+        options:
+          - dark
+          - light
+        default: dark
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-appstore-listing
+  cancel-in-progress: false
+
+jobs:
+  listing:
+    name: Remplir la fiche App Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Récupérer les captures
+        env:
+          APPEARANCE: ${{ inputs.appearance || 'dark' }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin store-screenshots
+          mkdir -p "$RUNNER_TEMP/shots"
+          git archive FETCH_HEAD "ios/$APPEARANCE" | tar -x -C "$RUNNER_TEMP/shots"
+          printf 'SHOTS=%s\n' "$RUNNER_TEMP/shots/ios/$APPEARANCE" >> "$GITHUB_ENV"
+          ls -l "$RUNNER_TEMP/shots/ios/$APPEARANCE"
+
+      - name: Envoyer textes et captures
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages cryptography 2>/dev/null || python3 -m pip install --quiet cryptography
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$ASC_KEY_P8" > "$key"; chmod 600 "$key"
+          trap 'rm -f "$key"' EXIT
+          python3 Scripts/asc_listing.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$key" com.poupoutch.cnsnn \
+            Store/app-store-fr.json "$SHOTS" | tee -a "$GITHUB_STEP_SUMMARY"
