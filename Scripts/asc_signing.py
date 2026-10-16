@@ -6,7 +6,7 @@ manually, with the Apple Distribution certificate of KEY_PEM (the CI's own priva
 encrypted in Scripts/ios-signing). Nothing is ever revoked or deleted:
   - App Groups is enabled on the app and widget identifiers if needed;
   - the certificate matching KEY_PEM is reused, or created once from a CSR;
-  - an App Store profile per identifier is reused while active, or created.
+  - an App Store profile per identifier is reused while active with the App Group, or created.
 Writes into OUT_DIR: dist-cert.der and <bundle id>.mobileprovision, and prints one line per
 profile: PROFILE <bundle id> <uuid> <name> groups=<App Groups it allows>.
 
@@ -103,21 +103,33 @@ else:
     print('Certificat Apple Distribution créé')
 (out / 'dist-cert.der').write_bytes(cert_der)
 
-# App Store profiles tied to that certificate (its id is in the name).
+# App Store profiles tied to that certificate (its id is in the name). A profile is reused only
+# while active and allowing REQUIRED_GROUP; otherwise a new one is made (Apple keeps the old one).
+REQUIRED_GROUP = 'group.com.poupoutch.cnsnn'
+
+
+def parse(content):
+    plist = plistlib.loads(re.search(rb'<\?xml.*</plist>', content, re.S).group(0))
+    return plist, plist.get('Entitlements', {}).get('com.apple.security.application-groups', [])
+
+
 _, res = api('GET', '/v1/profiles?filter[profileType]=IOS_APP_STORE&limit=200')
-existing = {p['attributes']['name']: p for p in res['data'] if p['attributes'].get('profileState') == 'ACTIVE'}
+active = [p for p in res['data'] if p['attributes'].get('profileState') == 'ACTIVE']
 for bundle in bundles:
     name = f'{PROFILE_PREFIX}{bundle} {cert_id}'
-    if name in existing:
-        content = base64.b64decode(existing[name]['attributes']['profileContent'])
-    else:
+    content = None
+    for profile in active:
+        if profile['attributes']['name'].startswith(name):
+            candidate = base64.b64decode(profile['attributes']['profileContent'])
+            if REQUIRED_GROUP in parse(candidate)[1]:
+                content = candidate
+    if content is None:
         _, res = api('POST', '/v1/profiles', {'data': {'type': 'profiles',
-            'attributes': {'name': name, 'profileType': 'IOS_APP_STORE'},
+            'attributes': {'name': f'{name} {time.strftime("%Y%m%d%H%M%S")}', 'profileType': 'IOS_APP_STORE'},
             'relationships': {
                 'bundleId': {'data': {'type': 'bundleIds', 'id': ids[bundle]}},
                 'certificates': {'data': [{'type': 'certificates', 'id': cert_id}]}}}})
         content = base64.b64decode(res['data']['attributes']['profileContent'])
     (out / f'{bundle}.mobileprovision').write_bytes(content)
-    plist = plistlib.loads(re.search(rb'<\?xml.*</plist>', content, re.S).group(0))
-    groups = plist.get('Entitlements', {}).get('com.apple.security.application-groups', [])
+    plist, groups = parse(content)
     print(f'PROFILE {bundle} {plist["UUID"]} groups={",".join(groups) or "-"} name={name}')
