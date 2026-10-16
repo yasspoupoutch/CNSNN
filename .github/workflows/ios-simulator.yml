@@ -222,7 +222,7 @@ jobs:
             -disableAutomaticPackageResolution \
             -parallel-testing-enabled NO \
             -test-timeouts-enabled YES \
-            -only-testing:CNSNNUITests \
+            -only-testing:CNSNNUITests/CNSNNUITests \
             -resultBundlePath "$CI_ROOT/ui-tests.xcresult" \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \

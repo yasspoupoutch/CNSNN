@@ -30,7 +30,7 @@ Guide pas à pas et textes des fiches : dans les notes du projet (`notes/publica
    - Confidentialité de l'app : Identifiants (ID utilisateur), Coordonnées (email), Contenu utilisateur (contenu de jeu, autre contenu), Diagnostics (données de plantage). Tout « lié à l'utilisateur » sauf les plantages, rien pour le suivi publicitaire.
    - URL de confidentialité et d'assistance : celles du site.
    - Compte de démonstration pour la revue : un compte email de test (la revue doit pouvoir jouer et voir la modération si on la mentionne).
-   - Captures : iPhone 6,9 pouces et 6,5 pouces (accueil, partie, résultat, classement, amis).
+   - Captures : iPhone 6,9 pouces et 6,5 pouces (accueil, partie, résultat, classement, amis). Les captures 6,9 pouces (1320 x 2868) se font avec le workflow **CNSNN - Captures App Store** : profil et classement inventés, hors ligne, publiés en artefact et sur la branche `store-screenshots` (`ios/light/` ou `ios/dark/`).
 5. **Connexion avec Apple** : pas obligatoire, l'app ne propose aucune connexion tierce (Google, Facebook).
 6. **Statut de commerçant (DSA)** : à déclarer dans App Store Connect pour être distribué dans l'Union européenne. App gratuite sans revenus : « pas commerçant », sinon l'adresse et le téléphone sont publiés.
 7. **SDK** : Apple exige au moins Xcode 26 et le SDK iOS 26 ; la CI utilise Xcode 27.

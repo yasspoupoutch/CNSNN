@@ -1,0 +1,318 @@
+name: CNSNN - Captures App Store
+
+# Lancement manuel uniquement : captures d'écran App Store sur un simulateur iPhone 6,9 pouces
+# (1320 x 2868). L'app tourne avec `--uitesting --screenshots` : profil, classement et défis
+# inventés, hors ligne (App/Services/ScreenshotDemo.swift), et seulement des cartes publiques du
+# Classique, jamais un mot du jour secret. Les PNG sont publiés en artefact et sur la branche
+# `store-screenshots` (dossier ios/<apparence>/).
+on:
+  workflow_dispatch:
+    inputs:
+      appearance:
+        description: Apparence du simulateur
+        required: false
+        type: choice
+        options:
+          - light
+          - dark
+        default: light
+
+permissions:
+  contents: read
+
+# Un nouveau lancement sur la même branche remplace le précédent.
+concurrency:
+  group: cnsnn-ios-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Prendre les captures App Store
+    runs-on: xcode-27
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+      NSUnbufferedIO: 'YES'
+      APPEARANCE: ${{ inputs.appearance || 'light' }}
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Vérifier Xcode 27 et la structure du projet
+        run: |
+          set -euo pipefail
+          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cnsnn-ci/logs"
+          xcodebuild -version | tee "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"
+          if ! grep -Eq '^Xcode 27([.]|$)' "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"; then
+            echo '::error::Le runner doit fournir Xcode 27.'
+            exit 1
+          fi
+          python3 Scripts/verify_project.py
+
+      - name: Télécharger les dépendances Firebase avec Swift Package Manager
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/packages.log"
+
+      # iPhone 17 Pro Max (écran 6,9 pouces, 1320 x 2868) de préférence, sinon le plus récent des
+      # « Pro Max », sur un iOS compatible avec le SDK.
+      - name: Choisir un simulateur iPhone 6,9 pouces
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          sdk = subprocess.check_output(
+              ['xcodebuild', '-version', '-sdk', 'iphonesimulator', 'SDKVersion'],
+              text=True,
+          ).strip()
+          sdk_version = tuple(int(part) for part in sdk.split('.')[:2])
+          listing = json.loads(subprocess.check_output(
+              ['xcrun', 'simctl', 'list', '--json'], text=True,
+          ))
+          candidates = []
+          for runtime in listing['runtimes']:
+              if not runtime.get('isAvailable') or '.iOS-' not in runtime['identifier']:
+                  continue
+              version = tuple(int(part) for part in runtime['version'].split('.')[:2])
+              if version[0] != sdk_version[0] or version > sdk_version:
+                  continue
+              for device in listing['devices'].get(runtime['identifier'], []):
+                  name = device['name']
+                  if not device.get('isAvailable') or not name.startswith('iPhone') or 'Pro Max' not in name:
+                      continue
+                  generation = int(re.search(r'iPhone (\d+)', name).group(1)) if re.search(r'iPhone (\d+)', name) else 0
+                  preferred = 1 if name == 'iPhone 17 Pro Max' else 0
+                  candidates.append((preferred, generation, version, name, device['udid']))
+          if not candidates:
+              raise SystemExit(f'Aucun simulateur iPhone Pro Max disponible pour le SDK {sdk}.')
+          _, _, version, name, identifier = sorted(candidates, reverse=True)[0]
+          if name != 'iPhone 17 Pro Max':
+              print(f'::warning::iPhone 17 Pro Max absent : {name} à la place, vérifiez la taille des captures.')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as file:
+              file.write(f'SIMULATOR_ID={identifier}\n')
+              file.write(f'SIMULATOR_NAME={name}\n')
+          print(f'Simulateur choisi : {name}, iOS {version[0]}.{version[1]}, {identifier}')
+          PY
+
+      - name: Compiler l'application et les tests UI sans signature Apple
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/build.log"
+
+      # Simulateur remis à neuf, barre d'état d'une capture Apple (9:41, batterie pleine, réseau au
+      # maximum) et apparence choisie.
+      - name: Préparer le simulateur (barre d'état, apparence)
+        run: |
+          set -euo pipefail
+          xcrun simctl shutdown "$SIMULATOR_ID" 2>/dev/null || true
+          xcrun simctl erase "$SIMULATOR_ID"
+          xcrun simctl boot "$SIMULATOR_ID"
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl ui "$SIMULATOR_ID" appearance "$APPEARANCE"
+          xcrun simctl status_bar "$SIMULATOR_ID" override \
+            --time '9:41' \
+            --dataNetwork wifi \
+            --wifiMode active \
+            --wifiBars 3 \
+            --cellularMode active \
+            --cellularBars 4 \
+            --operatorName '' \
+            --batteryState charged \
+            --batteryLevel 100
+          echo "Simulateur prêt : $SIMULATOR_NAME, apparence $APPEARANCE"
+
+      - name: Prendre les captures (CNSNNScreenshotTests)
+        run: |
+          set -euo pipefail
+          xcodebuild test-without-building \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests \
+            -resultBundlePath "$CI_ROOT/screenshots.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/screenshots.log"
+
+      # xcresulttool (Xcode 16 et plus) exporte les pièces jointes et un manifest.json qui relie chaque
+      # fichier au nom donné dans le test (« 01-accueil_0_<UUID>.png ») : on renomme en 01-accueil.png.
+      - name: Extraire les captures du résultat
+        run: |
+          set -euo pipefail
+          rm -rf "$CI_ROOT/attachments" "$CI_ROOT/screenshots"
+          mkdir -p "$CI_ROOT/attachments" "$CI_ROOT/screenshots"
+          xcrun xcresulttool export attachments \
+            --path "$CI_ROOT/screenshots.xcresult" \
+            --output-path "$CI_ROOT/attachments"
+          python3 - "$CI_ROOT/attachments" "$CI_ROOT/screenshots" <<'PY'
+          import json
+          import pathlib
+          import re
+          import shutil
+          import sys
+
+          source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          manifest = json.loads((source / 'manifest.json').read_text())
+          if isinstance(manifest, dict):
+              manifest = [manifest]
+          copied = []
+          for test in manifest:
+              for attachment in test.get('attachments', []):
+                  human = attachment.get('suggestedHumanReadableName', '')
+                  match = re.match(r'(\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*)', human)
+                  if not match:
+                      continue
+                  name = match.group(1) + '.png'
+                  shutil.copyfile(source / attachment['exportedFileName'], target / name)
+                  copied.append(name)
+          if not copied:
+              raise SystemExit('Aucune capture trouvée dans le résultat des tests.')
+          for name in sorted(copied):
+              print('Capture :', name)
+          PY
+
+      - name: Conserver les captures en artefact
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-screenshots-ios-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/cnsnn-ci/screenshots/
+          if-no-files-found: warn
+          retention-days: 30
+
+      # L'App Store attend exactement 1320 x 2868 pour l'iPhone 6,9 pouces.
+      - name: Vérifier la taille des captures (1320 x 2868)
+        run: |
+          set -euo pipefail
+          count=0; wrong=0
+          for file in "$CI_ROOT/screenshots/"*.png; do
+            width=$(sips -g pixelWidth "$file" | awk '/pixelWidth/ {print $2}')
+            height=$(sips -g pixelHeight "$file" | awk '/pixelHeight/ {print $2}')
+            echo "$(basename "$file") : ${width} x ${height}"
+            count=$((count + 1))
+            if [ "$width" != 1320 ] || [ "$height" != 2868 ]; then wrong=$((wrong + 1)); fi
+          done
+          if [ "$count" -lt 6 ]; then
+            echo "::error::$count captures seulement, 6 attendues."
+            exit 1
+          fi
+          if [ "$wrong" -gt 0 ]; then
+            echo "::error::$wrong capture(s) ne font pas 1320 x 2868 ($SIMULATOR_NAME)."
+            exit 1
+          fi
+
+      - name: Conserver les journaux en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-screenshots-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/cnsnn-ci/logs/
+            ${{ runner.temp }}/cnsnn-ci/*.xcresult
+          if-no-files-found: warn
+          retention-days: 1
+
+  # Seul ce job peut écrire dans le dépôt, et il ne compile ni n'exécute rien du projet : il pousse
+  # les PNG sur la branche `store-screenshots`, dans ios/<apparence>/ (l'autre apparence est gardée).
+  publish:
+    name: Publier sur la branche store-screenshots
+    needs: capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPEARANCE: ${{ inputs.appearance || 'light' }}
+
+    steps:
+      - name: Récupérer le dépôt (avec droit d'écriture)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: true
+
+      - name: Récupérer les captures
+        uses: actions/download-artifact@v4
+        with:
+          name: cnsnn-screenshots-ios-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/screenshots
+
+      - name: Pousser les captures sur store-screenshots
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch --depth=1 origin store-screenshots; then
+            git checkout -B store-screenshots FETCH_HEAD
+          else
+            git checkout --orphan store-screenshots
+            git rm -rf --quiet .
+          fi
+          # La branche ne contient que les captures.
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name ios -exec rm -rf {} +
+          rm -rf "ios/$APPEARANCE"
+          mkdir -p "ios/$APPEARANCE"
+          cp "$RUNNER_TEMP/screenshots/"*.png "ios/$APPEARANCE/"
+          ls -l "ios/$APPEARANCE"
+          git add -A .
+          if git diff --cached --quiet; then
+            echo 'Captures identiques : rien à publier.'
+            exit 0
+          fi
+          git commit -m "Captures App Store iOS ($APPEARANCE) depuis ${GITHUB_SHA::7}"
+          git push --force origin HEAD:refs/heads/store-screenshots
+          echo "Captures publiées : https://github.com/$GITHUB_REPOSITORY/tree/store-screenshots/ios/$APPEARANCE"

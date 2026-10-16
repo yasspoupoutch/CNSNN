@@ -48,6 +48,9 @@ import CNSNNCore
             } else {
                 loadLocalDaily(key: key, state: state)
             }
+        } else if ScreenshotDemo.isActive {
+            // App Store screenshots: always the same public Classique card.
+            card = ScreenshotDemo.classicCard
         } else {
             card = CardPicker.candidates(cards: state.cards, category: category, difficulty: difficulty, recent: state.progress.recentCards).randomElement()
         }
