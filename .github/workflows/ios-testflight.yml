@@ -7,6 +7,12 @@ name: CNSNN - iPhone TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnostic_only:
+        description: Seulement vérifier ce que la clé API peut faire (sans compiler)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,7 +57,18 @@ jobs:
           chmod 600 "$root/key/AuthKey_$ASC_KEY_ID.p8"
           printf 'TF_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
 
+      - name: Diagnostiquer l'acces a App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages cryptography 2>/dev/null || python3 -m pip install --quiet cryptography
+          python3 Scripts/asc_check.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" com.poupoutch.cnsnn \
+            | tee "$TF_ROOT/logs/asc-check.log" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Archiver l'app
+        if: ${{ !inputs.diagnostic_only }}
         # Archiving with automatic signing needs a development profile, which the API key cannot
         # create without a registered device. So archive unsigned, give the bundle an ad hoc
         # signature that carries the entitlements (App Group for the widget), and let the export
@@ -76,6 +93,7 @@ jobs:
           codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.poupoutch.cnsnn'
 
       - name: Envoyer sur App Store Connect
+        if: ${{ !inputs.diagnostic_only }}
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
