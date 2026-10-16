@@ -341,7 +341,8 @@ import CNSNNCore
         let lost = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: player.uid, day: day))
         XCTAssertFalse(lost.correct)
         // A lost day counts the full ten minutes: nothing saved this month.
-        XCTAssertEqual(try await repo.leaderboardEntry(uid: player.uid, source: .server)?.monthSaved, 0)
+        let lostEntry = try await repo.leaderboardEntry(uid: player.uid, source: .server)
+        XCTAssertEqual(lostEntry?.monthSaved, 0)
         try await repo.rename(uid: player.uid, username: "Camilla")
         let renamed = try await repo.leaderboardEntry(uid: player.uid, source: .server)
         XCTAssertEqual(renamed?.username, "Camilla")
