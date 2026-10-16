@@ -4,10 +4,6 @@ name: CNSNN - Fiche App Store
 # Store/app-store-fr.json, catégorie, copyright, captures 6,9 pouces de la branche
 # `store-screenshots`). Ne soumet jamais rien à la revue d'Apple ; relancer remplace tout.
 on:
-  # TEMPORAIRE : lancement sur la branche de travail tant que le workflow n'est pas sur main.
-  push:
-    branches: [claude/project-thread-3kudsw]
-    paths: [Store/**, Scripts/asc_listing.py, .github/workflows/appstore-listing.yml]
   workflow_dispatch:
     inputs:
       appearance:

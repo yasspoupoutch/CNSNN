@@ -3,10 +3,6 @@ name: CNSNN - Préparer la revue App Store
 # Lancement manuel : affiche puis (avec apply) règle la build, la classification d'âge et le
 # prix de la version en préparation. Ne soumet jamais rien à la revue d'Apple.
 on:
-  # TEMPORAIRE : lancement sur la branche de travail tant que le workflow n'est pas sur main.
-  push:
-    branches: [claude/project-thread-3kudsw]
-    paths: [Scripts/asc_release.py, .github/workflows/appstore-release.yml]
   workflow_dispatch:
     inputs:
       apply:
@@ -27,9 +23,6 @@ jobs:
     name: Vérifier et régler build, âge et prix
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      # TEMPORAIRE : mode des lancements par push (check ou apply).
-      PUSH_MODE: apply
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -48,6 +41,6 @@ jobs:
           printf '%s' "$ASC_KEY_P8" > "$key"; chmod 600 "$key"
           trap 'rm -f "$key"' EXIT
           flag=''
-          if [ "$APPLY_INPUT" = 'true' ] || { [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$PUSH_MODE" = 'apply' ]; }; then flag='--apply'; fi
+          if [ "$APPLY_INPUT" = 'true' ]; then flag='--apply'; fi
           python3 Scripts/asc_release.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$key" com.poupoutch.cnsnn $flag \
             | tee -a "$GITHUB_STEP_SUMMARY"

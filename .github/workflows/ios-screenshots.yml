@@ -6,9 +6,6 @@ name: CNSNN - Captures App Store
 # Classique, jamais un mot du jour secret. Les PNG sont publiés en artefact et sur la branche
 # `store-screenshots` (dossier ios/<apparence>/).
 on:
-  # TEMPORAIRE : lancement sur la branche de travail tant que le workflow n'est pas sur main.
-  push:
-    branches: [claude/project-thread-3kudsw]
   workflow_dispatch:
     inputs:
       appearance:
