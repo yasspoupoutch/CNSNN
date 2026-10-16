@@ -56,8 +56,8 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 | users/{uid}/friends/{amiUid} | amis ajoutés par code (pseudo, date) | propriétaire uniquement |
 | friendCodes/{CODE} | code ami de 6 caractères → uid, pseudo | création par le propriétaire ; lecture d’un code par tout joueur, liste de ses seuls codes |
 | dailySessions/{uid_day} | carte du jour, début serveur, indice, essais (`guesses`, `guess`, `guessAt`), fin serveur | création une fois le jour même ; 20 essais au plus, un par seconde, comptés avant d’être vérifiés ; une victoire nomme le dernier essai, au moins 2 s après le début ; fin une seule fois |
-| dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur, points recalculés | création unique, avec la mise à jour du classement dans le même lot |
-| leaderboard/{uid} | points, parties, victoires, séries, meilleur temps, `suspended` | n’avance que d’un nouveau résultat à la fois ; un modérateur peut seulement poser ou retirer `suspended` (aussi sur `dailyResults`) |
+| dailyResults/{uid_day} | résultat officiel public : temps = fin − début serveur ; `scoreMs` (temps + 1 min avec l’indice, 10 min si raté) et `rank` (jour × 1 000 000 + score) recalculés | création unique, avec la mise à jour du classement dans le même lot |
+| leaderboard/{uid} | parties, victoires, séries, meilleur temps, total du mois (`month`, `monthSaved` = 10 min × jours joués − temps, `monthPlayed`, `monthRank` = mois × 10⁸ + monthSaved), `suspended` | n’avance que d’un nouveau résultat à la fois ; un modérateur peut seulement poser ou retirer `suspended` (aussi sur `dailyResults`) |
 | meta/cards | `updatedAt` : version du catalogue des cartes approuvées | lecture par les joueurs ; un modérateur l’avance en approuvant, refusant ou retirant une carte |
 | dailyPuzzles/{day} | mot du jour secret : consonnes, catégorie, difficulté | outil `tools/daily.mjs` (Admin SDK) ; lecture le jour même et les jours passés |
 | dailyHints/{day} | indice du mot secret | lecture après l’avoir révélé (indice noté dans la session) ou la partie finie |

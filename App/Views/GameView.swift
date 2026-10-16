@@ -143,7 +143,7 @@ struct GameView: View {
             } label: {
                 HStack(spacing: 8) {
                     Text("Indice").fontWeight(.bold)
-                    Text(session.usedHint ? "révélé" : "points ÷ 2")
+                    if session.usedHint { Text("révélé") } else if session.ranked { Text("+1 min") }
                 }.scaledFont(13, .medium).foregroundStyle(Palette.foreground)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
@@ -281,10 +281,16 @@ private struct ResultSheet: View {
                 Text("« \(card.hint) »").scaledFont(15).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 6)
             }
             HStack(spacing: 10) {
-                tile("+\(result.points)", "points", Palette.foreground)
-                tile(Format.clock(result.timeMs), "temps", Palette.foreground)
-                if mode == .daily { tile("\(state.official?.currentStreak() ?? state.progress.streak())", "jours de série", Palette.foreground) }
-                else { tile(Format.number(state.progress.score), "total", Palette.foreground) }
+                if mode == .daily {
+                    // The ranked time: the hint adds a minute, a lost word counts ten.
+                    tile(Format.clock(DailyScore.scoreMs(timeMs: result.timeMs, usedHint: usedHint, correct: result.correct)), result.correct ? "temps" : "compté", Palette.foreground)
+                    tile(usedHint ? "+1 min" : "non", "indice", Palette.foreground)
+                    tile("\(state.official?.currentStreak() ?? state.progress.streak())", "jours de série", Palette.foreground)
+                } else {
+                    tile(Format.clock(result.timeMs), "temps", Palette.foreground)
+                    tile("\(state.progress.classicStreak)", "de suite", Palette.foreground)
+                    tile(Format.number(state.progress.correctAnswers), "mots trouvés", Palette.foreground)
+                }
             }.padding(.top, 18)
             if mode == .daily && ranked {
                 officialLine.padding(.top, 12)

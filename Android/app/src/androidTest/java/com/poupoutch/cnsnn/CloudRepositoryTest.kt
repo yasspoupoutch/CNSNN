@@ -14,6 +14,7 @@ import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.ChallengeTally
 import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Progress
@@ -22,7 +23,6 @@ import com.poupoutch.cnsnn.core.records
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.ModeStat
 import com.poupoutch.cnsnn.core.Attempt
-import com.poupoutch.cnsnn.core.Scoring
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.CloudRepository
@@ -98,13 +98,20 @@ class CloudRepositoryTest {
         assertEquals("Chocolat", repo.dailySecret(day)!!.wordFull)
         val official = repo.publishDailyResult(alice.uid, day)!!
         assertTrue(official.timeMs >= 1000)
-        assertEquals(Scoring.points(DailySchedule.difficulty(day)!!, official.timeMs, true, true), official.points)
         assertEquals(official.timeMs, repo.publishDailyResult(alice.uid, day)!!.timeMs)
+        // The hint was used: the official time adds a minute, and the month counts it.
+        val scoreMs = DailyScore.scoreMs(official.timeMs, true, true)
         val entry = repo.leaderboardEntry(alice.uid)!!
-        assertEquals(official.points, entry.points); assertEquals(1, entry.played); assertEquals(1, entry.streak)
-        val alone = repo.standing(day, official.timeMs, true)
+        assertEquals(1, entry.played); assertEquals(1, entry.streak)
+        assertEquals(DailyScore.monthIndex(day), entry.month); assertEquals(1, entry.monthPlayed)
+        assertEquals(DailyScore.MISSED_MS - scoreMs, entry.monthSaved)
+        val alone = repo.standing(day, DailyScore.rank(day, scoreMs, true)!!, true)
         assertEquals(1, alone.players); assertEquals(1, alone.rank)
-        assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
+        val ranking = repo.dailyRanking(day)
+        assertEquals(listOf("Alice"), ranking.map { it.username })
+        assertEquals(scoreMs, ranking.single().scoreMs); assertTrue(ranking.single().usedHint)
+        assertEquals(listOf(alice.uid), repo.monthlyPlayers(day).map { it.uid })
+        assertEquals(1 to 1, repo.monthlyRank(entry, day))
         assertEquals(1, repo.wrongOf(alice.uid, day))
     }
 
@@ -119,8 +126,12 @@ class CloudRepositoryTest {
         assertTrue(repo.finishDaily(bob.uid, day, false, 1))
         assertEquals("Chocolat", repo.dailySecret(day)!!.wordFull)
         val result = repo.publishDailyResult(bob.uid, day)!!
-        assertFalse(result.correct); assertEquals(0, result.points)
-        assertEquals(0, repo.leaderboardEntry(bob.uid)!!.streak)
+        assertFalse(result.correct)
+        val entry = repo.leaderboardEntry(bob.uid)!!
+        // A lost day counts ten minutes: nothing saved this month, and it sorts after every found word.
+        assertEquals(0, entry.streak); assertEquals(0, entry.monthSaved); assertEquals(1, entry.monthPlayed)
+        assertTrue(repo.dailyRanking(day).none { it.uid == bob.uid })
+        assertEquals(1, repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false).players)
         assertEquals(1, repo.wrongOf(bob.uid, day))
     }
 
@@ -286,26 +297,26 @@ class CloudRepositoryTest {
     @Test fun modeRecordsSyncAcrossDevices() = runBlocking<Unit> {
         val lou = repo.bootstrap("Lou")
         var phone = Progress(username = "Lou")
-            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 240, ModeStat.WORDS to 9, ModeStat.COMBO to 6), mapOf(ModeStat.GAMES to 1), "phone").first
-            .recordingMode(PlayMode.DUO, mapOf(ModeStat.SCORE to 900), mapOf(ModeStat.GAMES to 1, ModeStat.PERFECT to 1, ModeStat.DUOS_SOLVED to 5, ModeStat.DUOS_PLAYED to 5), "phone").first
+            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.WORDS to 9, ModeStat.COMBO to 6), mapOf(ModeStat.GAMES to 1), "phone").first
+            .recordingMode(PlayMode.DUO, mapOf(ModeStat.DUO to 599_957), mapOf(ModeStat.GAMES to 1, ModeStat.PERFECT to 1, ModeStat.DUOS_SOLVED to 5, ModeStat.DUOS_PLAYED to 5), "phone").first
         repo.saveCloudProgress(phone, lou.uid)
         val tablet = Progress(username = "Lou")
-            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 300, ModeStat.WORDS to 7), mapOf(ModeStat.GAMES to 1), "tablet").first
+            .recordingMode(PlayMode.SPRINT, mapOf(ModeStat.WORDS to 7, ModeStat.COMBO to 7), mapOf(ModeStat.GAMES to 1), "tablet").first
             .recordingMode(PlayMode.SURVIVAL, mapOf(ModeStat.WORDS to 23, ModeStat.LEVEL to 5), mapOf(ModeStat.GAMES to 1), "tablet").first
         val merged = repo.saveCloudProgress(tablet, lou.uid)
-        assertEquals(300, merged.records(PlayMode.SPRINT).best(ModeStat.SCORE))
+        assertEquals(7, merged.records(PlayMode.SPRINT).best(ModeStat.COMBO))
         assertEquals(9, merged.records(PlayMode.SPRINT).best(ModeStat.WORDS))
         assertEquals(2, merged.records(PlayMode.SPRINT).total(ModeStat.GAMES))
         assertEquals(23, merged.records(PlayMode.SURVIVAL).best(ModeStat.WORDS))
         // Saving the same games again counts nothing twice.
         assertEquals(2, repo.saveCloudProgress(phone, lou.uid).records(PlayMode.SPRINT).total(ModeStat.GAMES))
-        phone = phone.recordingMode(PlayMode.SPRINT, mapOf(ModeStat.SCORE to 50), mapOf(ModeStat.GAMES to 1), "phone").first
+        phone = phone.recordingMode(PlayMode.SPRINT, mapOf(ModeStat.WORDS to 5), mapOf(ModeStat.GAMES to 1), "phone").first
         repo.saveCloudProgress(phone, lou.uid)
         val restored = repo.cloudProgress(lou.uid)!!
         assertEquals(3, restored.records(PlayMode.SPRINT).total(ModeStat.GAMES))
-        assertEquals(900, restored.records(PlayMode.DUO).best(ModeStat.SCORE))
+        assertEquals(599_957, restored.records(PlayMode.DUO).best(ModeStat.DUO))
         assertEquals(1, restored.records(PlayMode.DUO).total(ModeStat.PERFECT))
-        assertEquals(0, restored.score)
+        assertEquals(0, restored.correctAnswers)
         assertTrue(restored.attempts.isEmpty())
     }
 
@@ -339,17 +350,17 @@ class CloudRepositoryTest {
 
         repo.suspend(alice.uid, "Alice", "Temps suspect")
         assertTrue(repo.isSuspended(alice.uid))
-        assertTrue(repo.topPlayers().none { it.uid == alice.uid })
+        assertTrue(repo.monthlyPlayers(day).none { it.uid == alice.uid })
         assertTrue(repo.fastestPlayers().none { it.uid == alice.uid })
         assertTrue(repo.dailyRanking(day).none { it.uid == alice.uid })
         assertTrue(repo.suspiciousTimes(day).none { it.uid == alice.uid })
         // Nothing is erased: totals and results stay.
-        assertEquals(official.points, repo.leaderboardEntry(alice.uid, com.google.firebase.firestore.Source.SERVER)!!.points)
+        assertEquals(1, repo.leaderboardEntry(alice.uid, com.google.firebase.firestore.Source.SERVER)!!.monthPlayed)
         assertEquals(official.timeMs, repo.dailyResult(alice.uid, day)!!.first.timeMs)
 
         repo.unsuspend(alice.uid)
         assertFalse(repo.isSuspended(alice.uid))
-        assertEquals(listOf(alice.uid), repo.topPlayers().map { it.uid })
+        assertEquals(listOf(alice.uid), repo.monthlyPlayers(day).map { it.uid })
         assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
     }
 

@@ -157,7 +157,7 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
             result?.let {
                 ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && !game.usedHint, game.standing,
-                    game.pendingOfficial, game.ranked, next = { game.next(state) }, close = close)
+                    game.pendingOfficial, game.ranked, game.usedHint, game.wrongAnswers, game.officialMs(it), next = { game.next(state) }, close = close)
             }
         }
     }
@@ -235,7 +235,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
         AnswerLine(game)
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
-                Text(buildString { append("Indice  "); append(if (game.usedHint) "révélé" else "points ÷ 2") })
+                // The hint costs a minute on the Mot du jour only; in Classique it is free.
+                Text(buildString { append("Indice"); if (game.usedHint) append("  révélé") else if (game.ranked) append("  +1 min") })
             }, enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
             AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
@@ -324,7 +325,7 @@ private fun Key(text: String, vowel: Boolean, width: Dp, enabled: Boolean, label
 
 @Composable
 private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode: GameMode, firstTry: Boolean, standing: DailyStanding?,
-                        pending: Boolean, ranked: Boolean, next: () -> Unit, close: () -> Unit) {
+                        pending: Boolean, ranked: Boolean, usedHint: Boolean, wrongAnswers: Int, officialMs: Int, next: () -> Unit, close: () -> Unit) {
     val context = LocalContext.current
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
@@ -336,10 +337,16 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                 Text("« ${card.hint} »", color = Palette.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             }
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ResultTile("+${result.points}", "points", Modifier.weight(1f))
-                ResultTile(Format.clock(result.timeMs), "temps", Modifier.weight(1f))
-                if (mode == GameMode.DAILY) ResultTile("${state.streak}", "jours de série", Modifier.weight(1f))
-                else ResultTile(Format.number(state.progress.score), "total", Modifier.weight(1f))
+                if (mode == GameMode.DAILY) {
+                    // The official time: the hint adds a minute, a lost day counts ten.
+                    ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
+                    ResultTile("$wrongAnswers", if (wrongAnswers > 1) "erreurs" else "erreur", Modifier.weight(1f))
+                    ResultTile("${state.streak}", "jours de série", Modifier.weight(1f))
+                } else {
+                    ResultTile(Format.clock(result.timeMs), "temps", Modifier.weight(1f))
+                    ResultTile(Format.number(state.progress.correctAnswers), "mots trouvés", Modifier.weight(1f))
+                    ResultTile("${state.progress.level}", "niveau", Modifier.weight(1f))
+                }
             }
             if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
             else if (result.correct && result.timeMs == state.progress.bestTimeMs)

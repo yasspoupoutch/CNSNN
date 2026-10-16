@@ -27,6 +27,39 @@ for (const profile of profiles) {
 }
 console.log(`Pseudos réservés : ${added} nouveaux, ${reserved.size} au total`);
 
+// Daily scores became times (2026-10): each result gets its scoreMs and rank, each leaderboard line its
+// month total, and the old points go away. Already converted documents are left as they are.
+const MISSED = 600000;
+const dayIndex = (day) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86400000);
+const monthIndex = (day) => Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7)) - 1;
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+const results = (await db.collection('dailyResults').get()).docs;
+const months = new Map();
+let scored = 0;
+for (const result of results) {
+  const r = result.data();
+  if (typeof r.day !== 'string' || typeof r.timeMs !== 'number') continue;
+  const scoreMs = r.correct ? Math.min(r.timeMs + (r.usedHint ? 60000 : 0), MISSED) : MISSED;
+  if (monthIndex(r.day) === monthIndex(today)) {
+    const m = months.get(r.userId) ?? { saved: 0, played: 0 };
+    m.saved += MISSED - scoreMs; m.played++;
+    months.set(r.userId, m);
+  }
+  if ('scoreMs' in r && !('points' in r)) continue;
+  await result.ref.update({ scoreMs, rank: dayIndex(r.day) * 1000000 + (r.correct ? scoreMs : 999999), points: FieldValue.delete() });
+  scored++;
+}
+let lines = 0;
+for (const line of (await db.collection('leaderboard').get()).docs) {
+  if ('month' in line.data()) continue;
+  const m = months.get(line.id);
+  const month = m ? monthIndex(today) : 0;
+  await line.ref.update({ month, monthSaved: m?.saved ?? 0, monthPlayed: m?.played ?? 0,
+    monthRank: m ? month * 100000000 + m.saved : 0, points: FieldValue.delete() });
+  lines++;
+}
+console.log(`Classement au temps : ${scored} résultats et ${lines} lignes converties`);
+
 const source = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 const ruleset = await getSecurityRules().releaseFirestoreRulesetFromSource(source);
 console.log(`Règles publiées : ${ruleset.name}`);

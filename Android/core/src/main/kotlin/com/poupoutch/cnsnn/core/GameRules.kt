@@ -5,13 +5,61 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-object Scoring {
-    /** Same formula as Core/GameRules.swift and firestore.rules `dailyPoints`. */
-    fun points(difficulty: Difficulty, timeMs: Int, usedHint: Boolean, correct: Boolean): Int {
-        if (!correct) return 0
-        val bonus = maxOf(0, 50 - maxOf(0, timeMs) / 1000)
-        return (difficulty.basePoints + bonus) / (if (usedHint) 2 else 1)
+/**
+ * The Mot du jour is scored on time only, the lower the better: the hint adds one minute, and a lost
+ * (or unplayed) day counts ten minutes, the most a day can cost. Same arithmetic as firestore.rules
+ * (`dailyScore`, `dailyRank`, `monthIndex`, `tallyMonth`) and Core/GameRules.swift.
+ */
+object DailyScore {
+    const val HINT_PENALTY_MS = 60_000
+    const val MISSED_MS = 600_000
+    /** Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts. */
+    const val EPOCH_OFFSET = 19_723
+    /** Spread of one day in `rank` and of one month in `monthRank`. */
+    const val DAY_SPAN = 1_000_000L
+    const val MONTH_SPAN = 100_000_000L
+    /** A lost day sorts after every found one. */
+    const val LOST_RANK = 999_999
+
+    fun scoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean): Int =
+        if (correct) minOf(timeMs + (if (usedHint) HINT_PENALTY_MS else 0), MISSED_MS) else MISSED_MS
+    /** Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`. */
+    fun dayIndex(day: String): Long? = DailySchedule.dayNumber(day)?.let { it.toLong() + EPOCH_OFFSET }
+    /** The first rank of a day: every result of that day sorts between base and base + 999 999. */
+    fun dayBase(day: String): Long? = dayIndex(day)?.let { it * DAY_SPAN }
+    /** One number per result that sorts the day's results: the day first, then the score (lost last). */
+    fun rank(day: String, scoreMs: Int, correct: Boolean): Long? = dayBase(day)?.let { it + if (correct) scoreMs else LOST_RANK }
+    /** year * 12 + month - 1. */
+    fun monthIndex(day: String): Int? {
+        val parts = day.split("-").mapNotNull { it.toIntOrNull() }
+        return if (parts.size == 3) parts[0] * 12 + parts[1] - 1 else null
     }
+    fun monthRank(month: Int, saved: Int): Long = month * MONTH_SPAN + saved
+    /** The month's total time after `dayOfMonth` days: every day costs ten minutes minus what was saved. */
+    fun monthTotal(saved: Int, dayOfMonth: Int): Int = maxOf(0, MISSED_MS * dayOfMonth - saved)
+    fun dayOfMonth(day: String): Int = day.split("-").lastOrNull()?.toIntOrNull() ?: 1
+
+    /** One player's month: its index, the time saved against ten minutes a day, and the days played. */
+    data class Month(val month: Int = 0, val saved: Int = 0, val played: Int = 0) {
+        val rank: Long get() = DailyScore.monthRank(month, saved)
+    }
+    /**
+     * The month after one more result: a new month starts from zero, and a late result from an older
+     * month (finished after midnight) leaves the current one alone, as the rules' `tallyMonth`.
+     */
+    fun tally(old: Month, day: String, scoreMs: Int): Month {
+        val month = monthIndex(day) ?: return old
+        if (month < old.month) return old
+        val same = month == old.month
+        return Month(month, (if (same) old.saved else 0) + MISSED_MS - scoreMs, (if (same) old.played else 0) + 1)
+    }
+}
+
+/** Classique has no points: the level grows with the words found, 20 per level. */
+object ClassicLevel {
+    const val WORDS_PER_LEVEL = 20
+    fun level(words: Int): Int = words / WORDS_PER_LEVEL + 1
+    fun into(words: Int): Int = words % WORDS_PER_LEVEL
 }
 
 /**

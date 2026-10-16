@@ -16,13 +16,22 @@ struct LeaderboardEntry: Identifiable, Equatable {
     var id: String { uid }
     let uid: String
     let username: String
-    let points: Int
     let played: Int
     let wins: Int
     let streak: Int
     let bestStreak: Int
     let bestTimeMs: Int?
     let lastWinDay: String
+    var month = 0
+    /// Ten minutes per day of the month minus this, the month's total time (see DailyScore).
+    var monthSaved = 0
+    var monthPlayed = 0
+    var monthTally: DailyScore.Month { DailyScore.Month(month: month, saved: monthSaved, played: monthPlayed) }
+    /// The month's total time on `day` (lower is better), nil when the player has not played this month.
+    func monthTotal(on day: String = DailySchedule.key()) -> Int? {
+        guard month > 0, month == DailyScore.monthIndex(day) else { return nil }
+        return DailyScore.monthTotal(saved: monthSaved, days: DailyScore.dayOfMonth(day))
+    }
     /// The stored streak only counts while the last win is today or yesterday.
     func currentStreak(at date: Date = Date()) -> Int {
         lastWinDay == DailySchedule.key(date) || lastWinDay == DailySchedule.key(DailySchedule.previousDay(date)) ? streak : 0
@@ -30,28 +39,32 @@ struct LeaderboardEntry: Identifiable, Equatable {
     var successRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
 }
 
-/// One line of the friends ranking: the player's totals and today's Mot du jour, when played.
+/// One line of the friends ranking: the month's total and today's Mot du jour, when played.
 struct FriendStanding: Identifiable, Equatable {
     var id: String { uid }
     let uid: String
     let username: String
-    let points: Int
+    /// The month's total time, nil when not played this month.
+    let monthMs: Int?
     let streak: Int
     let today: Attempt?
     /// Wrong guesses on today's word, when the player has a result.
     var todayWrong: Int? = nil
+    var todayHint = false
+    /// Today's time with the hint minute (10 min when lost).
+    var todayScoreMs: Int? { today.map { DailyScore.scoreMs(timeMs: $0.timeMs, usedHint: todayHint, correct: $0.correct) } }
 
     static func == (a: FriendStanding, b: FriendStanding) -> Bool {
-        a.uid == b.uid && a.username == b.username && a.points == b.points && a.streak == b.streak
-            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct
+        a.uid == b.uid && a.username == b.username && a.monthMs == b.monthMs && a.streak == b.streak
+            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct && a.todayHint == b.todayHint
     }
-    /// Found today first (fastest first), then the others by points.
+    /// Found today first (fastest first, hint minute included), then the others by the month's total.
     static func ordered(_ rows: [FriendStanding]) -> [FriendStanding] {
         rows.sorted { a, b in
             let fa = a.today?.correct == true, fb = b.today?.correct == true
             if fa != fb { return fa }
-            if fa, let ta = a.today?.timeMs, let tb = b.today?.timeMs, ta != tb { return ta < tb }
-            if a.points != b.points { return a.points > b.points }
+            if fa, let ta = a.todayScoreMs, let tb = b.todayScoreMs, ta != tb { return ta < tb }
+            if a.monthMs != b.monthMs { return (a.monthMs ?? .max) < (b.monthMs ?? .max) }
             return a.username.localizedCaseInsensitiveCompare(b.username) == .orderedAscending
         }
     }
@@ -63,9 +76,10 @@ struct DailyRank: Identifiable, Equatable {
     let uid: String
     let username: String
     let timeMs: Int
-    let points: Int
     let usedHint: Bool
     var wrongAnswers = 0
+    /// The time that ranks: the hint adds a minute.
+    var scoreMs: Int { DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: true) }
 }
 
 /// Where a finished daily result stands among today's players.
@@ -419,19 +433,19 @@ enum DailyGuesses {
               let cardID = s["cardId"] as? String else { return nil }
         let correct = s["correct"] as? Bool ?? false, usedHint = s["hintUsed"] as? Bool ?? false, wrong = s["wrongAnswers"] as? Int ?? 0
         let timeMs = Self.millis(finished) - Self.millis(started)
-        guard let difficulty = DailySchedule.difficulty(forKey: day) else { return nil }
-        let points = Scoring.points(difficulty: difficulty, timeMs: timeMs, usedHint: usedHint, correct: correct)
+        let scoreMs = DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
+        guard let rank = DailyScore.rank(day: day, scoreMs: scoreMs, correct: correct) else { return nil }
         let profile = try await db.collection("users").document(uid).getDocument(source: .server)
         let username = profile.data()?["username"] as? String ?? "Joueur"
         let old = try await leaderboardEntry(uid: uid, source: .server)
-        let tally = Self.tally(old: old, uid: uid, username: username, day: day, correct: correct, timeMs: timeMs, points: points)
+        let tally = Self.tally(old: old, uid: uid, username: username, day: day, correct: correct, timeMs: timeMs, scoreMs: scoreMs)
         let result: [String: Any] = ["userId":uid,"username":username,"day":day,"cardId":cardID,"correct":correct,"usedHint":usedHint,
-                                     "wrongAnswers":wrong,"timeMs":timeMs,"points":points,"startedAt":started,"finishedAt":finished]
+                                     "wrongAnswers":wrong,"timeMs":timeMs,"scoreMs":scoreMs,"rank":rank,"startedAt":started,"finishedAt":finished]
         let batch = db.batch()
         batch.setData(result, forDocument: resultRef(uid, day))
         batch.setData(tally, forDocument: db.collection("leaderboard").document(uid))
         _ = try await Self.awaitWrite { done in batch.commit(completion: done) }
-        return Attempt(cardID: cardID, mode: .daily, correct: correct, timeMs: timeMs, points: points, date: finished.dateValue(), dailyKey: day)
+        return Attempt(cardID: cardID, mode: .daily, correct: correct, timeMs: timeMs, points: 0, date: finished.dateValue(), dailyKey: day)
     }
 
     // MARK: Leaderboard
@@ -440,9 +454,17 @@ enum DailyGuesses {
         let doc = try await db.collection("leaderboard").document(uid).getDocument(source: source)
         return doc.data().flatMap { Self.entry(uid: uid, $0) }
     }
+    /// The month's lines, best first. One number sorts them (monthRank: the month, then the time saved
+    /// on ten minutes a day), so the ranking needs no composite index.
+    private func monthBoard(_ day: String) -> Query? {
+        guard let month = DailyScore.monthIndex(day) else { return nil }
+        return db.collection("leaderboard").whereField("monthRank", isGreaterThanOrEqualTo: DailyScore.monthRank(month: month, saved: 0))
+            .whereField("monthRank", isLessThan: DailyScore.monthRank(month: month + 1, saved: 0))
+    }
     // Rankings show 25 lines: a few more are read so suspended players can be left out.
-    func topPlayers(limit: Int = 25) async throws -> [LeaderboardEntry] {
-        let docs = try await db.collection("leaderboard").order(by: "points", descending: true).limit(to: limit + 10).getDocuments().documents
+    func monthPlayers(day: String, limit: Int = 25) async throws -> [LeaderboardEntry] {
+        guard let board = monthBoard(day) else { return [] }
+        let docs = try await board.order(by: "monthRank", descending: true).limit(to: limit + 10).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))
     }
     func fastestPlayers(limit: Int = 25) async throws -> [LeaderboardEntry] {
@@ -451,40 +473,46 @@ enum DailyGuesses {
     }
     /// A suspended player's totals and results stay stored but are hidden from everyone else.
     private static func visible(_ doc: QueryDocumentSnapshot) -> Bool { doc.data()["suspended"] as? Bool != true }
-    /// Rank by official points among every player.
-    func rank(points: Int) async throws -> (rank: Int, players: Int) {
-        let board = db.collection("leaderboard")
-        let ahead = try await Self.count(board.whereField("points", isGreaterThan: points))
+    /// Rank in the month's ranking among the players of the month, nil without a game this month.
+    func monthRank(_ entry: LeaderboardEntry, day: String) async throws -> (rank: Int, players: Int)? {
+        guard entry.monthTotal(on: day) != nil, let board = monthBoard(day) else { return nil }
+        let ahead = try await Self.count(board.whereField("monthRank", isGreaterThan: entry.monthTally.rank))
         return (ahead + 1, try await Self.count(board))
     }
+    /// Today's results, sorted by one number (rank: the day, then the time with the hint minute, lost last).
+    private func dayResults(_ day: String, from: Int = 0, to: Int = 999_999) -> Query? {
+        guard let base = DailyScore.dayBase(day) else { return nil }
+        return db.collection("dailyResults").whereField("rank", isGreaterThanOrEqualTo: base + from).whereField("rank", isLessThanOrEqualTo: base + to)
+    }
     func dailyRanking(day: String, limit: Int = 25) async throws -> [DailyRank] {
-        let docs = try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
-            .order(by: "timeMs").limit(to: limit + 10).getDocuments().documents
+        guard let found = dayResults(day, to: DailyScore.missedMs) else { return [] }
+        let docs = try await found.order(by: "rank").limit(to: limit + 10).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap(Self.rank).prefix(limit))
     }
     /// Moderation: today's wins under 5 s, too fast to be read and typed by hand.
     func suspiciousResults(day: String) async throws -> [DailyRank] {
-        let docs = try await db.collection("dailyResults").whereField("day", isEqualTo: day).whereField("correct", isEqualTo: true)
-            .whereField("timeMs", isLessThan: 5000).order(by: "timeMs").limit(to: 20).getDocuments(source: .server).documents
+        guard let fast = dayResults(day, to: 4999) else { return [] }
+        let docs = try await fast.order(by: "rank").limit(to: 20).getDocuments(source: .server).documents
         return docs.filter(Self.visible).compactMap(Self.rank)
     }
     private static func rank(_ doc: QueryDocumentSnapshot) -> DailyRank? {
         let d = doc.data()
         guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
-        return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, points: d["points"] as? Int ?? 0, usedHint: d["usedHint"] as? Bool ?? false,
+        return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, usedHint: d["usedHint"] as? Bool ?? false,
                          wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
     }
-    /// "Plus rapide que 98 % des joueurs": players who were slower or did not find the word,
-    /// among everyone else who played today.
-    func standing(day: String, timeMs: Int, correct: Bool) async throws -> DailyStanding {
-        let today = db.collection("dailyResults").whereField("day", isEqualTo: day)
+    /// "Plus rapide que 98 % des joueurs": players who were slower (hint minute included) or did not
+    /// find the word, among everyone else who played today.
+    func standing(day: String, scoreMs: Int, correct: Bool) async throws -> DailyStanding {
+        guard let today = dayResults(day) else { return DailyStanding(rank: nil, players: 0, beatenPercent: nil) }
         let players = try await Self.count(today)
-        guard correct else { return DailyStanding(rank: nil, players: players, beatenPercent: nil) }
-        let missed = try await Self.count(today.whereField("correct", isEqualTo: false))
-        let slower = try await Self.count(today.whereField("correct", isEqualTo: true).whereField("timeMs", isGreaterThan: timeMs))
-        let faster = try await Self.count(today.whereField("correct", isEqualTo: true).whereField("timeMs", isLessThan: timeMs))
+        guard correct, let behind = dayResults(day, from: scoreMs + 1), let ahead = dayResults(day, to: scoreMs - 1)
+        else { return DailyStanding(rank: nil, players: players, beatenPercent: nil) }
+        let slowerOrMissed = try await Self.count(behind)
+        var faster = 0
+        if scoreMs > 0 { faster = try await Self.count(ahead) }
         let others = players - 1
-        return DailyStanding(rank: faster + 1, players: players, beatenPercent: others > 0 ? min(100, (slower + missed) * 100 / others) : nil)
+        return DailyStanding(rank: faster + 1, players: players, beatenPercent: others > 0 ? min(100, slowerOrMissed * 100 / others) : nil)
     }
     private static func count(_ query: Query) async throws -> Int {
         try await query.count.getAggregation(source: .server).count.intValue
@@ -569,8 +597,9 @@ enum DailyGuesses {
             }
             let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
             let today = data.flatMap { Self.attempt(day: day, $0) }
-            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, points: entry?.points ?? 0,
-                                       streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int))
+            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, monthMs: entry?.monthTotal(on: day),
+                                       streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int,
+                                       todayHint: data?["usedHint"] as? Bool ?? false))
         }
         return FriendStanding.ordered(rows)
     }
@@ -869,24 +898,27 @@ enum DailyGuesses {
                                  guesses: d["guesses"] as? Int ?? 0)
     }
     private static func attempt(day: String, _ d: [String: Any]) -> Attempt? {
-        guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int, let points = d["points"] as? Int else { return nil }
+        guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
         let date = (d["finishedAt"] as? Timestamp)?.dateValue() ?? Date()
-        return Attempt(cardID: cardID, mode: .daily, correct: d["correct"] as? Bool ?? false, timeMs: timeMs, points: points, date: date, dailyKey: day)
+        return Attempt(cardID: cardID, mode: .daily, correct: d["correct"] as? Bool ?? false, timeMs: timeMs, points: 0, date: date, dailyKey: day)
     }
     private static func entry(uid: String, _ d: [String: Any]) -> LeaderboardEntry? {
-        guard let points = d["points"] as? Int else { return nil }
-        return LeaderboardEntry(uid: uid, username: d["username"] as? String ?? "Joueur", points: points, played: d["played"] as? Int ?? 0,
+        guard let played = d["played"] as? Int else { return nil }
+        return LeaderboardEntry(uid: uid, username: d["username"] as? String ?? "Joueur", played: played,
                                 wins: d["wins"] as? Int ?? 0, streak: d["streak"] as? Int ?? 0, bestStreak: d["bestStreak"] as? Int ?? 0,
-                                bestTimeMs: d["bestTimeMs"] as? Int, lastWinDay: d["lastWinDay"] as? String ?? "")
+                                bestTimeMs: d["bestTimeMs"] as? Int, lastWinDay: d["lastWinDay"] as? String ?? "",
+                                month: d["month"] as? Int ?? 0, monthSaved: d["monthSaved"] as? Int ?? 0, monthPlayed: d["monthPlayed"] as? Int ?? 0)
     }
     /// Same arithmetic as the `tallies` rule in Firebase/firestore.rules.
-    static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, points: Int) -> [String: Any] {
+    static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, scoreMs: Int) -> [String: Any] {
         let lastWin = old?.lastWinDay ?? "", oldStreak = old?.streak ?? 0
         let laterWin = correct && day > lastWin
         let previous = DailySchedule.dayNumber(forKey: day).map { $0 - 1 } == DailySchedule.dayNumber(forKey: lastWin)
         let streak = laterWin ? (previous ? oldStreak + 1 : 1) : (!correct && day > lastWin ? 0 : oldStreak)
         let best: Any = correct ? (min(old?.bestTimeMs ?? timeMs, timeMs) as Any) : (old?.bestTimeMs.map { $0 as Any } ?? NSNull())
-        return ["uid":uid,"username":username,"points":(old?.points ?? 0) + points,"played":(old?.played ?? 0) + 1,
+        let month = DailyScore.tally(old: old?.monthTally ?? DailyScore.Month(month: 0, saved: 0, played: 0), day: day, scoreMs: scoreMs)
+        return ["uid":uid,"username":username,"played":(old?.played ?? 0) + 1,
+                "month":month.month,"monthSaved":month.saved,"monthPlayed":month.played,"monthRank":month.rank,
                 "wins":(old?.wins ?? 0) + (correct ? 1 : 0),"streak":streak,"bestStreak":max(old?.bestStreak ?? 0, streak),
                 "bestTimeMs":best,"lastWinDay":laterWin ? day : lastWin,"lastResult":day,"updatedAt":FieldValue.serverTimestamp()]
     }

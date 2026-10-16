@@ -40,7 +40,7 @@ class ModeViewModel : ViewModel() {
     var successTick by mutableIntStateOf(0); private set
     var lifeLostTick by mutableIntStateOf(0); private set
     var lifeGainedTick by mutableIntStateOf(0); private set
-    /** "+60 · ×3" after a right Sprint answer. */
+    /** "+1" after a right Sprint answer. */
     var gain by mutableStateOf<String?>(null); private set
     var resumed by mutableStateOf(false); private set
     var over by mutableStateOf(false); private set
@@ -97,7 +97,7 @@ class ModeViewModel : ViewModel() {
         val text = answer; val now = elapsedMs
         when (mode) {
             PlayMode.SPRINT -> when (val outcome = sprint?.answer(text, now)) {
-                is SprintGame.Outcome.Right -> { answer = ""; successTick++; gain = "+${outcome.points}" + if (outcome.multiplier > 1) " · ×${outcome.multiplier}" else "" }
+                is SprintGame.Outcome.Right -> { answer = ""; successTick++; gain = "+1" }
                 SprintGame.Outcome.Wrong -> wrong()
                 else -> Unit
             }

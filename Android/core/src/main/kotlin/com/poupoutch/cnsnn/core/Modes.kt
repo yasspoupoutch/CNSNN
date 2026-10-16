@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 // Sprint, Survie and Double sens: the same rules as Core/Modes.swift. They hold no clock of their
 // own (the screen passes the elapsed time), and both apps replay the scenarios written by
-// Scripts/generate_content.py (ModeVectors.kt), so they find the same words, points and lives.
+// Scripts/generate_content.py (ModeVectors.kt), so they find the same words, combos and lives.
 
 enum class PlayMode(val key: String, val title: String) {
     SPRINT("sprint", "Sprint"), SURVIVAL("survival", "Survie"), DUO("duo", "Double sens");
@@ -72,9 +72,8 @@ object ModePicker {
 // ---- Sprint
 
 /**
- * 90 seconds to find as many words as possible. Each right answer scores its difficulty times the
- * combo (consecutive right answers, up to ×5). A wrong answer or a pass breaks the combo, and a pass
- * costs 5 seconds. The clock never stops, even in the background.
+ * 90 seconds to find as many words as possible. Right answers in a row make a combo; a wrong answer
+ * or a pass breaks it, and a pass costs 5 seconds. The clock never stops, even in the background.
  */
 @Serializable
 class SprintGame private constructor(
@@ -86,7 +85,6 @@ class SprintGame private constructor(
     var card: Card? = null; private set
     val used: MutableList<String> = mutableListOf()
     var found = 0; private set
-    var score = 0; private set
     /** Right answers in a row. */
     var streak = 0; private set
     var bestCombo = 0; private set
@@ -95,24 +93,19 @@ class SprintGame private constructor(
     var penaltyMs = 0; private set
     var finished = false; private set
 
-    /** What the next right answer is worth: ×1, ×2… up to ×5. */
-    val multiplier: Int get() = minOf(MAX_MULTIPLIER, streak + 1)
     fun remainingMs(elapsed: Int): Int = maxOf(0, DURATION_MS - elapsed - penaltyMs)
     /** Right answers out of all the answers checked, in percent. */
     val accuracy: Int get() = if (found + wrong == 0) 0 else found * 100 / (found + wrong)
 
-    sealed interface Outcome { data class Right(val points: Int, val multiplier: Int) : Outcome; data object Wrong : Outcome; data object Over : Outcome }
+    sealed interface Outcome { data class Right(val combo: Int) : Outcome; data object Wrong : Outcome; data object Over : Outcome }
 
     fun answer(text: String, elapsed: Int): Outcome {
         val shown = card
         if (finished || remainingMs(elapsed) <= 0 || shown == null) { finished = true; return Outcome.Over }
         if (!WordEngine.matches(text, shown.wordFull)) { wrong++; streak = 0; return Outcome.Wrong }
-        streak++
-        val multiplier = minOf(MAX_MULTIPLIER, streak)
-        val points = basePoints(shown.difficulty) * multiplier
-        score += points; found++; bestCombo = maxOf(bestCombo, streak)
+        streak++; found++; bestCombo = maxOf(bestCombo, streak)
         draw()
-        return Outcome.Right(points, multiplier)
+        return Outcome.Right(streak)
     }
 
     fun skip(elapsed: Int) {
@@ -135,15 +128,13 @@ class SprintGame private constructor(
         card?.let { used += it.id } ?: run { finished = true }
     }
 
-    val best: Map<String, Int> get() = mapOf(ModeStat.SCORE to score, ModeStat.WORDS to found, ModeStat.COMBO to bestCombo)
+    val best: Map<String, Int> get() = mapOf(ModeStat.WORDS to found, ModeStat.COMBO to bestCombo)
     val add: Map<String, Int> get() = mapOf(ModeStat.GAMES to 1)
 
     companion object {
         const val DURATION_MS = 90_000
         const val SKIP_PENALTY_MS = 5_000
-        const val MAX_MULTIPLIER = 5
         val WEIGHTS = listOf(40, 40, 20)
-        fun basePoints(difficulty: Difficulty): Int = when (difficulty) { Difficulty.EASY -> 10; Difficulty.MEDIUM -> 20; Difficulty.HARD -> 30 }
     }
 }
 
@@ -304,29 +295,30 @@ class DuoGame private constructor(val random: ModeRandom) {
     val wordsFound: Int get() = found.sumOf { pair -> pair.count { it } }
     val solved: Int get() = found.count { it[0] && it[1] }
     val perfect: Boolean get() = wordsFound == duos.size * 2 && errors == 0
-    /** 100 per word, 50 per complete duo, −20 per error, plus a time bonus that grows with the words found. */
-    fun score(elapsed: Int): Int {
-        val bonus = maxOf(0, TIME_BONUS_SECONDS - playMs(elapsed) / 1000) * wordsFound / 10
-        return maxOf(0, wordsFound * WORD_POINTS + solved * DUO_BONUS - errors * ERROR_PENALTY + bonus)
-    }
+    /** The game as a record: pairs found first, then the time (see DuoRecord). */
+    fun record(elapsed: Int): Int = DuoRecord.value(solved, playMs(elapsed))
 
-    fun best(elapsed: Int): Map<String, Int> = mapOf(ModeStat.SCORE to score(elapsed))
+    fun best(elapsed: Int): Map<String, Int> = mapOf(ModeStat.DUO to record(elapsed))
     val add: Map<String, Int> get() = mapOf(ModeStat.GAMES to 1, ModeStat.PERFECT to (if (perfect) 1 else 0), ModeStat.DUOS_SOLVED to solved, ModeStat.DUOS_PLAYED to duos.size)
 
     companion object {
         const val ROUNDS = 5
-        const val WORD_POINTS = 100
-        const val DUO_BONUS = 50
-        const val ERROR_PENALTY = 20
-        /** Seconds under which the remaining time adds a bonus, shared by the words found. */
-        const val TIME_BONUS_SECONDS = 300
     }
 }
 
 // ---- Personal records
 
+/** A Double sens game in one number that only grows with a better game: more pairs found, then less time. */
+object DuoRecord {
+    fun value(solved: Int, ms: Int): Int = solved * 100_000 + maxOf(0, 99_999 - maxOf(0, ms) / 1000)
+    fun solved(value: Int): Int = value / 100_000
+    fun seconds(value: Int): Int = 99_999 - value % 100_000
+}
+
 object ModeStat {
-    const val SCORE = "score"; const val WORDS = "words"; const val COMBO = "combo"; const val LEVEL = "level"
+    const val WORDS = "words"; const val COMBO = "combo"; const val LEVEL = "level"
+    /** Double sens best: pairs found first, then the time (see DuoRecord). */
+    const val DUO = "duo"
     const val GAMES = "games"; const val PERFECT = "perfect"; const val DUOS_SOLVED = "duosSolved"; const val DUOS_PLAYED = "duosPlayed"
 }
 

@@ -30,7 +30,6 @@ final class ModeVectorsTests: XCTestCase {
                 }
                 let label = "graine \(item.seed), \(step.action)"
                 XCTAssertEqual(step.card, game.card?.id ?? "", label)
-                XCTAssertEqual(step.score, game.score, label)
                 XCTAssertEqual(step.streak, game.streak, label)
                 XCTAssertEqual(step.found, game.found, label)
                 XCTAssertEqual(step.wrong, game.wrong, label)
@@ -84,7 +83,7 @@ final class ModeVectorsTests: XCTestCase {
                 XCTAssertEqual(step.solved, game.solved, label)
                 XCTAssertEqual(step.errors, game.errors, label)
                 XCTAssertEqual(step.playMs, game.playMs(elapsed: at), label)
-                XCTAssertEqual(step.score, game.score(elapsed: at), label)
+                XCTAssertEqual(step.record, game.records(elapsed: at).best[ModeStat.duo], label)
                 XCTAssertEqual(step.finished, game.finished, label)
             }
         }
@@ -98,27 +97,22 @@ final class SprintTests: XCTestCase {
 
     func testComboGrowsToFiveThenAWrongAnswerResetsIt() {
         var game = SprintGame(seed: 11)
-        var multipliers: [Int] = []
+        var combos: [Int] = []
         for second in 1...7 {
-            if case .right(_, let multiplier) = right(&game, second * 1000) { multipliers.append(multiplier) }
+            if case .right(let combo) = right(&game, second * 1000) { combos.append(combo) }
         }
-        XCTAssertEqual(multipliers, [1, 2, 3, 4, 5, 5, 5])
+        XCTAssertEqual(combos, [1, 2, 3, 4, 5, 6, 7])
         XCTAssertEqual(game.bestCombo, 7)
         XCTAssertEqual(game.answer("PASLEMOT", elapsed: 8000), .wrong)
         XCTAssertEqual(game.streak, 0)
-        XCTAssertEqual(game.multiplier, 1)
     }
 
-    func testPointsAreDifficultyTimesCombo() {
+    func testTheResultIsTheWordsFound() {
         var game = SprintGame(seed: 3)
-        var total = 0
-        for index in 0..<12 {
-            let card = game.card!
-            guard case .right(let points, _) = right(&game, index * 500) else { return XCTFail("bonne réponse refusée") }
-            XCTAssertEqual(points, SprintGame.basePoints(card.difficulty) * min(5, index + 1))
-            total += points
-        }
-        XCTAssertEqual(total, game.score)
+        for index in 0..<12 { right(&game, index * 500) }
+        game.answer("PASLEMOT", elapsed: 7000)
+        XCTAssertEqual(game.found, 12)
+        XCTAssertEqual(game.records.best, [ModeStat.words: 12, ModeStat.combo: 12])
     }
 
     func testPassingCostsFiveSecondsAndTheCombo() {
@@ -158,7 +152,7 @@ final class SprintTests: XCTestCase {
         right(&game, 1000); game.answer("NON", elapsed: 2000)
         var copy = try JSONDecoder().decode(SprintGame.self, from: JSONEncoder().encode(game))
         XCTAssertEqual(copy.card, game.card)
-        XCTAssertEqual(copy.score, game.score)
+        XCTAssertEqual(copy.found, game.found)
         right(&game, 3000); right(&copy, 3000)
         XCTAssertEqual(copy.card, game.card)
     }
@@ -234,7 +228,7 @@ final class DuoTests: XCTestCase {
         XCTAssertTrue(game.roundComplete)
     }
 
-    func testAPerfectGameScoresEveryBonus() {
+    func testAPerfectGameRecordsEveryPairAndItsTime() {
         var game = DuoGame(seed: 14)
         for index in 0..<DuoGame.rounds {
             let duo = game.duo!
@@ -245,14 +239,19 @@ final class DuoTests: XCTestCase {
         XCTAssertTrue(game.finished)
         XCTAssertTrue(game.perfect)
         XCTAssertEqual(game.playMs(elapsed: 99_000), 42_000)
-        XCTAssertEqual(game.score(elapsed: 99_000), 1000 + 250 + 258)
+        let record = game.records(elapsed: 99_000).best[ModeStat.duo]!
+        XCTAssertEqual(DuoRecord.solved(record), 5)
+        XCTAssertEqual(DuoRecord.seconds(record), 42)
+        // More pairs always beat a faster game with fewer pairs.
+        XCTAssertGreaterThan(DuoRecord.value(solved: 5, ms: 3_000_000), DuoRecord.value(solved: 4, ms: 1000))
+        XCTAssertGreaterThan(DuoRecord.value(solved: 5, ms: 40_000), DuoRecord.value(solved: 5, ms: 42_000))
         XCTAssertEqual(game.records(elapsed: 99_000).add[ModeStat.perfect], 1)
     }
 
     func testAbandonCountsEveryRound() {
         var game = DuoGame(seed: 15)
         for _ in 0..<20 { game.answer("FAUX", elapsed: 1000) }
-        XCTAssertEqual(game.score(elapsed: 2000), 0)
+        XCTAssertEqual(DuoRecord.solved(game.records(elapsed: 2000).best[ModeStat.duo]!), 0)
         game.abandon(elapsed: 3000)
         XCTAssertTrue(game.finished)
         XCTAssertEqual(game.records(elapsed: 3000).add[ModeStat.duosPlayed], 5)
@@ -309,10 +308,10 @@ final class ModeRecordsTests: XCTestCase {
         XCTAssertEqual(old.merged(with: progress).records(.duo).best("score"), 900)
     }
 
-    func testModeGamesNeverTouchTheOfficialScore() {
+    func testModeGamesNeverTouchTheClassicLevel() {
         var progress = Progress()
-        progress.recordMode(.sprint, best: ["score": 5000], add: ["games": 1], device: "A")
-        XCTAssertEqual(progress.score, 0)
+        progress.recordMode(.sprint, best: ["words": 50], add: ["games": 1], device: "A")
+        XCTAssertEqual(progress.level, 1)
         XCTAssertTrue(progress.attempts.isEmpty)
     }
 }

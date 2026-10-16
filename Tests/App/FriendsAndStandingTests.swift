@@ -20,13 +20,16 @@ final class FriendsAndStandingTests: XCTestCase {
     }
 
     func testFriendsFoundTodayComeFirstByTime() {
-        func row(_ uid: String, points: Int, today: (Bool, Int)?) -> FriendStanding {
-            FriendStanding(uid: uid, username: uid, points: points, streak: 0,
-                           today: today.map { Attempt(cardID: "x", mode: .daily, correct: $0.0, timeMs: $0.1, points: 0, date: Date(), dailyKey: "d") })
+        func row(_ uid: String, month: Int?, today: (Bool, Int)?, hint: Bool = false) -> FriendStanding {
+            FriendStanding(uid: uid, username: uid, monthMs: month, streak: 0,
+                           today: today.map { Attempt(cardID: "x", mode: .daily, correct: $0.0, timeMs: $0.1, points: 0, date: Date(), dailyKey: "d") },
+                           todayHint: hint)
         }
-        let ordered = FriendStanding.ordered([row("slow", points: 900, today: (true, 9000)), row("idle", points: 5000, today: nil),
-                                              row("fast", points: 10, today: (true, 3000)), row("miss", points: 100, today: (false, 2000))])
-        XCTAssertEqual(ordered.map(\.uid), ["fast", "slow", "idle", "miss"])
+        // "hint" found fastest but the hint minute puts them after "slow"; the others by month total.
+        let ordered = FriendStanding.ordered([row("slow", month: 90_000, today: (true, 9000)), row("idle", month: 600_000, today: nil),
+                                              row("fast", month: 900_000, today: (true, 3000)), row("miss", month: 1_200_000, today: (false, 2000)),
+                                              row("hint", month: 10_000, today: (true, 1000), hint: true), row("new", month: nil, today: nil)])
+        XCTAssertEqual(ordered.map(\.uid), ["fast", "slow", "hint", "idle", "miss", "new"])
     }
 
     func testMistakesLine() {

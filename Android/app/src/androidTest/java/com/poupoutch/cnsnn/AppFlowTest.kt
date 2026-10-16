@@ -45,7 +45,7 @@ class AppFlowTest {
         rule.onNodeWithText("Valider").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("XQ")).fetchSemanticsNodes().isNotEmpty() }
         // Hint, then give up: the result sheet shows the word.
-        rule.onNodeWithText("Indice  points ÷ 2").performClick()
+        rule.onNodeWithText("Indice").performClick()
         rule.onNodeWithText("Passer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Révéler le mot")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Révéler le mot").performClick()

@@ -61,7 +61,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.poupoutch.cnsnn.core.ClassicLevel
 import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.core.DuoGame
+import com.poupoutch.cnsnn.core.DuoRecord
 import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.ModeStat
 import com.poupoutch.cnsnn.core.PlayMode
@@ -114,9 +117,13 @@ private fun MyStats(state: AppViewModel) {
     state.official?.let { entry ->
         SectionCard {
             Kicker("Mot du jour · officiel")
+            // This month's total time: every day counts, 10 min for a day not found or not played.
             Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
-                Text(Format.number(entry.points), fontSize = 34.sp, fontWeight = FontWeight.Black)
-                Text("points", color = Palette.secondary, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+                val total = entry.monthTotalMs()
+                if (total != null) {
+                    Text(Format.clock(total), fontSize = 34.sp, fontWeight = FontWeight.Black)
+                    Text("au total ce mois-ci", color = Palette.secondary, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+                } else Text("Pas encore joué ce mois-ci", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary)
             }
             Row(Modifier.padding(top = 12.dp)) {
                 listOf("${entry.currentStreak()}" to "série", "${entry.bestStreak}" to "record de série",
@@ -129,15 +136,16 @@ private fun MyStats(state: AppViewModel) {
             }
         }
     }
-    val level = p.score / 1000 + 1; val into = p.score % 1000
+    val level = p.level; val into = p.levelInto
     SectionCard {
-        Text(if (state.official == null) "Vos points" else "Tous vos points, entraînement compris", fontSize = 13.sp, color = Palette.secondary)
-        Text(Format.number(p.score), fontSize = 52.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp)
+        Text("Mots trouvés, entraînement compris", fontSize = 13.sp, color = Palette.secondary)
+        Text(Format.number(p.correctAnswers), fontSize = 52.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp)
         Row(Modifier.padding(top = 10.dp)) {
             Text("Niveau $level", fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.weight(1f))
-            Text("${1000 - into} pts avant le niveau ${level + 1}", fontSize = 13.sp, color = Palette.secondary)
+            val left = ClassicLevel.WORDS_PER_LEVEL - into
+            Text("$left mot${if (left > 1) "s" else ""} avant le niveau ${level + 1}", fontSize = 13.sp, color = Palette.secondary)
         }
-        LevelBar(into / 1000f, Modifier.padding(top = 8.dp))
+        LevelBar(into / ClassicLevel.WORDS_PER_LEVEL.toFloat(), Modifier.padding(top = 8.dp))
     }
     val tiles = listOf(
         "${p.attempts.size}" to "Cartes jouées", "${(p.successRate * 100).toInt()} %" to "Réussite · ${p.correctAnswers} trouvés",
@@ -183,13 +191,14 @@ private fun ModeRecordsCard(state: AppViewModel) {
             val r = state.progress.records(mode)
             val games = r.total(ModeStat.GAMES)
             val values = when (mode) {
-                PlayMode.SPRINT -> listOf(Format.number(r.best(ModeStat.SCORE)) to "meilleur score", "${r.best(ModeStat.WORDS)}" to "mots max",
+                PlayMode.SPRINT -> listOf("${r.best(ModeStat.WORDS)}" to "mots max",
                     "${r.best(ModeStat.COMBO)}" to "meilleur combo", "$games" to if (games > 1) "parties" else "partie")
-                PlayMode.SURVIVAL -> listOf("${r.best(ModeStat.WORDS)}" to "meilleur parcours", "${r.best(ModeStat.LEVEL)}" to "niveau max",
+                PlayMode.SURVIVAL -> listOf("${maxOf(1, r.best(ModeStat.LEVEL))}" to "niveau max", "${r.best(ModeStat.WORDS)}" to "meilleur parcours",
                     "$games" to if (games > 1) "parties" else "partie")
                 PlayMode.DUO -> {
                     val played = r.total(ModeStat.DUOS_PLAYED)
-                    listOf(Format.number(r.best(ModeStat.SCORE)) to "meilleur score", "${r.total(ModeStat.PERFECT)}" to "parfaites",
+                    val best = r.best(ModeStat.DUO)
+                    listOf((if (best == 0) "—" else "${DuoRecord.solved(best)}/${DuoGame.ROUNDS} · ${Format.clock(DuoRecord.seconds(best) * 1000)}") to "meilleure partie", "${r.total(ModeStat.PERFECT)}" to "parfaites",
                         "${if (played == 0) 0 else r.total(ModeStat.DUOS_SOLVED) * 100 / played} %" to "duos résolus", "$games" to if (games > 1) "parties" else "partie")
                 }
             }
@@ -210,7 +219,10 @@ private fun ModeRecordsCard(state: AppViewModel) {
     }
 }
 
-private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), POINTS("Points"), FASTEST("Records") }
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), MONTH("Mois"), FASTEST("Records") }
+
+/** "12 jours joués" this month. */
+private fun monthDetail(entry: LeaderboardEntry): String = if (entry.monthPlayed > 1) "${entry.monthPlayed} jours joués" else "1 jour joué"
 private data class Line(val id: String, val name: String, val value: String, val detail: String? = null)
 
 @Composable
@@ -236,20 +248,20 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         val force = refreshToken != seenToken
         seenToken = refreshToken
         val day = DailySchedule.key()
-        val key = if (board == Board.TODAY) "today-$day" else board.name
+        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); else -> board.name }
         val summary = state.rankingIsStale("summary", force)
         if (!summary && !state.rankingIsStale(key, force)) return
         loading = true; failed = false
         try {
             if (summary) {
                 state.refreshOfficial()
-                state.official?.let { state.rankings = state.rankings.copy(myRank = state.cloud.rank(it.points)) }
+                state.rankings = state.rankings.copy(myRank = state.official?.let { state.cloud.monthlyRank(it, day) })
                 state.rankingRead("summary")
             }
             if (state.rankingIsStale(key, force)) {
                 state.rankings = when (board) {
                     Board.TODAY -> state.rankings.copy(today = state.cloud.dailyRanking(day))
-                    Board.POINTS -> state.rankings.copy(players = state.cloud.topPlayers())
+                    Board.MONTH -> state.rankings.copy(players = state.cloud.monthlyPlayers(day))
                     Board.FASTEST -> state.rankings.copy(fastest = state.cloud.fastestPlayers())
                     Board.FRIENDS -> state.rankings
                 }
@@ -261,8 +273,8 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
 
     val entry = state.official
     if (entry != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        StatTile(myRank?.let { Format.ordinal(it.first) } ?: "—", myRank?.let { "sur ${Format.number(it.second)} joueurs" } ?: "Rang", Modifier.weight(1f))
-        StatTile(Format.number(entry.points), "points officiels", Modifier.weight(1f))
+        StatTile(myRank?.let { Format.ordinal(it.first) } ?: "—", myRank?.let { "du mois sur ${Format.number(it.second)}" } ?: "Rang du mois", Modifier.weight(1f))
+        StatTile(entry.monthTotalMs()?.let { Format.clock(it) } ?: "—", "total du mois", Modifier.weight(1f))
         StatTile("${entry.currentStreak()}", "série en cours", Modifier.weight(1f))
     } else SectionCard { Text("Jouez le Mot du jour pour entrer au classement.", color = Palette.secondary) }
 
@@ -276,14 +288,16 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
     val hidden = state.hiddenPlayers
     val rows = when (board) {
-        Board.TODAY -> today.map { Line(it.uid, it.username, Format.clock(it.timeMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice" else "") }
-        Board.POINTS -> players.map { Line(it.uid, it.username, Format.number(it.points) + " pts") }
+        // The official time: a hint adds a minute.
+        Board.TODAY -> today.map { Line(it.uid, it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") }
+        // The month total: 10 min for every day not found or not played, so the lowest wins.
+        Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
         Board.FRIENDS -> emptyList()
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
         if (rows.isEmpty()) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else
-            if (board == Board.TODAY) "Personne n’a encore trouvé le mot du jour." else "Aucun résultat pour le moment.")
+            when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.MONTH -> "Personne n’a encore joué ce mois-ci."; else -> "Aucun résultat pour le moment." })
         rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
             val mine = row.id == state.uid
@@ -310,7 +324,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     Text("Appui long sur un joueur pour le signaler ou le masquer.", fontSize = 12.sp, color = Palette.tertiary)
     suspending?.let { row ->
         AlertDialog({ suspending = null }, title = { Text("Suspendre ${row.name} ?") },
-            text = { Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses points sont conservés : en levant la suspension dans Modération, il retrouve tout.") },
+            text = { Text("Le joueur disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses stats sont conservés : en levant la suspension dans Modération, il retrouve tout.") },
             confirmButton = { TextButton({
                 suspending = null
                 scope.launch {
@@ -394,9 +408,9 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
             val today = row.today
             Box {
                 RankRow(index, row.username, row.uid, mine,
-                    Format.number(row.points) + " pts" + (if (row.streak > 0) " · série ${row.streak}" else "") + (if (today?.correct == true) " · " + Mistakes.text(row.todayWrong ?: 0) else "")
-,
-                    when { today == null -> "pas joué"; today.correct -> Format.clock(today.timeMs); else -> "raté" },
+                    listOfNotNull(row.monthTotalMs?.let { "mois " + Format.clock(it) } ?: "pas joué ce mois", if (row.streak > 0) "série ${row.streak}" else null,
+                        if (today?.correct == true) Mistakes.text(row.todayWrong ?: 0) else null, if (today?.correct == true && row.todayHint) "indice" else null).joinToString(" · "),
+                    when { today == null -> "pas joué"; today.correct -> Format.clock(row.todayScoreMs ?: today.timeMs); else -> "raté" },
                     if (today?.correct == true) Palette.foreground else Palette.tertiary,
                     // Friend challenges: "2 victoires · 1 défaite" against this friend.
                     extra = if (mine) null else state.challengeTally(row.uid).label) { if (!mine) menu = true }

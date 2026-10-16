@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.ClassicLevel
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.Format
@@ -164,10 +165,7 @@ private class Tile(val icon: ImageVector, val tint: Color, val title: String, va
 private fun recordLine(state: AppViewModel, mode: PlayMode): String {
     val records = state.progress.records(mode)
     if (records.total(ModeStat.GAMES) == 0) return "Première partie"
-    return when (mode) {
-        PlayMode.SURVIVAL -> "Record ${records.best(ModeStat.WORDS)} mots"
-        else -> "Record ${Format.number(records.best(ModeStat.SCORE))} pts"
-    }
+    return "Record " + recordText(mode, records.best(mode.mainRecord))
 }
 
 val PlayMode.icon: ImageVector get() = when (this) {
@@ -252,7 +250,7 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
             DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (attempt.correct) "${Format.clock(attempt.timeMs)} · +${attempt.points} pts" else "Raté cette fois",
+                    Text(if (attempt.correct) Format.clock(attempt.timeMs) else "Raté cette fois",
                         fontSize = 13.sp, color = Palette.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Countdown()
                 }
@@ -315,8 +313,7 @@ private fun Countdown() {
 private fun ClassicCard(state: AppViewModel, play: (Category?, Difficulty?) -> Unit) {
     var category by rememberSaveable { mutableStateOf<Category?>(null) }
     var difficulty by rememberSaveable { mutableStateOf<Difficulty?>(null) }
-    val score = state.progress.score
-    val level = score / 1000 + 1; val into = score % 1000
+    val level = state.progress.level; val into = state.progress.levelInto
     Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Kicker("Classique", modifier = Modifier.weight(1f))
@@ -325,9 +322,10 @@ private fun ClassicCard(state: AppViewModel, play: (Category?, Difficulty?) -> U
         Text("Jouez sans limite", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 10.dp))
         Row(Modifier.padding(top = 16.dp)) {
             Text("Niveau $level", style = MaterialTheme.typography.bodySmall, color = Palette.secondary, modifier = Modifier.weight(1f))
-            Text("${1000 - into} pts avant le niveau ${level + 1}", style = MaterialTheme.typography.bodySmall, color = Palette.secondary)
+            val left = ClassicLevel.WORDS_PER_LEVEL - into
+            Text("$left mot${if (left > 1) "s" else ""} avant le niveau ${level + 1}", style = MaterialTheme.typography.bodySmall, color = Palette.secondary)
         }
-        LevelBar(into / 1000f, Modifier.padding(top = 8.dp))
+        LevelBar(into / ClassicLevel.WORDS_PER_LEVEL.toFloat(), Modifier.padding(top = 8.dp))
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterMenu(category?.label ?: "Toutes catégories", listOf<Category?>(null) + Category.entries, { it?.label ?: "Toutes catégories" }) { category = it }
             FilterMenu(difficulty?.label ?: "Toutes difficultés", listOf<Difficulty?>(null) + Difficulty.entries, { it?.label ?: "Toutes difficultés" }) { difficulty = it }

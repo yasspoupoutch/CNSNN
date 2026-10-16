@@ -110,7 +110,7 @@ struct ModeGameView: View {
     @ViewBuilder private var trailing: some View {
         switch mode {
         case .sprint:
-            pill(Format.number(session.sprint?.score ?? 0), label: "Score")
+            pill(Format.number(session.sprint?.found ?? 0), label: "Mots")
         case .survival:
             Hearts(lives: session.survival?.lives ?? 3, lost: session.lifeLostTick, gained: session.lifeGainedTick)
         case .duo:
@@ -143,8 +143,8 @@ struct ModeGameView: View {
         }.padding(.top, 6)
         HStack(spacing: 8) {
             stat("\(game.found)", game.found > 1 ? "mots" : "mot")
-            stat("×\(game.multiplier)", "combo", highlight: game.multiplier > 1)
-            stat(showGain ? (session.gain ?? "") : "+\(SprintGame.basePoints(game.card?.difficulty ?? .easy) * game.multiplier)", showGain ? "gagnés" : "en jeu", highlight: showGain)
+            stat("×\(max(1, game.streak))", "combo", highlight: game.streak > 1)
+            stat(showGain ? (session.gain ?? "") : "\(game.accuracy) %", showGain ? "trouvé" : "précision", highlight: showGain)
         }.padding(.top, 12)
         if let card = game.card { clue(card) }
         Spacer(minLength: 8)
@@ -397,7 +397,9 @@ private struct ModeResultView: View {
         }
     }
 
-    private var mainKey: String { session.mode == .survival ? ModeStat.words : ModeStat.score }
+    private var mainKey: String {
+        switch session.mode { case .sprint: ModeStat.words; case .survival: ModeStat.level; case .duo: ModeStat.duo }
+    }
     private var records: ModeRecords { state.progress.records(session.mode) }
 
     private var kicker: String {
@@ -409,24 +411,30 @@ private struct ModeResultView: View {
     }
     private var mainValue: Int {
         switch session.mode {
-        case .sprint: return session.sprint?.score ?? 0
-        case .survival: return session.survival?.found ?? 0
-        case .duo: return session.duo.map { $0.score(elapsed: session.elapsedMs) } ?? 0
+        case .sprint: return session.sprint?.found ?? 0
+        case .survival: return session.survival?.level ?? 1
+        case .duo: return session.duo?.solved ?? 0
         }
     }
-    private var mainLabel: String { session.mode == .survival ? (mainValue > 1 ? "mots trouvés" : "mot trouvé") : "points" }
+    private var mainLabel: String {
+        switch session.mode {
+        case .sprint: return mainValue > 1 ? "mots trouvés en 90 s" : "mot trouvé en 90 s"
+        case .survival: return "niveau atteint"
+        case .duo: return mainValue > 1 ? "paires trouvées" : "paire trouvée"
+        }
+    }
 
     private var tiles: [(String, String)] {
         switch session.mode {
         case .sprint:
             guard let game = session.sprint else { return [] }
-            return [("\(game.found)", game.found > 1 ? "mots" : "mot"), ("\(game.bestCombo)", "meilleur combo"), ("\(game.accuracy) %", "précision")]
+            return [("\(game.bestCombo)", "meilleur combo"), ("\(game.accuracy) %", "précision"), ("\(game.skips)", game.skips > 1 ? "passés" : "passé")]
         case .survival:
             guard let game = session.survival else { return [] }
-            return [("\(game.level)", "niveau atteint"), ("\(game.mistakes)", game.mistakes > 1 ? "erreurs" : "erreur"), (Format.number(records.best(ModeStat.words)), "meilleur parcours")]
+            return [("\(game.found)", game.found > 1 ? "mots trouvés" : "mot trouvé"), ("\(game.mistakes)", game.mistakes > 1 ? "erreurs" : "erreur"), (Format.number(records.best(ModeStat.words)), "meilleur parcours")]
         case .duo:
             guard let game = session.duo else { return [] }
-            return [("\(game.solved)/\(game.duos.count)", "duos résolus"), ("\(game.wordsFound)/\(game.duos.count * 2)", "réponses"), (Format.clock(game.playMs(elapsed: session.elapsedMs)), "temps")]
+            return [(Format.clock(game.playMs(elapsed: session.elapsedMs)), "temps"), ("\(game.wordsFound)/\(game.duos.count * 2)", "réponses"), ("\(game.errors)", game.errors > 1 ? "erreurs" : "erreur")]
         }
     }
 
@@ -445,7 +453,7 @@ private struct ModeResultView: View {
         } else if session.beaten.contains(mainKey) {
             Label("Premier record établi", systemImage: "flag.checkered").scaledFont(14, .semibold).foregroundStyle(Palette.secondary)
         } else {
-            Text("Record : \(Format.number(records.best(mainKey))) " + (session.mode == .survival ? "mots" : "points"))
+            Text("Record : " + ModeRecordText.main(session.mode, records))
                 .scaledFont(14, .semibold).foregroundStyle(Palette.secondary)
         }
     }
@@ -459,5 +467,22 @@ private struct ModeResultView: View {
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill1))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The main personal record of a mode, as words (no points anywhere).
+enum ModeRecordText {
+    static func main(_ mode: PlayMode, _ records: ModeRecords) -> String {
+        switch mode {
+        case .sprint:
+            let words = records.best(ModeStat.words)
+            return "\(words) " + (words > 1 ? "mots" : "mot")
+        case .survival: return "niveau \(max(1, records.best(ModeStat.level)))"
+        case .duo:
+            let best = records.best(ModeStat.duo)
+            guard best > 0 else { return "aucun" }
+            let solved = DuoRecord.solved(best)
+            return "\(solved) " + (solved > 1 ? "paires" : "paire") + " en " + Format.clock(DuoRecord.seconds(best) * 1000)
+        }
     }
 }

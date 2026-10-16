@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.CardPicker
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.DailySchedule
@@ -16,7 +17,6 @@ import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Guesses
-import com.poupoutch.cnsnn.core.Scoring
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.WordEngine
 import com.poupoutch.cnsnn.data.CloudError
@@ -99,6 +99,7 @@ class GameViewModel : ViewModel() {
         try {
             val session = cloud.dailySession(uid, key)
             if (session != null) {
+                usedHint = session.hintUsed
                 card = state.card(session.cardId)
                 if (session.finished) cloud.dailySecret(key)?.let { state.storeDailyWord(it, key); card = it }
                 else if (card == null) cloud.dailyPuzzle(key)?.let { state.storeDailyWord(it, key); card = it }
@@ -149,6 +150,8 @@ class GameViewModel : ViewModel() {
     fun next(state: AppViewModel) = load(state)
 
     val secret: Boolean get() = card?.id?.let { SecretDaily.day(it) } != null
+    /** The Mot du jour's official time: the hint adds a minute, a lost day counts ten. */
+    fun officialMs(attempt: Attempt): Int = DailyScore.scoreMs(attempt.timeMs, usedHint, attempt.correct)
 
     fun revealHint(state: AppViewModel) {
         if (usedHint || result != null || checking) return
@@ -281,15 +284,14 @@ class GameViewModel : ViewModel() {
         }
         val shown = card ?: return
         val ms = elapsedMs
-        val points = Scoring.points(shown.difficulty, ms, usedHint, correct)
-        val attempt = Attempt(cardID = shown.id, mode = mode, correct = correct, timeMs = ms, points = points, date = Instant.now(), dailyKey = day)
+        val attempt = Attempt(cardID = shown.id, mode = mode, correct = correct, timeMs = ms, date = Instant.now(), dailyKey = day)
         result = attempt; state.record(attempt)
         if (ranked && uid != null && day != null) {
             pendingOfficial = true
             viewModelScope.launch { makeOfficial(state.cloud, uid, day, correct, state, finished = alreadyFinished) }
         }
     }
-    /** Stamps the finish on the server, then shows the server's time and points instead of the local ones. */
+    /** Stamps the finish on the server, then shows the server's time instead of the local one. */
     private suspend fun makeOfficial(cloud: CloudRepository, uid: String, day: String, correct: Boolean, state: AppViewModel, finished: Boolean = false) {
         try {
             if (!finished) {
@@ -308,6 +310,7 @@ class GameViewModel : ViewModel() {
     }
     private suspend fun loadStanding(cloud: CloudRepository, attempt: Attempt) {
         val day = attempt.dailyKey ?: return
-        standing = runCatching { cloud.standing(day, attempt.timeMs, attempt.correct) }.getOrNull()
+        val rank = DailyScore.rank(day, officialMs(attempt), attempt.correct) ?: return
+        standing = runCatching { cloud.standing(day, rank, attempt.correct) }.getOrNull()
     }
 }

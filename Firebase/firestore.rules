@@ -1,6 +1,6 @@
 rules_version = '2';
 // CNSNN security rules for the free Spark plan: no Cloud Functions, so every
-// official value (daily time, points, leaderboard totals) is recomputed or
+// official value (daily time, score, leaderboard totals) is recomputed or
 // cross-checked here from server timestamps and documents the client cannot rewrite.
 service cloud.firestore {
  match /databases/{database}/documents {
@@ -61,14 +61,18 @@ service cloud.firestore {
    let w = dayDate(day).dayOfWeek();
    return w <= 2 ? 50 : (w <= 5 ? 100 : 150);
   }
-  function atLeastZero(n) { return n > 0 ? n : 0; }
   function larger(a, b) { return a > b ? a : b; }
   function smaller(a, b) { return a < b ? a : b; }
-  // Same formula as Core/GameRules.swift Scoring.points.
-  function dailyPoints(day, timeMs, usedHint, correct) {
-   let raw = dailyBase(day) + atLeastZero(50 - math.floor(timeMs / 1000));
-   return !correct ? 0 : (usedHint ? math.floor(raw / 2) : raw);
+  // The Mot du jour is ranked on time: same rules as Core/GameRules.swift DailyScore. The hint costs
+  // a minute, and a day lost or not played counts 10 minutes (a found word never counts more).
+  function dailyScore(timeMs, usedHint, correct) {
+   return correct ? smaller(timeMs + (usedHint ? 60000 : 0), 600000) : 600000;
   }
+  // Single-field sort keys, so the rankings need no composite index: the day (days since 1970) then
+  // the score, lost days last; the month (year * 12 + month - 1) then the time saved this month.
+  function dayIndex(day) { return int(dayDate(day).toMillis() / 86400000); }
+  function dailyRank(day, score, correct) { return dayIndex(day) * 1000000 + (correct ? score : 999999); }
+  function monthIndex(day) { let p = day.split('-'); return int(p[0]) * 12 + int(p[1]) - 1; }
 
   // ---- Profiles
   match /users/{uid} {
@@ -93,7 +97,7 @@ service cloud.firestore {
     && acceptsRules(request.resource.data);
    allow delete: if owner(uid);
 
-   // Synced practice progress (Classic points, history, local stats): owner only, not official.
+   // Synced practice progress (Classic history, local stats, mode records): owner only, not official.
    match /private/{docId} {
     allow read, delete: if owner(uid);
     allow create, update: if owner(uid) && docId == 'progress'
@@ -253,13 +257,13 @@ service cloud.firestore {
    allow delete: if (owner(resource.data.userId) && leaving()) || admin();
   }
   function createsResult(id, r, s) {
-   return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','wrongAnswers','timeMs','points','startedAt','finishedAt'])
+   return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','wrongAnswers','timeMs','scoreMs','rank','startedAt','finishedAt'])
     && r.userId == request.auth.uid && id == request.auth.uid + '_' + r.day
     && s.userId == r.userId && s.day == r.day && s.cardId == r.cardId && ('finishedAt' in s)
     && r.startedAt == s.startedAt && r.finishedAt == s.finishedAt
     && r.correct == s.correct && r.usedHint == s.hintUsed && r.wrongAnswers == s.wrongAnswers
     && r.timeMs == s.finishedAt.toMillis() - s.startedAt.toMillis()
-    && r.points == dailyPoints(r.day, r.timeMs, r.usedHint, r.correct)
+    && r.scoreMs == dailyScore(r.timeMs, r.usedHint, r.correct) && r.rank == dailyRank(r.day, r.scoreMs, r.correct)
     && r.username == get(at('users/' + request.auth.uid)).data.username
     // Must be tallied in the same batch, so totals and results never diverge.
     && getAfter(at('leaderboard/' + request.auth.uid)).data.lastResult == r.day;
@@ -268,7 +272,7 @@ service cloud.firestore {
   // ---- Leaderboard totals: they can only move by exactly one new result.
   match /leaderboard/{uid} {
    allow read: if signedIn();
-   allow create: if owner(uid) && tallies(uid, {'points':0,'played':0,'wins':0,'streak':0,'bestStreak':0,'bestTimeMs':null,'lastWinDay':''}, request.resource.data);
+   allow create: if owner(uid) && tallies(uid, {'played':0,'wins':0,'streak':0,'bestStreak':0,'bestTimeMs':null,'lastWinDay':'','month':0,'monthSaved':0,'monthPlayed':0}, request.resource.data);
    allow update: if owner(uid) && (
      tallies(uid, resource.data, request.resource.data)
      || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','updatedAt'])
@@ -285,14 +289,25 @@ service cloud.firestore {
    let r = getAfter(path).data;
    let laterWin = r.correct && day > old.lastWinDay;
    let streak = laterWin ? (isPreviousDay(old.lastWinDay, day) ? old.streak + 1 : 1) : (!r.correct && day > old.lastWinDay ? 0 : old.streak);
-   return n.keys().hasOnly(['uid','username','points','played','wins','streak','bestStreak','bestTimeMs','lastWinDay','lastResult','updatedAt'])
+   return n.keys().hasOnly(['uid','username','played','wins','streak','bestStreak','bestTimeMs','lastWinDay','lastResult','updatedAt','month','monthSaved','monthPlayed','monthRank'])
     && validDayKey(day) && !exists(path) && existsAfter(path)
     && n.uid == uid && n.username == r.username && n.updatedAt == request.time
-    && n.points == old.points + r.points && n.played == old.played + 1
+    && n.played == old.played + 1
     && n.wins == old.wins + (r.correct ? 1 : 0)
     && n.streak == streak && n.bestStreak == larger(old.bestStreak, streak)
     && n.bestTimeMs == (r.correct ? (old.bestTimeMs == null ? r.timeMs : smaller(old.bestTimeMs, r.timeMs)) : old.bestTimeMs)
-    && n.lastWinDay == (laterWin ? day : old.lastWinDay);
+    && n.lastWinDay == (laterWin ? day : old.lastWinDay)
+    && tallyMonth(old, n, monthIndex(day), 600000 - r.scoreMs);
+  }
+  // This month's total: the time saved against 10 minutes a day. A new month starts from zero; a late
+  // result from an earlier month (finished after midnight) leaves the month as it was.
+  function tallyMonth(old, n, month, saved) {
+   let oldMonth = 'month' in old ? old.month : 0;
+   let same = month == oldMonth;
+   return month < oldMonth
+    ? n.month == oldMonth && n.monthSaved == old.monthSaved && n.monthPlayed == old.monthPlayed && n.monthRank == old.monthRank
+    : n.month == month && n.monthSaved == (same ? old.monthSaved : 0) + saved && n.monthPlayed == (same ? old.monthPlayed : 0) + 1
+      && n.monthRank == month * 100000000 + n.monthSaved;
   }
   function validDayKeyOr(day) { return validDayKey(day) ? day : 'invalid'; }
 

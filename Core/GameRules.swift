@@ -1,11 +1,51 @@
 import Foundation
 
-public enum Scoring {
-    public static func points(difficulty: Difficulty, timeMs: Int, usedHint: Bool, correct: Bool) -> Int {
-        guard correct else { return 0 }
-        let bonus = max(0, 50 - max(0, timeMs) / 1000)
-        return (difficulty.basePoints + bonus) / (usedHint ? 2 : 1)
+/// The Mot du jour is scored on time only, the lower the better: the hint adds one minute, and a lost
+/// (or unplayed) day counts ten minutes, the most a day can cost. Same arithmetic as firestore.rules.
+public enum DailyScore {
+    public static let hintPenaltyMs = 60_000
+    public static let missedMs = 600_000
+    /// Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts.
+    static let epochOffset = 19_723
+
+    public static func scoreMs(timeMs: Int, usedHint: Bool, correct: Bool) -> Int {
+        correct ? min(timeMs + (usedHint ? hintPenaltyMs : 0), missedMs) : missedMs
     }
+    /// Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`.
+    public static func dayIndex(_ day: String) -> Int? { DailySchedule.dayNumber(forKey: day).map { $0 + epochOffset } }
+    /// One number per result that sorts the day's results: the day first, then the score (lost last).
+    public static func rank(day: String, scoreMs: Int, correct: Bool) -> Int? {
+        dayIndex(day).map { $0 * 1_000_000 + (correct ? scoreMs : 999_999) }
+    }
+    public static func dayBase(_ day: String) -> Int? { dayIndex(day).map { $0 * 1_000_000 } }
+    public static func monthIndex(_ day: String) -> Int? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        return parts.count == 3 ? parts[0] * 12 + parts[1] - 1 : nil
+    }
+    public static func monthRank(month: Int, saved: Int) -> Int { month * 100_000_000 + saved }
+    /// The month's total time after `days` days: every day costs ten minutes minus what was saved.
+    public static func monthTotal(saved: Int, days: Int) -> Int { max(0, missedMs * days - saved) }
+    public static func dayOfMonth(_ day: String) -> Int { day.split(separator: "-").compactMap { Int($0) }.last ?? 1 }
+
+    public struct Month: Equatable, Sendable {
+        public var month: Int, saved: Int, played: Int
+        public init(month: Int, saved: Int, played: Int) { self.month = month; self.saved = saved; self.played = played }
+        public var rank: Int { DailyScore.monthRank(month: month, saved: saved) }
+    }
+    /// The month tally after one more result: a new month starts from zero, and a late result from an
+    /// older month leaves the current one alone (same as the rules' `tallyMonth`).
+    public static func tally(old: Month, day: String, scoreMs: Int) -> Month {
+        guard let month = monthIndex(day), month >= old.month else { return old }
+        let same = month == old.month
+        return Month(month: month, saved: (same ? old.saved : 0) + missedMs - scoreMs, played: (same ? old.played : 0) + 1)
+    }
+}
+
+/// Classique has no points: the level grows with the words found.
+public enum ClassicLevel {
+    public static let wordsPerLevel = 20
+    public static func level(words: Int) -> Int { words / wordsPerLevel + 1 }
+    public static func into(words: Int) -> Int { words % wordsPerLevel }
 }
 /// The Mot du jour calendar, keyed yyyy-MM-dd on the phone's own time zone: the word changes at the
 /// player's local midnight (firestore.rules accepts a day while it is that day somewhere on Earth).

@@ -18,6 +18,7 @@ import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.Challenge
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.DailySchedule
@@ -30,7 +31,6 @@ import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
-import com.poupoutch.cnsnn.core.Scoring
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.Submission
 import com.poupoutch.cnsnn.core.WordEngine
@@ -46,8 +46,8 @@ data class CardReport(val id: String, val cardId: String, val reason: String, va
 data class PlayerReport(val id: String, val playerId: String, val username: String, val reason: String)
 /** A player a moderator suspended. */
 data class SuspendedPlayer(val id: String, val username: String, val reason: String)
-/** One line of the day's ranking. */
-data class DailyRank(val uid: String, val username: String, val timeMs: Int, val points: Int, val usedHint: Boolean, val wrongAnswers: Int)
+/** One line of the day's ranking. `scoreMs` is the official time: the hint minute included, 10 min for a lost day. */
+data class DailyRank(val uid: String, val username: String, val timeMs: Int, val scoreMs: Int, val usedHint: Boolean, val wrongAnswers: Int, val correct: Boolean = true)
 /** Server state of today's Mot du jour for the signed-in player. */
 data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean,
                         /** Guesses the server has counted, and the last one (normalized). */
@@ -320,53 +320,73 @@ class CloudRepository(
         val usedHint = s.getBoolean("hintUsed") ?: false
         val wrong = (s.getLong("wrongAnswers") ?: 0).toInt()
         val timeMs = (millis(finished) - millis(started)).toInt()
-        val difficulty = DailySchedule.difficulty(day) ?: return null
-        val points = Scoring.points(difficulty, timeMs, usedHint, correct)
+        val scoreMs = DailyScore.scoreMs(timeMs, usedHint, correct)
+        val rank = DailyScore.rank(day, scoreMs, correct) ?: return null
         val username = db.collection("users").document(uid).get(Source.SERVER).await().getString("username") ?: "Joueur"
         val old = leaderboardEntry(uid, Source.SERVER)
-        val tally = LeaderboardEntry.tally(old, uid, username, day, correct, timeMs, points) + ("updatedAt" to FieldValue.serverTimestamp())
+        // The whole line is replaced: an old `points` field goes, as the rules require.
+        val tally = LeaderboardEntry.tally(old, uid, username, day, correct, timeMs, scoreMs) + ("updatedAt" to FieldValue.serverTimestamp())
         val result = mapOf("userId" to uid, "username" to username, "day" to day, "cardId" to cardId, "correct" to correct, "usedHint" to usedHint,
-            "wrongAnswers" to wrong, "timeMs" to timeMs, "points" to points, "startedAt" to started, "finishedAt" to finished)
+            "wrongAnswers" to wrong, "timeMs" to timeMs, "scoreMs" to scoreMs, "rank" to rank, "startedAt" to started, "finishedAt" to finished)
         val batch = db.batch()
         batch.set(resultRef(uid, day), result)
         batch.set(db.collection("leaderboard").document(uid), tally)
         awaitWrite(batch.commit())
-        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = correct, timeMs = timeMs, points = points, date = finished.toInstant(), dailyKey = day)
+        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = correct, timeMs = timeMs, date = finished.toInstant(), dailyKey = day)
     }
 
     // ---- Leaderboard
 
     suspend fun leaderboardEntry(uid: String, source: Source = Source.DEFAULT): LeaderboardEntry? =
         db.collection("leaderboard").document(uid).get(source).await().data?.let { entry(uid, it) }
-    suspend fun topPlayers(limit: Int = 25): List<LeaderboardEntry> =
-        visible(db.collection("leaderboard").orderBy("points", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    /** This month's ranking: the most time saved first, so the lowest month total (single-field `monthRank`). */
+    suspend fun monthlyPlayers(today: String = DailySchedule.key(), limit: Int = 25): List<LeaderboardEntry> {
+        val month = DailyScore.monthIndex(today) ?: return emptyList()
+        return visible(monthRange(month).orderBy("monthRank", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    }
     suspend fun fastestPlayers(limit: Int = 25): List<LeaderboardEntry> =
         visible(db.collection("leaderboard").whereGreaterThan("bestTimeMs", 0).orderBy("bestTimeMs"), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
     /** A few more than needed, so the list stays full once suspended players are left out. */
     private suspend fun visible(query: Query, limit: Int): List<DocumentSnapshot> =
         query.limit(limit + 10L).get().await().documents.filter { it.getBoolean("suspended") != true }.take(limit)
-    /** Rank by official points among every player. */
-    suspend fun rank(points: Int): Pair<Int, Int> {
-        val board = db.collection("leaderboard")
-        return (count(board.whereGreaterThan("points", points)) + 1) to count(board)
+    private fun monthRange(month: Int): Query = db.collection("leaderboard")
+        .whereGreaterThanOrEqualTo("monthRank", DailyScore.monthRank(month, 0))
+        .whereLessThan("monthRank", DailyScore.monthRank(month + 1, 0))
+    /** My place in this month's ranking and the players this month; null without a result this month. */
+    suspend fun monthlyRank(entry: LeaderboardEntry, today: String = DailySchedule.key()): Pair<Int, Int>? {
+        val month = DailyScore.monthIndex(today) ?: return null
+        if (!entry.playedMonth(today)) return null
+        val mine = DailyScore.monthRank(month, entry.monthSaved)
+        val range = monthRange(month)
+        return (count(range.whereGreaterThan("monthRank", mine)) + 1) to count(range)
     }
-    suspend fun dailyRanking(day: String, limit: Int = 25): List<DailyRank> =
-        visible(db.collection("dailyResults").whereEqualTo("day", day).whereEqualTo("correct", true).orderBy("timeMs"), limit).mapNotNull { dailyRank(it) }
+    /** Today's found words, fastest first (the hint minute included): one range on the single-field `rank`. */
+    suspend fun dailyRanking(day: String, limit: Int = 25): List<DailyRank> {
+        val base = DailyScore.dayBase(day) ?: return emptyList()
+        return visible(db.collection("dailyResults").whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.MISSED_MS)
+            .orderBy("rank"), limit).mapNotNull { dailyRank(it) }
+    }
     private fun dailyRank(d: DocumentSnapshot): DailyRank? {
         val uid = d.getString("userId") ?: return null
         val timeMs = d.getLong("timeMs")?.toInt() ?: return null
-        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, (d.getLong("points") ?: 0).toInt(), d.getBoolean("usedHint") ?: false, (d.getLong("wrongAnswers") ?: 0).toInt())
+        val usedHint = d.getBoolean("usedHint") ?: false
+        val correct = d.getBoolean("correct") ?: false
+        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct)
+        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct)
     }
-    /** Players who were slower or did not find the word, among everyone else who played today. */
-    suspend fun standing(day: String, timeMs: Int, correct: Boolean): DailyStanding {
-        val today = db.collection("dailyResults").whereEqualTo("day", day)
-        val players = count(today)
+    /**
+     * Where my result stands among everyone who played today (`rank` from DailyScore.rank): faster
+     * players, then slower or lost ones, counted on the single-field `rank`.
+     */
+    suspend fun standing(day: String, rank: Long, correct: Boolean): DailyStanding {
+        val base = DailyScore.dayBase(day) ?: return DailyStanding(null, 0, null)
+        val results = db.collection("dailyResults")
+        val players = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK))
         if (!correct) return DailyStanding(null, players, null)
-        val missed = count(today.whereEqualTo("correct", false))
-        val slower = count(today.whereEqualTo("correct", true).whereGreaterThan("timeMs", timeMs))
-        val faster = count(today.whereEqualTo("correct", true).whereLessThan("timeMs", timeMs))
+        val faster = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThan("rank", rank))
+        val slower = count(results.whereGreaterThan("rank", rank).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK))
         val others = players - 1
-        return DailyStanding(faster + 1, players, if (others > 0) minOf(100, (slower + missed) * 100 / others) else null)
+        return DailyStanding(faster + 1, players, if (others > 0) minOf(100, slower * 100 / others) else null)
     }
     private suspend fun count(query: Query): Int = query.count().get(AggregateSource.SERVER).await().count.toInt()
 
@@ -433,7 +453,10 @@ class CloudRepository(
             }
             val result = resultRef(player, day).get(Source.SERVER).await()
             val today = result.data?.let { attempt(day, it) }
-            rows += FriendStanding(player, entry?.username ?: name, entry?.points ?: 0, entry?.currentStreak() ?: 0, today, result.getLong("wrongAnswers")?.toInt())
+            val hint = result.getBoolean("usedHint") ?: false
+            val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, hint, it.correct) }
+            rows += FriendStanding(player, entry?.username ?: name, entry?.monthTotalMs(day), entry?.currentStreak() ?: 0, today,
+                result.getLong("wrongAnswers")?.toInt(), score, hint)
         }
         return FriendStanding.ordered(rows)
     }
@@ -652,9 +675,12 @@ class CloudRepository(
         return refs.map { ref -> updating(ref, value) }
     }
     /** Today's wins under 5 seconds, fastest first, for a moderator to check. Suspended players are left out. */
-    suspend fun suspiciousTimes(day: String): List<DailyRank> =
-        db.collection("dailyResults").whereEqualTo("day", day).whereEqualTo("correct", true).whereLessThan("timeMs", 5000).orderBy("timeMs").limit(20)
+    /** Words found today in under 5 seconds (a hint adds a minute, so these never used one). */
+    suspend fun suspiciousTimes(day: String): List<DailyRank> {
+        val base = DailyScore.dayBase(day) ?: return emptyList()
+        return db.collection("dailyResults").whereGreaterThanOrEqualTo("rank", base).whereLessThan("rank", base + 5000).orderBy("rank").limit(20)
             .get(Source.SERVER).await().documents.filter { it.getBoolean("suspended") != true }.mapNotNull { dailyRank(it) }
+    }
     suspend fun suspendedPlayers(): List<SuspendedPlayer> =
         db.collection("banned").limit(100).get(Source.SERVER).await().documents.map { SuspendedPlayer(it.id, it.getString("username") ?: "Joueur", it.getString("reason") ?: "") }
     suspend fun pendingCards(): List<Card> {
@@ -725,15 +751,15 @@ class CloudRepository(
     private fun attempt(day: String, d: Map<String, Any>): Attempt? {
         val cardId = d["cardId"] as? String ?: return null
         val timeMs = (d["timeMs"] as? Number)?.toInt() ?: return null
-        val points = (d["points"] as? Number)?.toInt() ?: return null
         val date = (d["finishedAt"] as? Timestamp)?.toInstant() ?: Instant.now()
-        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = d["correct"] as? Boolean ?: false, timeMs = timeMs, points = points, date = date, dailyKey = day)
+        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = d["correct"] as? Boolean ?: false, timeMs = timeMs, date = date, dailyKey = day)
     }
+    /** A leaderboard line; an old one may still carry `points` (ignored) or lack the month fields (zeros). */
     private fun entry(uid: String, d: Map<String, Any>): LeaderboardEntry? {
-        val points = (d["points"] as? Number)?.toInt() ?: return null
+        if (d["played"] !is Number) return null
         fun int(key: String) = (d[key] as? Number)?.toInt() ?: 0
-        return LeaderboardEntry(uid, d["username"] as? String ?: "Joueur", points, int("played"), int("wins"), int("streak"), int("bestStreak"),
-            (d["bestTimeMs"] as? Number)?.toInt(), d["lastWinDay"] as? String ?: "")
+        return LeaderboardEntry(uid, d["username"] as? String ?: "Joueur", int("played"), int("wins"), int("streak"), int("bestStreak"),
+            (d["bestTimeMs"] as? Number)?.toInt(), d["lastWinDay"] as? String ?: "", int("month"), int("monthSaved"), int("monthPlayed"))
     }
 
     companion object {

@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 
 class WordEngineTest {
     @Test fun consonants() {
@@ -36,11 +37,52 @@ class NameFilterTest {
 }
 
 class GameRulesTest {
-    @Test fun scoring() {
-        assertEquals(150, Scoring.points(Difficulty.MEDIUM, 0, false, true))
-        assertEquals(75, Scoring.points(Difficulty.MEDIUM, 0, true, true))
-        assertEquals(50, Scoring.points(Difficulty.EASY, 90_000, false, true))
-        assertEquals(0, Scoring.points(Difficulty.HARD, 1000, false, false))
+    @Test fun dailyScoreIsTimeWithAMinuteForTheHint() {
+        assertEquals(12_345, DailyScore.scoreMs(12_345, usedHint = false, correct = true))
+        assertEquals(72_345, DailyScore.scoreMs(12_345, usedHint = true, correct = true))
+        // Ten minutes at most, and a lost day counts ten minutes.
+        assertEquals(600_000, DailyScore.scoreMs(580_000, usedHint = true, correct = true))
+        assertEquals(600_000, DailyScore.scoreMs(9_000_000, usedHint = false, correct = true))
+        assertEquals(600_000, DailyScore.scoreMs(3_000, usedHint = false, correct = false))
+    }
+    @Test fun dailyRankSortsTheDayThenTheTime() {
+        // Days since 1970, the rules' dayIndex: 2024-01-01 is day 19 723 and DailySchedule's day 0.
+        assertEquals(19_723L, DailyScore.dayIndex("2024-01-01"))
+        assertEquals(LocalDate.parse("2026-10-16").toEpochDay(), DailyScore.dayIndex("2026-10-16"))
+        assertEquals(DailySchedule.dayNumber("2026-10-16")!! + 19_723L, DailyScore.dayIndex("2026-10-16"))
+        val base = DailyScore.dayBase("2026-10-16")!!
+        assertEquals(20_742L * 1_000_000, base)
+        assertEquals(base + 72_345, DailyScore.rank("2026-10-16", 72_345, true))
+        assertEquals(base + 999_999, DailyScore.rank("2026-10-16", 600_000, false))
+        // A found word in ten minutes still sorts before a lost day, and every day before the next.
+        assertTrue(DailyScore.rank("2026-10-16", 600_000, true)!! < DailyScore.rank("2026-10-16", 600_000, false)!!)
+        assertTrue(DailyScore.rank("2026-10-16", 600_000, false)!! < DailyScore.dayBase("2026-10-17")!!)
+        assertNull(DailyScore.dayIndex("pas un jour"))
+    }
+    @Test fun monthIndexAndTotal() {
+        assertEquals(2026 * 12 + 9, DailyScore.monthIndex("2026-10-16"))
+        assertEquals(2027 * 12, DailyScore.monthIndex("2027-01-01"))
+        assertEquals(DailyScore.monthIndex("2026-10-31")!! + 1, DailyScore.monthIndex("2026-11-01"))
+        assertEquals(24_321L * 100_000_000 + 540_000, DailyScore.monthRank(24_321, 540_000))
+        // Three days in: one word in 1 min (saved 9 min), the other days count 10 min each.
+        assertEquals(21 * 60_000, DailyScore.monthTotal(540_000, 3))
+        assertEquals(16, DailyScore.dayOfMonth("2026-10-16"))
+    }
+    @Test fun monthTallyFollowsTheRules() {
+        val first = DailyScore.tally(DailyScore.Month(), "2026-10-14", 60_000)
+        assertEquals(DailyScore.Month(DailyScore.monthIndex("2026-10-14")!!, 540_000, 1), first)
+        val second = DailyScore.tally(first, "2026-10-15", 600_000)
+        assertEquals(DailyScore.Month(first.month, 540_000, 2), second)
+        // A new month starts from zero.
+        val november = DailyScore.tally(second, "2026-11-01", 30_000)
+        assertEquals(DailyScore.Month(first.month + 1, 570_000, 1), november)
+        assertEquals((first.month + 1) * 100_000_000L + 570_000, november.rank)
+        // A late result from the month before leaves the current month alone.
+        assertEquals(november, DailyScore.tally(november, "2026-10-31", 10_000))
+    }
+    @Test fun classicLevelGrowsEveryTwentyWords() {
+        assertEquals(1, ClassicLevel.level(0)); assertEquals(1, ClassicLevel.level(19)); assertEquals(2, ClassicLevel.level(20))
+        assertEquals(5, ClassicLevel.into(45)); assertEquals(3, ClassicLevel.level(45))
     }
     @Test fun dailyCalendar() {
         assertEquals(Difficulty.EASY, DailySchedule.difficulty("2024-01-01"))   // Monday
@@ -85,19 +127,47 @@ class GameRulesTest {
         assertNull(DailyStanding(1, 200, null).topPercent)
         assertEquals(1, DailyStanding(2, 200, null).topPercent)
         assertNull(DailyStanding(150, 200, null).topPercent)
-        fun row(uid: String, points: Int, today: Pair<Boolean, Int>?) = FriendStanding(uid, uid, points, 0,
-            today?.let { Attempt(cardID = "x", mode = GameMode.DAILY, correct = it.first, timeMs = it.second, points = 0, date = Instant.now(), dailyKey = "d") })
-        val ordered = FriendStanding.ordered(listOf(row("slow", 900, true to 9000), row("idle", 5000, null), row("fast", 10, true to 3000), row("miss", 100, false to 2000)))
-        assertEquals(listOf("fast", "slow", "idle", "miss"), ordered.map { it.uid })
+        fun row(uid: String, month: Int?, today: Pair<Boolean, Int>?, hint: Boolean = false) = FriendStanding(uid, uid, month, 0,
+            today?.let { Attempt(cardID = "x", mode = GameMode.DAILY, correct = it.first, timeMs = it.second, date = Instant.now(), dailyKey = "d") },
+            todayScoreMs = today?.let { DailyScore.scoreMs(it.second, hint, it.first) }, todayHint = hint)
+        // Found today first by today's time (the hint minute included), then the month total, lower first, none last.
+        val ordered = FriendStanding.ordered(listOf(row("slow", 900_000, true to 9000), row("idle", null, null), row("fast", 5_000_000, true to 3000),
+            row("hinted", 10, true to 2000, hint = true), row("miss", 1_200_000, false to 2000), row("steady", 800_000, null)))
+        assertEquals(listOf("fast", "slow", "hinted", "steady", "miss", "idle"), ordered.map { it.uid })
     }
     @Test fun tallyFollowsTheRules() {
-        val first = LeaderboardEntry.tally(null, "a", "A", "2026-10-14", true, 4000, 146)
-        assertEquals(1, first["streak"]); assertEquals(146, first["points"]); assertEquals(4000, first["bestTimeMs"])
-        val old = LeaderboardEntry("a", "A", 146, 1, 1, 1, 1, 4000, "2026-10-14")
-        val next = LeaderboardEntry.tally(old, "a", "A", "2026-10-15", true, 9000, 100)
+        val october = DailyScore.monthIndex("2026-10-14")!!
+        val first = LeaderboardEntry.tally(null, "a", "A", "2026-10-14", true, 4000, 4000)
+        assertEquals(1, first["streak"]); assertEquals(4000, first["bestTimeMs"]); assertFalse("points" in first)
+        assertEquals(october, first["month"]); assertEquals(596_000, first["monthSaved"]); assertEquals(1, first["monthPlayed"])
+        assertEquals(october * 100_000_000L + 596_000, first["monthRank"])
+        // The keys the rules accept (updatedAt is added with the server time).
+        assertEquals(setOf("uid", "username", "played", "wins", "streak", "bestStreak", "bestTimeMs", "lastWinDay", "lastResult", "month", "monthSaved", "monthPlayed", "monthRank"), first.keys)
+        val old = LeaderboardEntry("a", "A", 1, 1, 1, 1, 4000, "2026-10-14", october, 596_000, 1)
+        val next = LeaderboardEntry.tally(old, "a", "A", "2026-10-15", true, 9000, 69_000)
         assertEquals(2, next["streak"]); assertEquals(4000, next["bestTimeMs"])
-        val lost = LeaderboardEntry.tally(old, "a", "A", "2026-10-15", false, 9000, 0)
+        assertEquals(596_000 + 531_000, next["monthSaved"]); assertEquals(2, next["monthPlayed"])
+        val lost = LeaderboardEntry.tally(old, "a", "A", "2026-10-15", false, 9000, 600_000)
         assertEquals(0, lost["streak"]); assertEquals("2026-10-14", lost["lastWinDay"])
+        assertEquals(596_000, lost["monthSaved"]); assertEquals(2, lost["monthPlayed"])
+        // A line from before monthly totals (month 0) starts this month from zero.
+        val legacy = LeaderboardEntry("a", "A", 5, 4, 2, 3, 3000, "2026-09-30")
+        val fresh = LeaderboardEntry.tally(legacy, "a", "A", "2026-10-01", true, 10_000, 10_000)
+        assertEquals(october, fresh["month"]); assertEquals(590_000, fresh["monthSaved"]); assertEquals(1, fresh["monthPlayed"])
+        // New month: reset. Late result from the month before: the month stays as it was.
+        val november = LeaderboardEntry.tally(old, "a", "A", "2026-11-01", true, 1000, 1000)
+        assertEquals(october + 1, november["month"]); assertEquals(599_000, november["monthSaved"]); assertEquals(1, november["monthPlayed"])
+        val ahead = old.copy(month = october + 1, monthSaved = 599_000, monthPlayed = 1, lastWinDay = "2026-11-01")
+        val late = LeaderboardEntry.tally(ahead, "a", "A", "2026-10-31", true, 1000, 1000)
+        assertEquals(october + 1, late["month"]); assertEquals(599_000, late["monthSaved"]); assertEquals(1, late["monthPlayed"])
+        assertEquals((october + 1) * 100_000_000L + 599_000, late["monthRank"])
+    }
+    @Test fun monthTotalOnlyForThisMonth() {
+        val october = DailyScore.monthIndex("2026-10-14")!!
+        val entry = LeaderboardEntry("a", "A", 2, 2, 2, 2, 4000, "2026-10-14", october, 1_000_000, 2)
+        assertEquals(16 * 600_000 - 1_000_000, entry.monthTotalMs("2026-10-16"))
+        assertNull(entry.monthTotalMs("2026-11-02"))
+        assertNull(entry.copy(month = 0, monthSaved = 0, monthPlayed = 0).monthTotalMs("2026-10-16"))
     }
 }
 
@@ -108,7 +178,9 @@ class ProgressJsonTest {
     @Test fun readsTheIphoneProgress() {
         val progress = Progress.fromJson(swiftJson)
         assertEquals("Yasin", progress.username)
-        assertEquals(232, progress.score)
+        assertEquals(2, progress.correctAnswers); assertEquals(1, progress.level); assertEquals(2, progress.levelInto)
+        // Old points are still read (for the iPhone's copy), never added up.
+        assertEquals(97, progress.attempts[0].points)
         assertEquals(Instant.parse("2025-10-12T22:13:20.500Z"), progress.attempts[0].date)
         assertEquals("Les Aristochats", progress.dailyWords!!["2026-10-14"]!!.wordFull)
         assertEquals(Category.CINEMA, progress.dailyWords!!["2026-10-14"]!!.category)

@@ -74,6 +74,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.DuoGame
+import com.poupoutch.cnsnn.core.DuoRecord
 import com.poupoutch.cnsnn.core.DuoWord
 import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.ModeStat
@@ -129,7 +130,7 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
     if (confirmQuit) AlertDialog({ confirmQuit = false },
         title = { Text(if (mode == PlayMode.SPRINT) "Arrêter le sprint ?" else "Quitter la partie ?") },
         text = { Text(when (mode) {
-            PlayMode.SPRINT -> "La partie est comptée avec votre score actuel."
+            PlayMode.SPRINT -> "La partie est comptée avec les mots déjà trouvés."
             PlayMode.SURVIVAL -> "Vous pouvez la reprendre plus tard depuis l’accueil, ou l’abandonner : elle sera comptée telle quelle."
             PlayMode.DUO -> "Vous pouvez la reprendre plus tard (le chrono continue), ou l’abandonner : les manches restantes compteront comme perdues."
         }) },
@@ -160,7 +161,7 @@ private fun TopBar(game: ModeViewModel, mode: PlayMode, leave: () -> Unit) {
         }
         Box(Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
             when (mode) {
-                PlayMode.SPRINT -> Pill(Format.number(game.sprint?.score ?: 0), "Score")
+                PlayMode.SPRINT -> Pill(Format.number(game.sprint?.found ?: 0), "Mots")
                 PlayMode.SURVIVAL -> Hearts(game.survival?.lives ?: SurvivalGame.MAX_LIVES, game.lifeLostTick, game.lifeGainedTick)
                 PlayMode.DUO -> {
                     var tick by remember { mutableIntStateOf(0) }
@@ -205,24 +206,25 @@ private fun Hearts(lives: Int, lost: Int, gained: Int) {
 @Composable
 private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sprint: SprintGame) {
     game.version // The core games are plain objects: each part re-reads them after every move.
-    var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { while (true) { delay(200); tick++ } }
-    tick
-    SprintClock(sprint.remainingMs(game.elapsedMs))
+    SprintClock { sprint.remainingMs(game.elapsedMs) }
     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Stat("${sprint.found}", if (sprint.found > 1) "mots" else "mot", Modifier.weight(1f))
-        Stat("×${sprint.multiplier}", "combo", Modifier.weight(1f), highlight = sprint.multiplier > 1)
+        Stat("×${maxOf(1, sprint.streak)}", "combo", Modifier.weight(1f), highlight = sprint.streak > 1)
         var showGain by remember { mutableStateOf(false) }
         LaunchedEffect(game.successTick) { if (game.successTick > 0) { showGain = true; delay(900); showGain = false } }
-        val stake = SprintGame.basePoints(sprint.card?.difficulty ?: com.poupoutch.cnsnn.core.Difficulty.EASY) * sprint.multiplier
-        Stat(if (showGain) game.gain ?: "" else "+$stake", if (showGain) "gagnés" else "en jeu", Modifier.weight(1f), highlight = showGain)
+        Stat(if (showGain) game.gain ?: "" else "${sprint.accuracy} %", if (showGain) "trouvé" else "précision", Modifier.weight(1f), highlight = showGain)
     }
     sprint.card?.let { Clue(it) }
     Controls(state, game, "Passer · −5 s", "Passer ce mot, 5 secondes de pénalité")
 }
 
 @Composable
-private fun SprintClock(remainingMs: Int) {
+private fun SprintClock(remaining: () -> Int) {
+    // Only the clock re-reads the time five times a second, not the whole board and keyboard.
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(200); tick++ } }
+    tick
+    val remainingMs = remaining()
     val seconds = (remainingMs + 999) / 1000
     val low = remainingMs <= 10_000
     val haptics = rememberHaptics()
@@ -351,7 +353,7 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
     val mode = game.mode
     val haptics = rememberHaptics()
     val reduce = rememberReduceMotion()
-    val mainKey = if (mode == PlayMode.SURVIVAL) ModeStat.WORDS else ModeStat.SCORE
+    val mainKey = mode.mainRecord
     val records = state.progress.records(mode)
     val celebrate = remember { Animatable(if (reduce) 1f else 0.85f) }
     LaunchedEffect(Unit) {
@@ -359,14 +361,14 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
     }
     val now = game.elapsedMs
     val (kicker, value, unit) = when (mode) {
-        PlayMode.SPRINT -> Triple(if ((game.sprint?.remainingMs(now) ?: 0) == 0) "Temps écoulé !" else "Sprint arrêté", game.sprint?.score ?: 0, "points")
-        PlayMode.SURVIVAL -> { val found = game.survival?.found ?: 0; Triple(if ((game.survival?.lives ?: 0) == 0) "Plus de vies…" else "Partie terminée", found, if (found > 1) "mots trouvés" else "mot trouvé") }
-        PlayMode.DUO -> Triple(if (game.duo?.perfect == true) "Parfait, 10 sur 10 !" else "Partie terminée", game.duo?.score(now) ?: 0, "points")
+        PlayMode.SPRINT -> { val found = game.sprint?.found ?: 0; Triple(if ((game.sprint?.remainingMs(now) ?: 0) == 0) "Temps écoulé !" else "Sprint arrêté", found, if (found > 1) "mots trouvés en 90 s" else "mot trouvé en 90 s") }
+        PlayMode.SURVIVAL -> Triple(if ((game.survival?.lives ?: 0) == 0) "Plus de vies…" else "Partie terminée", game.survival?.level ?: 1, "niveau atteint")
+        PlayMode.DUO -> { val solved = game.duo?.solved ?: 0; Triple(if (game.duo?.perfect == true) "Parfait, 10 sur 10 !" else "Partie terminée", solved, if (solved > 1) "paires trouvées" else "paire trouvée") }
     }
     val tiles: List<Pair<String, String>> = when (mode) {
-        PlayMode.SPRINT -> game.sprint?.let { listOf("${it.found}" to (if (it.found > 1) "mots" else "mot"), "${it.bestCombo}" to "meilleur combo", "${it.accuracy} %" to "précision") }
-        PlayMode.SURVIVAL -> game.survival?.let { listOf("${it.level}" to "niveau atteint", "${it.mistakes}" to (if (it.mistakes > 1) "erreurs" else "erreur"), Format.number(records.best(ModeStat.WORDS)) to "meilleur parcours") }
-        PlayMode.DUO -> game.duo?.let { listOf("${it.solved}/${it.duos.size}" to "duos résolus", "${it.wordsFound}/${it.duos.size * 2}" to "réponses", Format.clock(it.playMs(now)) to "temps") }
+        PlayMode.SPRINT -> game.sprint?.let { listOf("${it.bestCombo}" to "meilleur combo", "${it.accuracy} %" to "précision", "${it.skips}" to (if (it.skips > 1) "passés" else "passé")) }
+        PlayMode.SURVIVAL -> game.survival?.let { listOf("${it.found}" to (if (it.found > 1) "mots trouvés" else "mot trouvé"), "${it.mistakes}" to (if (it.mistakes > 1) "erreurs" else "erreur"), Format.number(records.best(ModeStat.WORDS)) to "meilleur parcours") }
+        PlayMode.DUO -> game.duo?.let { listOf(Format.clock(it.playMs(now)) to "temps", "${it.wordsFound}/${it.duos.size * 2}" to "réponses", "${it.errors}" to (if (it.errors > 1) "erreurs" else "erreur")) }
     } ?: emptyList()
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
@@ -391,7 +393,7 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
                         Text("Nouveau record personnel", color = Palette.mint, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(start = 6.dp))
                     }
                     mainKey in game.beaten -> Text("Premier record établi", color = Palette.secondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    else -> Text("Record : ${Format.number(records.best(mainKey))} " + if (mode == PlayMode.SURVIVAL) "mots" else "points",
+                    else -> Text("Record : " + recordText(mode, records.best(mainKey)),
                         color = Palette.secondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
@@ -406,5 +408,18 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
             Spacer(Modifier.height(10.dp))
             Text("Record personnel : il ne compte pas dans les classements du mot du jour.", fontSize = 11.sp, color = Palette.tertiary, textAlign = TextAlign.Center)
         }
+    }
+}
+
+/** The record a mode is judged on: words in Sprint, the level in Survie, pairs then time in Double sens. */
+internal val PlayMode.mainRecord: String get() = when (this) { PlayMode.SPRINT -> ModeStat.WORDS; PlayMode.SURVIVAL -> ModeStat.LEVEL; PlayMode.DUO -> ModeStat.DUO }
+
+/** A mode's main record in words: "12 mots", "niveau 4", "4 paires en 1:32". */
+internal fun recordText(mode: PlayMode, value: Int): String = when (mode) {
+    PlayMode.SPRINT -> "${Format.number(value)} mot" + if (value > 1) "s" else ""
+    PlayMode.SURVIVAL -> "niveau ${maxOf(1, value)}"
+    PlayMode.DUO -> if (value <= 0) "aucun" else {
+        val solved = DuoRecord.solved(value)
+        "$solved paire" + (if (solved > 1) "s" else "") + " en " + Format.clock(DuoRecord.seconds(value) * 1000)
     }
 }

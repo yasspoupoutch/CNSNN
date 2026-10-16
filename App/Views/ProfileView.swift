@@ -30,7 +30,7 @@ struct ProfileView: View {
                     AvatarView(name: state.progress.username, colorIndex: avatar, size: 96)
                         .shadow(color: Palette.glassShadow, radius: 20, y: 16)
                     Text(state.progress.username).scaledFont(28, .bold).tracking(-0.5).padding(.top, 16)
-                    Text("Niveau \(state.progress.score / 1000 + 1) · \(Format.number(state.progress.score)) points")
+                    Text("Niveau \(state.progress.level) · \(Format.number(state.progress.correctAnswers)) " + (state.progress.correctAnswers > 1 ? "mots trouvés" : "mot trouvé"))
                         .scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 4)
                     AvatarPicker(selection: $avatar).padding(.top, 18)
                     Button("Modifier le pseudo") { name = state.progress.username; editingName = true }
@@ -192,7 +192,7 @@ struct AccountView: View {
                     } footer: {
                         Text(login
                              ? "Vos parties d’entraînement de cet iPhone rejoignent ce compte. Les Mots du jour joués en invité restent sur le profil invité."
-                             : "Votre compte invité devient permanent : même profil, mêmes points, mêmes propositions. Vous pourrez le retrouver sur un autre iPhone ou après une réinstallation.")
+                             : "Votre compte invité devient permanent : même profil, mêmes stats, mêmes propositions. Vous pourrez le retrouver sur un autre iPhone ou après une réinstallation.")
                     }
                 } else {
                     Section {
@@ -273,7 +273,7 @@ enum Support {
 struct PrivacyView: View {
     @Environment(\.dismiss) private var dismiss
     private let sections: [(String, String)] = [
-        ("Ce que nous enregistrons", "Votre pseudo, vos parties (mots du jour, temps, points, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter."),
+        ("Ce que nous enregistrons", "Votre pseudo, vos parties (mots du jour, temps, indices, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter."),
         ("Ce qui est public", "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché."),
         ("Où sont les données", "Sur les serveurs Firebase de Google (Authentication et Cloud Firestore), et sur votre iPhone. Aucune publicité, aucun traceur, aucune revente de données."),
         ("Notifications et widget", "Le rappel du mot du jour et le widget sont calculés sur votre iPhone : rien n’est envoyé par un serveur."),

@@ -125,7 +125,7 @@ fun ModerationContent(state: AppViewModel) {
                 }
             }
         }
-        Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses points sont conservés.", fontSize = 12.sp, color = Palette.tertiary)
+        Text("Un joueur suspendu disparaît des classements et ne peut plus jouer le mot du jour classé, proposer ni signaler. Ses résultats et ses stats sont conservés.", fontSize = 12.sp, color = Palette.tertiary)
 
         Kicker("Temps suspects", modifier = Modifier.padding(top = 10.dp))
         if (suspicious.isEmpty()) Text(loading ?: "Aucun temps sous 5 secondes aujourd’hui.", color = Palette.secondary)
@@ -152,12 +152,12 @@ fun ModerationContent(state: AppViewModel) {
                         Text(player.username, fontWeight = FontWeight.SemiBold)
                         if (player.reason.isNotEmpty()) Text(player.reason, fontSize = 12.sp, color = Palette.secondary)
                     }
-                    OutlinedButton({ act { cloud.unsuspend(player.id); message = "${player.username} est rétabli et retrouve ses résultats, ses points et sa place au classement." } },
+                    OutlinedButton({ act { cloud.unsuspend(player.id); message = "${player.username} est rétabli et retrouve ses résultats, ses stats et sa place au classement." } },
                         enabled = !busy) { Text("Rétablir") }
                 }
             }
         }
-        Text("Rétablir un joueur lui rend tout : ses résultats, ses points et sa place au classement.", fontSize = 12.sp, color = Palette.tertiary)
+        Text("Rétablir un joueur lui rend tout : ses résultats, ses stats et sa place au classement.", fontSize = 12.sp, color = Palette.tertiary)
         Spacer(Modifier.height(24.dp))
     }
 }
