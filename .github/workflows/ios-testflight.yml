@@ -1,8 +1,9 @@
 name: CNSNN - iPhone TestFlight
 
 # Signs the app with the Apple Developer account and sends it to App Store Connect (TestFlight),
-# without a Mac: Xcode creates the certificate and profiles itself through an App Store Connect
-# API key (role Admin). Needs these repository secrets, see Docs/PUBLICATION.md:
+# without a Mac: Scripts/asc_signing.py creates the distribution certificate and the App Store
+# profiles through an App Store Connect API key (role Admin), then Xcode signs and uploads.
+# Needs these repository secrets, see Docs/PUBLICATION.md:
 #   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (content of the .p8 file).
 
 on:
@@ -92,6 +93,47 @@ jobs:
           codesign --force --sign - --timestamp=none --entitlements App/CNSNN.entitlements "$app"
           codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.poupoutch.cnsnn'
 
+      - name: Preparer le certificat et les profils
+        if: ${{ !inputs.diagnostic_only }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          sign="$TF_ROOT/key/signing"
+          mkdir -p "$sign"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$TF_ROOT/key/sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$TF_ROOT/key/sa.json" node Scripts/ios-signing/signing.mjs decrypt "$sign/dist-key.pem"
+          rm -f "$TF_ROOT/key/sa.json"
+          python3 Scripts/asc_signing.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" "$sign/dist-key.pem" "$sign" \
+            com.poupoutch.cnsnn com.poupoutch.cnsnn.widget | tee "$TF_ROOT/logs/signing.log"
+          # The binaries carry the widget App Group: each profile must allow it.
+          for id in com.poupoutch.cnsnn com.poupoutch.cnsnn.widget; do
+            if ! grep "^PROFILE $id " "$TF_ROOT/logs/signing.log" | grep -q "group.com.poupoutch.cnsnn"; then
+              echo "::error::Le profil de $id n'autorise pas group.com.poupoutch.cnsnn : créer l'App Group sur developer.apple.com et le cocher sur les deux identifiants."
+              exit 1
+            fi
+          done
+          # Temporary keychain holding only the distribution certificate.
+          kc="$TF_ROOT/key/ci.keychain-db"; pass="$(uuidgen)"
+          security create-keychain -p "$pass" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$pass" "$kc"
+          /usr/bin/openssl x509 -inform der -in "$sign/dist-cert.der" -out "$sign/dist-cert.pem"
+          /usr/bin/openssl pkcs12 -export -inkey "$sign/dist-key.pem" -in "$sign/dist-cert.pem" -out "$sign/dist.p12" -passout pass:"$pass"
+          security import "$sign/dist.p12" -k "$kc" -P "$pass" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$kc"
+          for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            grep '^PROFILE ' "$TF_ROOT/logs/signing.log" | while read -r _ id uuid _; do
+              cp "$sign/$id.mobileprovision" "$dir/$uuid.mobileprovision"
+            done
+          done
+          printf 'TF_KEYCHAIN=%s\n' "$kc" >> "$GITHUB_ENV"
+
       - name: Envoyer sur App Store Connect
         if: ${{ !inputs.diagnostic_only }}
         env:
@@ -107,7 +149,12 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>$APPLE_TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.poupoutch.cnsnn</key><string>$(awk '$2=="com.poupoutch.cnsnn"{print $3}' "$TF_ROOT/logs/signing.log")</string>
+              <key>com.poupoutch.cnsnn.widget</key><string>$(awk '$2=="com.poupoutch.cnsnn.widget"{print $3}' "$TF_ROOT/logs/signing.log")</string>
+            </dict>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
@@ -116,16 +163,17 @@ jobs:
             -archivePath "$TF_ROOT/CNSNN.xcarchive" \
             -exportOptionsPlist "$TF_ROOT/ExportOptions.plist" \
             -exportPath "$TF_ROOT/export" \
-            -allowProvisioningUpdates \
             -authenticationKeyPath "$TF_ROOT/key/AuthKey_$ASC_KEY_ID.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             2>&1 | tee "$TF_ROOT/logs/export.log"
           echo "Build ${{ github.run_number }} envoyé sur App Store Connect. Il apparaît dans TestFlight après le traitement d'Apple." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Effacer la cle API
+      - name: Effacer la cle API et le certificat
         if: ${{ always() }}
-        run: rm -rf "$RUNNER_TEMP/cnsnn-tf/key"
+        run: |
+          if [ -n "${TF_KEYCHAIN:-}" ]; then security delete-keychain "$TF_KEYCHAIN" || true; fi
+          rm -rf "$RUNNER_TEMP/cnsnn-tf/key"
 
       - name: Conserver les diagnostics
         if: ${{ always() && !cancelled() }}
