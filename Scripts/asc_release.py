@@ -16,9 +16,13 @@ API = 'https://api.appstoreconnect.apple.com'
 EDITABLE = {'PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED', 'METADATA_REJECTED'}
 # Age rating: nothing sensitive in CNSNN. Players do create content (usernames shown in rankings,
 # cards proposed then moderated), with reporting and blocking. No chat, no ads, no web browser.
-TRUE_ANSWERS = {'userGeneratedContent'}
-SKIPPED = {'kidsAgeBand', 'ageRatingOverride', 'ageRatingOverrideV2', 'koreaAgeRatingOverride',
-           'developerAgeRatingInfoUrl'}
+FREQUENCY_NONE = ['alcoholTobaccoOrDrugUseOrReferences', 'contests', 'gamblingSimulated', 'gunsOrOtherWeapons',
+                  'horrorOrFearThemes', 'matureOrSuggestiveThemes', 'medicalOrTreatmentInformation',
+                  'profanityOrCrudeHumor', 'sexualContentGraphicAndNudity', 'sexualContentOrNudity',
+                  'violenceCartoonOrFantasy', 'violenceRealistic', 'violenceRealisticProlongedGraphicOrSadistic']
+NO = ['advertising', 'ageAssurance', 'gambling', 'healthOrWellnessTopics', 'lootBox', 'messagingAndChat',
+      'parentalControls', 'socialMedia', 'socialMediaAgeRestricted', 'unrestrictedWebAccess']
+YES = ['userGeneratedContent']
 
 
 def b64(data):
@@ -86,16 +90,9 @@ rating = (call('GET', f"/v1/appInfos/{info['id']}/ageRatingDeclaration") or {}).
 if rating:
     attrs = rating['attributes']
     print('Classification actuelle : ' + json.dumps(attrs, ensure_ascii=False, sort_keys=True))
-    answers = {}
-    for key, value in attrs.items():
-        if key in SKIPPED:
-            continue
-        if key in TRUE_ANSWERS:
-            answers[key] = True
-        elif isinstance(value, bool):
-            answers[key] = False
-        elif isinstance(value, str):
-            answers[key] = 'NONE'
+    answers = {key: 'NONE' for key in FREQUENCY_NONE if key in attrs}
+    answers.update({key: False for key in NO if key in attrs})
+    answers.update({key: True for key in YES if key in attrs})
     if APPLY and call('PATCH', f"/v1/ageRatingDeclarations/{rating['id']}", {'data': {
             'type': 'ageRatingDeclarations', 'id': rating['id'], 'attributes': answers}}) is not None:
         print('Classification enregistrée : ' + json.dumps(answers, ensure_ascii=False, sort_keys=True))
@@ -120,8 +117,20 @@ if APPLY and not any(p['type'] == 'appPrices' for p in prices):
                           'relationships': {'appPricePoint': {'data': {'type': 'appPricePoints', 'id': free['id']}}}}]}) is not None:
         print('Prix : gratuit.')
 
-# Availability (countries) is only reported here.
-availability = call('GET', f"/v2/appAvailabilities/{app['id']}")
-print('Disponibilité : ' + (json.dumps((availability or {}).get('data', {}).get('attributes'), ensure_ascii=False)
-                            if availability else 'non définie'))
+# Availability: every country, and new ones as Apple adds them, if nothing is set yet.
+availability = call('GET', f"/v1/apps/{app['id']}/appAvailabilityV2")
+print('Disponibilité : ' + ('déjà définie' if availability and availability.get('data') else 'non définie'))
+if APPLY and not (availability and availability.get('data')):
+    territories = call('GET', '/v1/territories?limit=200') or {'data': []}
+    items = [{'type': 'territoryAvailabilities', 'id': f"${{{t['id']}}}", 'attributes': {'available': True},
+              'relationships': {'territory': {'data': {'type': 'territories', 'id': t['id']}}}}
+             for t in territories['data']]
+    if items and call('POST', '/v2/appAvailabilities', {
+            'data': {'type': 'appAvailabilities', 'attributes': {'availableInNewTerritories': True},
+                     'relationships': {'app': {'data': {'type': 'apps', 'id': app['id']}},
+                                       'territoryAvailabilities': {'data': [
+                                           {'type': i['type'], 'id': i['id']} for i in items]}}},
+            'included': items}) is not None:
+        print(f'Disponibilité : {len(items)} pays.')
+
 print('Rien n’a été soumis à la revue.')
