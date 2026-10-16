@@ -104,6 +104,8 @@ import CNSNNCore
             progress.attempts.append(Attempt(cardID: card.id, mode: .daily, correct: true, timeMs: 71_485_000, points: 50,
                                              date: Date(), dailyKey: DailySchedule.key()))
         }
+        // App Store screenshots: an invented, lively profile with rankings (see ScreenshotDemo).
+        if ScreenshotDemo.isActive { ScreenshotDemo.fill(self) }
         persist()
         await refreshAll()
     }
