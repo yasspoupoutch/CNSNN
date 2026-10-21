@@ -79,6 +79,8 @@ struct MainShell: View {
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
+        // Pages stay alive, so "Mes propositions" reloads its statuses each time it is shown.
+        .onChange(of: tab) { _, page in if page == .propose { Task { await state.refreshSubmissions() } } }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
         .fullScreenCover(item: $game, onDismiss: askReviewIfPending) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
