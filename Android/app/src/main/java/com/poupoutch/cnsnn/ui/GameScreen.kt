@@ -206,7 +206,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
-            modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + consonants.toList().joinToString(", ") })
+            modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
         Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
         AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
             Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))

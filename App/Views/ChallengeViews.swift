@@ -518,7 +518,7 @@ struct ChallengeGameView: View {
             Text(consonants)
                 .font(Typo.serif(consonants.count > 5 ? 60 : 80)).tracking(3)
                 .lineLimit(1).minimumScaleFactor(0.35).padding(.top, 6)
-                .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
+                .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
             Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 4)

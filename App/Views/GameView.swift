@@ -107,7 +107,7 @@ struct GameView: View {
             .font(Typo.serif(consonants.count > 5 ? 64 : 88)).tracking(3)
             .lineLimit(1).minimumScaleFactor(0.35)
             .padding(.top, 40)
-            .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
+            .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
         Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
         if session.usedHint {
             Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)

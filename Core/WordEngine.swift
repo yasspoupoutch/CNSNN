@@ -12,6 +12,17 @@ public enum WordEngine {
     public static func consonants(_ value: String) -> String {
         normalize(value).filter { !"AEIOUY".contains($0) }
     }
+    /// What the board shows: the consonants of each word, a space between words, a dash for a word
+    /// with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants.
+    public static func shownConsonants(_ value: String) -> String {
+        let words = value.split(whereSeparator: \.isWhitespace).map(String.init).filter { !normalize($0).isEmpty }
+        guard words.count > 1 else { return consonants(value) }
+        return words.map { consonants($0).isEmpty ? "–" : consonants($0) }.joined(separator: " ")
+    }
+    /// The board read aloud: letters apart, words apart.
+    public static func spoken(_ shown: String) -> String {
+        shown.split(separator: " ").map { $0.map(String.init).joined(separator: ", ") }.joined(separator: " ; ")
+    }
     public static func matches(_ answer: String, word: String) -> Bool {
         let normalized = normalize(answer)
         return !normalized.isEmpty && normalized == normalize(word)

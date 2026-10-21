@@ -21,7 +21,7 @@ public struct Card: Identifiable, Codable, Hashable, Sendable {
     public var author: String?
     /// Consonants given by the server for a secret Mot du jour, whose word stays unknown until the end.
     public var masked: String?
-    public var wordNoVowels: String { masked ?? WordEngine.consonants(wordFull) }
+    public var wordNoVowels: String { masked ?? WordEngine.shownConsonants(wordFull) }
     public init(id: String, wordFull: String, hint: String, category: Category, difficulty: Difficulty, status: ReviewStatus = .approved, author: String? = nil, masked: String? = nil) {
         self.id = id; self.wordFull = wordFull; self.hint = hint; self.category = category; self.difficulty = difficulty; self.status = status; self.author = author; self.masked = masked
     }

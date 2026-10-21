@@ -768,7 +768,7 @@ enum DailyGuesses {
         }
         let author = profile["username"] as? String ?? "Joueur"
         let batch = db.batch()
-        batch.setData(["wordFull":card.wordFull,"wordNoVowels":card.wordNoVowels,"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending","authorName":author], forDocument: ref)
+        batch.setData(["wordFull":card.wordFull,"wordNoVowels":WordEngine.consonants(card.wordFull),"normalizedAnswer":id,"hint":card.hint,"category":card.category.rawValue,"difficulty":card.difficulty.rawValue,"createdBy":uid,"createdAt":FieldValue.serverTimestamp(),"status":"pending","authorName":author], forDocument: ref)
         batch.updateData(quota, forDocument: userRef)
         try await batch.commit()
         var stored = card; stored.id = id; stored.author = author

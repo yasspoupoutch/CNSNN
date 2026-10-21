@@ -9,6 +9,15 @@ import java.time.Instant
 import java.time.LocalDate
 
 class WordEngineTest {
+    @Test fun theBoardSeparatesWords() {
+        assertEquals("L R LN", WordEngine.shownConsonants("Le Roi Lion"))
+        assertEquals("– ST CHRL", WordEngine.shownConsonants("Où est Charlie ?"))
+        assertEquals("MSSN MPSSBL", WordEngine.shownConsonants("Mission : Impossible"))
+        assertEquals("LG D GLC", WordEngine.shownConsonants("L’Âge de glace"))
+        assertEquals("SPDRMN", WordEngine.shownConsonants("Spider-Man"))
+        assertEquals("PPLLN", WordEngine.shownConsonants("Papillon"))
+        assertEquals("L ; R ; L, N", WordEngine.spoken("L R LN"))
+    }
     @Test fun consonants() {
         assertEquals("CHCLT", WordEngine.consonants("CHOCOLAT"))
         assertEquals("LPHNT", WordEngine.consonants("Éléphant"))
