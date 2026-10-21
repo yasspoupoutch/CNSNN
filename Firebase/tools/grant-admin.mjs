@@ -10,4 +10,5 @@ initializeApp({ credential: applicationDefault(), projectId: 'cnsnn-9ctosy' });
 const user = await getAuth().getUser(uid);
 await getAuth().setCustomUserClaims(uid, { ...(user.customClaims ?? {}), admin: true });
 await getFirestore().doc(`admins/${uid}`).set({ grantedAt: FieldValue.serverTimestamp() });
-console.log(`Administrateur ajouté : ${uid} (${user.email ?? 'compte invité'})`);
+// No email in the log: run logs become public whenever the repository is.
+console.log(`Administrateur ajouté : ${uid} (${user.email ? 'compte avec email' : 'compte invité'})`);
