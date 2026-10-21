@@ -399,9 +399,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
           offset=$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/preview/timing.json'))['offset'])")
+          # The whole scene must fit in 30 s: a longer take plays faster instead of being cut.
+          speed=$(python3 -c "import json; print(max(1.0, json.load(open('$RUNNER_TEMP/preview/timing.json'))['duration'] / 29.0))")
           ffmpeg -hide_banner -loglevel error -y -ss "$offset" -i "$RUNNER_TEMP/preview/raw.mov" \
             -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -t 29.5 \
-            -vf "scale=886:1920:force_original_aspect_ratio=decrease,pad=886:1920:(ow-iw)/2:(oh-ih)/2:color=0x06070c,fps=30,format=yuv420p" \
+            -vf "setpts=PTS/${speed},scale=886:1920:force_original_aspect_ratio=decrease,pad=886:1920:(ow-iw)/2:(oh-ih)/2:color=0x06070c,fps=30,format=yuv420p" \
             -c:v libx264 -profile:v high -level 4.0 -b:v 8M -maxrate 10M -bufsize 16M \
             -c:a aac -b:a 256k -ar 44100 -ac 2 -shortest -movflags +faststart "$RUNNER_TEMP/preview/preview.mp4"
           length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$RUNNER_TEMP/preview/preview.mp4")
