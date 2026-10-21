@@ -50,6 +50,7 @@ export function parseList(tsv) {
     const [d, category, word, hint] = line.split('\t');
     const entry = { word: word?.trim(), hint: hint?.trim(), category, difficulty: difficulties[d] };
     if (!entry.difficulty || !categories.includes(category) || !entry.word || !entry.hint) throw new Error(`Ligne ${i + 1} invalide`);
+    if (!singleWord(entry)) throw new Error(`Ligne ${i + 1} : un seul mot par mot du jour`);
     return entry;
   });
   validate(words);
@@ -65,6 +66,9 @@ export function validate(words) {
     seen.add(answer);
   }
 }
+
+// The Mot du jour is one word: an answer with a space (an expression) stays out of the schedule.
+export const singleWord = (w) => !/\s/.test(w.word.trim());
 
 // Several lists become one; a word already in an earlier list is skipped.
 export function combine(lists) {
@@ -130,7 +134,8 @@ async function seed(dry) {
   const { private_key: privateKey } = await serviceAccount();
   const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
   const lists = await Promise.all(files.map(async (name) => decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)));
-  const { words, skipped } = combine(lists);
+  const { words: all, skipped } = combine(lists);
+  const words = all.filter(singleWord);
   validate(words);
   const { initializeApp, applicationDefault } = await import('firebase-admin/app');
   const { getFirestore, FieldPath } = await import('firebase-admin/firestore');
@@ -143,7 +148,7 @@ async function seed(dry) {
   // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
   const days = schedule(words, shiftDay(today, 1), scheduledDays, played);
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
-  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s) ignoré(s)), ${played.size} déjà joués.`);
+  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - words.length} expression(s) de plusieurs mots ignorés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
   if (dry) return;
   for (let i = 0; i < days.length; i += 150) {
