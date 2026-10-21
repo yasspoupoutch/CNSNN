@@ -296,7 +296,8 @@ struct Chip: View {
     var action: () -> Void
     var body: some View {
         Button { Haptics.selection(); action() } label: {
-            Text(title).scaledFont(14, .medium)
+            // One line, never squeezed: a chip that wrapped cut « Général » in two.
+            Text(title).scaledFont(14, .medium).lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(selected ? Palette.background : Palette.foreground)
                 .padding(.horizontal, 14).frame(minHeight: 36)
                 .background(Capsule().fill(selected ? Palette.foreground : Palette.fill1))
