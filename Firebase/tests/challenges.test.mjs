@@ -24,6 +24,7 @@ async function players() {
   await seed('users/bob', { uid: 'bob', username: 'Bob' });
   await seed('users/carol', { uid: 'carol', username: 'Carol' });
   await seed('users/alice/friends/bob', { username: 'Bob', addedAt: now });
+  await seed('users/bob/friends/alice', { username: 'Alice', addedAt: now });
 }
 const challenge = (over = {}) => ({ from: 'alice', fromName: 'Alice', to: 'bob', toName: 'Bob', cardIds: cards, createdAt: serverTimestamp(), fromStartedAt: serverTimestamp(), ...over });
 const finish = (side, skips = 0, errors = 1) => ({ [`${side}FinishedAt`]: serverTimestamp(), [`${side}Skips`]: skips, [`${side}Errors`]: errors });
@@ -42,6 +43,16 @@ test('a challenge goes to a friend, under the real names, with 5 distinct words'
   await assertFails(setDoc(doc(user('bob'), 'challenges/c9'), challenge()));
   await seed('banned/alice', { username: 'Alice', reason: 'Test' });
   await assertFails(setDoc(doc(db, 'challenges/c10'), challenge()));
+});
+
+test('a player only in the challenger\'s own list cannot be challenged', async () => {
+  await players();
+  // Anyone may put any player in their own list: Carol never gave her code to Alice.
+  await assertSucceeds(setDoc(doc(user('alice'), 'users/alice/friends/carol'), { username: 'Carol', addedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(user('alice'), 'challenges/c1'), challenge({ to: 'carol', toName: 'Carol' })));
+  // Once Carol has Alice too, the challenge goes.
+  await seed('users/carol/friends/alice', { username: 'Alice', addedAt: Timestamp.now() });
+  await assertSucceeds(setDoc(doc(user('alice'), 'challenges/c2'), challenge({ to: 'carol', toName: 'Carol' })));
 });
 
 test('only the two players read a challenge, and each lists their own', async () => {
@@ -102,6 +113,7 @@ test('challenges are deleted only with the account, by either player', async () 
 test('web deletion removes the challenges sent and received', async () => {
   await players();
   await seed('users/carol/friends/alice', { username: 'Alice', addedAt: Timestamp.now() });
+  await seed('users/alice/friends/carol', { username: 'Carol', addedAt: Timestamp.now() });
   await assertSucceeds(setDoc(doc(user('alice'), 'challenges/sent'), challenge()));
   await assertSucceeds(setDoc(doc(user('carol'), 'challenges/received'), challenge({ from: 'carol', fromName: 'Carol', to: 'alice', toName: 'Alice' })));
   await assertSucceeds(setDoc(doc(user('carol'), 'challenges/other'), { ...challenge({ from: 'carol', fromName: 'Carol', to: 'alice', toName: 'Alice' }) }).then(() => patch('challenges/other', { to: 'bob', toName: 'Bob' })));

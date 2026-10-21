@@ -56,11 +56,6 @@ service cloud.firestore {
   function isPreviousDay(previous, day) {
    return validDayKey(previous) && sameDate(dayDate(day) - duration.value(1, 'd'), previous);
   }
-  // Daily difficulty follows the weekday: Monday-Tuesday easy, Wednesday-Friday medium, weekend hard.
-  function dailyBase(day) {
-   let w = dayDate(day).dayOfWeek();
-   return w <= 2 ? 50 : (w <= 5 ? 100 : 150);
-  }
   function larger(a, b) { return a > b ? a : b; }
   function smaller(a, b) { return a < b ? a : b; }
   // The Mot du jour is ranked on time: same rules as Core/GameRules.swift DailyScore. The hint costs
@@ -409,17 +404,11 @@ service cloud.firestore {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
    allow write: if false;
   }
-  // Daily words published by a moderator override the app's built-in schedule for that day.
+  // Old daily words published in clear by a moderator: nothing writes them any more, since a word
+  // stored here would be readable before the game. The apps still read the collection, finding nothing.
   match /dailyChallenges/{day} {
    allow read: if signedIn();
-   allow create, update: if admin() && validDayKey(day)
-    && request.resource.data.keys().hasOnly(['cardId','wordFull','hint','category','difficulty','publishedBy','publishedAt'])
-    && request.resource.data.cardId is string && request.resource.data.cardId.size() >= 1 && request.resource.data.cardId.size() <= 80
-    && request.resource.data.wordFull is string && request.resource.data.wordFull.size() >= 3 && request.resource.data.wordFull.size() <= 80
-    && request.resource.data.hint is string && request.resource.data.hint.size() >= 5 && request.resource.data.hint.size() <= 160
-    && request.resource.data.category in categories()
-    && request.resource.data.difficulty == ['Facile','Moyen','Difficile'][dailyBase(day) / 50 - 1]
-    && request.resource.data.publishedBy == request.auth.uid && request.resource.data.publishedAt == request.time;
+   allow create, update: if false;
    allow delete: if admin();
   }
 
@@ -444,12 +433,14 @@ service cloud.firestore {
     && c[2] is string && c[2].size() >= 1 && c[2].size() <= 80 && c[3] is string && c[3].size() >= 1 && c[3].size() <= 80
     && c[4] is string && c[4].size() >= 1 && c[4].size() <= 80 && c.toSet().size() == 5;
   }
-  // Only a player the challenger added as a friend, under the name saved with that friend.
+  // Only a friend both ways, under the name saved with that friend: anyone may put any player in their
+  // own list, so the friend's list holding the challenger is what shows they agreed (code, or a challenge).
   function createsChallenge(c) {
    return c.keys().hasOnly(['from','fromName','to','toName','cardIds','createdAt','fromStartedAt'])
     && c.from == request.auth.uid && c.to is string && c.to != c.from
     && c.fromName == get(at('users/' + request.auth.uid)).data.username
     && exists(at('users/' + request.auth.uid + '/friends/' + c.to))
+    && exists(at('users/' + c.to + '/friends/' + request.auth.uid))
     && c.toName == get(at('users/' + request.auth.uid + '/friends/' + c.to)).data.username
     && challengeCards(c.cardIds) && c.createdAt == request.time && c.fromStartedAt == request.time;
   }
