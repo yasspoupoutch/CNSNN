@@ -28,7 +28,7 @@ struct GameView: View {
                     if let card = session.card { board(card) }
                     else if session.result == nil { emptyState }
                 }
-            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
+            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6).readableWidth()
             if let result = session.result {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
                 VStack {
@@ -37,7 +37,7 @@ struct GameView: View {
                                 usedHint: session.usedHint, standing: session.standing, pending: session.pendingOfficial, ranked: session.ranked,
                                 next: nextCard, close: { dismiss() })
                         .padding(.horizontal, 8)
-                }.transition(.move(edge: .bottom))
+                }.readableWidth().transition(.move(edge: .bottom))
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: session.result?.id)
@@ -55,6 +55,9 @@ struct GameView: View {
                 }
             }.disabled(!(5...300).contains(reportReason.count))
             Button("Annuler", role: .cancel) {}
+        }
+        .onChange(of: session.result?.id) { _, _ in
+            if mode == .daily, session.result?.correct == true, ReviewPrompt.shouldAsk(dailyWins: state.progress.dailyWins) { state.reviewPending = true }
         }
         .task { if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, state: state) } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { session.resume() } else { session.pause() } }

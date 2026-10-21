@@ -56,11 +56,6 @@ service cloud.firestore {
   function isPreviousDay(previous, day) {
    return validDayKey(previous) && sameDate(dayDate(day) - duration.value(1, 'd'), previous);
   }
-  // Daily difficulty follows the weekday: Monday-Tuesday easy, Wednesday-Friday medium, weekend hard.
-  function dailyBase(day) {
-   let w = dayDate(day).dayOfWeek();
-   return w <= 2 ? 50 : (w <= 5 ? 100 : 150);
-  }
   function larger(a, b) { return a > b ? a : b; }
   function smaller(a, b) { return a < b ? a : b; }
   // The Mot du jour is ranked on time: same rules as Core/GameRules.swift DailyScore. The hint costs
@@ -73,6 +68,8 @@ service cloud.firestore {
   function dayIndex(day) { return int(dayDate(day).toMillis() / 86400000); }
   function dailyRank(day, score, correct) { return dayIndex(day) * 1000000 + (correct ? score : 999999); }
   function monthIndex(day) { let p = day.split('-'); return int(p[0]) * 12 + int(p[1]) - 1; }
+  // Weeks run Monday to Sunday: weeks since Monday 1969-12-29 (1970-01-01 was a Thursday).
+  function weekIndex(day) { return int((dayIndex(day) + 3) / 7); }
 
   // ---- Profiles
   match /users/{uid} {
@@ -289,7 +286,8 @@ service cloud.firestore {
    let r = getAfter(path).data;
    let laterWin = r.correct && day > old.lastWinDay;
    let streak = laterWin ? (isPreviousDay(old.lastWinDay, day) ? old.streak + 1 : 1) : (!r.correct && day > old.lastWinDay ? 0 : old.streak);
-   return n.keys().hasOnly(['uid','username','played','wins','streak','bestStreak','bestTimeMs','lastWinDay','lastResult','updatedAt','month','monthSaved','monthPlayed','monthRank'])
+   return n.keys().hasOnly(['uid','username','played','wins','streak','bestStreak','bestTimeMs','lastWinDay','lastResult','updatedAt','month','monthSaved','monthPlayed','monthRank',
+     'week','weekFound','weekTimeMs','weekPlayed','weekRank'])
     && validDayKey(day) && !exists(path) && existsAfter(path)
     && n.uid == uid && n.username == r.username && n.updatedAt == request.time
     && n.played == old.played + 1
@@ -297,7 +295,8 @@ service cloud.firestore {
     && n.streak == streak && n.bestStreak == larger(old.bestStreak, streak)
     && n.bestTimeMs == (r.correct ? (old.bestTimeMs == null ? r.timeMs : smaller(old.bestTimeMs, r.timeMs)) : old.bestTimeMs)
     && n.lastWinDay == (laterWin ? day : old.lastWinDay)
-    && tallyMonth(old, n, monthIndex(day), 600000 - r.scoreMs);
+    && tallyMonth(old, n, monthIndex(day), 600000 - r.scoreMs)
+    && tallyWeek(old, n, weekIndex(day), r.correct, r.scoreMs);
   }
   // This month's total: the time saved against 10 minutes a day. A new month starts from zero; a late
   // result from an earlier month (finished after midnight) leaves the month as it was.
@@ -308,6 +307,18 @@ service cloud.firestore {
     ? n.month == oldMonth && n.monthSaved == old.monthSaved && n.monthPlayed == old.monthPlayed && n.monthRank == old.monthRank
     : n.month == month && n.monthSaved == (same ? old.monthSaved : 0) + saved && n.monthPlayed == (same ? old.monthPlayed : 0) + 1
       && n.monthRank == month * 100000000 + n.monthSaved;
+  }
+  // This week's ranking: the words found, then their total time (a lost day adds nothing). Apps from
+  // before it (iOS 1.0, Android) send no week fields: the line then simply leaves the week's ranking.
+  function tallyWeek(old, n, week, correct, score) {
+   let fields = ['week','weekFound','weekTimeMs','weekPlayed','weekRank'];
+   let oldWeek = 'week' in old ? old.week : 0;
+   let same = week == oldWeek;
+   return !n.keys().hasAny(fields) || (n.keys().hasAll(fields) && (week < oldWeek
+    ? n.week == oldWeek && n.weekFound == old.weekFound && n.weekTimeMs == old.weekTimeMs && n.weekPlayed == old.weekPlayed && n.weekRank == old.weekRank
+    : n.week == week && n.weekFound == (same ? old.weekFound : 0) + (correct ? 1 : 0)
+      && n.weekTimeMs == (same ? old.weekTimeMs : 0) + (correct ? score : 0) && n.weekPlayed == (same ? old.weekPlayed : 0) + 1
+      && n.weekRank == week * 100000000 + n.weekFound * 10000000 + (9999999 - n.weekTimeMs)));
   }
   function validDayKeyOr(day) { return validDayKey(day) ? day : 'invalid'; }
 
@@ -393,17 +404,11 @@ service cloud.firestore {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
    allow write: if false;
   }
-  // Daily words published by a moderator override the app's built-in schedule for that day.
+  // Old daily words published in clear by a moderator: nothing writes them any more, since a word
+  // stored here would be readable before the game. The apps still read the collection, finding nothing.
   match /dailyChallenges/{day} {
    allow read: if signedIn();
-   allow create, update: if admin() && validDayKey(day)
-    && request.resource.data.keys().hasOnly(['cardId','wordFull','hint','category','difficulty','publishedBy','publishedAt'])
-    && request.resource.data.cardId is string && request.resource.data.cardId.size() >= 1 && request.resource.data.cardId.size() <= 80
-    && request.resource.data.wordFull is string && request.resource.data.wordFull.size() >= 3 && request.resource.data.wordFull.size() <= 80
-    && request.resource.data.hint is string && request.resource.data.hint.size() >= 5 && request.resource.data.hint.size() <= 160
-    && request.resource.data.category in categories()
-    && request.resource.data.difficulty == ['Facile','Moyen','Difficile'][dailyBase(day) / 50 - 1]
-    && request.resource.data.publishedBy == request.auth.uid && request.resource.data.publishedAt == request.time;
+   allow create, update: if false;
    allow delete: if admin();
   }
 
@@ -428,12 +433,14 @@ service cloud.firestore {
     && c[2] is string && c[2].size() >= 1 && c[2].size() <= 80 && c[3] is string && c[3].size() >= 1 && c[3].size() <= 80
     && c[4] is string && c[4].size() >= 1 && c[4].size() <= 80 && c.toSet().size() == 5;
   }
-  // Only a player the challenger added as a friend, under the name saved with that friend.
+  // Only a friend both ways, under the name saved with that friend: anyone may put any player in their
+  // own list, so the friend's list holding the challenger is what shows they agreed (code, or a challenge).
   function createsChallenge(c) {
    return c.keys().hasOnly(['from','fromName','to','toName','cardIds','createdAt','fromStartedAt'])
     && c.from == request.auth.uid && c.to is string && c.to != c.from
     && c.fromName == get(at('users/' + request.auth.uid)).data.username
     && exists(at('users/' + request.auth.uid + '/friends/' + c.to))
+    && exists(at('users/' + c.to + '/friends/' + request.auth.uid))
     && c.toName == get(at('users/' + request.auth.uid + '/friends/' + c.to)).data.username
     && challengeCards(c.cardIds) && c.createdAt == request.time && c.fromStartedAt == request.time;
   }

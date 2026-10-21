@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fills the App Store listing of the version being prepared: texts, category, copyright and
-iPhone 6.9" screenshots. Never submits anything to Apple review.
+"""Fills the App Store listing of the version being prepared (created from "version" in LISTING_JSON
+when none is): texts, category, copyright and iPhone 6.9" screenshots. Never submits anything to Apple review.
 
-Usage: asc_listing.py KEY_ID ISSUER_ID KEY_PATH BUNDLE_ID LISTING_JSON SCREENSHOT_DIR
-The screenshots are SCREENSHOT_DIR/<name>.png, in the order of "screenshots" in LISTING_JSON.
+Usage: asc_listing.py KEY_ID ISSUER_ID KEY_PATH BUNDLE_ID LISTING_JSON SCREENSHOT_DIR [PREVIEW_MP4]
+The screenshots are SCREENSHOT_DIR/<name>.png, in the order of "screenshots" in LISTING_JSON. The
+optional PREVIEW_MP4 becomes the iPhone 6.9" app preview video (886 x 1920, 15 to 30 s).
 Running it again replaces the texts and the screenshots: it is safe to repeat.
 """
 import base64, hashlib, json, os, sys, time, urllib.error, urllib.parse, urllib.request
@@ -12,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 key_id, issuer, key_path, bundle, listing_path, shots_dir = sys.argv[1:7]
+preview_path = sys.argv[7] if len(sys.argv) > 7 and os.path.exists(sys.argv[7]) else None
 listing = json.load(open(listing_path, encoding='utf-8'))
 API = 'https://api.appstoreconnect.apple.com'
 # Apple's API names the 6.9" iPhone slot APP_IPHONE_67; it takes 1320 x 2868 screenshots.
@@ -69,14 +71,16 @@ print(f"App : {app['attributes']['name']} ({app['id']}), langue principale {app[
 versions = call('GET', f"/v1/apps/{app['id']}/appStoreVersions?filter[platform]=IOS&limit=20")['data']
 version = next((v for v in versions if state(v) in EDITABLE), None)
 if version is None:
-    if versions:
+    # The next version ("version" in LISTING_JSON) is created once the previous one is on sale.
+    wanted = listing.get('version', '1.0')
+    if any(v['attributes']['versionString'] == wanted for v in versions):
         states = ', '.join(f"{v['attributes']['versionString']} {state(v)}" for v in versions)
-        sys.exit(f'::error::Aucune version modifiable ({states}).')
+        sys.exit(f'::error::Aucune version modifiable et la {wanted} existe déjà ({states}).')
     version = call('POST', '/v1/appStoreVersions', {'data': {
         'type': 'appStoreVersions',
-        'attributes': {'platform': 'IOS', 'versionString': '1.0'},
+        'attributes': {'platform': 'IOS', 'versionString': wanted},
         'relationships': {'app': {'data': {'type': 'apps', 'id': app['id']}}}}})['data']
-    print('Version 1.0 créée.')
+    print(f'Version {wanted} créée.')
 print(f"Version {version['attributes']['versionString']} ({state(version)})")
 call('PATCH', f"/v1/appStoreVersions/{version['id']}", {'data': {
     'type': 'appStoreVersions', 'id': version['id'], 'attributes': {'copyright': listing['copyright']}}})
@@ -105,6 +109,9 @@ print(f'Nom, sous-titre et confidentialité ({locale}) enregistrés.')
 
 # Version texts.
 version_attrs = {k: listing[k] for k in ('description', 'keywords', 'promotionalText', 'supportUrl', 'marketingUrl')}
+# "What's new" exists only from the second version on.
+if listing.get('whatsNew') and version['attributes']['versionString'] != '1.0':
+    version_attrs['whatsNew'] = listing['whatsNew']
 version_locs = call('GET', f"/v1/appStoreVersions/{version['id']}/appStoreVersionLocalizations")['data']
 version_loc = first(version_locs, locale=locale)
 if version_loc:
@@ -153,4 +160,38 @@ for _ in range(12):
 print('État des captures : ' + ', '.join(f"{s['attributes']['fileName']} {st}" for s, st in zip(shots, states)))
 if 'FAILED' in states or len(shots) != len(listing['screenshots']):
     sys.exit('::error::Une capture a été refusée par Apple.')
+
+# App preview video: the same upload dance as the screenshots, in the 6.9" preview set. Apple
+# processes the video for several minutes; its state is only reported here.
+if preview_path:
+    sets = call('GET', f"/v1/appStoreVersionLocalizations/{version_loc['id']}/appPreviewSets")['data']
+    preview_set = first(sets, previewType='IPHONE_67')
+    if preview_set is None:
+        preview_set = call('POST', '/v1/appPreviewSets', {'data': {
+            'type': 'appPreviewSets', 'attributes': {'previewType': 'IPHONE_67'},
+            'relationships': {'appStoreVersionLocalization': {'data': {
+                'type': 'appStoreVersionLocalizations', 'id': version_loc['id']}}}}})['data']
+    for old in call('GET', f"/v1/appPreviewSets/{preview_set['id']}/appPreviews")['data']:
+        call('DELETE', f"/v1/appPreviews/{old['id']}")
+    data = open(preview_path, 'rb').read()
+    preview = call('POST', '/v1/appPreviews', {'data': {
+        'type': 'appPreviews', 'attributes': {'fileName': 'preview.mp4', 'fileSize': len(data), 'mimeType': 'video/mp4'},
+        'relationships': {'appPreviewSet': {'data': {'type': 'appPreviewSets', 'id': preview_set['id']}}}}})['data']
+    for op in preview['attributes']['uploadOperations']:
+        part = data[op['offset']:op['offset'] + op['length']]
+        headers = {h['name']: h['value'] for h in op.get('requestHeaders', [])}
+        urllib.request.urlopen(urllib.request.Request(op['url'], data=part, method=op['method'], headers=headers),
+                               timeout=300).read()
+    call('PATCH', f"/v1/appPreviews/{preview['id']}", {'data': {
+        'type': 'appPreviews', 'id': preview['id'],
+        'attributes': {'uploaded': True, 'sourceFileChecksum': hashlib.md5(data).hexdigest()}}})
+    for _ in range(24):
+        state_now = (call('GET', f"/v1/appPreviews/{preview['id']}")['data']['attributes'].get('assetDeliveryState') or {}).get('state')
+        if state_now in ('COMPLETE', 'FAILED'):
+            break
+        time.sleep(10)
+    print(f'Aperçu vidéo envoyé : {state_now}')
+    if state_now == 'FAILED':
+        sys.exit('::error::Apple a refusé l’aperçu vidéo.')
+
 print('Fiche prête. Rien n’a été soumis à la revue.')

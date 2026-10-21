@@ -82,15 +82,17 @@ enum ScreenshotDemo {
         state.isAnonymous = false
         state.email = nil
 
-        let dayOfMonth = DailyScore.dayOfMonth(today)
-        let month = DailyScore.monthIndex(today) ?? 0
+        // Every player found every word so far this week.
+        let days = DailyScore.dayOfWeek(today)
+        let weekIndex = DailyScore.weekIndex(today) ?? 0
+        func week(_ p: Player) -> DailyScore.Week { DailyScore.Week(week: weekIndex, found: days, timeMs: p.averageMs * days, played: days) }
         let entries = players.map { p in
             LeaderboardEntry(uid: p.uid, username: p.uid == uid ? progress.username : p.name, played: p.played, wins: p.wins,
-                             streak: p.streak, bestStreak: p.bestStreak, bestTimeMs: p.bestMs, lastWinDay: today, month: month,
-                             monthSaved: (DailyScore.missedMs - p.averageMs) * dayOfMonth, monthPlayed: dayOfMonth)
+                             streak: p.streak, bestStreak: p.bestStreak, bestTimeMs: p.bestMs, lastWinDay: today,
+                             week: weekIndex, weekFound: days, weekTimeMs: p.averageMs * days, weekPlayed: days)
         }
         state.official = entries.first { $0.uid == uid }
-        state.rankings.players = entries.sorted { ($0.monthTotal() ?? 0) < ($1.monthTotal() ?? 0) }
+        state.rankings.players = entries.sorted { $0.weekTally.rank > $1.weekTally.rank }
         state.rankings.fastest = entries.sorted { ($0.bestTimeMs ?? 0) < ($1.bestTimeMs ?? 0) }
         state.rankings.myRank = (rank: 4, players: 1_287)
         state.rankings.today = players.map { p in
@@ -98,7 +100,7 @@ enum ScreenshotDemo {
         }.sorted { $0.scoreMs < $1.scoreMs }
         state.rankings.friendCode = "K7M2QX"
         state.rankings.friends = FriendStanding.ordered(players.filter { ["demo-lea", "demo-hugo", "demo-jade", uid].contains($0.uid) }.map { p in
-            FriendStanding(uid: p.uid, username: p.uid == uid ? progress.username : p.name, monthMs: p.averageMs * dayOfMonth, streak: p.streak,
+            FriendStanding(uid: p.uid, username: p.uid == uid ? progress.username : p.name, week: week(p), streak: p.streak,
                            today: Attempt(cardID: todayCard.id, mode: .daily, correct: true, timeMs: p.todayMs, points: 0, date: now, dailyKey: today),
                            todayWrong: p.wrong, todayHint: p.hint)
         })

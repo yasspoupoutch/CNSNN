@@ -445,13 +445,13 @@ struct ChallengeGameView: View {
                     Spacer()
                 case .done: Spacer()
                 }
-            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
+            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6).readableWidth()
             if session.phase == .done {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
                 VStack {
                     Spacer()
                     ChallengeResultView(session: session, close: { dismiss() }).padding(.horizontal, 8)
-                }.transition(.move(edge: .bottom))
+                }.readableWidth().transition(.move(edge: .bottom))
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: session.phase)

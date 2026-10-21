@@ -5,7 +5,8 @@ struct StatsView: View {
     @Environment(AppState.self) private var state
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
     private var progress: CNSNNCore.Progress { state.progress }
-    @State private var page = 0
+    /// Opens on the rankings (today's Mot du jour); 0 is the player's own numbers.
+    @State private var page = 1
     @State private var refreshToken = 0
     var body: some View {
         ScrollView {
@@ -14,8 +15,8 @@ struct StatsView: View {
                     .padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4)
                     .accessibilityAddTraits(.isHeader)
                 HStack(spacing: 8) {
-                    Chip(title: "Mes stats", selected: page == 0) { page = 0 }
                     Chip(title: "Classement", selected: page == 1) { page = 1 }
+                    Chip(title: "Mes stats", selected: page == 0) { page = 0 }
                 }
                 if page == 1 { LeaderboardView(refreshToken: refreshToken) } else { mine }
             }.padding(.horizontal, 20).padding(.top, 8)
@@ -48,11 +49,11 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionKicker(text: "Mot du jour · officiel", color: Palette.secondary)
             HStack(alignment: .firstTextBaseline) {
-                if let total = entry.monthTotal() {
-                    Text(Format.clock(total)).scaledFont(34, .heavy).monospacedDigit()
-                    Text("au total ce mois-ci").scaledFont(15).foregroundStyle(Palette.secondary)
+                if let week = entry.thisWeek() {
+                    Text(Format.weekDays(week)).scaledFont(34, .heavy).monospacedDigit()
+                    Text("cette semaine, en " + Format.clock(week.timeMs)).scaledFont(15).foregroundStyle(Palette.secondary)
                 } else {
-                    Text("Pas encore joué ce mois-ci").scaledFont(17, .semibold).foregroundStyle(Palette.secondary)
+                    Text("Pas encore joué cette semaine").scaledFont(17, .semibold).foregroundStyle(Palette.secondary)
                 }
                 Spacer()
             }
