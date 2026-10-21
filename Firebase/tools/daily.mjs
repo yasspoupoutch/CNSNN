@@ -70,6 +70,19 @@ export function validate(words) {
 // The Mot du jour is one word: an answer with a space (an expression) stays out of the schedule.
 export const singleWord = (w) => !/\s/.test(w.word.trim());
 
+// The game is general knowledge: football keeps at most one word in ten of each difficulty.
+export const footballShare = 0.1;
+export function limitFootball(words) {
+  const out = [];
+  for (const level of Object.values(difficulties)) {
+    const pool = words.filter((w) => w.difficulty === level);
+    const others = pool.filter((w) => w.category !== 'Football');
+    const allowed = Math.floor(others.length * footballShare / (1 - footballShare));
+    out.push(...others, ...shuffle(pool.filter((w) => w.category === 'Football'), `${level} football`).slice(0, allowed));
+  }
+  return out;
+}
+
 // Several lists become one; a word already in an earlier list is skipped.
 export function combine(lists) {
   const seen = new Set(), words = [];
@@ -135,7 +148,8 @@ async function seed(dry) {
   const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
   const lists = await Promise.all(files.map(async (name) => decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)));
   const { words: all, skipped } = combine(lists);
-  const words = all.filter(singleWord);
+  const single = all.filter(singleWord);
+  const words = limitFootball(single);
   validate(words);
   const { initializeApp, applicationDefault } = await import('firebase-admin/app');
   const { getFirestore, FieldPath } = await import('firebase-admin/firestore');
@@ -148,7 +162,7 @@ async function seed(dry) {
   // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
   const days = schedule(words, shiftDay(today, 1), scheduledDays, played);
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
-  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - words.length} expression(s) de plusieurs mots ignorés), ${played.size} déjà joués.`);
+  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots et ${single.length - words.length} mot(s) de football écartés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
   if (dry) return;
   for (let i = 0; i < days.length; i += 150) {

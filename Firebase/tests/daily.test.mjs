@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord } from '../tools/daily.mjs';
+import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball } from '../tools/daily.mjs';
 
 const list = parseList([
  'F\tGénéral\tBonbon\tUne douceur sucrée.', 'F\tAnimaux\tŒuf\tUn indice assez long.',
@@ -53,4 +53,11 @@ test('the Mot du jour is a single word', () => {
   assert.equal(singleWord({ word: 'Arc-en-ciel' }), true);
   assert.equal(singleWord({ word: 'Coup de pied' }), false);
   assert.throws(() => parseList('F\tGénéral\tCoup de pied\tUn geste au football.'), /un seul mot/);
+});
+
+test('football keeps at most one word in ten', () => {
+  const make = (category, n) => Array.from({ length: n }, (_, i) => ({ word: `${category}${i}`, hint: 'Un indice.', category, difficulty: 'Difficile' }));
+  const kept = limitFootball([...make('Football', 30), ...make('Général', 45)]);
+  assert.equal(kept.filter((w) => w.category === 'Football').length, 5);
+  assert.equal(kept.filter((w) => w.category === 'Général').length, 45);
 });
