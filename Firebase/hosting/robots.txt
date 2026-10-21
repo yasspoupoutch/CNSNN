@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /d/
+Sitemap: https://cnsnn-9ctosy.web.app/sitemap.xml
