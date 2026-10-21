@@ -1,0 +1,38 @@
+name: CNSNN - Texte promo App Store
+
+# Lancement manuel : remplace seulement le texte promotionnel de la fiche App Store en vente
+# (champ promotionalText de Store/app-store-fr.json). Apple le laisse changer sans revue ;
+# rien n'est soumis, aucune version n'est créée.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-appstore-listing
+  cancel-in-progress: false
+
+jobs:
+  promo:
+    name: Changer le texte promotionnel
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Envoyer le texte
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages cryptography 2>/dev/null || python3 -m pip install --quiet cryptography
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$ASC_KEY_P8" > "$key"; chmod 600 "$key"
+          trap 'rm -f "$key"' EXIT
+          python3 Scripts/asc_promo.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$key" com.poupoutch.cnsnn \
+            Store/app-store-fr.json | tee -a "$GITHUB_STEP_SUMMARY"
