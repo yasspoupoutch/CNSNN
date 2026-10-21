@@ -326,6 +326,8 @@ import CNSNNCore
         var readAt: [String: Date] = [:]
     }
     var rankings = Rankings()
+    /// Bumped when the server confirms a daily result, so an open ranking reads again at once.
+    var rankingsVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
     /// Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh.
@@ -348,7 +350,7 @@ import CNSNNCore
     /// The server's result replaces this device's measurement for that day.
     func recordOfficial(_ attempt: Attempt) {
         guard let day = attempt.dailyKey else { return }
-        rankings.readAt = [:]
+        rankings.readAt = [:]; rankingsVersion += 1
         if let index = progress.attempts.firstIndex(where: { $0.dailyKey == day }) {
             var official = attempt
             official.id = progress.attempts[index].id
