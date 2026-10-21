@@ -14,7 +14,8 @@ class WordEngineTest {
         assertEquals("– ST CHRL", WordEngine.shownConsonants("Où est Charlie ?"))
         assertEquals("MSSN MPSSBL", WordEngine.shownConsonants("Mission : Impossible"))
         assertEquals("LG D GLC", WordEngine.shownConsonants("L’Âge de glace"))
-        assertEquals("SPDRMN", WordEngine.shownConsonants("Spider-Man"))
+        assertEquals("SPDR MN", WordEngine.shownConsonants("Spider-Man"))
+        assertEquals("RG GRG", WordEngine.shownConsonants("Rouge-gorge"))
         assertEquals("PPLLN", WordEngine.shownConsonants("Papillon"))
         assertEquals("L ; R ; L, N", WordEngine.spoken("L R LN"))
     }

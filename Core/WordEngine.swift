@@ -12,10 +12,10 @@ public enum WordEngine {
     public static func consonants(_ value: String) -> String {
         normalize(value).filter { !"AEIOUY".contains($0) }
     }
-    /// What the board shows: the consonants of each word, a space between words, a dash for a word
+    /// What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
     /// with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants.
     public static func shownConsonants(_ value: String) -> String {
-        let words = value.split(whereSeparator: \.isWhitespace).map(String.init).filter { !normalize($0).isEmpty }
+        let words = value.split(whereSeparator: { $0.isWhitespace || "-‐‑–—".contains($0) }).map(String.init).filter { !normalize($0).isEmpty }
         guard words.count > 1 else { return consonants(value) }
         return words.map { consonants($0).isEmpty ? "–" : consonants($0) }.joined(separator: " ")
     }
