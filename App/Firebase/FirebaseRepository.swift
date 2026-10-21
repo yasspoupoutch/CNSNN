@@ -32,6 +32,17 @@ struct LeaderboardEntry: Identifiable, Equatable {
         guard month > 0, month == DailyScore.monthIndex(day) else { return nil }
         return DailyScore.monthTotal(saved: monthSaved, days: DailyScore.dayOfMonth(day))
     }
+    var week = 0
+    var weekFound = 0
+    /// Total time of the words found this week, hint minutes included.
+    var weekTimeMs = 0
+    var weekPlayed = 0
+    var weekTally: DailyScore.Week { DailyScore.Week(week: week, found: weekFound, timeMs: weekTimeMs, played: weekPlayed) }
+    /// This week's tally on `day`, nil when the player has not played this week (or only with an older app).
+    func thisWeek(on day: String = DailySchedule.key()) -> DailyScore.Week? {
+        guard week > 0, week == DailyScore.weekIndex(day) else { return nil }
+        return weekTally
+    }
     /// The stored streak only counts while the last win is today or yesterday.
     func currentStreak(at date: Date = Date()) -> Int {
         lastWinDay == DailySchedule.key(date) || lastWinDay == DailySchedule.key(DailySchedule.previousDay(date)) ? streak : 0
@@ -39,13 +50,13 @@ struct LeaderboardEntry: Identifiable, Equatable {
     var successRate: Double { played == 0 ? 0 : Double(wins) / Double(played) }
 }
 
-/// One line of the friends ranking: the month's total and today's Mot du jour, when played.
+/// One line of the friends ranking: the week's tally and today's Mot du jour, when played.
 struct FriendStanding: Identifiable, Equatable {
     var id: String { uid }
     let uid: String
     let username: String
-    /// The month's total time, nil when not played this month.
-    let monthMs: Int?
+    /// The week's words found and time, nil when not played this week.
+    let week: DailyScore.Week?
     let streak: Int
     let today: Attempt?
     /// Wrong guesses on today's word, when the player has a result.
@@ -55,16 +66,16 @@ struct FriendStanding: Identifiable, Equatable {
     var todayScoreMs: Int? { today.map { DailyScore.scoreMs(timeMs: $0.timeMs, usedHint: todayHint, correct: $0.correct) } }
 
     static func == (a: FriendStanding, b: FriendStanding) -> Bool {
-        a.uid == b.uid && a.username == b.username && a.monthMs == b.monthMs && a.streak == b.streak
+        a.uid == b.uid && a.username == b.username && a.week == b.week && a.streak == b.streak
             && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct && a.todayHint == b.todayHint
     }
-    /// Found today first (fastest first, hint minute included), then the others by the month's total.
+    /// Found today first (fastest first, hint minute included), then the others by the week's ranking.
     static func ordered(_ rows: [FriendStanding]) -> [FriendStanding] {
         rows.sorted { a, b in
             let fa = a.today?.correct == true, fb = b.today?.correct == true
             if fa != fb { return fa }
             if fa, let ta = a.todayScoreMs, let tb = b.todayScoreMs, ta != tb { return ta < tb }
-            if a.monthMs != b.monthMs { return (a.monthMs ?? .max) < (b.monthMs ?? .max) }
+            if a.week?.rank != b.week?.rank { return (a.week?.rank ?? .min) > (b.week?.rank ?? .min) }
             return a.username.localizedCaseInsensitiveCompare(b.username) == .orderedAscending
         }
     }
@@ -454,17 +465,17 @@ enum DailyGuesses {
         let doc = try await db.collection("leaderboard").document(uid).getDocument(source: source)
         return doc.data().flatMap { Self.entry(uid: uid, $0) }
     }
-    /// The month's lines, best first. One number sorts them (monthRank: the month, then the time saved
-    /// on ten minutes a day), so the ranking needs no composite index.
-    private func monthBoard(_ day: String) -> Query? {
-        guard let month = DailyScore.monthIndex(day) else { return nil }
-        return db.collection("leaderboard").whereField("monthRank", isGreaterThanOrEqualTo: DailyScore.monthRank(month: month, saved: 0))
-            .whereField("monthRank", isLessThan: DailyScore.monthRank(month: month + 1, saved: 0))
+    /// The week's lines, best first. One number sorts them (weekRank: the week, the words found, then
+    /// the time), so the ranking needs no composite index.
+    private func weekBoard(_ day: String) -> Query? {
+        guard let week = DailyScore.weekIndex(day) else { return nil }
+        return db.collection("leaderboard").whereField("weekRank", isGreaterThanOrEqualTo: DailyScore.weekRank(week: week, found: 0, timeMs: DailyScore.weekTimeCap))
+            .whereField("weekRank", isLessThan: DailyScore.weekRank(week: week + 1, found: 0, timeMs: DailyScore.weekTimeCap))
     }
     // Rankings show 25 lines: a few more are read so suspended players can be left out.
-    func monthPlayers(day: String, limit: Int = 25) async throws -> [LeaderboardEntry] {
-        guard let board = monthBoard(day) else { return [] }
-        let docs = try await board.order(by: "monthRank", descending: true).limit(to: limit + 10).getDocuments().documents
+    func weekPlayers(day: String, limit: Int = 25) async throws -> [LeaderboardEntry] {
+        guard let board = weekBoard(day) else { return [] }
+        let docs = try await board.order(by: "weekRank", descending: true).limit(to: limit + 10).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))
     }
     func fastestPlayers(limit: Int = 25) async throws -> [LeaderboardEntry] {
@@ -473,10 +484,10 @@ enum DailyGuesses {
     }
     /// A suspended player's totals and results stay stored but are hidden from everyone else.
     private static func visible(_ doc: QueryDocumentSnapshot) -> Bool { doc.data()["suspended"] as? Bool != true }
-    /// Rank in the month's ranking among the players of the month, nil without a game this month.
-    func monthRank(_ entry: LeaderboardEntry, day: String) async throws -> (rank: Int, players: Int)? {
-        guard entry.monthTotal(on: day) != nil, let board = monthBoard(day) else { return nil }
-        let ahead = try await Self.count(board.whereField("monthRank", isGreaterThan: entry.monthTally.rank))
+    /// Rank in the week's ranking among the players of the week, nil without a game this week.
+    func weekRank(_ entry: LeaderboardEntry, day: String) async throws -> (rank: Int, players: Int)? {
+        guard let week = entry.thisWeek(on: day), let board = weekBoard(day) else { return nil }
+        let ahead = try await Self.count(board.whereField("weekRank", isGreaterThan: week.rank))
         return (ahead + 1, try await Self.count(board))
     }
     /// Today's results, sorted by one number (rank: the day, then the time with the hint minute, lost last).
@@ -597,7 +608,7 @@ enum DailyGuesses {
             }
             let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
             let today = data.flatMap { Self.attempt(day: day, $0) }
-            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, monthMs: entry?.monthTotal(on: day),
+            rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, week: entry?.thisWeek(on: day),
                                        streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int,
                                        todayHint: data?["usedHint"] as? Bool ?? false))
         }
@@ -907,7 +918,9 @@ enum DailyGuesses {
         return LeaderboardEntry(uid: uid, username: d["username"] as? String ?? "Joueur", played: played,
                                 wins: d["wins"] as? Int ?? 0, streak: d["streak"] as? Int ?? 0, bestStreak: d["bestStreak"] as? Int ?? 0,
                                 bestTimeMs: d["bestTimeMs"] as? Int, lastWinDay: d["lastWinDay"] as? String ?? "",
-                                month: d["month"] as? Int ?? 0, monthSaved: d["monthSaved"] as? Int ?? 0, monthPlayed: d["monthPlayed"] as? Int ?? 0)
+                                month: d["month"] as? Int ?? 0, monthSaved: d["monthSaved"] as? Int ?? 0, monthPlayed: d["monthPlayed"] as? Int ?? 0,
+                                week: d["week"] as? Int ?? 0, weekFound: d["weekFound"] as? Int ?? 0, weekTimeMs: d["weekTimeMs"] as? Int ?? 0,
+                                weekPlayed: d["weekPlayed"] as? Int ?? 0)
     }
     /// Same arithmetic as the `tallies` rule in Firebase/firestore.rules.
     static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, scoreMs: Int) -> [String: Any] {
@@ -917,8 +930,11 @@ enum DailyGuesses {
         let streak = laterWin ? (previous ? oldStreak + 1 : 1) : (!correct && day > lastWin ? 0 : oldStreak)
         let best: Any = correct ? (min(old?.bestTimeMs ?? timeMs, timeMs) as Any) : (old?.bestTimeMs.map { $0 as Any } ?? NSNull())
         let month = DailyScore.tally(old: old?.monthTally ?? DailyScore.Month(month: 0, saved: 0, played: 0), day: day, scoreMs: scoreMs)
+        // The month stays tallied for the apps from before the weekly ranking (iOS 1.0, Android).
+        let week = DailyScore.tally(old: old?.weekTally ?? .none, day: day, correct: correct, scoreMs: scoreMs)
         return ["uid":uid,"username":username,"played":(old?.played ?? 0) + 1,
                 "month":month.month,"monthSaved":month.saved,"monthPlayed":month.played,"monthRank":month.rank,
+                "week":week.week,"weekFound":week.found,"weekTimeMs":week.timeMs,"weekPlayed":week.played,"weekRank":week.rank,
                 "wins":(old?.wins ?? 0) + (correct ? 1 : 0),"streak":streak,"bestStreak":max(old?.bestStreak ?? 0, streak),
                 "bestTimeMs":best,"lastWinDay":laterWin ? day : lastWin,"lastResult":day,"updatedAt":FieldValue.serverTimestamp()]
     }

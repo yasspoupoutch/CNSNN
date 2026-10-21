@@ -1,7 +1,8 @@
 import Foundation
 
 /// The Mot du jour is scored on time only, the lower the better: the hint adds one minute, and a lost
-/// (or unplayed) day counts ten minutes, the most a day can cost. Same arithmetic as firestore.rules.
+/// day counts ten minutes, the most a day can cost. The week's ranking counts the words found first,
+/// then their time. Same arithmetic as firestore.rules.
 public enum DailyScore {
     public static let hintPenaltyMs = 60_000
     public static let missedMs = 600_000
@@ -38,6 +39,34 @@ public enum DailyScore {
         guard let month = monthIndex(day), month >= old.month else { return old }
         let same = month == old.month
         return Month(month: month, saved: (same ? old.saved : 0) + missedMs - scoreMs, played: (same ? old.played : 0) + 1)
+    }
+
+    // The week's ranking (Monday to Sunday): the most words found first, then the lowest total time of
+    // the found days, hint minutes included. A lost or unplayed day adds nothing: no invented time.
+    /// Weeks since Monday 1969-12-29 (1970-01-01, day 0, was a Thursday), as the rules' `weekIndex`.
+    public static func weekIndex(_ day: String) -> Int? { dayIndex(day).map { ($0 + 3) / 7 } }
+    /// 1 on Monday to 7 on Sunday.
+    public static func dayOfWeek(_ day: String) -> Int { dayIndex(day).map { ($0 + 3) % 7 + 1 } ?? 1 }
+    /// Above the most a week can add up to (7 days of 10 minutes), so the time fits in the rank's last digits.
+    public static let weekTimeCap = 9_999_999
+    /// One number sorts the week, best first when descending: the week, the words found, then the time.
+    public static func weekRank(week: Int, found: Int, timeMs: Int) -> Int {
+        week * 100_000_000 + found * 10_000_000 + (weekTimeCap - timeMs)
+    }
+
+    public struct Week: Equatable, Sendable {
+        public var week: Int, found: Int, timeMs: Int, played: Int
+        public init(week: Int, found: Int, timeMs: Int, played: Int) { self.week = week; self.found = found; self.timeMs = timeMs; self.played = played }
+        public static let none = Week(week: 0, found: 0, timeMs: 0, played: 0)
+        public var rank: Int { DailyScore.weekRank(week: week, found: found, timeMs: timeMs) }
+    }
+    /// The week tally after one more result: a new week starts from zero, and a late result from an
+    /// older week leaves the current one alone (same as the rules' `tallyWeek`).
+    public static func tally(old: Week, day: String, correct: Bool, scoreMs: Int) -> Week {
+        guard let week = weekIndex(day), week >= old.week else { return old }
+        let same = week == old.week
+        return Week(week: week, found: (same ? old.found : 0) + (correct ? 1 : 0),
+                    timeMs: (same ? old.timeMs : 0) + (correct ? scoreMs : 0), played: (same ? old.played : 0) + 1)
     }
 }
 

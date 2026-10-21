@@ -25,13 +25,13 @@ struct ModeGameView: View {
             VStack(spacing: 0) {
                 topBar
                 if session.over { Spacer() } else { content }
-            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6)
+            }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6).readableWidth()
             if session.over {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
                 VStack {
                     Spacer()
                     ModeResultView(session: session, replay: replay, close: { dismiss() }).padding(.horizontal, 8)
-                }.transition(.move(edge: .bottom))
+                }.readableWidth().transition(.move(edge: .bottom))
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: session.over)

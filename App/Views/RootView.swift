@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import CNSNNCore
 
 struct RootView: View {
@@ -11,7 +12,7 @@ struct RootView: View {
             AmbientBackground()
             if !introDone || state.isRestoring { LaunchView(loading: introDone).transition(.opacity) }
             else if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
-            else { OnboardingView().transition(.opacity) }
+            else { OnboardingView().readableWidth().transition(.opacity) }
         }
         .animation(.easeInOut(duration: 0.35), value: introDone)
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
@@ -61,6 +62,7 @@ struct MainShell: View {
     @State private var tab: AppTab = .play
     @State private var game: GameRoute?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.requestReview) private var requestReview
     var body: some View {
         ZStack(alignment: .bottom) {
             // Every page stays alive so it keeps its state, as with a native tab view.
@@ -78,18 +80,30 @@ struct MainShell: View {
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
-        .fullScreenCover(item: $game) { route in
+        .fullScreenCover(item: $game, onDismiss: askReviewIfPending) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let play = route.play { ModeGameView(mode: play) }
             else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty) }
         }
     }
     @ViewBuilder private func content(_ page: AppTab) -> some View {
-        switch page {
-        case .play: HomeView { game = $0 }
-        case .stats: StatsView()
-        case .propose: ProposeView()
-        case .profile: ProfileView()
+        Group {
+            switch page {
+            case .play: HomeView { game = $0 }
+            case .stats: StatsView()
+            case .propose: ProposeView()
+            case .profile: ProfileView()
+            }
+        }.readableWidth()
+    }
+    /// Apple's rating prompt, back on the home page after a found daily word, never during a game.
+    private func askReviewIfPending() {
+        guard state.reviewPending else { return }
+        state.reviewPending = false
+        ReviewPrompt.markAsked()
+        Task {
+            try? await Task.sleep(for: .seconds(0.8))
+            requestReview()
         }
     }
 }

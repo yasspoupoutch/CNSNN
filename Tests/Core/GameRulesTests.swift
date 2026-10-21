@@ -30,6 +30,29 @@ final class GameRulesTests: XCTestCase {
   XCTAssertEqual(DailyScore.tally(old:month,day:"2026-09-30",scoreMs:1000),month)
   XCTAssertEqual(DailyScore.tally(old:month,day:"2026-11-01",scoreMs:600000),DailyScore.Month(month:2026*12+10,saved:0,played:1))
  }
+ func testTheWeekRanksWordsFoundThenTime() {
+  // 2026-10-19 is a Monday, 2026-10-25 the Sunday of the same week.
+  XCTAssertEqual(DailyScore.dayOfWeek("2026-10-19"),1)
+  XCTAssertEqual(DailyScore.dayOfWeek("2026-10-25"),7)
+  XCTAssertEqual(DailyScore.dayOfWeek("1970-01-01"),4)
+  XCTAssertEqual(DailyScore.weekIndex("2026-10-19"),DailyScore.weekIndex("2026-10-25"))
+  XCTAssertEqual(DailyScore.weekIndex("2026-10-26"),DailyScore.weekIndex("2026-10-25")!+1)
+  var week=DailyScore.Week.none
+  week=DailyScore.tally(old:week,day:"2026-10-19",correct:true,scoreMs:30000)
+  week=DailyScore.tally(old:week,day:"2026-10-20",correct:false,scoreMs:600000)
+  week=DailyScore.tally(old:week,day:"2026-10-21",correct:true,scoreMs:95000)
+  let w=DailyScore.weekIndex("2026-10-21")!
+  // A lost day adds nothing to the time.
+  XCTAssertEqual(week,DailyScore.Week(week:w,found:2,timeMs:125000,played:3))
+  XCTAssertEqual(week.rank,w*100_000_000+2*10_000_000+9_999_999-125000)
+  // One more word found beats any time; at equal words, the faster wins.
+  XCTAssertGreaterThan(DailyScore.weekRank(week:w,found:3,timeMs:1_800_000),DailyScore.weekRank(week:w,found:2,timeMs:20000))
+  XCTAssertGreaterThan(DailyScore.weekRank(week:w,found:2,timeMs:20000),DailyScore.weekRank(week:w,found:2,timeMs:21000))
+  XCTAssertGreaterThan(DailyScore.weekRank(week:w+1,found:0,timeMs:0),DailyScore.weekRank(week:w,found:7,timeMs:0))
+  // A late result from last week leaves this one alone; next Monday starts from zero.
+  XCTAssertEqual(DailyScore.tally(old:week,day:"2026-10-18",correct:true,scoreMs:1000),week)
+  XCTAssertEqual(DailyScore.tally(old:week,day:"2026-10-26",correct:true,scoreMs:40000),DailyScore.Week(week:w+1,found:1,timeMs:40000,played:1))
+ }
  func testClassicLevelFollowsTheWordsFound() {
   XCTAssertEqual(ClassicLevel.level(words:0),1)
   XCTAssertEqual(ClassicLevel.level(words:19),1)

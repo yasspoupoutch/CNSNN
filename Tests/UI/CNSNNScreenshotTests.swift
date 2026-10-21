@@ -82,6 +82,77 @@ final class CNSNNScreenshotTests: XCTestCase {
         capture("06-profil")
     }
 
+    /// The App Store preview video: the workflow films the simulator during this test and keeps the
+    /// 30 seconds that follow the "PREVIEW_START" line. Same invented data as the screenshots.
+    @MainActor func testAppPreview() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7"]
+        app.launch()
+        let next = app.buttons["Continuer"]
+        XCTAssertTrue(next.waitForExistence(timeout: 10))
+        next.tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+        XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
+        dismissKeyboardIfNeeded(app)
+        Thread.sleep(forTimeInterval: 1)
+        print("PREVIEW_START \(Date().timeIntervalSince1970)")
+
+        // The home page, then a Classique game: PPLLN, typed letter by letter, is PAPILLON.
+        Thread.sleep(forTimeInterval: 2.5)
+        tile(app, "Classique").tap()
+        let launch = app.buttons["Lancer une partie"]
+        XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        launch.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.5)
+        type(app, "PAPILLON")
+        app.buttons["Valider"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        let home = app.buttons["Retour à l’accueil"]
+        XCTAssertTrue(home.waitForExistence(timeout: 5))
+        home.tap()
+
+        // Sprint: MNGST is MANGOUSTE, then the clock runs on.
+        let sprint = tile(app, "Sprint")
+        XCTAssertTrue(sprint.waitForExistence(timeout: 10))
+        sprint.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
+        type(app, "MANGOUSTE")
+        app.buttons["Valider"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["Quitter"].tap()
+        let stop = app.buttons["Arrêter le sprint"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let back = app.buttons["Accueil"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10))
+        back.tap()
+
+        // Today's ranking, then the week's.
+        let ranking = app.buttons["Classement"]
+        XCTAssertTrue(ranking.waitForExistence(timeout: 10))
+        ranking.tap()
+        Thread.sleep(forTimeInterval: 3)
+        let week = app.buttons["Semaine"]
+        if week.waitForExistence(timeout: 3) { week.tap() }
+        Thread.sleep(forTimeInterval: 3)
+        print("PREVIEW_END \(Date().timeIntervalSince1970)")
+    }
+
+    /// Types a word on the game's own keyboard, at a pace a viewer can follow.
+    @MainActor private func type(_ app: XCUIApplication, _ word: String) {
+        for letter in word {
+            app.buttons[String(letter)].firstMatch.tap()
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+    }
+
     /// A mode tile of the home page ("Sprint. 90 secondes…").
     @MainActor private func tile(_ app: XCUIApplication, _ title: String) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title + ".")).firstMatch

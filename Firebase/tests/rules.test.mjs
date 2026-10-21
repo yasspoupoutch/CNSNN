@@ -30,6 +30,8 @@ function score(timeMs,usedHint,correct){return correct?Math.min(timeMs+(usedHint
 const dayIndex=key=>Math.round(Date.parse(`${key}T00:00:00Z`)/86400000);
 const dailyRank=(key,s,correct)=>dayIndex(key)*1000000+(correct?s:999999);
 const monthIndex=key=>Number(key.slice(0,4))*12+Number(key.slice(5,7))-1;
+const weekIndex=key=>Math.floor((dayIndex(key)+3)/7);
+const weekRank=(w,found,ms)=>w*100000000+found*10000000+(9999999-ms);
 
 // Creates the profile and reserves its pseudo in the same batch, as the apps do.
 function signUpBatch(uid='alice',username='Alice',data=profile(uid,username)){
@@ -72,19 +74,24 @@ async function resultFor(uid,day,overrides={}){
  return {userId:uid,username:(await read(`users/${uid}`)).username,day,cardId:s.cardId,correct:s.correct,usedHint:s.hintUsed,wrongAnswers:s.wrongAnswers,
   timeMs,scoreMs:score(timeMs,s.hintUsed,s.correct),rank:dailyRank(day,score(timeMs,s.hintUsed,s.correct),s.correct),startedAt:s.startedAt,finishedAt:s.finishedAt,...overrides};
 }
-function tally(old,r,uid='alice'){
+// The week's tally as iOS 1.1 sends it; `weeks:false` is an app from before (iOS 1.0, Android).
+function tally(old,r,uid='alice',{weeks=true}={}){
  const laterWin=r.correct&&r.day>old.lastWinDay;
  const streak=laterWin?(old.lastWinDay===shiftKey(r.day,-1)?old.streak+1:1):(!r.correct&&r.day>old.lastWinDay?0:old.streak);
  const m=monthIndex(r.day),om=old.month??0,same=m===om,saved=(same?old.monthSaved:0)+600000-r.scoreMs;
  const month=m<om?{month:om,monthSaved:old.monthSaved,monthPlayed:old.monthPlayed,monthRank:old.monthRank}
   :{month:m,monthSaved:saved,monthPlayed:(same?old.monthPlayed:0)+1,monthRank:m*100000000+saved};
- return {uid,username:r.username,...month,played:old.played+1,wins:old.wins+(r.correct?1:0),streak,bestStreak:Math.max(old.bestStreak,streak),
+ const w=weekIndex(r.day),ow=old.week??0,sameWeek=w===ow;
+ const found=(sameWeek?old.weekFound:0)+(r.correct?1:0),ms=(sameWeek?old.weekTimeMs:0)+(r.correct?r.scoreMs:0);
+ const week=!weeks?{}:w<ow?{week:ow,weekFound:old.weekFound,weekTimeMs:old.weekTimeMs,weekPlayed:old.weekPlayed,weekRank:old.weekRank}
+  :{week:w,weekFound:found,weekTimeMs:ms,weekPlayed:(sameWeek?old.weekPlayed:0)+1,weekRank:weekRank(w,found,ms)};
+ return {uid,username:r.username,...month,...week,played:old.played+1,wins:old.wins+(r.correct?1:0),streak,bestStreak:Math.max(old.bestStreak,streak),
   bestTimeMs:r.correct?(old.bestTimeMs==null?r.timeMs:Math.min(old.bestTimeMs,r.timeMs)):old.bestTimeMs,lastWinDay:laterWin?r.day:old.lastWinDay,lastResult:r.day,updatedAt:serverTimestamp()};
 }
 const zero={played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',month:0,monthSaved:0,monthPlayed:0};
-async function publish(uid,r,old=zero,forged={}){
+async function publish(uid,r,old=zero,forged={},options={}){
  const db=user(uid),b=writeBatch(db);
- b.set(doc(db,`dailyResults/${uid}_${r.day}`),r);b.set(doc(db,`leaderboard/${uid}`),{...tally(old,r,uid),...forged});
+ b.set(doc(db,`dailyResults/${uid}_${r.day}`),r);b.set(doc(db,`leaderboard/${uid}`),{...tally(old,r,uid,options),...forged});
  return b.commit();
 }
 
@@ -331,6 +338,67 @@ test('the month total starts again each month and ignores a late day from an old
  await assertSucceeds(publish('alice',late,newer));
  board=await read('leaderboard/alice');
  assert.equal(board.month,m+1); assert.equal(board.monthSaved,2000000); assert.equal(board.monthPlayed,5);
+});
+test('the week ranks words found then time, and starts again each Monday',async()=>{
+ await signUp();
+ const day=parisKey(),yesterday=shiftKey(day,-1),w=weekIndex(day);
+ const line=(week,found,ms)=>({uid:'alice',username:'Alice',played:2,wins:2,streak:0,bestStreak:2,bestTimeMs:9000,lastWinDay:'',lastResult:yesterday,
+  month:monthIndex(day),monthSaved:0,monthPlayed:0,monthRank:monthIndex(day)*100000000,week,weekFound:found,weekTimeMs:ms,weekPlayed:found,weekRank:weekRank(week,found,ms),updatedAt:Timestamp.now()});
+ await seed('leaderboard/alice',line(w,2,70000));
+ await startDaily(); await finishDaily();
+ let r=await resultFor('alice',day),old=await read('leaderboard/alice');
+ // Forged words found, time or rank are refused; so is half a week tally.
+ await assertFails(publish('alice',r,old,{weekFound:4,weekRank:weekRank(w,4,70000+r.scoreMs)}));
+ await assertFails(publish('alice',r,old,{weekTimeMs:1000,weekRank:weekRank(w,3,1000)}));
+ await assertFails(publish('alice',r,old,{weekRank:weekRank(w,3,0)}));
+ { const half=tally(old,r); delete half.weekRank; const db=user(),b=writeBatch(db);
+   b.set(doc(db,`dailyResults/alice_${day}`),r); b.set(doc(db,'leaderboard/alice'),half); await assertFails(b.commit()); }
+ await assertSucceeds(publish('alice',r,old));
+ let board=await read('leaderboard/alice');
+ assert.equal(board.week,w); assert.equal(board.weekFound,3); assert.equal(board.weekTimeMs,70000+r.scoreMs); assert.equal(board.weekPlayed,3);
+ assert.equal(board.weekRank,weekRank(w,3,70000+r.scoreMs));
+ // A lost day counts as played, adds no time and no word.
+ await env.clearFirestore(); await signUp();
+ await seed('leaderboard/alice',line(w,2,70000));
+ await startDaily(); await finishDaily('alice',day,false);
+ r=await resultFor('alice',day); old=await read('leaderboard/alice');
+ await assertFails(publish('alice',r,old,{weekTimeMs:70000+600000,weekRank:weekRank(w,2,670000)}));
+ await assertSucceeds(publish('alice',r,old));
+ board=await read('leaderboard/alice');
+ assert.equal(board.weekFound,2); assert.equal(board.weekTimeMs,70000); assert.equal(board.weekPlayed,3);
+ // Last week's tally is not carried over; a late day from an older week leaves the newer week alone.
+ await env.clearFirestore(); await signUp();
+ await seed('leaderboard/alice',line(w-1,6,200000));
+ await startDaily(); await finishDaily();
+ r=await resultFor('alice',day); old=await read('leaderboard/alice');
+ await assertFails(publish('alice',r,old,{week:w,weekFound:7,weekTimeMs:200000+r.scoreMs,weekPlayed:7,weekRank:weekRank(w,7,200000+r.scoreMs)}));
+ await assertSucceeds(publish('alice',r,old));
+ board=await read('leaderboard/alice');
+ assert.equal(board.week,w); assert.equal(board.weekFound,1); assert.equal(board.weekTimeMs,r.scoreMs);
+ await env.clearFirestore(); await signUp();
+ await seed('leaderboard/alice',line(w+1,1,30000));
+ await startDaily(); await finishDaily();
+ r=await resultFor('alice',day); old=await read('leaderboard/alice');
+ await assertFails(publish('alice',r,old,{week:w,weekFound:1,weekTimeMs:r.scoreMs,weekPlayed:1,weekRank:weekRank(w,1,r.scoreMs)}));
+ await assertSucceeds(publish('alice',r,old));
+ board=await read('leaderboard/alice');
+ assert.equal(board.week,w+1); assert.equal(board.weekFound,1); assert.equal(board.weekTimeMs,30000);
+});
+test('an app from before the weekly ranking still saves its results',async()=>{
+ await signUp();
+ const day=parisKey(),w=weekIndex(day);
+ await startDaily(); await finishDaily();
+ const r=await resultFor('alice',day);
+ // iOS 1.0 sends no week fields: accepted, and the line leaves the week's ranking.
+ await assertSucceeds(publish('alice',r,zero,{},{weeks:false}));
+ const board=await read('leaderboard/alice');
+ assert.equal(board.week,undefined); assert.equal(board.month,monthIndex(day));
+ // Week fields sent at all must be complete and right.
+ await env.clearFirestore(); await signUp(); await startDaily(); await finishDaily();
+ const again=await resultFor('alice',day);
+ await assertFails(publish('alice',again,zero,{week:w},{weeks:false}));
+ await assertSucceeds(publish('alice',again));
+ assert.equal((await read('leaderboard/alice')).weekRank,weekRank(w,1,again.scoreMs));
 });
 test('leaderboard rename follows the profile only',async()=>{
  await signUp();

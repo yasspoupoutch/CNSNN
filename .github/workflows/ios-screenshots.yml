@@ -1,7 +1,7 @@
 name: CNSNN - Captures App Store
 
-# Lancement manuel uniquement : captures d'écran App Store sur un simulateur iPhone 6,9 pouces
-# (1320 x 2868). L'app tourne avec `--uitesting --screenshots` : profil, classement et défis
+# Lancement manuel uniquement : captures d'écran et aperçu vidéo App Store sur un simulateur iPhone
+# 6,9 pouces (1320 x 2868), et les mêmes captures sur l'iPhone Duo pour vérifier la mise en page. L'app tourne avec `--uitesting --screenshots` : profil, classement et défis
 # inventés, hors ligne (App/Services/ScreenshotDemo.swift), et seulement des cartes publiques du
 # Classique, jamais un mot du jour secret. Les PNG sont publiés en artefact et sur la branche
 # `store-screenshots` (dossier ios/<apparence>/).
@@ -176,7 +176,7 @@ jobs:
             -disableAutomaticPackageResolution \
             -parallel-testing-enabled NO \
             -test-timeouts-enabled YES \
-            -only-testing:CNSNNUITests/CNSNNScreenshotTests \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests/testAppStoreScreenshots \
             -resultBundlePath "$CI_ROOT/screenshots.xcresult" \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
@@ -222,6 +222,101 @@ jobs:
           for name in sorted(copied):
               print('Capture :', name)
           PY
+
+      # Aperçu vidéo App Store : le simulateur est filmé pendant testAppPreview ; le test écrit
+      # « PREVIEW_START <heure> » quand l'app est prête, et la vidéo est coupée à partir de là
+      # (le job publish la met au format Apple, 886 x 1920, 30 i/s).
+      - name: Filmer l'aperçu vidéo (CNSNNScreenshotTests/testAppPreview)
+        run: |
+          set -euo pipefail
+          mkdir -p "$CI_ROOT/preview"
+          xcrun simctl io "$SIMULATOR_ID" recordVideo --codec=h264 --force "$CI_ROOT/preview/raw.mov" &
+          recorder=$!
+          started=$(python3 -c 'import time; print(time.time())')
+          sleep 2
+          set +e
+          xcodebuild test-without-building \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -parallel-testing-enabled NO \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests/testAppPreview \
+            -resultBundlePath "$CI_ROOT/preview.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            > "$CI_ROOT/logs/preview.log" 2>&1
+          status=$?
+          set -e
+          kill -INT "$recorder"; wait "$recorder" || true
+          tail -20 "$CI_ROOT/logs/preview.log"
+          if [ "$status" -ne 0 ]; then echo '::error::Le test de l’aperçu vidéo a échoué.'; exit "$status"; fi
+          python3 - "$CI_ROOT/logs/preview.log" "$started" "$CI_ROOT/preview/timing.json" <<'PY'
+          import json, re, sys
+          log = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+          start = float(re.search(r'PREVIEW_START ([0-9.]+)', log).group(1))
+          end = float(re.search(r'PREVIEW_END ([0-9.]+)', log).group(1))
+          timing = {'offset': round(start - float(sys.argv[2]), 2), 'duration': round(end - start, 2)}
+          json.dump(timing, open(sys.argv[3], 'w'))
+          print('Aperçu vidéo :', timing)
+          PY
+          ls -l "$CI_ROOT/preview"
+
+      - name: Conserver la vidéo brute en artefact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-preview-ios-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/cnsnn-ci/preview/
+          if-no-files-found: error
+          retention-days: 7
+
+      # iPhone Duo (pliable, grand écran intérieur) : mêmes captures sur son simulateur s'il existe sur
+      # ce runner, pour vérifier la mise en page. Elles restent en artefact, rien n'est publié.
+      - name: Vérifier la mise en page sur l'iPhone Duo
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          duo=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = [d for runtime in json.load(sys.stdin)["devices"].values() for d in runtime if "Duo" in d["name"]]
+          print(devices[-1]["udid"] if devices else "")')
+          if [ -z "$duo" ]; then
+            echo '::warning::Pas de simulateur iPhone Duo sur ce runner : mise en page non vérifiée.'
+            xcrun simctl list devicetypes | grep -i iphone | tail -15
+            exit 0
+          fi
+          xcrun simctl boot "$duo"; xcrun simctl bootstatus "$duo" -b
+          xcrun simctl ui "$duo" appearance "$APPEARANCE"
+          xcodebuild test-without-building \
+            -project CNSNN.xcodeproj -scheme CNSNN -configuration Debug -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$duo" -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution -parallel-testing-enabled NO \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests/testAppStoreScreenshots \
+            -resultBundlePath "$CI_ROOT/duo.xcresult" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            2>&1 | tail -30
+          mkdir -p "$CI_ROOT/duo"
+          xcrun xcresulttool export attachments --path "$CI_ROOT/duo.xcresult" --output-path "$CI_ROOT/duo"
+          xcrun simctl shutdown "$duo" || true
+
+      - name: Conserver les captures iPhone Duo
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-screenshots-duo-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/cnsnn-ci/duo/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Conserver les captures en artefact
         if: ${{ always() && !cancelled() }}
@@ -291,6 +386,29 @@ jobs:
           name: cnsnn-screenshots-ios-${{ env.APPEARANCE }}
           path: ${{ runner.temp }}/screenshots
 
+      - name: Récupérer la vidéo brute
+        uses: actions/download-artifact@v4
+        with:
+          name: cnsnn-preview-ios-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/preview
+
+      # Format Apple pour l'iPhone 6,9 pouces : 886 x 1920, 30 i/s, H.264, 15 à 30 s, piste son
+      # stéréo (silencieuse ici).
+      - name: Mettre l'aperçu vidéo au format App Store
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          offset=$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/preview/timing.json'))['offset'])")
+          ffmpeg -hide_banner -loglevel error -y -ss "$offset" -i "$RUNNER_TEMP/preview/raw.mov" \
+            -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -t 29.5 \
+            -vf "scale=886:1920:force_original_aspect_ratio=decrease,pad=886:1920:(ow-iw)/2:(oh-ih)/2:color=0x06070c,fps=30,format=yuv420p" \
+            -c:v libx264 -profile:v high -level 4.0 -b:v 8M -maxrate 10M -bufsize 16M \
+            -c:a aac -b:a 256k -ar 44100 -ac 2 -shortest -movflags +faststart "$RUNNER_TEMP/preview/preview.mp4"
+          length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$RUNNER_TEMP/preview/preview.mp4")
+          size=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$RUNNER_TEMP/preview/preview.mp4")
+          echo "Aperçu vidéo : ${size}, ${length} s"
+          python3 -c "import sys; d=float('$length'); sys.exit(0 if 15 <= d <= 30 else 'Durée hors des 15 à 30 s demandées par Apple')"
+
       - name: Pousser les captures sur store-screenshots
         run: |
           set -euo pipefail
@@ -307,6 +425,7 @@ jobs:
           rm -rf "ios/$APPEARANCE"
           mkdir -p "ios/$APPEARANCE"
           cp "$RUNNER_TEMP/screenshots/"*.png "ios/$APPEARANCE/"
+          cp "$RUNNER_TEMP/preview/preview.mp4" "ios/$APPEARANCE/preview.mp4"
           ls -l "ios/$APPEARANCE"
           git add -A .
           if git diff --cached --quiet; then

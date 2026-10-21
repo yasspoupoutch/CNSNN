@@ -6,6 +6,8 @@ import CNSNNCore
     var progress = CNSNNCore.Progress()
     var cards = SeedCards.all + ExtraCards.all
     var error: String?
+    /// Set by a game won on the daily word when the rating prompt is due; shown once that game is closed.
+    var reviewPending = false
     var isBusy = false
     var cloud: FirebaseRepository?
     var uid: String?

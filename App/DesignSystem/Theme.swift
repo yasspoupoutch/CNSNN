@@ -1,4 +1,5 @@
 import SwiftUI
+import CNSNNCore
 import UIKit
 
 /// Design tokens from the Claude Design "CNSNN — Liquid Glass" prototype (dark theme).
@@ -47,6 +48,15 @@ enum CNSNNTheme {
     static let spring = Animation.spring(response: 0.32, dampingFraction: 0.84)
     static let ease = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: 0.45)
     static let avatarKey = "cnsnn.avatarIndex"
+    /// Widest the content gets: on a wide screen (the unfolded iPhone Duo) it stays phone-shaped, centered.
+    static let readableWidth: CGFloat = 560
+}
+
+extension View {
+    /// Caps the width at `CNSNNTheme.readableWidth` and centers it; no effect on a phone.
+    func readableWidth() -> some View {
+        frame(maxWidth: CNSNNTheme.readableWidth).frame(maxWidth: .infinity)
+    }
 }
 
 enum Typo {
@@ -434,4 +444,8 @@ enum Format {
     /// 1er, 2e, 3e…
     static func ordinal(_ value: Int) -> String { value == 1 ? "1er" : "\(number(value))e" }
     static func seconds(_ ms: Int?) -> String { ms.map { String(format: "%.1f s", Double($0) / 1000) } ?? "—" }
+    /// The week's words found out of its days so far: "5/7 jours", "1/3 jour".
+    static func weekDays(_ week: DailyScore.Week, on day: String = DailySchedule.key()) -> String {
+        "\(week.found)/\(DailyScore.dayOfWeek(day)) " + (week.found > 1 ? "jours" : "jour")
+    }
 }

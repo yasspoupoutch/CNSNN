@@ -88,6 +88,28 @@ final class RepositoryTests: XCTestCase {
         // The month's total on the 13th: 13 days at ten minutes, minus what the two games saved.
         XCTAssertEqual(old.monthTotal(on: "2026-10-13"), 13 * 600_000 - 596_000)
         XCTAssertNil(old.monthTotal(on: "2026-11-01"))
+        // The week (2026-10-12 is a Monday): words found, then their time; a lost day adds nothing.
+        let w = DailyScore.weekIndex("2026-10-12")!
+        XCTAssertEqual(first["week"] as? Int, w)
+        XCTAssertEqual(first["weekFound"] as? Int, 1)
+        XCTAssertEqual(first["weekTimeMs"] as? Int, 4000)
+        XCTAssertEqual(first["weekRank"] as? Int, DailyScore.weekRank(week: w, found: 1, timeMs: 4000))
+        let thisWeek = LeaderboardEntry(uid: "a", username: "Alice", played: 1, wins: 1, streak: 1, bestStreak: 1, bestTimeMs: 4000, lastWinDay: "2026-10-12",
+                                        week: w, weekFound: 1, weekTimeMs: 4000, weekPlayed: 1)
+        let tuesday = FirebaseRepository.tally(old: thisWeek, uid: "a", username: "Alice", day: "2026-10-13", correct: true, timeMs: 9000, scoreMs: 69_000)
+        XCTAssertEqual(tuesday["weekFound"] as? Int, 2)
+        XCTAssertEqual(tuesday["weekTimeMs"] as? Int, 73_000)
+        XCTAssertEqual(tuesday["weekPlayed"] as? Int, 2)
+        let missed = FirebaseRepository.tally(old: thisWeek, uid: "a", username: "Alice", day: "2026-10-13", correct: false, timeMs: 9000, scoreMs: 600_000)
+        XCTAssertEqual(missed["weekFound"] as? Int, 1)
+        XCTAssertEqual(missed["weekTimeMs"] as? Int, 4000)
+        let nextMonday = FirebaseRepository.tally(old: thisWeek, uid: "a", username: "Alice", day: "2026-10-19", correct: true, timeMs: 9000, scoreMs: 9000)
+        XCTAssertEqual(nextMonday["week"] as? Int, w + 1)
+        XCTAssertEqual(nextMonday["weekFound"] as? Int, 1)
+        XCTAssertEqual(nextMonday["weekTimeMs"] as? Int, 9000)
+        XCTAssertEqual(thisWeek.thisWeek(on: "2026-10-18"), DailyScore.Week(week: w, found: 1, timeMs: 4000, played: 1))
+        XCTAssertNil(thisWeek.thisWeek(on: "2026-10-19"))
+        XCTAssertNil(old.thisWeek(on: "2026-10-13"), "A line saved by an older app has no week")
     }
     func testLeaderboardStreakExpires() {
         let calendar = DailySchedule.calendar

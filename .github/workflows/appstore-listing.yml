@@ -2,7 +2,7 @@ name: CNSNN - Fiche App Store
 
 # Lancement manuel : remplit la fiche App Store de la version en préparation (textes de
 # Store/app-store-fr.json, catégorie, copyright, captures 6,9 pouces de la branche
-# `store-screenshots`). Ne soumet jamais rien à la revue d'Apple ; relancer remplace tout.
+# `store-screenshots` avec leurs légendes). Ne soumet jamais rien à la revue d'Apple ; relancer remplace tout.
 on:
   workflow_dispatch:
     inputs:
@@ -40,8 +40,18 @@ jobs:
           git fetch --depth=1 origin store-screenshots
           mkdir -p "$RUNNER_TEMP/shots"
           git archive FETCH_HEAD "ios/$APPEARANCE" | tar -x -C "$RUNNER_TEMP/shots"
-          printf 'SHOTS=%s\n' "$RUNNER_TEMP/shots/ios/$APPEARANCE" >> "$GITHUB_ENV"
           ls -l "$RUNNER_TEMP/shots/ios/$APPEARANCE"
+
+      # Une phrase en haut de chaque capture (champ captions de Store/app-store-fr.json).
+      - name: Ajouter les légendes
+        env:
+          APPEARANCE: ${{ inputs.appearance || 'dark' }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages pillow 2>/dev/null || python3 -m pip install --quiet pillow
+          python3 Scripts/store_captions.py Store/app-store-fr.json "$RUNNER_TEMP/shots/ios/$APPEARANCE" "$RUNNER_TEMP/captioned"
+          printf 'SHOTS=%s\n' "$RUNNER_TEMP/captioned" >> "$GITHUB_ENV"
+          printf 'PREVIEW=%s\n' "$RUNNER_TEMP/shots/ios/$APPEARANCE/preview.mp4" >> "$GITHUB_ENV"
 
       - name: Envoyer textes et captures
         env:
@@ -55,4 +65,4 @@ jobs:
           printf '%s' "$ASC_KEY_P8" > "$key"; chmod 600 "$key"
           trap 'rm -f "$key"' EXIT
           python3 Scripts/asc_listing.py "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$key" com.poupoutch.cnsnn \
-            Store/app-store-fr.json "$SHOTS" | tee -a "$GITHUB_STEP_SUMMARY"
+            Store/app-store-fr.json "$SHOTS" "$PREVIEW" | tee -a "$GITHUB_STEP_SUMMARY"

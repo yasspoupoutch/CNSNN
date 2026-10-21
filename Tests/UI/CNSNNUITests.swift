@@ -89,8 +89,11 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Connectez-vous à Internet pour défier vos amis."].exists)
         app.swipeDown(velocity: .fast)
 
-        // The records page lists the three modes.
+        // Stats opens on the rankings; the player's own page lists the records of the three modes.
         app.buttons["Stats"].tap()
+        let mine = app.buttons["Mes stats"]
+        XCTAssertTrue(mine.waitForExistence(timeout: 5))
+        mine.tap()
         XCTAssertTrue(app.staticTexts["Records personnels"].waitForExistence(timeout: 5))
     }
 
