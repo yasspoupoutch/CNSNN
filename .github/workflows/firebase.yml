@@ -21,6 +21,14 @@ on:
         description: UID Firebase à nommer administrateur (facultatif)
         type: string
         default: ''
+      delete_users:
+        description: Pseudos de comptes à supprimer, séparés par des virgules (montrés seulement, sauf confirmation)
+        type: string
+        default: ''
+      confirm_delete:
+        description: Confirmer la suppression définitive des comptes ci-dessus
+        type: boolean
+        default: false
       daily_public_key:
         description: Afficher la clé publique qui chiffre la liste des mots du jour
         type: boolean
@@ -101,7 +109,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key is harmless, so it also runs on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key)) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -135,6 +143,12 @@ jobs:
         env:
           ADMIN_UID: ${{ inputs.admin_uid }}
         run: node tools/grant-admin.mjs "$ADMIN_UID"
+      - name: Montrer ou supprimer des comptes
+        if: ${{ inputs.delete_users != '' && github.ref == 'refs/heads/main' }}
+        env:
+          DELETE_USERS: ${{ inputs.delete_users }}
+          CONFIRM: ${{ inputs.confirm_delete && '--delete' || '' }}
+        run: node tools/delete-users.mjs "$DELETE_USERS" $CONFIRM
       - name: Clé publique des mots du jour
         if: ${{ inputs.daily_public_key }}
         run: node tools/daily.mjs public-key

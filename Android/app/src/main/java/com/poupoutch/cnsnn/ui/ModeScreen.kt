@@ -74,6 +74,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.DuoGame
+import com.poupoutch.cnsnn.core.WordEngine
 import com.poupoutch.cnsnn.core.DuoRecord
 import com.poupoutch.cnsnn.core.DuoWord
 import com.poupoutch.cnsnn.core.Format
@@ -263,7 +264,7 @@ private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: 
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         val consonants = current.consonants
         Text(consonants, style = Type.serif(if (consonants.length > 4) 64 else 84), letterSpacing = 4.sp, maxLines = 1,
-            modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + consonants.toList().joinToString(", ") })
+            modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
         Text("Deux mots, les mêmes consonnes", fontSize = 12.sp, color = Palette.tertiary)
         Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             DuoClue(1, current.first, duo.found[duo.round][0], duo.roundComplete)
@@ -310,7 +311,7 @@ internal fun ColumnScope.Clue(card: Card) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val consonants = shown.wordNoVowels
                 Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 84), letterSpacing = 3.sp, maxLines = 1,
-                    modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + consonants.toList().joinToString(", ") })
+                    modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
                 Text("${shown.category.label} · ${shown.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
                 Text("« ${shown.hint} »", style = Type.serifItalic(22), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp, start = 10.dp, end = 10.dp))
             }

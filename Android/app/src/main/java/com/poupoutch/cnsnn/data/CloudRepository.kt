@@ -612,7 +612,7 @@ class CloudRepository(
         }
         val author = profile.getString("username") ?: "Joueur"
         val batch = db.batch()
-        batch.set(ref, mapOf("wordFull" to card.wordFull, "wordNoVowels" to card.wordNoVowels, "normalizedAnswer" to id, "hint" to card.hint,
+        batch.set(ref, mapOf("wordFull" to card.wordFull, "wordNoVowels" to WordEngine.consonants(card.wordFull), "normalizedAnswer" to id, "hint" to card.hint,
             "category" to card.category.label, "difficulty" to card.difficulty.label, "createdBy" to uid, "createdAt" to FieldValue.serverTimestamp(),
             "status" to "pending", "authorName" to author))
         batch.update(userRef, quota)

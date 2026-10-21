@@ -174,7 +174,7 @@ struct ModeGameView: View {
             Text(consonants)
                 .font(Typo.serif(consonants.count > 4 ? 64 : 84)).tracking(4)
                 .lineLimit(1).minimumScaleFactor(0.4).padding(.top, 18)
-                .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
+                .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
             Text("Deux mots, les mêmes consonnes").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 2)
             VStack(spacing: 10) {
                 DuoClueRow(number: 1, word: duo.first, found: game.found[game.round][0], revealed: game.roundComplete)
@@ -198,7 +198,7 @@ struct ModeGameView: View {
             Text(consonants)
                 .font(Typo.serif(consonants.count > 5 ? 60 : 80)).tracking(3)
                 .lineLimit(1).minimumScaleFactor(0.35)
-                .accessibilityLabel("Consonnes : " + consonants.map(String.init).joined(separator: ", "))
+                .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
             Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 4)

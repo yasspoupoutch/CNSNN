@@ -8,6 +8,16 @@ final class WordEngineTests: XCTestCase {
   XCTAssertEqual(WordEngine.consonants("œuf"),"F")
   XCTAssertEqual(WordEngine.consonants("Penalty"),"PNLT")
  }
+ func testTheBoardSeparatesWords() {
+  XCTAssertEqual(WordEngine.shownConsonants("Le Roi Lion"),"L R LN")
+  XCTAssertEqual(WordEngine.shownConsonants("Où est Charlie ?"),"– ST CHRL")
+  XCTAssertEqual(WordEngine.shownConsonants("Mission : Impossible"),"MSSN MPSSBL")
+  XCTAssertEqual(WordEngine.shownConsonants("L’Âge de glace"),"LG D GLC")
+  XCTAssertEqual(WordEngine.shownConsonants("Spider-Man"),"SPDRMN")
+  XCTAssertEqual(WordEngine.shownConsonants("Papillon"),"PPLLN")
+  XCTAssertEqual(Card(id: "x", wordFull: "Le Roi Lion", hint: "", category: .cinema, difficulty: .easy).wordNoVowels,"L R LN")
+  XCTAssertEqual(WordEngine.spoken("L R LN"),"L ; R ; L, N")
+ }
  func testFrenchNormalization() {
   XCTAssertEqual(WordEngine.normalize("  L’ŒUVRE — d'Été  "),"LOEUVREDETE")
   XCTAssertTrue(WordEngine.matches(" ballon d'or ",word:"Ballon d’or"))

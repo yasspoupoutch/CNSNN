@@ -68,7 +68,7 @@ data class Card(
     /** Consonants given by the server for a secret Mot du jour, whose word stays unknown until the end. */
     val masked: String? = null,
 ) {
-    val wordNoVowels: String get() = masked ?: WordEngine.consonants(wordFull)
+    val wordNoVowels: String get() = masked ?: WordEngine.shownConsonants(wordFull)
 }
 
 @Serializable
