@@ -85,6 +85,20 @@ for (const line of (await db.collection('leaderboard').get()).docs) {
 }
 console.log(`Classement de la semaine : ${weekLines} lignes complétées`);
 
+// Challenges need a friend both ways (2026-10): friends added before the code also filled the other
+// side (or whose other side failed) get it now, so their challenges keep working.
+const usernames = new Map(profiles.map((p) => [p.id, p.get('username')]));
+let mutual = 0;
+for (const friend of (await db.collectionGroup('friends').get()).docs) {
+  const owner = friend.ref.parent.parent?.id;
+  if (!owner || !usernames.has(owner) || !usernames.has(friend.id) || owner === friend.id) continue;
+  const back = db.doc(`users/${friend.id}/friends/${owner}`);
+  if ((await back.get()).exists) continue;
+  await back.create({ username: usernames.get(owner), addedAt: FieldValue.serverTimestamp() });
+  mutual++;
+}
+console.log(`Amitiés rendues réciproques : ${mutual}`);
+
 const source = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 const ruleset = await getSecurityRules().releaseFirestoreRulesetFromSource(source);
 console.log(`Règles publiées : ${ruleset.name}`);

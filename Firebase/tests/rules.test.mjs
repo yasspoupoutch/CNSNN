@@ -545,16 +545,15 @@ test('approved query permitted, global enumeration denied',async()=>{
 test('client cannot forge legacy attempts or schedule',async()=>{
  for(const path of ['attempts/fake','dailyChallenges/2026-10-06']) await assertFails(setDoc(doc(user(),path),{userId:'alice',score:100}));
 });
-test('moderators publish daily words with the weekday difficulty',async()=>{
- const challenge=(difficulty)=>({cardId:'custom-1',wordFull:'Montgolfière',hint:'Un ballon à air chaud.',category:'Objets',difficulty,publishedBy:'mod',publishedAt:serverTimestamp()});
+test('nobody writes a daily word in clear any more, not even a moderator',async()=>{
+ const challenge={cardId:'custom-1',wordFull:'Montgolfière',hint:'Un ballon à air chaud.',category:'Objets',difficulty:'Difficile',publishedBy:'mod',publishedAt:serverTimestamp()};
  const mod=user('mod',{admin:true});
- // 2026-10-17 is a Saturday: hard.
- await assertFails(setDoc(doc(mod,'dailyChallenges/2026-10-17'),challenge('Facile')));
- await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-17'),challenge('Difficile')));
- await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-13'),challenge('Facile')));
- await assertSucceeds(setDoc(doc(mod,'dailyChallenges/2026-10-14'),challenge('Moyen')));
- await assertFails(setDoc(doc(user(),'dailyChallenges/2026-10-18'),{...challenge('Difficile'),publishedBy:'alice'}));
- await assertSucceeds(getDoc(doc(user(),'dailyChallenges/2026-10-17')));
+ await assertFails(setDoc(doc(mod,'dailyChallenges/2026-10-17'),challenge));
+ await seed('dailyChallenges/2026-10-17',{...challenge,publishedAt:new Date()});
+ await assertFails(updateDoc(doc(mod,'dailyChallenges/2026-10-17'),{hint:'Un autre indice.'}));
+ // The apps still look for one, and an old one can be removed.
+ await assertSucceeds(getDoc(doc(user(),'dailyChallenges/2026-10-18')));
+ await assertSucceeds(deleteDoc(doc(mod,'dailyChallenges/2026-10-17')));
 });
 test('a missing card id can be checked before proposing',async()=>{
  await assertSucceeds(getDoc(doc(user(),'cards/INCONNU')));
