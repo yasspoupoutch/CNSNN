@@ -230,10 +230,7 @@ struct ModeGameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            ForEach(Array(session.answer.enumerated()), id: \.offset) { _, character in
-                Text(String(character)).scaledFont(30, .medium).tracking(2.4)
-                    .foregroundStyle(Vowels.contains(character) ? Palette.accent : Palette.foreground)
-            }
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
             Caret()
         }
         .lineLimit(1).minimumScaleFactor(0.4)

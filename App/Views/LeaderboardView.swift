@@ -121,10 +121,12 @@ struct LeaderboardView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
-        }.glassPanel(radius: 24, padding: 0)
+        }
+        // The highlighted "vous" row follows the panel's rounded corners.
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).glassPanel(radius: 24, padding: 0)
     }
 
-    private var refreshKey: String { (state.uid ?? "") + "-" + String(refreshToken) }
+    private var refreshKey: String { (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion) }
 
     private var emptyText: String {
         switch board {
@@ -218,7 +220,7 @@ struct FriendsBoard: View {
             if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
             board
         }
-        .task(id: (state.uid ?? "") + "-" + String(refreshToken)) { await refresh() }
+        .task(id: (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion)) { await refresh() }
     }
 
     @ViewBuilder private var board: some View {
@@ -266,7 +268,9 @@ struct FriendsBoard: View {
                     .accessibilityElement(children: .combine)
                 }
             }
-        }.glassPanel(radius: 24, padding: 0)
+        }
+        // The highlighted "vous" row follows the panel's rounded corners.
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).glassPanel(radius: 24, padding: 0)
     }
 
     private func todayText(_ row: FriendStanding) -> String {

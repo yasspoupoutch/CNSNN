@@ -163,10 +163,7 @@ struct GameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            ForEach(Array(session.answer.enumerated()), id: \.offset) { _, character in
-                Text(String(character)).scaledFont(30, .medium).tracking(2.4)
-                    .foregroundStyle(Vowels.contains(character) ? Palette.accent : Palette.foreground)
-            }
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
             if session.result == nil { Caret() }
         }
         .lineLimit(1).minimumScaleFactor(0.4)
@@ -440,6 +437,20 @@ private struct KeyCap: View {
                 }
                 .contentShape(Rectangle())
         }.buttonStyle(PressStyle(scale: 0.88))
+    }
+}
+
+/// The typed answer as one text, vowels in gold: when a long answer has to shrink, every letter
+/// shrinks by the same amount (separate texts each shrank on their own, wide letters like M more).
+struct AnswerLetters: View {
+    let answer: String
+    var body: some View {
+        Text(answer.reduce(into: AttributedString()) { line, character in
+            var letter = AttributedString(String(character))
+            letter.foregroundColor = Vowels.contains(character) ? Palette.accent : Palette.foreground
+            line += letter
+        })
+        .tracking(4.4).scaledFont(30, .medium)
     }
 }
 
