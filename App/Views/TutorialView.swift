@@ -74,50 +74,57 @@ struct TutorialOverlay: View {
     @AccessibilityFocusState private var titleFocused: Bool
 
     var body: some View {
-        GeometryReader { proxy in
-            let hole = spotlight(in: proxy)
-            ZStack(alignment: .topLeading) {
+        ZStack {
+            // The dim covers the whole screen, status bar included.
+            GeometryReader { proxy in
+                let hole = spotlight(in: proxy)
                 SpotlightShape(hole: hole.rect, radius: hole.radius)
                     .fill(Color.black.opacity(0.76), style: FillStyle(eoFill: true))
                     .contentShape(Rectangle())
                     .onTapGesture {}
                     .accessibilityHidden(true)
-                if step == .play, let anchor = anchors[.play] { playButton(proxy[anchor]) }
-                VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button("Passer") { close() }
-                            .scaledFont(15, .semibold).foregroundStyle(Palette.secondary)
-                            .padding(.horizontal, 16).frame(minHeight: 44)
-                            .accessibilityIdentifier("tutorial.skip")
-                    }
-                    .padding(.top, proxy.safeAreaInsets.top).padding(.horizontal, 8)
-                    if step.target == nil {
-                        // Centred, and scrolls on a small phone or with large text instead of being cut off.
-                        ScrollView {
-                            VStack(spacing: 18) {
-                                example
-                                callout
-                            }
-                            .padding(.horizontal, 26).padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom - 80))
-                        }
-                        .scrollBounceBehavior(.basedOnSize).scrollIndicators(.hidden)
-                    } else {
-                        callout
-                            .padding(.horizontal, 20)
-                            .padding(.top, max(0, hole.rect.maxY + 18 - proxy.safeAreaInsets.top - 44))
-                        Spacer(minLength: 0)
-                    }
-                }
-                .padding(.bottom, proxy.safeAreaInsets.bottom + 12)
-                .frame(maxWidth: CNSNNTheme.readableWidth)
-                .frame(maxWidth: .infinity)
             }
-            .animation(reduceMotion ? nil : CNSNNTheme.ease, value: step)
-            .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintShown)
+            .ignoresSafeArea()
+            // The text and buttons stay inside the safe area, clear of the status bar and the Dynamic Island.
+            GeometryReader { proxy in
+                let hole = spotlight(in: proxy)
+                ZStack(alignment: .topLeading) {
+                    if step == .play, let anchor = anchors[.play] { playButton(proxy[anchor]) }
+                    VStack(spacing: 0) {
+                        HStack {
+                            Spacer()
+                            Button("Passer") { close() }
+                                .scaledFont(15, .semibold).foregroundStyle(Palette.secondary)
+                                .padding(.horizontal, 16).frame(minHeight: 44)
+                                .accessibilityIdentifier("tutorial.skip")
+                        }
+                        .padding(.horizontal, 8)
+                        if step.target == nil {
+                            // Centred, and scrolls on a small phone or with large text instead of being cut off.
+                            ScrollView {
+                                VStack(spacing: 18) {
+                                    example
+                                    callout
+                                }
+                                .padding(.horizontal, 26).padding(.vertical, 12)
+                                .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - 56))
+                            }
+                            .scrollBounceBehavior(.basedOnSize).scrollIndicators(.hidden)
+                        } else {
+                            callout
+                                .padding(.horizontal, 20)
+                                .padding(.top, max(0, hole.rect.maxY + 18 - 44))
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(.bottom, 12)
+                    .frame(maxWidth: CNSNNTheme.readableWidth)
+                    .frame(maxWidth: .infinity)
+                }
+            }
         }
-        .ignoresSafeArea()
+        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: step)
+        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintShown)
         .accessibilityAddTraits(.isModal)
         .onAppear { titleFocused = true }
     }
