@@ -46,7 +46,7 @@ private enum TutorialStep: Int, CaseIterable {
     var message: String {
         switch self {
         case .play: "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"
-        case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
+        case .consonants: "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… Le thème vous met sur la piste. À vous de le retrouver !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
         case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour). En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer."
