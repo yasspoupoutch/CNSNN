@@ -93,10 +93,16 @@ struct TutorialOverlay: View {
                     }
                     .padding(.top, proxy.safeAreaInsets.top).padding(.horizontal, 8)
                     if step.target == nil {
-                        Spacer(minLength: 12)
-                        example.padding(.horizontal, 26)
-                        callout.padding(.horizontal, 26).padding(.top, 18)
-                        Spacer(minLength: 12)
+                        // Centred, and scrolls on a small phone or with large text instead of being cut off.
+                        ScrollView {
+                            VStack(spacing: 18) {
+                                example
+                                callout
+                            }
+                            .padding(.horizontal, 26).padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom - 80))
+                        }
+                        .scrollBounceBehavior(.basedOnSize).scrollIndicators(.hidden)
                     } else {
                         callout
                             .padding(.horizontal, 20)

@@ -1,6 +1,9 @@
 package com.poupoutch.cnsnn.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.graphicsLayer
@@ -176,11 +179,15 @@ fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
                 Callout(step, index, false, ::next, ::back)
             }
         } else {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp, vertical = 48.dp),
-                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Example(step, hintShown) { haptics.selection(); hintShown = true }
-                Spacer(Modifier.height(18.dp))
-                Callout(step, index, hintShown, ::next, ::back)
+            // Centred, and scrolls on a small phone or with large text instead of being cut off.
+            BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(top = 48.dp)) {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight)
+                    .padding(horizontal = 26.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Example(step, hintShown) { haptics.selection(); hintShown = true }
+                    Spacer(Modifier.height(18.dp))
+                    Callout(step, index, hintShown, ::next, ::back)
+                }
             }
         }
     }
