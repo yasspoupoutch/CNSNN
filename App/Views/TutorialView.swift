@@ -40,7 +40,7 @@ private enum TutorialStep: Int, CaseIterable {
         case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
         case .second: "… ou AUTEUR…"
-        case .help: "Thème, indice et chrono"
+        case .help: "Si vous ne trouvez pas…"
         }
     }
     var message: String {
@@ -49,14 +49,14 @@ private enum TutorialStep: Int, CaseIterable {
         case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
-        case .help: "En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer. Sous le mot, l’indice si vous séchez (+1 min sur le mot du jour) : « Il a écrit le livre. » C’est AUTEUR !"
+        case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour). En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer."
         }
     }
     /// The word revealed under the consonants, vowels in gold.
     var word: String? {
         switch self {
         case .first: "TROU"
-        case .second, .help: "AUTEUR"
+        case .second: "AUTEUR"
         default: nil
         }
     }
@@ -68,6 +68,8 @@ struct TutorialOverlay: View {
     var anchors: [TutorialTarget: Anchor<CGRect>]
     var finish: () -> Void
     @State private var step = TutorialStep.play
+    /// The last step: Indice was tapped, the hint is showing and AUTEUR slides in.
+    @State private var hintShown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AccessibilityFocusState private var titleFocused: Bool
 
@@ -107,6 +109,7 @@ struct TutorialOverlay: View {
                 .frame(maxWidth: .infinity)
             }
             .animation(reduceMotion ? nil : CNSNNTheme.ease, value: step)
+            .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintShown)
         }
         .ignoresSafeArea()
         .accessibilityAddTraits(.isModal)
@@ -157,7 +160,7 @@ struct TutorialOverlay: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($titleFocused)
-            Text(step.message).scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 6)
+            Text(step == .help && hintShown ? "« Il a écrit le livre. » : c’est AUTEUR ! Le thème et le chrono sont en haut, comme ici." : step.message).scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 6)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 if step != .play {
@@ -183,6 +186,7 @@ struct TutorialOverlay: View {
     /// (tap the word to see it again). The step being explained gets a gold ring.
     private var example: some View {
         let help = step == .help
+        let hint = help && hintShown
         return VStack(spacing: 0) {
             ZStack {
                 VStack(spacing: 2) {
@@ -191,31 +195,39 @@ struct TutorialOverlay: View {
                         .foregroundStyle(help ? Palette.accent : Palette.tertiary)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 6)
-                .modifier(Lit(on: help))
+                .modifier(Lit(on: help, blink: false))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Exemple, thème : " + Tutorial.theme)
                 ExampleClock(running: help)
-                    .modifier(Lit(on: help))
+                    .modifier(Lit(on: help, blink: false))
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            // The last step keeps AUTEUR on screen without playing it again.
-            MorphWord(word: step.word, from: step == .second ? TutorialStep.first.word : nil)
-                .id(help ? .second : step)
+            // The last step starts again from TR; the hint brings AUTEUR in.
+            MorphWord(word: hint ? "AUTEUR" : step.word, from: step == .second ? TutorialStep.first.word : nil)
+                .id("\(step)-\(hint)")
                 .frame(maxWidth: .infinity, minHeight: 96)
                 .padding(.top, 8)
-            if help {
+            if hint {
                 Text("« Il a écrit le livre. »").font(Typo.serifItalic(20)).multilineTextAlignment(.center)
                     .transition(.opacity.combined(with: .offset(y: 6)))
             }
-            HStack(spacing: 8) {
-                Text("Indice").fontWeight(.bold)
-                Text(help ? "révélé" : "+1 min")
+            // Blinks on the last step until it is tapped, like the game's button.
+            Button {
+                guard help, !hintShown else { return }
+                Haptics.selection()
+                hintShown = true
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Indice").fontWeight(.bold)
+                    Text(hint ? "révélé" : "+1 min")
+                }
+                .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
+                .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule()
             }
-            .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
-            .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule()
-            .modifier(Lit(on: help))
+            .buttonStyle(PressStyle())
+            .modifier(Lit(on: help && !hint))
             .padding(.top, 12)
-            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("tutorial.hint")
         }
         .glassCard(radius: 30, padding: 18)
     }
@@ -224,11 +236,12 @@ struct TutorialOverlay: View {
         Haptics.selection()
         guard let following = TutorialStep(rawValue: step.rawValue + 1) else { close(); return }
         step = following
+        hintShown = false
         titleFocused = true
     }
     private func back() {
         Haptics.selection()
-        if let previous = TutorialStep(rawValue: step.rawValue - 1) { step = previous }
+        if let previous = TutorialStep(rawValue: step.rawValue - 1) { step = previous; hintShown = false }
         titleFocused = true
     }
     private func close() {
@@ -313,16 +326,22 @@ private struct MorphWord: View {
 }
 
 /// A gold ring that breathes around the part of the example being explained.
+/// A gold ring around a part of the example: steady to point at it, blinking (with a gold glow) where to tap.
 private struct Lit: ViewModifier {
     var on: Bool
+    var blink = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func body(content: Content) -> some View {
-        content.overlay {
-            Capsule().strokeBorder(Palette.accent, lineWidth: 2)
-                .modifier(Pulse(active: !reduceMotion))
-                .opacity(on ? 1 : 0)
-                .padding(-3)
-        }
+        content
+            .background {
+                if on && blink { Capsule().fill(Palette.accentSoft).modifier(Pulse(active: !reduceMotion)) }
+            }
+            .overlay {
+                Capsule().strokeBorder(Palette.accent, lineWidth: 2)
+                    .modifier(Pulse(active: blink && !reduceMotion))
+                    .opacity(on ? 1 : 0)
+                    .padding(-3)
+            }
     }
 }
 

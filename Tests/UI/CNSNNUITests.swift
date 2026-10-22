@@ -130,7 +130,7 @@ final class CNSNNUITests: XCTestCase {
     }
 
     /// First-launch tutorial: the daily card and its Jouer button (tapped through the spotlight), then TR:
-    /// TROU but also AUTEUR, then the theme, the hint and the clock. Profil > Revoir le tutoriel shows it again, and Passer closes it.
+    /// TROU or AUTEUR, then Indice (tapped) with the theme and the clock. Profil > Revoir le tutoriel shows it again, and Passer closes it.
     @MainActor func testTutorial() {
         let app = XCUIApplication()
         app.launchArguments = ["--uitesting", "--tutorial"]
@@ -161,7 +161,10 @@ final class CNSNNUITests: XCTestCase {
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["… ou AUTEUR…"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Thème, indice et chrono"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Si vous ne trouvez pas…"].waitForExistence(timeout: 5))
+        // Indice blinks; tapping it shows the hint.
+        app.buttons["tutorial.hint"].tap()
+        XCTAssertTrue(app.staticTexts["« Il a écrit le livre. »"].waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
         XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout: 5))

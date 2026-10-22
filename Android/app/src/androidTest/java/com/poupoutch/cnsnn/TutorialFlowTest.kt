@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 
 /**
  * The tutorial, opened again from Profil: the daily card, its Jouer button lit and tapped, then TR:
- * TROU, but also AUTEUR, then the theme, the hint and the clock. Retour goes back a step, "À vous de jouer" closes it on the home page.
+ * TROU or AUTEUR, then Indice (tapped) with the theme and the clock. Retour goes back a step, "À vous de jouer" closes it on the home page.
  */
 @RunWith(AndroidJUnit4::class)
 class TutorialFlowTest {
@@ -54,7 +54,10 @@ class TutorialFlowTest {
         rule.onNodeWithText("Suivant").performClick()
         waitFor("… ou AUTEUR…")
         rule.onNodeWithText("Suivant").performClick()
-        waitFor("Thème, indice et chrono")
+        waitFor("Si vous ne trouvez pas…")
+        // Indice blinks; tapping it shows the hint.
+        rule.onNodeWithTag("tutorial.hint").performClick()
+        waitFor("« Il a écrit le livre. »")
         rule.onNodeWithContentDescription("Chrono").assertIsDisplayed()
         rule.onNodeWithText("À vous de jouer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }

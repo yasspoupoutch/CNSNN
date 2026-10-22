@@ -110,8 +110,8 @@ private enum class TutorialStep(val target: TutorialTarget?, val title: String, 
     FIRST(null, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
     SECOND(null, "… ou AUTEUR…",
         "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !", "AUTEUR"),
-    HELP(null, "Thème, indice et chrono",
-        "En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer. Sous le mot, l’indice si vous séchez (+1 min sur le mot du jour) : « Il a écrit le livre. » C’est AUTEUR !", "AUTEUR"),
+    HELP(null, "Si vous ne trouvez pas…",
+        "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour). En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer."),
 }
 
 /**
@@ -122,6 +122,8 @@ private enum class TutorialStep(val target: TutorialTarget?, val title: String, 
 fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
     var index by rememberSaveable { mutableStateOf(0) }
     val step = TutorialStep.entries[index]
+    // The last step: Indice was tapped, the hint is showing and AUTEUR slides in.
+    var hintShown by rememberSaveable(index) { mutableStateOf(false) }
     val haptics = rememberHaptics()
     fun next() { haptics.selection(); if (index == TutorialStep.entries.lastIndex) finish() else index++ }
     fun back() { haptics.selection(); if (index > 0) index-- }
@@ -171,21 +173,21 @@ fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
         if (step.target != null && target != null) {
             val top = with(density) { (hole.bottom + 18.dp.toPx()).roundToInt() }
             Box(Modifier.fillMaxWidth().offset { IntOffset(0, top) }.padding(horizontal = 20.dp), contentAlignment = Alignment.TopCenter) {
-                Callout(step, index, ::next, ::back)
+                Callout(step, index, false, ::next, ::back)
             }
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp, vertical = 48.dp),
                 verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Example(step)
+                Example(step, hintShown) { haptics.selection(); hintShown = true }
                 Spacer(Modifier.height(18.dp))
-                Callout(step, index, ::next, ::back)
+                Callout(step, index, hintShown, ::next, ::back)
             }
         }
     }
 }
 
 @Composable
-private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -> Unit) {
+private fun Callout(step: TutorialStep, index: Int, hintShown: Boolean, next: () -> Unit, back: () -> Unit) {
     AnimatedContent(step, Modifier.widthIn(max = 560.dp), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "callout") { shown ->
         SectionCard(radius = 28.dp) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.semantics {
@@ -198,7 +200,8 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
             }
             Text(shown.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 14.dp).semantics { heading() })
-            Text(shown.message, color = Palette.secondary, modifier = Modifier.padding(top = 6.dp))
+            Text(if (shown == TutorialStep.HELP && hintShown) "« Il a écrit le livre. » : c’est AUTEUR ! Le thème et le chrono sont en haut, comme ici." else shown.message,
+                color = Palette.secondary, modifier = Modifier.padding(top = 6.dp))
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (index > 0) TextButton(back) { Text("Retour", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
                 Spacer(Modifier.weight(1f))
@@ -220,11 +223,14 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
  * word to see it again). On the last step the theme, the clock and the hint get a gold ring.
  */
 @Composable
-private fun Example(step: TutorialStep) {
+private fun Example(step: TutorialStep, hintShown: Boolean, showHint: () -> Unit) {
     val help = step == TutorialStep.HELP
-    val pulse by rememberInfiniteTransition(label = "lit").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.35f,
-        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "lit")
-    val ring = Modifier.border(2.dp, Palette.accent.copy(alpha = if (help) pulse else 0f), RoundedCornerShape(50))
+    val hint = help && hintShown
+    val pulse by rememberInfiniteTransition(label = "lit").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.25f,
+        infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "lit")
+    // Steady around the theme and the clock; Indice blinks until it is tapped.
+    val ring = Modifier.border(2.dp, Palette.accent.copy(alpha = if (help) 1f else 0f), RoundedCornerShape(50))
+    val blinking = help && !hint
     SectionCard(Modifier.widthIn(max = 560.dp), padding = 18.dp, radius = 30.dp) {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.align(Alignment.Center).then(ring).padding(horizontal = 14.dp, vertical = 6.dp)
@@ -237,18 +243,22 @@ private fun Example(step: TutorialStep) {
             ExampleClock(help, Modifier.align(Alignment.CenterEnd).then(ring))
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            // The last step keeps AUTEUR on screen without playing it again.
-            key(if (help) TutorialStep.SECOND else step) {
-                MorphWord(step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null)
+            // The last step starts again from TR; the hint brings AUTEUR in.
+            key(step, hint) {
+                MorphWord(if (hint) "AUTEUR" else step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null)
             }
         }
-        if (help) Text("« Il a écrit le livre. »", style = Type.serifItalic(20), textAlign = TextAlign.Center,
+        if (hint) Text("« Il a écrit le livre. »", style = Type.serifItalic(20), textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth())
-        Row(Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp).then(ring)
-            .background(Palette.fill1, RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 8.dp),
+        Row(Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp)
+            .border(2.dp, Palette.accent.copy(alpha = if (blinking) pulse else 0f), RoundedCornerShape(50))
+            .background(if (blinking) Palette.accent.copy(alpha = 0.18f * pulse) else Palette.fill1, RoundedCornerShape(50))
+            .clickable(enabled = blinking, role = Role.Button, onClick = showHint)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("tutorial.hint"),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Indice", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(if (help) "révélé" else "+1 min", fontSize = 13.sp)
+            Text(if (hint) "révélé" else "+1 min", fontSize = 13.sp)
         }
     }
 }
