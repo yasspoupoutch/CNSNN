@@ -308,7 +308,7 @@ private struct MorphWord: View {
         .accessibilityLabel(word ?? "Consonnes : T, R")
         .accessibilityAddTraits(.isStaticText)
     }
-    private func letters(_ text: String, progress: (Int) -> CGFloat) -> some View {
+    private func letters(_ text: String, progress: @escaping (Int) -> CGFloat) -> some View {
         HStack(spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { index, character in
                 if Vowels.contains(character) {
