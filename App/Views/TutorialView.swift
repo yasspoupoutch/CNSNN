@@ -39,7 +39,7 @@ private enum TutorialStep: Int, CaseIterable {
         case .play: "Le mot du jour"
         case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
-        case .second: "… mais aussi AUTEUR !"
+        case .second: "… ou AUTEUR…"
         case .help: "Thème, indice et chrono"
         }
     }
@@ -48,7 +48,7 @@ private enum TutorialStep: Int, CaseIterable {
         case .play: "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"
         case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
-        case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Alors, TROU ou AUTEUR ?"
+        case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
         case .help: "En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer. Sous le mot, l’indice si vous séchez (+1 min sur le mot du jour) : « Il a écrit le livre. » C’est AUTEUR !"
         }
     }

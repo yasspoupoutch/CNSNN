@@ -52,7 +52,7 @@ class TutorialFlowTest {
         rule.onNodeWithText("Suivant").performClick()
         waitFor("Ça peut être TROU…")
         rule.onNodeWithText("Suivant").performClick()
-        waitFor("… mais aussi AUTEUR !")
+        waitFor("… ou AUTEUR…")
         rule.onNodeWithText("Suivant").performClick()
         waitFor("Thème, indice et chrono")
         rule.onNodeWithContentDescription("Chrono").assertIsDisplayed()

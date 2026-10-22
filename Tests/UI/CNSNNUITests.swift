@@ -159,7 +159,7 @@ final class CNSNNUITests: XCTestCase {
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Ça peut être TROU…"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["… mais aussi AUTEUR !"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["… ou AUTEUR…"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Thème, indice et chrono"].waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
