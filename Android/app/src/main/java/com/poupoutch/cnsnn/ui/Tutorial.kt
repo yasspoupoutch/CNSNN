@@ -1,0 +1,223 @@
+package com.poupoutch.cnsnn.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateValueAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+
+/** The places on the home page the first-launch tutorial points at. */
+enum class TutorialTarget { DAILY, PLAY }
+
+/** Where the targets are on screen, filled by the home page and read by the overlay. */
+class TutorialTargets { val rects = mutableStateMapOf<TutorialTarget, Rect>() }
+
+val LocalTutorialTargets = staticCompositionLocalOf<TutorialTargets?> { null }
+
+fun Modifier.tutorialTarget(target: TutorialTarget): Modifier = composed {
+    val targets = LocalTutorialTargets.current ?: return@composed this
+    // A target that leaves the screen (the daily word found) is forgotten, so nothing points at an old place.
+    DisposableEffect(targets) { onDispose { targets.rects.remove(target) } }
+    onGloballyPositioned { targets.rects[target] = it.boundsInRoot() }
+}
+
+/** A fixed example, never the real daily word, so the tutorial cannot give anything away. */
+private const val EXAMPLE = "TR"
+
+private enum class TutorialStep(val target: TutorialTarget?, val title: String, val message: String, val word: String? = null) {
+    DAILY(TutorialTarget.DAILY, "Le mot du jour",
+        "Un nouveau mot chaque jour, le même pour tout le monde. Une seule partie, avec un chrono."),
+    PLAY(TutorialTarget.PLAY, "Appuyez sur Jouer",
+        "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."),
+    CONSONANTS(null, "Les voyelles ont disparu",
+        "Il ne reste que les consonnes, dans l’ordre. À vous de remettre les voyelles pour retrouver le mot."),
+    FIRST(null, "Ça peut être TROU…", "On glisse O et U entre les consonnes : T, R… TROU.", "TROU"),
+    SECOND(null, "… mais aussi AUTEUR !",
+        "Attention, une voyelle peut aussi se cacher au début ou à la fin. L’indice vous aide à trancher : « Il a écrit le livre. »", "AUTEUR"),
+}
+
+/**
+ * First-launch tutorial: dims the app, lights up the daily card then its Jouer button,
+ * and ends on an example (TR: TROU, but also AUTEUR).
+ */
+@Composable
+fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
+    var index by rememberSaveable { mutableStateOf(0) }
+    val step = TutorialStep.entries[index]
+    val haptics = rememberHaptics()
+    fun next() { haptics.selection(); if (index == TutorialStep.entries.lastIndex) finish() else index++ }
+    fun back() { haptics.selection(); if (index > 0) index-- }
+    BackHandler { if (index > 0) back() else finish() }
+
+    val density = LocalDensity.current
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val target = step.target?.let { targets.rects[it] }?.translate(-origin)
+    val inset = with(density) { (if (step.target == TutorialTarget.PLAY) 8.dp else 6.dp).toPx() }
+    val hole = target?.inflate(inset) ?: Rect(bounds.center, bounds.center)
+    val reduce = rememberReduceMotion()
+    val animatedHole by animateValueAsState(hole, Rect.VectorConverter, if (reduce) tween(0) else tween(420), label = "hole")
+    val radius by animateFloatAsState(when (step.target) {
+        TutorialTarget.PLAY -> hole.height / 2
+        TutorialTarget.DAILY -> with(density) { 34.dp.toPx() }
+        null -> 0f
+    }, if (reduce) tween(0) else tween(420), label = "radius")
+    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(1f, if (reduce) 1f else 0.35f,
+        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
+
+    Box(Modifier.fillMaxSize()
+        .onGloballyPositioned { origin = it.positionInRoot(); bounds = Rect(Offset.Zero, Offset(it.size.width.toFloat(), it.size.height.toFloat())) }
+        // The app underneath stays out of reach while the tutorial is up.
+        .pointerInput(Unit) { detectTapGestures {} }
+        .testTag("tutorial")) {
+        Canvas(Modifier.fillMaxSize()) {
+            val path = Path().apply {
+                fillType = PathFillType.EvenOdd
+                addRect(Rect(Offset.Zero, this@Canvas.size))
+                if (animatedHole.width > 1f) addRoundRect(RoundRect(animatedHole, CornerRadius(radius)))
+            }
+            drawPath(path, Color.Black.copy(alpha = 0.76f))
+            if (step.target == TutorialTarget.PLAY && animatedHole.width > 1f) {
+                drawRoundRect(Palette.accent.copy(alpha = pulse), animatedHole.topLeft, animatedHole.size, CornerRadius(radius), style = Stroke(2.dp.toPx()))
+            }
+        }
+        // The lit Jouer button can be tapped to go on, like the real one.
+        if (step.target == TutorialTarget.PLAY && target != null) {
+            with(density) {
+                Box(Modifier.offset { IntOffset(hole.left.roundToInt(), hole.top.roundToInt()) }.size(hole.width.toDp(), hole.height.toDp())
+                    .clickable(role = Role.Button) { next() }
+                    .semantics { contentDescription = "Jouer" }
+                    .testTag("tutorial.play"))
+            }
+        }
+        TextButton(finish, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 8.dp).testTag("tutorial.skip")) {
+            Text("Passer", color = Palette.secondary, fontWeight = FontWeight.SemiBold)
+        }
+        if (step.target != null && target != null) {
+            val top = with(density) { (hole.bottom + 18.dp.toPx()).roundToInt() }
+            Box(Modifier.fillMaxWidth().offset { IntOffset(0, top) }.padding(horizontal = 20.dp), contentAlignment = Alignment.TopCenter) {
+                Callout(step, index, ::next, ::back)
+            }
+        } else {
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp, vertical = 48.dp),
+                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Example(step)
+                Spacer(Modifier.height(18.dp))
+                Callout(step, index, ::next, ::back)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -> Unit) {
+    AnimatedContent(step, Modifier.widthIn(max = 560.dp), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "callout") { shown ->
+        SectionCard(radius = 28.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.semantics {
+                contentDescription = "Étape ${shown.ordinal + 1} sur ${TutorialStep.entries.size}"
+            }) {
+                TutorialStep.entries.forEach { item ->
+                    Box(Modifier.height(6.dp).width(if (item == shown) 18.dp else 6.dp)
+                        .background(if (item == shown) Palette.accent else Palette.fill2, RoundedCornerShape(3.dp)))
+                }
+            }
+            Text(shown.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 14.dp).semantics { heading() })
+            Text(shown.message, color = Palette.secondary, modifier = Modifier.padding(top = 6.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (index > 0) TextButton(back) { Text("Retour", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
+                Spacer(Modifier.weight(1f))
+                Button(next, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp)) {
+                    Text(if (shown == TutorialStep.SECOND) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
+/** TR, then the word with its vowels sliding in. */
+@Composable
+private fun Example(step: TutorialStep) {
+    SectionCard(Modifier.widthIn(max = 560.dp), padding = 22.dp, radius = 30.dp) {
+        Kicker("Exemple")
+        Text(EXAMPLE, style = Type.serif(72), letterSpacing = 6.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp)
+            .semantics { contentDescription = "Consonnes : T, R" })
+        Box(Modifier.padding(vertical = 16.dp)) { Divider() }
+        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+            val word = step.word
+            if (word != null) key(word) {
+                VowelWord(word, MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 2.4.sp), once = true, delayMs = 250)
+            } else Text("? ? ?", style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 4.sp), color = Palette.tertiary,
+                modifier = Modifier.semantics { contentDescription = "Mot à trouver" })
+        }
+    }
+}

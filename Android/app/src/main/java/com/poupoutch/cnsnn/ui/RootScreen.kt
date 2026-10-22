@@ -58,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -187,27 +188,42 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
     LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) tab = Tab.PLAY }
     val holder = rememberSaveableStateHolder()
     val haptics = rememberHaptics()
-    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, bottomBar = {
-        NavigationBar(containerColor = Palette.surface.copy(alpha = 0.94f), tonalElevation = 0.dp) {
-            Tab.entries.forEach { item ->
-                val selected = tab == item
-                NavigationBarItem(selected, onClick = { if (!selected) haptics.selection(); tab = item },
-                    icon = { Icon(if (selected) item.selectedIcon else item.icon, contentDescription = null) },
-                    label = { Text(item.label, fontWeight = FontWeight.SemiBold) },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Palette.onAccent, indicatorColor = Palette.accent,
-                        selectedTextColor = Palette.foreground, unselectedIconColor = Palette.tertiary, unselectedTextColor = Palette.tertiary))
-            }
-        }
-    }) { padding ->
-        AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
-            holder.SaveableStateProvider(page.name) {
-                when (page) {
-                    Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge)
-                    Tab.STATS -> StatsScreen(state)
-                    Tab.PROPOSE -> ProposeScreen(state)
-                    Tab.PROFILE -> ProfileScreen(state)
+    // The first-launch tutorial, over the navigation bar, pointing at the daily card.
+    val targets = remember { TutorialTargets() }
+    var tutorial by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!state.local.tutorialSeen && state.progress.attempts.isEmpty() && state.inviteCode == null) { delay(600); tab = Tab.PLAY; tutorial = true }
+    }
+    var seenTutorialRequest by rememberSaveable { mutableStateOf(state.tutorialRequest) }
+    LaunchedEffect(state.tutorialRequest) { if (state.tutorialRequest != seenTutorialRequest) { seenTutorialRequest = state.tutorialRequest; tab = Tab.PLAY; tutorial = true } }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalTutorialTargets provides targets) {
+            Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, bottomBar = {
+                NavigationBar(containerColor = Palette.surface.copy(alpha = 0.94f), tonalElevation = 0.dp) {
+                    Tab.entries.forEach { item ->
+                        val selected = tab == item
+                        NavigationBarItem(selected, onClick = { if (!selected) haptics.selection(); tab = item },
+                            icon = { Icon(if (selected) item.selectedIcon else item.icon, contentDescription = null) },
+                            label = { Text(item.label, fontWeight = FontWeight.SemiBold) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Palette.onAccent, indicatorColor = Palette.accent,
+                                selectedTextColor = Palette.foreground, unselectedIconColor = Palette.tertiary, unselectedTextColor = Palette.tertiary))
+                    }
+                }
+            }) { padding ->
+                AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
+                    holder.SaveableStateProvider(page.name) {
+                        when (page) {
+                            Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge)
+                            Tab.STATS -> StatsScreen(state)
+                            Tab.PROPOSE -> ProposeScreen(state)
+                            Tab.PROFILE -> ProfileScreen(state)
+                        }
+                    }
                 }
             }
+        }
+        androidx.compose.animation.AnimatedVisibility(tutorial, enter = fadeIn(), exit = fadeOut()) {
+            TutorialOverlay(targets) { state.local.tutorialSeen = true; tutorial = false }
         }
     }
 }

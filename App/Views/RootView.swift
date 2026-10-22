@@ -63,6 +63,8 @@ struct MainShell: View {
     @State private var game: GameRoute?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.requestReview) private var requestReview
+    @AppStorage(Tutorial.seenKey) private var tutorialSeen = false
+    @State private var showTutorial = false
     var body: some View {
         ZStack(alignment: .bottom) {
             // Every page stays alive so it keeps its state, as with a native tab view.
@@ -77,7 +79,22 @@ struct MainShell: View {
                 .padding(.bottom, 8)
                 .ignoresSafeArea(.keyboard)
         }
+        // The first-launch tutorial, above the tab bar, pointing at the daily card.
+        .overlayPreferenceValue(TutorialAnchors.self) { anchors in
+            if showTutorial {
+                TutorialOverlay(anchors: anchors) { tutorialSeen = true; showTutorial = false }
+                    .transition(.opacity)
+            }
+        }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
+        .animation(CNSNNTheme.ease, value: showTutorial)
+        .task {
+            guard Tutorial.shouldShow(seen: tutorialSeen, state) else { return }
+            try? await Task.sleep(for: .seconds(0.6))
+            tab = .play
+            showTutorial = true
+        }
+        .onChange(of: state.tutorialRequest) { _, _ in tab = .play; showTutorial = true }
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
         // Pages stay alive, so "Mes propositions" reloads its statuses each time it is shown.
         .onChange(of: tab) { _, page in if page == .propose { Task { await state.refreshSubmissions() } } }

@@ -1,0 +1,61 @@
+package com.poupoutch.cnsnn
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * The tutorial, opened again from Profil: the daily card, its Jouer button lit and tapped, then TR:
+ * TROU, but also AUTEUR. Retour goes back a step, "À vous de jouer" closes it on the home page.
+ */
+@RunWith(AndroidJUnit4::class)
+class TutorialFlowTest {
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private fun has(text: String) = rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
+    private fun waitFor(text: String) = rule.waitUntil(5_000) { has(text) }
+
+    @Test fun tutorialFromProfile() {
+        rule.waitUntil(15_000) { has("Continuer") || has("Bonjour,") }
+        if (has("Continuer")) {
+            rule.onNodeWithText("Continuer").performClick()
+            rule.onNodeWithText("Pseudo").performTextInput("Tuto")
+            rule.onNodeWithText("J’accepte les règles de la communauté", substring = true).performScrollTo().performClick()
+            rule.onNodeWithText("C’est parti").performClick()
+        }
+        rule.waitUntil(20_000) { has("Bonjour,") }
+        if (has("J’accepte")) rule.onNodeWithText("J’accepte").performClick()
+        rule.skipTutorial()
+
+        rule.onNodeWithText("Profil").performClick()
+        rule.onNodeWithText("Revoir le tutoriel").performScrollTo().performClick()
+        waitFor("Le mot du jour")
+        rule.onNodeWithText("Suivant").performClick()
+        waitFor("Appuyez sur Jouer")
+        // The lit Jouer button is where the real one is, and tapping it goes on.
+        rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial.play")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("tutorial.play").assertIsDisplayed().performClick()
+        waitFor("Les voyelles ont disparu")
+        rule.onNodeWithText("TR").assertIsDisplayed()
+        rule.onNodeWithText("Suivant").performClick()
+        waitFor("Ça peut être TROU…")
+        rule.onNodeWithText("Retour").performClick()
+        waitFor("Les voyelles ont disparu")
+        rule.onNodeWithText("Suivant").performClick()
+        waitFor("Ça peut être TROU…")
+        rule.onNodeWithText("Suivant").performClick()
+        waitFor("… mais aussi AUTEUR !")
+        rule.onNodeWithText("À vous de jouer").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }
+        waitFor("Bonjour,")
+    }
+}
