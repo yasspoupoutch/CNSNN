@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 
 /**
  * The tutorial, opened again from Profil: the daily card, its Jouer button lit and tapped, then TR:
- * TROU, but also AUTEUR. Retour goes back a step, "À vous de jouer" closes it on the home page.
+ * TROU, but also AUTEUR, and where the theme is written. Retour goes back a step, "À vous de jouer" closes it on the home page.
  */
 @RunWith(AndroidJUnit4::class)
 class TutorialFlowTest {
@@ -55,6 +55,8 @@ class TutorialFlowTest {
         waitFor("Ça peut être TROU…")
         rule.onNodeWithText("Suivant").performClick()
         waitFor("… mais aussi AUTEUR !")
+        rule.onNodeWithText("Suivant").performClick()
+        waitFor("Le thème peut vous aider")
         rule.onNodeWithText("À vous de jouer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }
         waitFor("Bonjour,")

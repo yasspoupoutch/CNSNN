@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -96,6 +97,7 @@ fun Modifier.tutorialTarget(target: TutorialTarget): Modifier = composed {
 
 /** A fixed example, never the real daily word, so the tutorial cannot give anything away. */
 private const val EXAMPLE = "TR"
+private const val THEME = "Général · Facile"
 
 private enum class TutorialStep(val target: TutorialTarget?, val title: String, val message: String, val word: String? = null) {
     DAILY(TutorialTarget.DAILY, "Le mot du jour",
@@ -106,7 +108,9 @@ private enum class TutorialStep(val target: TutorialTarget?, val title: String, 
         "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"),
     FIRST(null, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
     SECOND(null, "… mais aussi AUTEUR !",
-        "On repart de TR : cette fois, les voyelles se glissent aussi avant le T. L’indice vous aide à trancher : « Il a écrit le livre. »", "AUTEUR"),
+        "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Alors, TROU ou AUTEUR ?", "AUTEUR"),
+    THEME(null, "Le thème peut vous aider",
+        "Pendant la partie, il est écrit en haut, sous le titre, avec la difficulté. Et si vous séchez, l’indice tranche : « Il a écrit le livre. »", "AUTEUR"),
 }
 
 /**
@@ -201,20 +205,37 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
                 if (index > 0) TextButton(back) { Text("Retour", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
                 Spacer(Modifier.weight(1f))
                 Button(next, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp)) {
-                    Text(if (shown == TutorialStep.SECOND) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(if (shown == TutorialStep.THEME) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
     }
 }
 
-/** TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again. */
+/**
+ * Like the top of a game: the title, the theme and the difficulty, then the word. TR alone, then the
+ * vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
+ */
 @Composable
 private fun Example(step: TutorialStep) {
+    val lit = step == TutorialStep.THEME
+    val pulse by rememberInfiniteTransition(label = "theme").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.35f,
+        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "theme")
     SectionCard(Modifier.widthIn(max = 560.dp), padding = 22.dp, radius = 30.dp) {
-        Kicker("Exemple")
-        Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 6.dp), contentAlignment = Alignment.Center) {
-            key(step) { MorphWord(step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null) }
+        Column(Modifier.align(Alignment.CenterHorizontally)
+            .border(2.dp, Palette.accent.copy(alpha = if (lit) pulse else 0f), RoundedCornerShape(50))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) { contentDescription = "Exemple, thème : $THEME" },
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Exemple", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(THEME, fontSize = 12.sp, fontWeight = if (lit) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (lit) Palette.accent else Palette.tertiary)
+        }
+        Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 8.dp), contentAlignment = Alignment.Center) {
+            // The theme step keeps AUTEUR on screen without playing it again.
+            key(if (lit) TutorialStep.SECOND else step) {
+                MorphWord(step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null)
+            }
         }
     }
 }

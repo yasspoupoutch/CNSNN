@@ -161,6 +161,8 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ça peut être TROU…"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["… mais aussi AUTEUR !"].waitForExistence(timeout: 5))
+        app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Le thème peut vous aider"].waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
         XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout: 5))

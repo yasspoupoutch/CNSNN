@@ -27,10 +27,11 @@ enum Tutorial {
     }
     /// A fixed example, never the real daily word, so the tutorial cannot give anything away.
     static let consonants = "TR"
+    static let theme = "Général · Facile"
 }
 
 private enum TutorialStep: Int, CaseIterable {
-    case daily, play, consonants, first, second
+    case daily, play, consonants, first, second, theme
 
     var target: TutorialTarget? {
         switch self {
@@ -46,6 +47,7 @@ private enum TutorialStep: Int, CaseIterable {
         case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
         case .second: "… mais aussi AUTEUR !"
+        case .theme: "Le thème peut vous aider"
         }
     }
     var message: String {
@@ -54,14 +56,15 @@ private enum TutorialStep: Int, CaseIterable {
         case .play: "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."
         case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
-        case .second: "On repart de TR : cette fois, les voyelles se glissent aussi avant le T. L’indice vous aide à trancher : « Il a écrit le livre. »"
+        case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Alors, TROU ou AUTEUR ?"
+        case .theme: "Pendant la partie, il est écrit en haut, sous le titre, avec la difficulté. Et si vous séchez, l’indice tranche : « Il a écrit le livre. »"
         }
     }
     /// The word revealed under the consonants, vowels in gold.
     var word: String? {
         switch self {
         case .first: "TROU"
-        case .second: "AUTEUR"
+        case .second, .theme: "AUTEUR"
         default: nil
         }
     }
@@ -170,8 +173,8 @@ struct TutorialOverlay: View {
                         .frame(minHeight: 44)
                 }
                 Spacer()
-                Button(step == .second ? "À vous de jouer" : "Suivant") { next() }
-                    .buttonStyle(PrimaryPillStyle(height: 48)).frame(width: step == .second ? 190 : 130)
+                Button(step == .theme ? "À vous de jouer" : "Suivant") { next() }
+                    .buttonStyle(PrimaryPillStyle(height: 48)).frame(width: step == .theme ? 190 : 130)
             }.padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,14 +183,28 @@ struct TutorialOverlay: View {
         .transition(.opacity)
     }
 
-    /// TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
+    /// Like the top of a game: the title, the theme and the difficulty, then the word. TR alone, then the
+    /// vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
     private var example: some View {
         VStack(spacing: 0) {
-            SectionKicker(text: "Exemple").frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 2) {
+                Text("Exemple").scaledFont(16, .semibold)
+                Text(Tutorial.theme).scaledFont(12, step == .theme ? .semibold : .regular)
+                    .foregroundStyle(step == .theme ? Palette.accent : Palette.tertiary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .overlay {
+                Capsule().strokeBorder(Palette.accent, lineWidth: 2)
+                    .modifier(Pulse(active: !reduceMotion))
+                    .opacity(step == .theme ? 1 : 0)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Exemple, thème : " + Tutorial.theme)
+            // The theme step keeps AUTEUR on screen without playing it again.
             MorphWord(word: step.word, from: step == .second ? TutorialStep.first.word : nil)
-                .id(step)
+                .id(step == .theme ? .second : step)
                 .frame(maxWidth: .infinity, minHeight: 96)
-                .padding(.top, 6)
+                .padding(.top, 8)
         }
         .glassCard(radius: 30, padding: 22)
     }
