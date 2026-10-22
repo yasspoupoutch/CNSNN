@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 
 /**
  * The tutorial, opened again from Profil: the daily card, its Jouer button lit and tapped, then TR:
- * TROU, but also AUTEUR, and where the theme is written. Retour goes back a step, "À vous de jouer" closes it on the home page.
+ * TROU, but also AUTEUR, then the theme, the hint and the clock. Retour goes back a step, "À vous de jouer" closes it on the home page.
  */
 @RunWith(AndroidJUnit4::class)
 class TutorialFlowTest {
@@ -40,9 +40,7 @@ class TutorialFlowTest {
         rule.onNodeWithText("Profil").performClick()
         rule.onNodeWithText("Revoir le tutoriel").performScrollTo().performClick()
         waitFor("Le mot du jour")
-        rule.onNodeWithText("Suivant").performClick()
-        waitFor("Appuyez sur Jouer")
-        // The lit Jouer button is where the real one is, and tapping it goes on.
+        // The Jouer button, ringed in gold, goes on like Suivant.
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial.play")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("tutorial.play").assertIsDisplayed().performClick()
         waitFor("J’ai enlevé les voyelles")
@@ -56,7 +54,8 @@ class TutorialFlowTest {
         rule.onNodeWithText("Suivant").performClick()
         waitFor("… mais aussi AUTEUR !")
         rule.onNodeWithText("Suivant").performClick()
-        waitFor("Le thème peut vous aider")
+        waitFor("Thème, indice et chrono")
+        rule.onNodeWithContentDescription("Chrono").assertIsDisplayed()
         rule.onNodeWithText("À vous de jouer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }
         waitFor("Bonjour,")

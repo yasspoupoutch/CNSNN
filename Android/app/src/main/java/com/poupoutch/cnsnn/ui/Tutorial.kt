@@ -1,6 +1,9 @@
 package com.poupoutch.cnsnn.ui
 
 import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.delay
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.LinearEasing
@@ -100,22 +103,20 @@ private const val EXAMPLE = "TR"
 private const val THEME = "Général · Facile"
 
 private enum class TutorialStep(val target: TutorialTarget?, val title: String, val message: String, val word: String? = null) {
-    DAILY(TutorialTarget.DAILY, "Le mot du jour",
-        "Un nouveau mot chaque jour, le même pour tout le monde. Une seule partie, avec un chrono."),
-    PLAY(TutorialTarget.PLAY, "Appuyez sur Jouer",
-        "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."),
+    PLAY(TutorialTarget.DAILY, "Le mot du jour",
+        "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"),
     CONSONANTS(null, "J’ai enlevé les voyelles",
         "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"),
     FIRST(null, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
     SECOND(null, "… mais aussi AUTEUR !",
         "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Alors, TROU ou AUTEUR ?", "AUTEUR"),
-    THEME(null, "Le thème peut vous aider",
-        "Pendant la partie, il est écrit en haut, sous le titre, avec la difficulté. Et si vous séchez, l’indice tranche : « Il a écrit le livre. »", "AUTEUR"),
+    HELP(null, "Thème, indice et chrono",
+        "En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer. Sous le mot, l’indice si vous séchez (+1 min sur le mot du jour) : « Il a écrit le livre. » C’est AUTEUR !", "AUTEUR"),
 }
 
 /**
- * First-launch tutorial: dims the app, lights up the daily card then its Jouer button,
- * and ends on an example (TR: TROU, but also AUTEUR).
+ * First-launch tutorial: dims the app around the daily card with its Jouer button pulsing, then an
+ * example (TR: TROU, but also AUTEUR) and where the theme, the hint and the clock are.
  */
 @Composable
 fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
@@ -130,15 +131,12 @@ fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val target = step.target?.let { targets.rects[it] }?.translate(-origin)
-    val inset = with(density) { (if (step.target == TutorialTarget.PLAY) 8.dp else 6.dp).toPx() }
-    val hole = target?.inflate(inset) ?: Rect(bounds.center, bounds.center)
+    val hole = target?.inflate(with(density) { 6.dp.toPx() }) ?: Rect(bounds.center, bounds.center)
+    // The Jouer button, ringed in gold on the first step.
+    val play = if (step == TutorialStep.PLAY) targets.rects[TutorialTarget.PLAY]?.translate(-origin)?.inflate(with(density) { 6.dp.toPx() }) else null
     val reduce = rememberReduceMotion()
     val animatedHole by animateValueAsState(hole, Rect.VectorConverter, if (reduce) tween(0) else tween(420), label = "hole")
-    val radius by animateFloatAsState(when (step.target) {
-        TutorialTarget.PLAY -> hole.height / 2
-        TutorialTarget.DAILY -> with(density) { 34.dp.toPx() }
-        null -> 0f
-    }, if (reduce) tween(0) else tween(420), label = "radius")
+    val radius by animateFloatAsState(if (step.target == null) 0f else with(density) { 34.dp.toPx() }, if (reduce) tween(0) else tween(420), label = "radius")
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(1f, if (reduce) 1f else 0.35f,
         infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
 
@@ -154,14 +152,14 @@ fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
                 if (animatedHole.width > 1f) addRoundRect(RoundRect(animatedHole, CornerRadius(radius)))
             }
             drawPath(path, Color.Black.copy(alpha = 0.76f))
-            if (step.target == TutorialTarget.PLAY && animatedHole.width > 1f) {
-                drawRoundRect(Palette.accent.copy(alpha = pulse), animatedHole.topLeft, animatedHole.size, CornerRadius(radius), style = Stroke(2.dp.toPx()))
+            if (play != null) {
+                drawRoundRect(Palette.accent.copy(alpha = pulse), play.topLeft, play.size, CornerRadius(play.height / 2), style = Stroke(2.5.dp.toPx()))
             }
         }
         // The lit Jouer button can be tapped to go on, like the real one.
-        if (step.target == TutorialTarget.PLAY && target != null) {
+        if (play != null) {
             with(density) {
-                Box(Modifier.offset { IntOffset(hole.left.roundToInt(), hole.top.roundToInt()) }.size(hole.width.toDp(), hole.height.toDp())
+                Box(Modifier.offset { IntOffset(play.left.roundToInt(), play.top.roundToInt()) }.size(play.width.toDp(), play.height.toDp())
                     .clickable(role = Role.Button) { next() }
                     .semantics { contentDescription = "Jouer" }
                     .testTag("tutorial.play"))
@@ -204,8 +202,12 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (index > 0) TextButton(back) { Text("Retour", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
                 Spacer(Modifier.weight(1f))
-                Button(next, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp)) {
-                    Text(if (shown == TutorialStep.THEME) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                // The button breathes, so it is clear a tap goes on.
+                val reduce = rememberReduceMotion()
+                val breath by rememberInfiniteTransition(label = "next").animateFloat(1f, if (reduce) 1f else 1.06f,
+                    infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "next")
+                Button(next, Modifier.heightIn(min = 48.dp).graphicsLayer { scaleX = breath; scaleY = breath }, shape = RoundedCornerShape(24.dp)) {
+                    Text(if (shown == TutorialStep.HELP) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -213,31 +215,52 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
 }
 
 /**
- * Like the top of a game: the title, the theme and the difficulty, then the word. TR alone, then the
- * vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
+ * A small game screen: the title with the theme and the difficulty, the clock at the top right, the word,
+ * then the Indice button. TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR (tap the
+ * word to see it again). On the last step the theme, the clock and the hint get a gold ring.
  */
 @Composable
 private fun Example(step: TutorialStep) {
-    val lit = step == TutorialStep.THEME
-    val pulse by rememberInfiniteTransition(label = "theme").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.35f,
-        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "theme")
-    SectionCard(Modifier.widthIn(max = 560.dp), padding = 22.dp, radius = 30.dp) {
-        Column(Modifier.align(Alignment.CenterHorizontally)
-            .border(2.dp, Palette.accent.copy(alpha = if (lit) pulse else 0f), RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-            .semantics(mergeDescendants = true) { contentDescription = "Exemple, thème : $THEME" },
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Exemple", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text(THEME, fontSize = 12.sp, fontWeight = if (lit) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (lit) Palette.accent else Palette.tertiary)
+    val help = step == TutorialStep.HELP
+    val pulse by rememberInfiniteTransition(label = "lit").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.35f,
+        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "lit")
+    val ring = Modifier.border(2.dp, Palette.accent.copy(alpha = if (help) pulse else 0f), RoundedCornerShape(50))
+    SectionCard(Modifier.widthIn(max = 560.dp), padding = 18.dp, radius = 30.dp) {
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.align(Alignment.Center).then(ring).padding(horizontal = 14.dp, vertical = 6.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "Exemple, thème : $THEME" },
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Exemple", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(THEME, fontSize = 12.sp, fontWeight = if (help) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (help) Palette.accent else Palette.tertiary)
+            }
+            ExampleClock(help, Modifier.align(Alignment.CenterEnd).then(ring))
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            // The theme step keeps AUTEUR on screen without playing it again.
-            key(if (lit) TutorialStep.SECOND else step) {
+            // The last step keeps AUTEUR on screen without playing it again.
+            key(if (help) TutorialStep.SECOND else step) {
                 MorphWord(step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null)
             }
         }
+        if (help) Text("« Il a écrit le livre. »", style = Type.serifItalic(20), textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth())
+        Row(Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp).then(ring)
+            .background(Palette.fill1, RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Indice", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(if (help) "révélé" else "+1 min", fontSize = 13.sp)
+        }
     }
+}
+
+/** The example's clock, like the game's: it runs on the last step, from 0:00. */
+@Composable
+private fun ExampleClock(running: Boolean, modifier: Modifier) {
+    var seconds by remember { mutableStateOf(0) }
+    LaunchedEffect(running) { seconds = 0; while (running) { delay(1_000); seconds++ } }
+    Text("%d:%02d".format(seconds / 60, seconds % 60), fontWeight = FontWeight.Bold, fontSize = 14.sp,
+        modifier = modifier.background(Palette.fill1, RoundedCornerShape(50)).padding(horizontal = 13.dp, vertical = 8.dp)
+            .semantics { contentDescription = "Chrono" })
 }
 
 private const val OUT = 0.45f

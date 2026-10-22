@@ -31,51 +31,43 @@ enum Tutorial {
 }
 
 private enum TutorialStep: Int, CaseIterable {
-    case daily, play, consonants, first, second, theme
+    case play, consonants, first, second, help
 
-    var target: TutorialTarget? {
-        switch self {
-        case .daily: .daily
-        case .play: .play
-        default: nil
-        }
-    }
+    var target: TutorialTarget? { self == .play ? .daily : nil }
     var title: String {
         switch self {
-        case .daily: "Le mot du jour"
-        case .play: "Appuyez sur Jouer"
+        case .play: "Le mot du jour"
         case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
         case .second: "… mais aussi AUTEUR !"
-        case .theme: "Le thème peut vous aider"
+        case .help: "Thème, indice et chrono"
         }
     }
     var message: String {
         switch self {
-        case .daily: "Un nouveau mot chaque jour, le même pour tout le monde. Une seule partie, avec un chrono."
-        case .play: "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."
+        case .play: "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"
         case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Alors, TROU ou AUTEUR ?"
-        case .theme: "Pendant la partie, il est écrit en haut, sous le titre, avec la difficulté. Et si vous séchez, l’indice tranche : « Il a écrit le livre. »"
+        case .help: "En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer. Sous le mot, l’indice si vous séchez (+1 min sur le mot du jour) : « Il a écrit le livre. » C’est AUTEUR !"
         }
     }
     /// The word revealed under the consonants, vowels in gold.
     var word: String? {
         switch self {
         case .first: "TROU"
-        case .second, .theme: "AUTEUR"
+        case .second, .help: "AUTEUR"
         default: nil
         }
     }
 }
 
-/// First-launch tutorial: dims the app, lights up the daily card then its Jouer button,
-/// and ends on an example (TR: TROU, but also AUTEUR).
+/// First-launch tutorial: dims the app around the daily card with its Jouer button pulsing, then an
+/// example (TR: TROU, but also AUTEUR) and where the theme, the hint and the clock are.
 struct TutorialOverlay: View {
     var anchors: [TutorialTarget: Anchor<CGRect>]
     var finish: () -> Void
-    @State private var step = TutorialStep.daily
+    @State private var step = TutorialStep.play
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AccessibilityFocusState private var titleFocused: Bool
 
@@ -88,7 +80,7 @@ struct TutorialOverlay: View {
                     .contentShape(Rectangle())
                     .onTapGesture {}
                     .accessibilityHidden(true)
-                if step == .play, hole.rect.width > 0 { playButton(hole) }
+                if step == .play, let anchor = anchors[.play] { playButton(proxy[anchor]) }
                 VStack(spacing: 0) {
                     HStack {
                         Spacer()
@@ -134,17 +126,18 @@ struct TutorialOverlay: View {
         }
     }
 
-    /// The lit Jouer button can be tapped to go on, like the real one.
-    private func playButton(_ hole: (rect: CGRect, radius: CGFloat)) -> some View {
-        Button { next() } label: {
-            RoundedRectangle(cornerRadius: hole.radius, style: .continuous)
-                .strokeBorder(Palette.accent, lineWidth: 2)
+    /// The Jouer button gets a pulsing gold ring and can be tapped to go on, like the real one.
+    private func playButton(_ frame: CGRect) -> some View {
+        let ring = frame.insetBy(dx: -6, dy: -6)
+        return Button { next() } label: {
+            Capsule()
+                .strokeBorder(Palette.accent, lineWidth: 2.5)
                 .modifier(Pulse(active: !reduceMotion))
-                .contentShape(RoundedRectangle(cornerRadius: hole.radius, style: .continuous))
+                .contentShape(Capsule())
         }
         .buttonStyle(PressStyle(scale: 0.96))
-        .frame(width: hole.rect.width, height: hole.rect.height)
-        .position(x: hole.rect.midX, y: hole.rect.midY)
+        .frame(width: ring.width, height: ring.height)
+        .position(x: ring.midX, y: ring.midY)
         .accessibilityLabel("Jouer")
         .accessibilityIdentifier("tutorial.play")
     }
@@ -167,14 +160,16 @@ struct TutorialOverlay: View {
             Text(step.message).scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 6)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                if step != .daily {
+                if step != .play {
                     Button("Retour") { back() }
                         .scaledFont(15, .semibold).foregroundStyle(Palette.secondary)
                         .frame(minHeight: 44)
                 }
                 Spacer()
-                Button(step == .theme ? "À vous de jouer" : "Suivant") { next() }
-                    .buttonStyle(PrimaryPillStyle(height: 48)).frame(width: step == .theme ? 190 : 130)
+                // The button breathes, so it is clear a tap goes on.
+                Button(step == .help ? "À vous de jouer" : "Suivant") { next() }
+                    .buttonStyle(PrimaryPillStyle(height: 48)).frame(width: step == .help ? 190 : 130)
+                    .modifier(Breathe(active: !reduceMotion))
             }.padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -183,30 +178,46 @@ struct TutorialOverlay: View {
         .transition(.opacity)
     }
 
-    /// Like the top of a game: the title, the theme and the difficulty, then the word. TR alone, then the
-    /// vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
+    /// A small game screen: the title with the theme and the difficulty, the clock at the top right, the
+    /// word, then the Indice button. TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR
+    /// (tap the word to see it again). The step being explained gets a gold ring.
     private var example: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 2) {
-                Text("Exemple").scaledFont(16, .semibold)
-                Text(Tutorial.theme).scaledFont(12, step == .theme ? .semibold : .regular)
-                    .foregroundStyle(step == .theme ? Palette.accent : Palette.tertiary)
+        let help = step == .help
+        return VStack(spacing: 0) {
+            ZStack {
+                VStack(spacing: 2) {
+                    Text("Exemple").scaledFont(16, .semibold)
+                    Text(Tutorial.theme).scaledFont(12, help ? .semibold : .regular)
+                        .foregroundStyle(help ? Palette.accent : Palette.tertiary)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .modifier(Lit(on: help))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Exemple, thème : " + Tutorial.theme)
+                ExampleClock(running: help)
+                    .modifier(Lit(on: help))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .padding(.horizontal, 14).padding(.vertical, 6)
-            .overlay {
-                Capsule().strokeBorder(Palette.accent, lineWidth: 2)
-                    .modifier(Pulse(active: !reduceMotion))
-                    .opacity(step == .theme ? 1 : 0)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Exemple, thème : " + Tutorial.theme)
-            // The theme step keeps AUTEUR on screen without playing it again.
+            // The last step keeps AUTEUR on screen without playing it again.
             MorphWord(word: step.word, from: step == .second ? TutorialStep.first.word : nil)
-                .id(step == .theme ? .second : step)
+                .id(help ? .second : step)
                 .frame(maxWidth: .infinity, minHeight: 96)
                 .padding(.top, 8)
+            if help {
+                Text("« Il a écrit le livre. »").font(Typo.serifItalic(20)).multilineTextAlignment(.center)
+                    .transition(.opacity.combined(with: .offset(y: 6)))
+            }
+            HStack(spacing: 8) {
+                Text("Indice").fontWeight(.bold)
+                Text(help ? "révélé" : "+1 min")
+            }
+            .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
+            .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule()
+            .modifier(Lit(on: help))
+            .padding(.top, 12)
+            .accessibilityElement(children: .combine)
         }
-        .glassCard(radius: 30, padding: 22)
+        .glassCard(radius: 30, padding: 18)
     }
 
     private func next() {
@@ -299,4 +310,49 @@ private struct MorphWord: View {
         .font(Typo.serif(68)).tracking(3).lineLimit(1).fixedSize()
     }
     private static func smooth(_ x: Double) -> CGFloat { let t = min(max(x, 0), 1); return CGFloat(t * t * (3 - 2 * t)) }
+}
+
+/// A gold ring that breathes around the part of the example being explained.
+private struct Lit: ViewModifier {
+    var on: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func body(content: Content) -> some View {
+        content.overlay {
+            Capsule().strokeBorder(Palette.accent, lineWidth: 2)
+                .modifier(Pulse(active: !reduceMotion))
+                .opacity(on ? 1 : 0)
+                .padding(-3)
+        }
+    }
+}
+
+/// The example's clock, like the game's: it runs during the clock step, from 0:00.
+private struct ExampleClock: View {
+    var running: Bool
+    @State private var start = Date()
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let seconds = running ? max(0, Int(context.date.timeIntervalSince(start))) : 0
+            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                .scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.foreground)
+                .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
+        }
+        .onChange(of: running) { _, now in if now { start = Date() } }
+        .accessibilityLabel("Chrono")
+    }
+}
+
+/// A gentle grow and shrink, so the button to tap catches the eye.
+private struct Breathe: ViewModifier {
+    var active: Bool
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(on ? 1.06 : 1)
+            .shadow(color: Palette.accent.opacity(on ? 0.55 : 0), radius: on ? 14 : 0)
+            .onAppear {
+                guard active else { return }
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { on = true }
+            }
+    }
 }
