@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -44,12 +45,12 @@ class TutorialFlowTest {
         // The lit Jouer button is where the real one is, and tapping it goes on.
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial.play")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("tutorial.play").assertIsDisplayed().performClick()
-        waitFor("Les voyelles ont disparu")
-        rule.onNodeWithText("TR").assertIsDisplayed()
+        waitFor("J’ai enlevé les voyelles")
+        rule.onNodeWithContentDescription("Consonnes : T, R").assertIsDisplayed()
         rule.onNodeWithText("Suivant").performClick()
         waitFor("Ça peut être TROU…")
         rule.onNodeWithText("Retour").performClick()
-        waitFor("Les voyelles ont disparu")
+        waitFor("J’ai enlevé les voyelles")
         rule.onNodeWithText("Suivant").performClick()
         waitFor("Ça peut être TROU…")
         rule.onNodeWithText("Suivant").performClick()

@@ -43,7 +43,7 @@ private enum TutorialStep: Int, CaseIterable {
         switch self {
         case .daily: "Le mot du jour"
         case .play: "Appuyez sur Jouer"
-        case .consonants: "Les voyelles ont disparu"
+        case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
         case .second: "… mais aussi AUTEUR !"
         }
@@ -52,9 +52,9 @@ private enum TutorialStep: Int, CaseIterable {
         switch self {
         case .daily: "Un nouveau mot chaque jour, le même pour tout le monde. Une seule partie, avec un chrono."
         case .play: "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."
-        case .consonants: "Il ne reste que les consonnes, dans l’ordre. À vous de remettre les voyelles pour retrouver le mot."
-        case .first: "On glisse O et U entre les consonnes : T, R… TROU."
-        case .second: "Attention, une voyelle peut aussi se cacher au début ou à la fin. L’indice vous aide à trancher : « Il a écrit le livre. »"
+        case .consonants: "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"
+        case .first: "Les voyelles O et U reviennent se glisser entre T et R."
+        case .second: "On repart de TR : cette fois, les voyelles se glissent aussi avant le T. L’indice vous aide à trancher : « Il a écrit le livre. »"
         }
     }
     /// The word revealed under the consonants, vowels in gold.
@@ -180,22 +180,14 @@ struct TutorialOverlay: View {
         .transition(.opacity)
     }
 
-    /// TR, then the word with its vowels sliding in.
+    /// TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again.
     private var example: some View {
         VStack(spacing: 0) {
             SectionKicker(text: "Exemple").frame(maxWidth: .infinity, alignment: .leading)
-            Text(Tutorial.consonants).font(Typo.serif(72)).tracking(6).padding(.top, 6)
-                .accessibilityLabel("Consonnes : T, R")
-            Rectangle().fill(Palette.line).frame(height: 1).padding(.vertical, 16)
-            Group {
-                if let word = step.word {
-                    VowelWord(word: word, font: .system(size: 34, weight: .heavy), delay: 0.25, once: true)
-                        .tracking(2.4).id(word)
-                } else {
-                    Text("? ? ?").font(.system(size: 34, weight: .heavy)).tracking(4).foregroundStyle(Palette.tertiary)
-                        .accessibilityLabel("Mot à trouver")
-                }
-            }.frame(height: 44)
+            MorphWord(word: step.word, from: step == .second ? TutorialStep.first.word : nil)
+                .id(step)
+                .frame(maxWidth: .infinity, minHeight: 96)
+                .padding(.top, 6)
         }
         .glassCard(radius: 30, padding: 22)
     }
@@ -246,4 +238,48 @@ private struct Pulse: ViewModifier {
                 withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true }
             }
     }
+}
+
+/// The example word, one big serif line: the consonants stay put and the gold vowels slide in between
+/// them. With `from`, that word's vowels first slide back out, so TROU turns back into TR before AUTEUR.
+private struct MorphWord: View {
+    var word: String?
+    var from: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var start = Date()
+    private static let out = 0.45, pause = 0.4, lead = 0.35, grow = 0.45, stagger = 0.1
+    private var still: Bool { reduceMotion || RuntimeFlags.isTesting }
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: still)) { context in
+            let time = context.date.timeIntervalSince(start)
+            let back = from == nil ? 0 : Self.out + Self.pause
+            if let from, !still, time < back {
+                letters(from) { _ in 1 - Self.smooth(time / Self.out) }
+            } else {
+                letters(word ?? Tutorial.consonants) { index in
+                    still ? 1 : Self.smooth((time - back - Self.lead - Double(index) * Self.stagger) / Self.grow)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { start = Date() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(word ?? "Consonnes : T, R")
+        .accessibilityAddTraits(.isStaticText)
+    }
+    private func letters(_ text: String, progress: (Int) -> CGFloat) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                if Vowels.contains(character) {
+                    let value = progress(index)
+                    CollapseLayout(progress: value) { Text(String(character)).foregroundStyle(Palette.accent) }
+                        .opacity(value).clipped()
+                } else {
+                    Text(String(character))
+                }
+            }
+        }
+        .font(Typo.serif(68)).tracking(3).lineLimit(1).fixedSize()
+    }
+    private static func smooth(_ x: Double) -> CGFloat { let t = min(max(x, 0), 1); return CGFloat(t * t * (3 - 2 * t)) }
 }

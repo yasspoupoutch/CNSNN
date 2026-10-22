@@ -1,6 +1,10 @@
 package com.poupoutch.cnsnn.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.VectorConverter
@@ -98,11 +102,11 @@ private enum class TutorialStep(val target: TutorialTarget?, val title: String, 
         "Un nouveau mot chaque jour, le même pour tout le monde. Une seule partie, avec un chrono."),
     PLAY(TutorialTarget.PLAY, "Appuyez sur Jouer",
         "Le chrono démarre et les consonnes du mot apparaissent. Voyons un exemple."),
-    CONSONANTS(null, "Les voyelles ont disparu",
-        "Il ne reste que les consonnes, dans l’ordre. À vous de remettre les voyelles pour retrouver le mot."),
-    FIRST(null, "Ça peut être TROU…", "On glisse O et U entre les consonnes : T, R… TROU.", "TROU"),
+    CONSONANTS(null, "J’ai enlevé les voyelles",
+        "Il ne reste que les consonnes de ce mot, dans l’ordre. À vous de retrouver le mot !"),
+    FIRST(null, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
     SECOND(null, "… mais aussi AUTEUR !",
-        "Attention, une voyelle peut aussi se cacher au début ou à la fin. L’indice vous aide à trancher : « Il a écrit le livre. »", "AUTEUR"),
+        "On repart de TR : cette fois, les voyelles se glissent aussi avant le T. L’indice vous aide à trancher : « Il a écrit le livre. »", "AUTEUR"),
 }
 
 /**
@@ -204,20 +208,56 @@ private fun Callout(step: TutorialStep, index: Int, next: () -> Unit, back: () -
     }
 }
 
-/** TR, then the word with its vowels sliding in. */
+/** TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR. Tap the word to see it again. */
 @Composable
 private fun Example(step: TutorialStep) {
     SectionCard(Modifier.widthIn(max = 560.dp), padding = 22.dp, radius = 30.dp) {
         Kicker("Exemple")
-        Text(EXAMPLE, style = Type.serif(72), letterSpacing = 6.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp)
-            .semantics { contentDescription = "Consonnes : T, R" })
-        Box(Modifier.padding(vertical = 16.dp)) { Divider() }
-        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-            val word = step.word
-            if (word != null) key(word) {
-                VowelWord(word, MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 2.4.sp), once = true, delayMs = 250)
-            } else Text("? ? ?", style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 4.sp), color = Palette.tertiary,
-                modifier = Modifier.semantics { contentDescription = "Mot à trouver" })
+        Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 6.dp), contentAlignment = Alignment.Center) {
+            key(step) { MorphWord(step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null) }
         }
     }
 }
+
+private const val OUT = 0.45f
+private const val PAUSE = 0.4f
+private const val LEAD = 0.35f
+private const val GROW = 0.45f
+private const val STAGGER = 0.1f
+
+/**
+ * The example word, one big serif line: the consonants stay put and the gold vowels slide in between
+ * them. With `from`, that word's vowels first slide back out, so TROU turns back into TR before AUTEUR.
+ */
+@Composable
+private fun MorphWord(word: String?, from: String?) {
+    val reduce = rememberReduceMotion()
+    val clock = remember { Animatable(0f) }
+    var replays by remember { mutableStateOf(0) }
+    LaunchedEffect(replays) {
+        if (reduce) return@LaunchedEffect
+        clock.snapTo(0f)
+        clock.animateTo(4f, tween(4_000, easing = LinearEasing))
+    }
+    val time = clock.value
+    val back = if (from == null) 0f else OUT + PAUSE
+    val collapsing = from != null && !reduce && time < back
+    val shown = if (collapsing) from!! else word ?: EXAMPLE
+    fun progress(index: Int): Float = when {
+        reduce -> 1f
+        collapsing -> 1f - ease(time / OUT)
+        else -> ease((time - back - LEAD - index * STAGGER) / GROW)
+    }
+    Row(Modifier.pointerInput(Unit) { detectTapGestures { replays++ } }
+        .semantics(mergeDescendants = true) { contentDescription = word ?: "Consonnes : T, R" }) {
+        val style = Type.serif(68).copy(letterSpacing = 3.sp)
+        shown.forEachIndexed { index, c ->
+            if (isVowel(c)) {
+                val p = progress(index)
+                Text(c.toString(), style = style, color = Palette.accent, softWrap = false, modifier = Modifier.collapse(p).alpha(p))
+            } else Text(c.toString(), style = style, color = Palette.foreground, softWrap = false)
+        }
+    }
+}
+
+private fun ease(x: Float): Float { val t = x.coerceIn(0f, 1f); return t * t * (3 - 2 * t) }
