@@ -454,7 +454,7 @@ struct LetterKeyboard: View {
     var submit: () -> Void
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
-    static let rowHeight: CGFloat = 57
+    static let rowHeight: CGFloat = 56
     var body: some View {
         GeometryReader { geo in
             let unit = geo.size.width / 10
@@ -485,7 +485,7 @@ struct LetterKeyboard: View {
         .padding(.horizontal, 3).padding(.vertical, 6)
         .glassCard(radius: 30, padding: 0)
         // The iPhone keeps a strip under its keys (globe, dictation): the keys sit as high as there.
-        .padding(.bottom, 8)
+        .padding(.bottom, 34)
     }
 
     private func letterRow(_ row: String, _ unit: CGFloat) -> some View {
@@ -530,7 +530,7 @@ private struct KeyStyle: ButtonStyle {
                 if vowel { shape.fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)) }
                 else { shape.fill(pressed && popup == nil ? Palette.fill2 : Palette.fill1).overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1)) }
             }
-            .padding(.horizontal, 3).padding(.vertical, 5)
+            .padding(.horizontal, 3).padding(.vertical, 5.5)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if let popup, pressed {

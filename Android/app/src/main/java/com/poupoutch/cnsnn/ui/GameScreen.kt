@@ -331,9 +331,9 @@ private fun Caret() {
 fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
-    val rowHeight = 57.dp
+    val rowHeight = 56.dp
     // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
-    Box(Modifier.fillMaxWidth().padding(bottom = 14.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+    Box(Modifier.fillMaxWidth().padding(bottom = 40.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
         BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
             val unit = maxWidth / 10
             Column {
