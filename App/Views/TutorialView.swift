@@ -1,3 +1,6 @@
+import SwiftUI
+import CNSNNCore
+
 /// The places the first-launch tutorial points at: the daily card on the home page, then the real
 /// Mot du jour page (played with an example word, never the real one).
 enum TutorialTarget: Hashable { case daily, play, title, clock, board, hint }
@@ -127,8 +130,8 @@ struct TutorialGameOverlay: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let (hole, radius) = spotlight(proxy)
-            TutorialStage(hole: hole, radius: radius, size: proxy.size, skip: { finish(false) }) {
+            let spot = spotlight(proxy)
+            TutorialStage(hole: spot.rect, radius: spot.radius, size: proxy.size, skip: { finish(false) }) {
                 TutorialBubble(step: demo.step, hintShown: demo.hintShown, back: back, next: next)
             } extra: {
                 if demo.step == .help && !demo.hintShown, let anchor = anchors[.hint] { hintButton(proxy[anchor]) }
@@ -138,7 +141,7 @@ struct TutorialGameOverlay: View {
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: demo.hintShown)
     }
 
-    private func spotlight(_ proxy: GeometryProxy) -> (CGRect, CGFloat) {
+    private func spotlight(_ proxy: GeometryProxy) -> (rect: CGRect, radius: CGFloat) {
         func frame(_ target: TutorialTarget) -> CGRect? { anchors[target].map { proxy[$0] } }
         switch demo.step {
         case .top:

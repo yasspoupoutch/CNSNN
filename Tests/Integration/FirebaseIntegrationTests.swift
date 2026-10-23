@@ -479,7 +479,7 @@ import CNSNNCore
     /// Rattrapage: a missed day of the week is played like the daily word (secret answer, checked by the
     /// server) and counts in the week with 5 minutes more, out of the day's ranking and the streak.
     func testCatchUpCountsInTheWeek() async throws {
-        guard let day = CatchUp.days(today: DailySchedule.key()).first(where: { $0.status == .open })?.key else {
+        guard let day = CatchUp.days(today: DailySchedule.key(), results: [:]).first(where: { $0.status == .open })?.key else {
             throw XCTSkip("No day of this week can be caught up yet (Monday, or Tuesday before 12:00 UTC).")
         }
         let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
