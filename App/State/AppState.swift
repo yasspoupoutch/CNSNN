@@ -26,6 +26,8 @@ import CNSNNCore
     var challenges: [Challenge] = []
     /// Asks the home page to open the challenge sheet (from the daily result).
     var challengeRequest = 0
+    /// Shows the first-launch tutorial again (Profil).
+    var tutorialRequest = 0
     /// The code of a challenge link the app was opened with, waiting for the challenge sheet to join it.
     var inviteCode: String?
     /// Asks the shell to show the leaderboard (from the home page).

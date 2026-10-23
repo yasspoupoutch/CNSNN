@@ -48,6 +48,11 @@ class LocalStore(context: Context) {
         get() = prefs.getStringSet("hiddenPlayers", emptySet())!!.toSet()
         set(value) { prefs.edit().putStringSet("hiddenPlayers", value).apply() }
 
+    /** The first-launch tutorial was seen (or skipped). */
+    var tutorialSeen: Boolean
+        get() = prefs.getBoolean("tutorial.seen", false)
+        set(value) { prefs.edit().putBoolean("tutorial.seen", value).apply() }
+
     var remindersEnabled: Boolean
         get() = prefs.getBoolean("reminders.enabled", false)
         set(value) { prefs.edit().putBoolean("reminders.enabled", value).apply() }

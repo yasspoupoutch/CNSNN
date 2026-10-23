@@ -51,6 +51,9 @@ struct ProfileView: View {
                 }
                 ReminderSettings()
                 VStack(spacing: 0) {
+                    Button { state.tutorialRequest += 1 } label: { row("Revoir le tutoriel", symbol: "questionmark.circle") }
+                        .accessibilityIdentifier("profile.tutorial")
+                    Rectangle().fill(Palette.line).frame(height: 1)
                     Link(destination: Support.mail) { row("Contacter le support", symbol: "envelope") }
                     Rectangle().fill(Palette.line).frame(height: 1)
                     Button { privacy = true } label: { row("Confidentialité", symbol: "hand.raised") }

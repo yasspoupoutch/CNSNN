@@ -128,4 +128,53 @@ final class CNSNNUITests: XCTestCase {
             XCTAssertLessThanOrEqual(element.frame.maxX, screen.maxX, "\(name) dépasse à droite")
         }
     }
+
+    /// First-launch tutorial: the daily card and its Jouer button (tapped through the spotlight), then TR:
+    /// TROU or AUTEUR, then Indice (tapped) with the theme and the clock. Profil > Revoir le tutoriel shows it again, and Passer closes it.
+    @MainActor func testTutorial() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--tutorial"]
+        app.launch()
+        let next = app.buttons["Continuer"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        next.tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+
+        XCTAssertTrue(app.staticTexts["Le mot du jour"].waitForExistence(timeout: 5))
+        // The Jouer button, ringed in gold, goes on like Suivant.
+        let lit = app.buttons["tutorial.play"]
+        XCTAssertTrue(lit.waitForExistence(timeout: 5))
+        XCTAssertTrue(lit.isHittable)
+        lit.tap()
+        XCTAssertTrue(app.staticTexts["J’ai enlevé les voyelles"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Consonnes : T, R"].exists)
+        app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Ça peut être TROU…"].waitForExistence(timeout: 5))
+        app.buttons["Retour"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["J’ai enlevé les voyelles"].waitForExistence(timeout: 5))
+        app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Ça peut être TROU…"].waitForExistence(timeout: 5))
+        app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["… ou AUTEUR…"].waitForExistence(timeout: 5))
+        app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Si vous ne trouvez pas…"].waitForExistence(timeout: 5))
+        // Indice blinks; tapping it shows the hint.
+        app.buttons["tutorial.hint"].tap()
+        XCTAssertTrue(app.staticTexts["« Il a écrit le livre. »"].waitForExistence(timeout: 5))
+        app.buttons["À vous de jouer"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
+        XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout: 5))
+
+        app.buttons["Profil"].tap()
+        let again = app.buttons["profile.tutorial"]
+        XCTAssertTrue(again.waitForExistence(timeout: 5))
+        again.tap()
+        XCTAssertTrue(app.staticTexts["Le mot du jour"].waitForExistence(timeout: 5))
+        app.buttons["tutorial.skip"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.staticTexts["Le mot du jour"])], timeout: 5)
+    }
 }

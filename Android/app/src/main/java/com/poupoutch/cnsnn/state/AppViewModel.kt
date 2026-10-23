@@ -71,6 +71,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var inviteCode by mutableStateOf<String?>(null)
     /** Asks the shell to show the leaderboard (from the home page). */
     var leaderboardRequest by mutableStateOf(0)
+    /** Shows the first-launch tutorial again (Profil). */
+    var tutorialRequest by mutableStateOf(0)
 
     private var scope: String? = local.activeScope
     private var savingAllowed = true

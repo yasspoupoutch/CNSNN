@@ -116,13 +116,14 @@ struct HomeView: View {
                     Spacer(minLength: 4)
                     Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
                         .buttonStyle(PrimaryPillStyle(height: 54)).frame(width: 128)
+                        .tutorialTarget(.play)
                 }
                 Text(consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne. Reprenez la partie.")
                     .font(Typo.serifItalic(18)).foregroundStyle(Palette.secondary).padding(.top, 8)
                     .accessibilityLabel((consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne.")
                         + (state.uid == nil ? " Une seule partie par jour, enregistrée sur cet iPhone." : " Le même mot pour tous, une seule partie classée par jour."))
             }
-        }.glassCard(radius: 32, padding: 20).padding(.top, 2)
+        }.glassCard(radius: 32, padding: 20).tutorialTarget(.daily).padding(.top, 2)
     }
 
     private func dailyKicker(done: Bool) -> some View {

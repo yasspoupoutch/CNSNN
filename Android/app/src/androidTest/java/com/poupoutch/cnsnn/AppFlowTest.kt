@@ -34,6 +34,7 @@ class AppFlowTest {
         // A player from before the rules accepts them once.
         if (rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isNotEmpty()) rule.onNodeWithText("J’accepte").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("J’accepte")).fetchSemanticsNodes().isEmpty() }
+        rule.skipTutorial()
         // Classique opens its filters in a sheet.
         rule.onNodeWithText("Classique").performScrollTo().performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Lancer une partie")).fetchSemanticsNodes().isNotEmpty() }

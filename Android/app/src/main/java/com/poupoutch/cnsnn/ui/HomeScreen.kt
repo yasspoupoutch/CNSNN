@@ -241,7 +241,7 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }
     // Compact, so the challenge and the modes stay on screen.
-    SectionCard(radius = 28.dp, padding = 18.dp) {
+    SectionCard(Modifier.tutorialTarget(TutorialTarget.DAILY), radius = 28.dp, padding = 18.dp) {
         if (attempt != null) {
             val card = state.card(attempt.cardID)
             val context = LocalContext.current
@@ -271,7 +271,7 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
                         softWrap = false, color = if (consonants == null) Palette.tertiary else Palette.foreground, modifier = Modifier.padding(top = 4.dp)
                             .semantics { contentDescription = consonants?.let { "Consonnes : " + it.toList().joinToString(", ") } ?: "Mot masqué" })
                 }
-                Button(play, Modifier.height(54.dp).width(128.dp), shape = RoundedCornerShape(27.dp)) {
+                Button(play, Modifier.height(54.dp).width(128.dp).tutorialTarget(TutorialTarget.PLAY), shape = RoundedCornerShape(27.dp)) {
                     Text(if (consonants == null) "Jouer" else "Reprendre", fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
                 }
             }

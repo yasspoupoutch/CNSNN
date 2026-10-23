@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -118,6 +119,8 @@ fun ProfileScreen(state: AppViewModel) {
         if (state.isSuspended) SectionCard(radius = 24.dp) { Text(AppViewModel.SUSPENDED_TEXT, color = Palette.red, fontSize = 14.sp) }
         ReminderSettings(state)
         SectionCard(padding = 0.dp, radius = 24.dp) {
+            NavRow("Revoir le tutoriel", Icons.AutoMirrored.Outlined.HelpOutline) { state.tutorialRequest++ }
+            Divider()
             NavRow("Contacter le support", Icons.Outlined.Email) {
                 context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SUPPORT_EMAIL?subject=CNSNN")))
             }

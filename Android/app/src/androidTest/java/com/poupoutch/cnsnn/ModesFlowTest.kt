@@ -54,6 +54,7 @@ class ModesFlowTest {
         waitFor("Bonjour,", 20_000)
         if (has("J’accepte")) rule.onNodeWithText("J’accepte").performClick()
         rule.waitUntil(5_000) { !has("J’accepte") }
+        rule.skipTutorial()
     }
 
     private fun open(title: String) {

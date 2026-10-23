@@ -15,6 +15,7 @@ Jeu de mots iPhone en SwiftUI : retrouver un mot à partir de ses seules consonn
 - **Comptes** : invité automatique, puis compte e-mail sans perte de données. Connexion, mot de passe oublié, suppression du compte et de toutes ses données. Progression synchronisée entre appareils et conservée après réinstallation.
 - **Propositions de cartes** : doublons impossibles (l'identifiant est le mot normalisé), 30 s entre deux propositions, 10 par 24 h, statuts en attente, approuvée ou refusée, signalements.
 - **Modération** (administrateurs) : approuver ou refuser une carte, corriger son indice, sa catégorie ou sa difficulté, voir son auteur, traiter les signalements.
+- **Tutoriel de démarrage** : au premier lancement, l'accueil s'assombrit autour du mot du jour (bouton Jouer qui pulse), puis montre un exemple fixe (TR : TROU… ou AUTEUR…), jamais le vrai mot du jour, puis « Si vous ne trouvez pas… prenez un indice ! » (le bouton Indice clignote, le toucher révèle l’indice et AUTEUR), avec le thème et le chrono. 5 étapes. « Revoir le tutoriel » dans Profil.
 - **Rappel quotidien** : notification locale à l'heure choisie dans Profil, plus un rappel le soir si la série est en jeu.
 - **Widget** écran d'accueil (petit et moyen) : mot du jour à jouer, trouvé ou raté, série et temps avant le prochain mot.
 - **Design** Liquid Glass : effets natifs sur iOS 26, matériaux système sur iOS 17 à 25. Retours haptiques, Dynamic Type, cibles de 44 pt. Les réglages « Réduire les animations » et « Réduire la transparence » sont respectés.
