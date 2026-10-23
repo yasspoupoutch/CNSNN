@@ -179,6 +179,11 @@ struct GameView: View {
         Spacer(minLength: 12)
         answerLine
         HStack(spacing: 8) {
+            // After a minute without the hint, a small bubble on its left points at it (no room above,
+            // under the answer); the buttons slide right to make room.
+            if hintNudge && !session.usedHint && session.result == nil && tutorial == nil {
+                HintNudge().transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
+            }
             Button {
                 Haptics.selection()
                 withAnimation(reduceMotion ? nil : CNSNNTheme.ease) { session.revealHint(state: state) }
@@ -190,14 +195,6 @@ struct GameView: View {
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
             .tutorialTarget(.hint)
-            .overlay(alignment: .top) {
-                // After a minute without the hint, a small bubble points at it.
-                if hintNudge && !session.usedHint && session.result == nil && tutorial == nil {
-                    // A zero-height frame on the button's top edge, the bubble rising from it: always above.
-                    HintNudge().frame(height: 0, alignment: .bottom).offset(y: -4)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
-                }
-            }
             .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintNudge)
             Button { confirmSkip = true } label: {
                 Text("Passer").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
@@ -669,18 +666,32 @@ struct VowelReveal: View {
     }
 }
 
-/// "Besoin d’un indice ?": a light bubble whose arrow points down at the Indice button.
+/// "Un indice ?": a light bubble whose arrow points right at the Indice button. It blinks for its
+/// first 5 seconds, then stays.
 private struct HintNudge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
     var body: some View {
-        VStack(spacing: 0) {
-            Text("Besoin d’un indice ?").scaledFont(14, .semibold).foregroundStyle(Palette.ink)
-                .padding(.horizontal, 14).padding(.vertical, 8)
+        HStack(spacing: 0) {
+            Text("Un indice ?").scaledFont(13, .semibold).foregroundStyle(Palette.ink)
+                .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(Capsule().fill(Palette.foreground))
-            Triangle(up: false).fill(Palette.foreground).frame(width: 16, height: 8)
+            Triangle(up: false).fill(Palette.foreground).frame(width: 12, height: 6)
+                .rotationEffect(.degrees(-90)).frame(width: 6, height: 12)
         }
         .fixedSize()
+        .opacity(dim ? 0.25 : 1)
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .allowsHitTesting(false)
-        .accessibilityLabel("Besoin d’un indice ? Le bouton Indice est juste en dessous.")
+        .accessibilityLabel("Un indice ? Le bouton Indice est juste à droite.")
+        .task {
+            guard !reduceMotion else { return }
+            for _ in 0..<5 {
+                withAnimation(.easeInOut(duration: 0.5)) { dim = true }
+                try? await Task.sleep(for: .milliseconds(500))
+                withAnimation(.easeInOut(duration: 0.5)) { dim = false }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
     }
 }
