@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,7 +43,7 @@ class TutorialFlowTest {
         rule.onNodeWithText("Revoir le tutoriel").performScrollTo().performClick()
         waitFor("Le mot du jour")
         // Only Jouer, ringed in gold, goes on: it opens the real Mot du jour page.
-        assert(!has("Suivant"))
+        assertFalse(has("Suivant"))
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial.play")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("tutorial.play").assertIsDisplayed().performClick()
         waitFor("J’ai enlevé les voyelles")
@@ -66,7 +67,7 @@ class TutorialFlowTest {
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }
         // The real daily game opens next.
         rule.waitUntil(10_000) { rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("Fermer")).fetchSemanticsNodes().isNotEmpty() }
-        assert(!has("« Il a écrit le livre. »"))
+        assertFalse(has("« Il a écrit le livre. »"))
         rule.onNodeWithContentDescription("Fermer").performClick()
         waitFor("Bonjour,")
     }
