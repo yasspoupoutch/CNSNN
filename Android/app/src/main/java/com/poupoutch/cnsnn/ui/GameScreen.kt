@@ -408,7 +408,11 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                     Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))
                 }
                 val ends = mode == GameMode.DAILY
-                PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) { if (ends) close() else next() }
+                PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) {
+                    // Today's word: straight to the day's ranking.
+                    if (ends && ranked && !catchUp) state.leaderboardRequest++
+                    if (ends) close() else next()
+                }
             }
             if (catchUp) Text(when {
                     pending -> "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau."

@@ -360,6 +360,8 @@ private struct ResultSheet: View {
                 }
                 Button(mode == .daily ? "Terminer" : "Mot suivant") {
                     Haptics.selection()
+                    // Today's word: straight to the day's ranking.
+                    if mode == .daily && ranked && !catchUp { state.leaderboardRequest += 1 }
                     if mode == .daily { close() } else { next() }
                 }
                     .buttonStyle(PrimaryPillStyle(height: 54)).layoutPriority(1)
