@@ -120,7 +120,7 @@ enum class TutorialStep(val target: TutorialTarget, val title: String, val messa
     SECOND(TutorialTarget.BOARD, "… ou AUTEUR…",
         "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !", "AUTEUR"),
     TOP(TutorialTarget.TITLE, "Le thème et le chrono",
-        "En haut, le thème du mot pour vous mettre sur la piste, et le chrono, qui part dès que vous appuyez sur Jouer."),
+        "Sous les consonnes, le thème du mot pour vous mettre sur la piste. Le chrono, en haut à droite, part dès que vous appuyez sur Jouer."),
     HELP(TutorialTarget.HINT, "Si vous ne trouvez pas…", "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."),
 }
 
@@ -169,8 +169,8 @@ fun TutorialGameOverlay(targets: TutorialTargets, demo: TutorialDemo, revealHint
     BackHandler { if (demo.step == TutorialStep.CONSONANTS) finish(false) else back() }
     val rects = targets.rects
     val hole = when {
-        demo.step == TutorialStep.TOP -> listOfNotNull(rects[TutorialTarget.TITLE], rects[TutorialTarget.CLOCK]).reduceOrNull { a, b ->
-            Rect(minOf(a.left, b.left), minOf(a.top, b.top), maxOf(a.right, b.right), maxOf(a.bottom, b.bottom)) }
+        // The theme under the consonants; the bubble names the clock.
+        demo.step == TutorialStep.TOP -> rects[TutorialTarget.TITLE]
         demo.step == TutorialStep.HELP && !demo.hintShown -> rects[TutorialTarget.HINT]
         else -> rects[TutorialTarget.BOARD]
     }

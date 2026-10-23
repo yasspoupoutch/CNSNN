@@ -50,7 +50,7 @@ enum TutorialStep: Int, CaseIterable {
         case .consonants: "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… À vous de le retrouver !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
-        case .top: "En haut, le thème du mot pour vous mettre sur la piste, et le chrono, qui part dès que vous appuyez sur Jouer."
+        case .top: "Sous les consonnes, le thème du mot pour vous mettre sur la piste. Le chrono, en haut à droite, part dès que vous appuyez sur Jouer."
         case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."
         }
     }
@@ -144,9 +144,9 @@ struct TutorialGameOverlay: View {
         func frame(_ target: TutorialTarget) -> CGRect? { anchors[target].map { proxy[$0] } }
         switch demo.step {
         case .top:
-            // The title with the theme, and the clock on the right.
-            let both = [frame(.title), frame(.clock)].compactMap { $0 }.reduce(CGRect.null) { $0.union($1) }
-            return (both.isNull ? .zero : both.insetBy(dx: -10, dy: -6), 24)
+            // The theme under the consonants; the bubble names the clock.
+            let theme = frame(.title) ?? .zero
+            return (theme.insetBy(dx: -8, dy: -8), theme.height / 2 + 8)
         case .help where !demo.hintShown:
             let hint = frame(.hint) ?? .zero
             return (hint.insetBy(dx: -8, dy: -8), hint.height / 2 + 8)
