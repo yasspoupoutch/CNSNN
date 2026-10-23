@@ -74,14 +74,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var leaderboardRequest by mutableStateOf(0)
     /** Shows the first-launch tutorial again (Profil). */
     var tutorialRequest by mutableStateOf(0)
-    /** Rattrapage on this phone, day to found (see CatchUp). */
-    var catchUpDone by mutableStateOf(local.catchUpDone); private set
-    /** The week's daily words before today: played, caught up, or still to catch up. */
-    fun catchUpDays(now: Instant = Instant.now()): List<CatchUp.Day> =
-        CatchUp.days(DailySchedule.key(now), progress.attempts.mapNotNull { it.dailyKey }.toSet(), catchUpDone, now)
-    fun recordCatchUp(day: String, found: Boolean) {
-        catchUpDone = catchUpDone + (day to found); local.catchUpDone = catchUpDone
-    }
+    /** This week's daily words, Monday to Sunday: found, lost, to catch up, today, coming. */
+    fun dailyWeek(now: Instant = Instant.now()): List<CatchUp.Day> = CatchUp.week(DailySchedule.key(now), dailyResults(), now)
+    /** The week's daily words before today: played on time, caught up, or still to catch up. */
+    fun catchUpDays(now: Instant = Instant.now()): List<CatchUp.Day> = CatchUp.days(DailySchedule.key(now), dailyResults(), now)
+    /** Day to found, for every daily word played on this account. */
+    private fun dailyResults(): Map<String, Boolean> =
+        progress.attempts.mapNotNull { a -> a.dailyKey?.let { it to a.correct } }.reversed().toMap()
     /** Set by a found daily word while the 12h reminder was never offered; offered once back on the home page. */
     var reminderPending by mutableStateOf(false)
 
@@ -358,7 +357,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun finishPendingDaily() {
         val user = uid ?: return
         val today = DailySchedule.key()
-        for (day in listOf(DailySchedule.shift(today, -1), today)) {
+        // Yesterday, today, and the days caught up this week whose finish may not have reached the server.
+        val week = CatchUp.days(today, emptyMap()).map { it.key }.toSet()
+        val caughtUp = progress.attempts.filter { it.catchUp == true }.mapNotNull { it.dailyKey }.filter { it in week }
+        for (day in (listOf(DailySchedule.shift(today, -1), today) + caughtUp).distinct()) {
             val session = runCatching { cloud.dailySession(user, day) }.getOrNull() ?: continue
             if (!session.finished) continue
             runCatching { cloud.publishDailyResult(user, day) }.getOrNull()?.let { recordOfficial(it) }
@@ -437,10 +439,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val readAt: Map<String, Long> = emptyMap(),
     )
     var rankings by mutableStateOf(Rankings())
-    /** Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh. */
+    /** Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again. */
     fun rankingIsStale(key: String, force: Boolean): Boolean {
         val at = rankings.readAt[key] ?: return true
-        return System.currentTimeMillis() - at > if (force) 30_000 else 300_000
+        return System.currentTimeMillis() - at > if (force) 10_000 else 300_000
     }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }

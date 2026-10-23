@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.CatchUp
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeInvite
@@ -33,6 +34,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -137,15 +139,34 @@ class CloudRepositoryTest {
         assertEquals(1, repo.wrongOf(bob.uid, day))
     }
 
-    /** Rattrapage: a day over everywhere gives its word to anyone signed in; today's stays secret. */
-    @Test fun catchUpReadsOnlyDaysOverEverywhere() = runBlocking<Unit> {
+    /**
+     * Rattrapage: a missed day of the week is played like the daily word (answer secret until the week
+     * ends, checked by the server) and counts with 5 minutes more, out of the day's ranking and the streak.
+     */
+    @Test fun catchUpCountsWithFiveMinutesMore() = runBlocking<Unit> {
         val today = DailySchedule.key()
-        val past = DailySchedule.shift(today, -3)
-        seedSecret(past, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        val day = CatchUp.days(today, emptyMap()).firstOrNull { it.status == CatchUp.Status.Open }?.key
+        assumeTrue("No day of this week can be caught up yet (Monday, or Tuesday before 12:00 UTC)", day != null)
+        day!!
+        seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         seedSecret(today, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
-        repo.bootstrap("Alice")
-        assertEquals("Chocolat", repo.dailySecret(past)!!.wordFull)
-        expectDenied { repo.dailySecret(today) }
+        val alice = repo.bootstrap("Alice")
+        expectDenied { repo.dailySecret(day) }
+        // Today cannot be "caught up".
+        expectDenied { repo.startDaily(alice.uid, today, SecretDaily.cardId(today), catchUp = true) }
+        repo.startDaily(alice.uid, day, SecretDaily.cardId(day), catchUp = true)
+        delay(2100)
+        assertEquals(1, repo.registerGuess(alice.uid, day, "CHOCOLAT"))
+        assertTrue(repo.finishDaily(alice.uid, day, true, 0, "CHOCOLAT"))
+        assertEquals("Chocolat", repo.dailySecret(day)!!.wordFull)
+        val official = repo.publishDailyResult(alice.uid, day)!!
+        assertEquals(true, official.catchUp)
+        assertTrue(repo.dailyRanking(day).none { it.uid == alice.uid })
+        val entry = repo.leaderboardEntry(alice.uid)!!
+        assertEquals(0, entry.streak); assertNull(entry.bestTimeMs)
+        assertEquals(DailyScore.MISSED_MS - DailyScore.catchUpScoreMs(official.timeMs, false, true), entry.monthSaved)
+        // Once only.
+        expectDenied { repo.startDaily(alice.uid, day, SecretDaily.cardId(day), catchUp = true) }
     }
 
     @Test fun standingCountsTheFindersLikeTheRanking() = runBlocking<Unit> {

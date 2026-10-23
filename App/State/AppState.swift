@@ -35,8 +35,6 @@ import CNSNNCore
     /// Asks the shell to show the leaderboard (from the home page).
     var leaderboardRequest = 0
     /// Rattrapage on this iPhone, day: found. Outside every ranking, never sent to the server.
-    var catchUpDone: [String: Bool] = RuntimeFlags.isTesting ? [:] : (UserDefaults.standard.dictionary(forKey: AppState.catchUpKey) as? [String: Bool] ?? [:])
-    static let catchUpKey = "catchUp.done"
     private var local: any ProgressRepository
     private var savingAllowed = true
     private var cloudSave: Task<Void, Never>?
@@ -308,7 +306,11 @@ import CNSNNCore
     func finishPendingDaily() async {
         guard let cloud, let uid else { return }
         let now = Date()
-        for day in [DailySchedule.key(DailySchedule.previousDay(now)), DailySchedule.key(now)] {
+        // Yesterday, today, and the days caught up this week whose finish may not have reached the server.
+        var days = [DailySchedule.key(DailySchedule.previousDay(now)), DailySchedule.key(now)]
+        let week = Set(CatchUp.days(today: DailySchedule.key(now), results: [:], now: now).map(\.key))
+        days += progress.attempts.filter { $0.catchUp == true }.compactMap(\.dailyKey).filter { week.contains($0) && !days.contains($0) }
+        for day in days {
             guard let session = try? await cloud.dailySession(uid: uid, day: day), session.finished,
                   let official = try? await cloud.publishDailyResult(uid: uid, day: day) else { continue }
             recordOfficial(official)
@@ -337,10 +339,10 @@ import CNSNNCore
     var rankingsVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
-    /// Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh.
+    /// Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again.
     func rankingIsStale(_ key: String, force: Bool) -> Bool {
         guard let at = rankings.readAt[key] else { return true }
-        return Date().timeIntervalSince(at) > (force ? 30 : 300)
+        return Date().timeIntervalSince(at) > (force ? 10 : 300)
     }
 
     // MARK: Results
@@ -354,13 +356,17 @@ import CNSNNCore
         progress.recentCards = Array(progress.recentCards.suffix(20))
         persist()
     }
-    /// The week's daily words before today: played, caught up, or still to catch up.
-    func catchUpDays(now: Date = Date()) -> [CatchUp.Day] {
-        CatchUp.days(today: DailySchedule.key(now), played: Set(progress.attempts.compactMap(\.dailyKey)), done: catchUpDone, now: now)
+    /// This week's daily words, Monday to Sunday: found, lost, to catch up, today, coming.
+    func dailyWeek(now: Date = Date()) -> [CatchUp.Day] {
+        CatchUp.week(today: DailySchedule.key(now), results: dailyResults, now: now)
     }
-    func recordCatchUp(day: String, found: Bool) {
-        catchUpDone[day] = found
-        if !RuntimeFlags.isTesting { UserDefaults.standard.set(catchUpDone, forKey: Self.catchUpKey) }
+    /// The week's daily words before today: played on time, caught up, or still to catch up.
+    func catchUpDays(now: Date = Date()) -> [CatchUp.Day] {
+        CatchUp.days(today: DailySchedule.key(now), results: dailyResults, now: now)
+    }
+    /// Day to found, for every daily word played on this account.
+    private var dailyResults: [String: Bool] {
+        Dictionary(progress.attempts.compactMap { a in a.dailyKey.map { ($0, a.correct) } }, uniquingKeysWith: { first, _ in first })
     }
     /// The server's result replaces this device's measurement for that day.
     func recordOfficial(_ attempt: Attempt) {

@@ -16,6 +16,11 @@ on:
           - dark
           - light
         default: dark
+      duo:
+        description: Vérifier aussi la mise en page sur l'iPhone Duo (lent, peut bloquer)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -282,7 +287,10 @@ jobs:
       # iPhone Duo (pliable, grand écran intérieur) : mêmes captures sur son simulateur s'il existe sur
       # ce runner, pour vérifier la mise en page. Elles restent en artefact, rien n'est publié.
       - name: Vérifier la mise en page sur l'iPhone Duo
+        if: ${{ inputs.duo }}
         continue-on-error: true
+        # Un simulateur Duo qui ne répond pas ne doit pas bloquer la publication des captures.
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           duo=$(xcrun simctl list devices available -j | python3 -c '
@@ -310,7 +318,7 @@ jobs:
           xcrun simctl shutdown "$duo" || true
 
       - name: Conserver les captures iPhone Duo
-        if: ${{ always() && !cancelled() }}
+        if: ${{ inputs.duo && always() && !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cnsnn-screenshots-duo-${{ env.APPEARANCE }}
@@ -365,7 +373,7 @@ jobs:
     name: Publier sur la branche store-screenshots
     needs: capture
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
     defaults:
@@ -395,6 +403,9 @@ jobs:
       # Format Apple pour l'iPhone 6,9 pouces : 886 x 1920, 30 i/s, H.264, 15 à 30 s, piste son
       # stéréo (silencieuse ici).
       - name: Mettre l'aperçu vidéo au format App Store
+        # Si la vidéo traîne (installation de ffmpeg), les captures sont publiées quand même.
+        continue-on-error: true
+        timeout-minutes: 7
         run: |
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
@@ -427,7 +438,7 @@ jobs:
           rm -rf "ios/$APPEARANCE"
           mkdir -p "ios/$APPEARANCE"
           cp "$RUNNER_TEMP/screenshots/"*.png "ios/$APPEARANCE/"
-          cp "$RUNNER_TEMP/preview/preview.mp4" "ios/$APPEARANCE/preview.mp4"
+          if [ -f "$RUNNER_TEMP/preview/preview.mp4" ]; then cp "$RUNNER_TEMP/preview/preview.mp4" "ios/$APPEARANCE/preview.mp4"; fi
           ls -l "ios/$APPEARANCE"
           git add -A .
           if git diff --cached --quiet; then

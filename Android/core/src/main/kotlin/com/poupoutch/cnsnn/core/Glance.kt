@@ -24,7 +24,7 @@ data class Glance(
     companion object {
         fun of(progress: Progress, streak: Int): Glance {
             val last = progress.attempts.filter { it.mode == GameMode.DAILY && it.dailyKey != null }.maxByOrNull { it.dailyKey!! }
-            val lastWin = progress.attempts.filter { it.mode == GameMode.DAILY && it.correct }.mapNotNull { it.dailyKey }.maxOrNull()
+            val lastWin = progress.attempts.filter { it.mode == GameMode.DAILY && it.correct && it.onTime }.mapNotNull { it.dailyKey }.maxOrNull()
             return Glance(last?.dailyKey, last?.correct ?: false, last?.timeMs ?: 0, streak, lastWin)
         }
         fun fromJson(json: String?): Glance? = json?.let { runCatching { ProgressJson.decodeFromString(serializer(), it) }.getOrNull() }

@@ -394,10 +394,14 @@ enum DailyGuesses {
     }
     /// Starts today's clock on the server. Only returns once the server has recorded the start,
     /// so the consonants are never shown before the official timer runs.
-    func startDaily(uid: String, day: String, cardID: String) async throws -> DailySessionState {
+    /// `catchUp`: a missed day of the week, played later (see CatchUp).
+    func startDaily(uid: String, day: String, cardID: String, catchUp: Bool = false) async throws -> DailySessionState {
         let ref = sessionRef(uid, day)
+        var data: [String: Any] = ["userId":uid,"day":day,"cardId":cardID,"startedAt":FieldValue.serverTimestamp(),"hintUsed":false]
+        if catchUp { data["catchUp"] = true }
+        let payload = data
         let acknowledged = try await Self.awaitWrite { done in
-            ref.setData(["userId":uid,"day":day,"cardId":cardID,"startedAt":FieldValue.serverTimestamp(),"hintUsed":false], completion: done)
+            ref.setData(payload, completion: done)
         }
         guard acknowledged, let session = try await dailySession(uid: uid, day: day) else { throw CloudError.offline }
         return session
@@ -448,19 +452,24 @@ enum DailyGuesses {
               let cardID = s["cardId"] as? String else { return nil }
         let correct = s["correct"] as? Bool ?? false, usedHint = s["hintUsed"] as? Bool ?? false, wrong = s["wrongAnswers"] as? Int ?? 0
         let timeMs = Self.millis(finished) - Self.millis(started)
-        let scoreMs = DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
-        guard let rank = DailyScore.rank(day: day, scoreMs: scoreMs, correct: correct) else { return nil }
+        // A caught-up day counts in the week with 5 minutes more, and stays out of the day's ranking (rank 0).
+        let catchUp = s["catchUp"] as? Bool == true
+        let scoreMs = catchUp ? DailyScore.catchUpScoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
+            : DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
+        guard let rank = catchUp ? 0 : DailyScore.rank(day: day, scoreMs: scoreMs, correct: correct) else { return nil }
         let profile = try await db.collection("users").document(uid).getDocument(source: .server)
         let username = profile.data()?["username"] as? String ?? "Joueur"
         let old = try await leaderboardEntry(uid: uid, source: .server)
-        let tally = Self.tally(old: old, uid: uid, username: username, day: day, correct: correct, timeMs: timeMs, scoreMs: scoreMs)
-        let result: [String: Any] = ["userId":uid,"username":username,"day":day,"cardId":cardID,"correct":correct,"usedHint":usedHint,
+        let tally = Self.tally(old: old, uid: uid, username: username, day: day, correct: correct, timeMs: timeMs, scoreMs: scoreMs, catchUp: catchUp)
+        var result: [String: Any] = ["userId":uid,"username":username,"day":day,"cardId":cardID,"correct":correct,"usedHint":usedHint,
                                      "wrongAnswers":wrong,"timeMs":timeMs,"scoreMs":scoreMs,"rank":rank,"startedAt":started,"finishedAt":finished]
+        if catchUp { result["catchUp"] = true }
         let batch = db.batch()
         batch.setData(result, forDocument: resultRef(uid, day))
         batch.setData(tally, forDocument: db.collection("leaderboard").document(uid))
         _ = try await Self.awaitWrite { done in batch.commit(completion: done) }
-        return Attempt(cardID: cardID, mode: .daily, correct: correct, timeMs: timeMs, points: 0, date: finished.dateValue(), dailyKey: day)
+        return Attempt(cardID: cardID, mode: .daily, correct: correct, timeMs: timeMs, points: 0, date: finished.dateValue(), dailyKey: day,
+                       catchUp: catchUp ? true : nil)
     }
 
     // MARK: Leaderboard
@@ -930,7 +939,8 @@ enum DailyGuesses {
     private static func attempt(day: String, _ d: [String: Any]) -> Attempt? {
         guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
         let date = (d["finishedAt"] as? Timestamp)?.dateValue() ?? Date()
-        return Attempt(cardID: cardID, mode: .daily, correct: d["correct"] as? Bool ?? false, timeMs: timeMs, points: 0, date: date, dailyKey: day)
+        return Attempt(cardID: cardID, mode: .daily, correct: d["correct"] as? Bool ?? false, timeMs: timeMs, points: 0, date: date, dailyKey: day,
+                       catchUp: d["catchUp"] as? Bool == true ? true : nil)
     }
     private static func entry(uid: String, _ d: [String: Any]) -> LeaderboardEntry? {
         guard let played = d["played"] as? Int else { return nil }
@@ -942,12 +952,13 @@ enum DailyGuesses {
                                 weekPlayed: d["weekPlayed"] as? Int ?? 0)
     }
     /// Same arithmetic as the `tallies` rule in Firebase/firestore.rules.
-    static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, scoreMs: Int) -> [String: Any] {
+    /// A caught-up day (`catchUp`) counts in the week only: the streak and the best time stay those of days played on time.
+    static func tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Bool, timeMs: Int, scoreMs: Int, catchUp: Bool = false) -> [String: Any] {
         let lastWin = old?.lastWinDay ?? "", oldStreak = old?.streak ?? 0
-        let laterWin = correct && day > lastWin
+        let laterWin = !catchUp && correct && day > lastWin
         let previous = DailySchedule.dayNumber(forKey: day).map { $0 - 1 } == DailySchedule.dayNumber(forKey: lastWin)
-        let streak = laterWin ? (previous ? oldStreak + 1 : 1) : (!correct && day > lastWin ? 0 : oldStreak)
-        let best: Any = correct ? (min(old?.bestTimeMs ?? timeMs, timeMs) as Any) : (old?.bestTimeMs.map { $0 as Any } ?? NSNull())
+        let streak = catchUp ? oldStreak : laterWin ? (previous ? oldStreak + 1 : 1) : (!correct && day > lastWin ? 0 : oldStreak)
+        let best: Any = !catchUp && correct ? (min(old?.bestTimeMs ?? timeMs, timeMs) as Any) : (old?.bestTimeMs.map { $0 as Any } ?? NSNull())
         let month = DailyScore.tally(old: old?.monthTally ?? DailyScore.Month(month: 0, saved: 0, played: 0), day: day, scoreMs: scoreMs)
         // The month stays tallied for the apps from before the weekly ranking (iOS 1.0, Android).
         let week = DailyScore.tally(old: old?.weekTally ?? .none, day: day, correct: correct, scoreMs: scoreMs)

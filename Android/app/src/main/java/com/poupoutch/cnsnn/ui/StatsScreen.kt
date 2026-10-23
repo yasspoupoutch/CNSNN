@@ -245,7 +245,8 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     /** Reads only the ranking on screen, and only when the kept copy is old (see AppViewModel.rankings). */
     suspend fun refresh() {
         if (board == Board.FRIENDS) return
-        val force = refreshToken != seenToken
+        // Every open, tab switch and return to the app reads again (at most every 10 s, see rankingIsStale).
+        val force = true
         seenToken = refreshToken
         val day = DailySchedule.key()
         val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); else -> board.name }
@@ -269,7 +270,8 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
             }
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
-    LaunchedEffect(state.uid, refreshToken, board) { refresh() }
+    val resumes = rememberResumeCount()
+    LaunchedEffect(state.uid, refreshToken, board, resumes) { refresh() }
 
     val entry = state.official
     if (entry != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -378,7 +380,8 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     val name = state.progress.username.ifEmpty { "Joueur" }
     /** Two reads per friend: kept a few minutes like the other rankings (see AppViewModel.rankings). */
     suspend fun refresh() {
-        val force = refreshToken != seenToken
+        // Every open, tab switch and return to the app reads again (at most every 10 s, see rankingIsStale).
+        val force = true
         seenToken = refreshToken
         val key = "friends-" + DailySchedule.key()
         // A friend who typed my code since the last read: one count, then the list at once.
@@ -395,7 +398,8 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
         } catch (_: Exception) { failed = true } finally { loading = false }
     }
     // A friend added here: the ranking was marked to read again, so this reads it at once.
-    LaunchedEffect(uid, refreshToken, reload) { refresh() }
+    val resumes = rememberResumeCount()
+    LaunchedEffect(uid, refreshToken, reload, resumes) { refresh() }
 
     FriendCodeCards(state) { reload++ }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp)) }
@@ -480,4 +484,20 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)) }
     }
+}
+
+/** Counts the returns to the app while this screen is shown, so the ranking on screen reads again. */
+@Composable
+private fun rememberResumeCount(): Int {
+    var count by remember { mutableIntStateOf(0) }
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        var started = false
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            // The first resume is the screen opening, already read.
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { if (started) count++ else started = true }
+        }
+        lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
+    }
+    return count
 }

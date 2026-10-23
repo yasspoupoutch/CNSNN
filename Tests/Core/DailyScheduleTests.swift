@@ -95,17 +95,31 @@ final class DailyScheduleTests: XCTestCase {
     }
 
     func testCatchUpListsTheWeekBeforeToday() {
-        // Friday 2026-10-23, at 12:00 UTC (14 h in Paris): Thursday opens at 12:00 UTC exactly.
+        // Friday 2026-10-23, at 11:00 UTC: Thursday opens at 12:00 UTC (14 h in Paris).
         let now = ISO8601DateFormatter().date(from: "2026-10-23T11:00:00Z")!
-        let days = CatchUp.days(today: "2026-10-23", played: ["2026-10-19"], done: ["2026-10-20": false], now: now)
+        let days = CatchUp.days(today: "2026-10-23", results: ["2026-10-19": true, "2026-10-20": false], now: now)
         XCTAssertEqual(days.map(\.key), ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"])
-        XCTAssertEqual(days.map(\.status), [.played, .done(found: false), .open, .later(ISO8601DateFormatter().date(from: "2026-10-23T12:00:00Z")!)])
+        XCTAssertEqual(days.map(\.status), [.played(found: true), .played(found: false), .open, .later(ISO8601DateFormatter().date(from: "2026-10-23T12:00:00Z")!)])
         XCTAssertEqual(CatchUp.toPlay(days), 2)
-        let later = CatchUp.days(today: "2026-10-23", played: [], done: [:], now: now.addingTimeInterval(3_600))
+        let later = CatchUp.days(today: "2026-10-23", results: [:], now: now.addingTimeInterval(3_600))
         XCTAssertEqual(later.last?.status, .open)
         // Monday: nothing to catch up yet; Sunday: the six days before.
-        XCTAssertTrue(CatchUp.days(today: "2026-10-26", played: [], done: [:], now: now).isEmpty)
-        XCTAssertEqual(CatchUp.days(today: "2026-10-25", played: [], done: [:], now: now).first?.key, "2026-10-19")
-        XCTAssertEqual(CatchUp.days(today: "2026-10-25", played: [], done: [:], now: now).count, 6)
+        XCTAssertTrue(CatchUp.days(today: "2026-10-26", results: [:], now: now).isEmpty)
+        XCTAssertEqual(CatchUp.days(today: "2026-10-25", results: [:], now: now).first?.key, "2026-10-19")
+        XCTAssertEqual(CatchUp.days(today: "2026-10-25", results: [:], now: now).count, 6)
+        // The whole week, Monday to Sunday.
+        let week = CatchUp.week(today: "2026-10-23", results: ["2026-10-19": true, "2026-10-23": false], now: now)
+        XCTAssertEqual(week.map(\.key).first, "2026-10-19")
+        XCTAssertEqual(week.map(\.key).last, "2026-10-25")
+        XCTAssertEqual(week.map(\.status)[4...], [.played(found: false), .coming, .coming])
+        XCTAssertEqual(CatchUp.week(today: "2026-10-22", results: [:], now: now)[3].status, .today)
+        XCTAssertEqual(CatchUp.toPlay(CatchUp.week(today: "2026-10-22", results: [:], now: now)), 3)
+    }
+
+    func testCatchUpCostsFiveMinutesMore() {
+        XCTAssertEqual(DailyScore.catchUpScoreMs(timeMs: 40_000, usedHint: false, correct: true), 340_000)
+        XCTAssertEqual(DailyScore.catchUpScoreMs(timeMs: 40_000, usedHint: true, correct: true), 400_000)
+        XCTAssertEqual(DailyScore.catchUpScoreMs(timeMs: 500_000, usedHint: false, correct: true), 600_000)
+        XCTAssertEqual(DailyScore.catchUpScoreMs(timeMs: 40_000, usedHint: false, correct: false), 600_000)
     }
 }

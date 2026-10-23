@@ -32,6 +32,17 @@ const dailyRank=(key,s,correct)=>dayIndex(key)*1000000+(correct?s:999999);
 const monthIndex=key=>Number(key.slice(0,4))*12+Number(key.slice(5,7))-1;
 const weekIndex=key=>Math.floor((dayIndex(key)+3)/7);
 const weekRank=(w,found,ms)=>w*100000000+found*10000000+(9999999-ms);
+// Rattrapage (same as the rules): 5 minutes more than the day's own score, out of the day's ranking.
+const catchUpScore=(timeMs,usedHint,correct)=>correct?Math.min(score(timeMs,usedHint,true)+300000,600000):600000;
+const hour=3600000;
+const dayOverAt=key=>Date.parse(`${key}T00:00:00Z`)+36*hour;
+// The week's answers become public once its Sunday is over everywhere (Monday 12:00 UTC).
+const weekEndAt=key=>Date.parse(`${key}T00:00:00Z`)+(7-(dayIndex(key)+3)%7)*24*hour+12*hour;
+// A day of this week over everywhere, that can be caught up now (none early in the week).
+function catchUpDay(now=Date.now()){
+ for(let back=1;back<=8;back++){const k=new Date(now-back*24*hour).toISOString().slice(0,10);if(now>=dayOverAt(k)+60000&&now<weekEndAt(k)-60000)return k;}
+ return null;
+}
 
 // Creates the profile and reserves its pseudo in the same batch, as the apps do.
 function signUpBatch(uid='alice',username='Alice',data=profile(uid,username)){
@@ -76,8 +87,10 @@ async function resultFor(uid,day,overrides={}){
 }
 // The week's tally as iOS 1.1 sends it; `weeks:false` is an app from before (iOS 1.0, Android).
 function tally(old,r,uid='alice',{weeks=true}={}){
- const laterWin=r.correct&&r.day>old.lastWinDay;
- const streak=laterWin?(old.lastWinDay===shiftKey(r.day,-1)?old.streak+1:1):(!r.correct&&r.day>old.lastWinDay?0:old.streak);
+ // A caught-up day counts in the week only: streak, last win and best time stay those of days played on time.
+ const onTime=r.catchUp!==true;
+ const laterWin=onTime&&r.correct&&r.day>old.lastWinDay;
+ const streak=!onTime?old.streak:laterWin?(old.lastWinDay===shiftKey(r.day,-1)?old.streak+1:1):(!r.correct&&r.day>old.lastWinDay?0:old.streak);
  const m=monthIndex(r.day),om=old.month??0,same=m===om,saved=(same?old.monthSaved:0)+600000-r.scoreMs;
  const month=m<om?{month:om,monthSaved:old.monthSaved,monthPlayed:old.monthPlayed,monthRank:old.monthRank}
   :{month:m,monthSaved:saved,monthPlayed:(same?old.monthPlayed:0)+1,monthRank:m*100000000+saved};
@@ -86,7 +99,7 @@ function tally(old,r,uid='alice',{weeks=true}={}){
  const week=!weeks?{}:w<ow?{week:ow,weekFound:old.weekFound,weekTimeMs:old.weekTimeMs,weekPlayed:old.weekPlayed,weekRank:old.weekRank}
   :{week:w,weekFound:found,weekTimeMs:ms,weekPlayed:(sameWeek?old.weekPlayed:0)+1,weekRank:weekRank(w,found,ms)};
  return {uid,username:r.username,...month,...week,played:old.played+1,wins:old.wins+(r.correct?1:0),streak,bestStreak:Math.max(old.bestStreak,streak),
-  bestTimeMs:r.correct?(old.bestTimeMs==null?r.timeMs:Math.min(old.bestTimeMs,r.timeMs)):old.bestTimeMs,lastWinDay:laterWin?r.day:old.lastWinDay,lastResult:r.day,updatedAt:serverTimestamp()};
+  bestTimeMs:onTime&&r.correct?(old.bestTimeMs==null?r.timeMs:Math.min(old.bestTimeMs,r.timeMs)):old.bestTimeMs,lastWinDay:laterWin?r.day:old.lastWinDay,lastResult:r.day,updatedAt:serverTimestamp()};
 }
 const zero={played:0,wins:0,streak:0,bestStreak:0,bestTimeMs:null,lastWinDay:'',month:0,monthSaved:0,monthPlayed:0};
 async function publish(uid,r,old=zero,forged={},options={}){
@@ -182,9 +195,10 @@ test('daily word at local midnight: open while it is that day somewhere, answer 
  // Too early everywhere: tomorrow's word cannot be read or started in advance.
  await assertFails(getDoc(doc(user(),`dailyPuzzles/${closed[0]}`)));
  await assertFails(start(closed[0]));
- // Over everywhere: no new game, the answer is public.
+ // Over everywhere: no new game. Its answer is public once its week is over too (a missed day can be caught up until then).
  await assertFails(start(closed[1]));
- await assertSucceeds(getDoc(doc(user('bob'),`dailySecrets/${closed[1]}`)));
+ if(now>=weekEndAt(closed[1])) await assertSucceeds(getDoc(doc(user('bob'),`dailySecrets/${closed[1]}`)));
+ else await assertFails(getDoc(doc(user('bob'),`dailySecrets/${closed[1]}`)));
  // A day already started cannot be started again.
  await assertFails(start(open[0]));
 });
@@ -212,7 +226,7 @@ test('hint cannot be hidden and finish happens once',async()=>{
 });
 test('secret daily word: consonants today, hint and answer only when earned',async()=>{
  await signUp(); await signUp('bob','Bob');
- const day=parisKey(),old=shiftKey(day,-3),next=shiftKey(day,2);
+ const day=parisKey(),old=shiftKey(day,-14),next=shiftKey(day,2);
  for(const d of [day,old,next]){
   await seed(`dailyPuzzles/${d}`,{consonants:'CHCLT',category:'Général',difficulty:'Facile'});
   await seed(`dailyHints/${d}`,{hint:'Un carré gourmand.'});
@@ -230,8 +244,9 @@ test('secret daily word: consonants today, hint and answer only when earned',asy
  await assertFails(getDoc(doc(db,`dailySecrets/${day}`)));
  await assertFails(getDocs(collection(db,'dailySecrets')));
  await assertFails(getDoc(doc(db,`dailySecrets/${next}`)));
- // Past days are open, so the history can show yesterday's word.
+ // Past weeks are open.
  await assertSucceeds(getDoc(doc(db,`dailySecrets/${old}`)));
+ await assertSucceeds(getDoc(doc(db,`dailyHints/${old}`)));
  await startDaily();
  await assertFails(getDoc(doc(db,`dailyHints/${day}`)));
  await assertFails(getDoc(doc(db,`dailySecrets/${day}`)));
@@ -750,4 +765,69 @@ test('a deleted account takes its suspension record and the reports naming it',a
  const about=await assertSucceeds(getDocs(query(collection(db,'playerReports'),where('playerId','==','alice'))));
  assert.equal(about.size,1);
  await assertSucceeds(deleteDoc(doc(db,'playerReports/bob_alice')));
+});
+
+// ---------- Rattrapage
+
+test('a missed day of the week is caught up: answer secret until the week ends, checked by the server, counted in the week only',async(t)=>{
+ const day=catchUpDay();
+ if(!day){ t.skip('no day of this week is over everywhere yet'); return; }
+ await signUp(); await signUp('bob','Bob');
+ const today=parisKey(),lastWeek=shiftKey(day,-7),w=weekIndex(day);
+ for(const d of [day,lastWeek]){
+  await seed(`dailyPuzzles/${d}`,{consonants:'CHCLT',category:'Général',difficulty:'Facile'});
+  await seed(`dailyHints/${d}`,{hint:'Un carré gourmand.'});
+  await seed(`dailySecrets/${d}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un carré gourmand.',category:'Général',difficulty:'Facile'});
+ }
+ // The week is not over: neither the answer nor the hint can be read, the consonants can.
+ await assertFails(getDoc(doc(user('bob'),`dailySecrets/${day}`)));
+ await assertFails(getDoc(doc(user('bob'),`dailyHints/${day}`)));
+ await assertSucceeds(getDoc(doc(user('bob'),`dailyPuzzles/${day}`)));
+ const start=(uid,d,extra={catchUp:true})=>setDoc(doc(user(uid),`dailySessions/${uid}_${d}`),{userId:uid,day:d,cardId:'secret-x',startedAt:serverTimestamp(),hintUsed:false,...extra});
+ // Only as a catch-up, only this week, only once the day is over everywhere.
+ await assertFails(start('alice',day,{}));
+ await assertFails(start('alice',day,{catchUp:false}));
+ await assertFails(start('alice',lastWeek));
+ await assertFails(start('alice',shiftKey(today,1)));
+ await assertSucceeds(start('alice',day));
+ await assertFails(start('alice',day));
+ await patch(`dailySessions/alice_${day}`,{startedAt:Timestamp.fromMillis(Date.now()-10000)});
+ // The hint opens once used; the answer is checked by the server like the daily word.
+ const ref=doc(user(),`dailySessions/alice_${day}`);
+ await assertSucceeds(updateDoc(ref,{hintUsed:true}));
+ await assertSucceeds(getDoc(doc(user(),`dailyHints/${day}`)));
+ await guess('alice',day,'CHOCOLA');
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,answer:'CHOCOLA'}));
+ await guess('alice',day,'CHOCOLAT');
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:1,answer:'CHOCOLAT'}));
+ await assertSucceeds(getDoc(doc(user(),`dailySecrets/${day}`)));
+ await assertFails(getDoc(doc(user('bob'),`dailySecrets/${day}`)));
+ // The result: 5 minutes more, out of the day's ranking; the week counts the word.
+ const plain=await resultFor('alice',day);
+ const r={...plain,catchUp:true,scoreMs:catchUpScore(plain.timeMs,true,true),rank:0};
+ assert.equal(r.scoreMs,Math.min(plain.timeMs+60000+300000,600000));
+ const old={...zero,played:4,wins:4,streak:2,bestStreak:3,bestTimeMs:5000,lastWinDay:today,lastResult:today,week:w,weekFound:2,weekTimeMs:50000,weekPlayed:2,weekRank:weekRank(w,2,50000)};
+ await seed('leaderboard/alice',{uid:'alice',username:'Alice',...old,updatedAt:Timestamp.now()});
+ const line=await read('leaderboard/alice');
+ await assertFails(publish('alice',plain,line));
+ const {catchUp:_flag,...unflagged}=r;
+ await assertFails(publish('alice',unflagged,line));
+ await assertFails(publish('alice',{...r,scoreMs:plain.scoreMs},line));
+ await assertFails(publish('alice',{...r,rank:plain.rank},line));
+ // It neither extends the streak nor sets a best time.
+ await assertFails(publish('alice',r,line,{streak:3,bestStreak:3}));
+ await assertFails(publish('alice',r,line,{bestTimeMs:Math.min(5000,r.timeMs),lastWinDay:day}));
+ await assertSucceeds(publish('alice',r,line));
+ const board=await read('leaderboard/alice');
+ assert.equal(board.weekFound,3); assert.equal(board.weekTimeMs,50000+r.scoreMs); assert.equal(board.streak,2); assert.equal(board.lastWinDay,today); assert.equal(board.bestTimeMs,5000);
+ // Out of that day's ranking.
+ const ranked=await getDocs(query(collection(user('bob'),'dailyResults'),where('rank','>=',dayIndex(day)*1000000),where('rank','<=',dayIndex(day)*1000000+999999)));
+ assert.equal(ranked.size,0);
+});
+test('a day played on time cannot be caught up again',async(t)=>{
+ const day=catchUpDay();
+ if(!day){ t.skip('no day of this week is over everywhere yet'); return; }
+ await signUp();
+ await seed(`dailySessions/alice_${day}`,{userId:'alice',day,cardId:'secret-x',startedAt:Timestamp.fromMillis(Date.now()-86400000),hintUsed:false});
+ await assertFails(setDoc(doc(user(),`dailySessions/alice_${day}`),{userId:'alice',day,cardId:'secret-x',startedAt:serverTimestamp(),hintUsed:false,catchUp:true}));
 });

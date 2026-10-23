@@ -25,7 +25,7 @@ import CNSNNCore
     /// Why the last check could not reach the server (network), shown under the board.
     var notice: String?
     private var dailyKey: String?
-    /// Rattrapage: a past daily word of the week, played for fun (see CatchUp).
+    /// Rattrapage: a missed daily word of the week, played later and counted in the week (see CatchUp).
     private(set) var catchUpDay: String?
     private var dailyStart: Date?
     private var start = ContinuousClock.now
@@ -36,19 +36,16 @@ import CNSNNCore
         answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = catchUp
         ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
-        if let catchUp {
-            phase = .loading
-            Task { await loadCatchUp(day: catchUp, state: state) }
-        } else if mode == .daily {
-            let key = DailySchedule.key(); dailyKey = key
-            if state.cloud != nil {
+        if mode == .daily {
+            let key = catchUp ?? DailySchedule.key(); dailyKey = key
+            if state.cloud != nil || catchUp != nil {
                 // With a server, the daily game is always the official one: no offline replay to learn the word.
                 ranked = true; phase = .loading
                 Task {
                     if state.uid == nil { await state.connectIfConfigured() }
                     guard let cloud = state.cloud, let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
                     if state.isSuspended, (try? await cloud.dailySession(uid: uid, day: key)) == nil { phase = .failed(AppState.suspendedText); return }
-                    await loadRankedDaily(key: key, cloud: cloud, uid: uid, state: state)
+                    await loadRankedDaily(key: key, catchUp: catchUp != nil, cloud: cloud, uid: uid, state: state)
                 }
             } else {
                 loadLocalDaily(key: key, state: state)
@@ -61,16 +58,13 @@ import CNSNNCore
         }
     }
 
-    /// The day is over everywhere, so its word is public: it is checked on this iPhone, nothing is sent.
-    private func loadCatchUp(day: String, state: AppState) async {
-        if state.uid == nil { await state.connectIfConfigured() }
-        guard let cloud = state.cloud, state.uid != nil else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
-        do {
-            guard let word = try await cloud.dailySecret(day: day) else { phase = .failed("Ce mot du jour n’est pas disponible."); return }
-            card = word; start = .now; elapsedBeforePause = .zero; phase = .playing
-        } catch {
-            phase = .failed(CloudError.message(error))
-        }
+    /// The first-launch tutorial: the Mot du jour page with an example word, nothing recorded or sent.
+    func loadTutorial(_ example: Card) {
+        guard card?.id != example.id else { return }
+        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
+        start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = nil
+        ranked = false; pendingOfficial = false; standing = nil; secret = false; checking = false; notice = nil
+        card = example; phase = .playing
     }
 
     /// Without Firebase (tests, missing configuration): the start time is kept on this iPhone.
@@ -89,7 +83,8 @@ import CNSNNCore
 
     /// Signed in: one server session per day. The consonants appear only once the server has
     /// recorded the start, and a finished day always shows its official result.
-    private func loadRankedDaily(key: String, cloud: FirebaseRepository, uid: String, state: AppState) async {
+    /// A caught-up day (`catchUp`) runs the same way: its answer stays secret until the week is over.
+    private func loadRankedDaily(key: String, catchUp: Bool, cloud: FirebaseRepository, uid: String, state: AppState) async {
         do {
             if let session = try await cloud.dailySession(uid: uid, day: key) {
                 secret = FirebaseRepository.secretDay(cardID: session.cardID) != nil
@@ -130,8 +125,8 @@ import CNSNNCore
                     return
                 }
                 let puzzle = try await cloud.dailyPuzzle(day: key)
-                guard let daily = puzzle ?? state.dailyCard(day: key) else { phase = .failed("Le mot du jour est indisponible."); return }
-                let session = try await cloud.startDaily(uid: uid, day: key, cardID: daily.id)
+                guard let daily = puzzle ?? (catchUp ? nil : state.dailyCard(day: key)) else { phase = .failed("Le mot du jour est indisponible."); return }
+                let session = try await cloud.startDaily(uid: uid, day: key, cardID: daily.id, catchUp: catchUp)
                 card = daily; dailyStart = session.startedAt; secret = puzzle != nil
                 if secret { state.storeDailyWord(daily, day: key) }
             }
@@ -264,9 +259,10 @@ import CNSNNCore
         }
         guard let card else { return }
         let ms = elapsedMs
-        let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: 0, date: Date(), dailyKey: dailyKey)
+        let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: 0, date: Date(), dailyKey: dailyKey,
+                              catchUp: catchUpDay != nil ? true : nil)
         result = attempt
-        if let catchUpDay { state.recordCatchUp(day: catchUpDay, found: correct) } else { state.record(attempt) }
+        state.record(attempt)
         if correct { Haptics.success() }
         if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey {
             pendingOfficial = true
@@ -288,7 +284,8 @@ import CNSNNCore
         }
     }
     private func loadStanding(cloud: FirebaseRepository, attempt: Attempt) async {
-        guard let day = attempt.dailyKey else { return }
+        // A caught-up day is out of the day's ranking.
+        guard let day = attempt.dailyKey, catchUpDay == nil else { return }
         standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, correct: attempt.correct), correct: attempt.correct)
     }
 }

@@ -47,7 +47,7 @@ struct LeaderboardView: View {
                 }
             }
         }
-        .task(id: refreshKey + board.rawValue) { await refresh() }
+        .task(id: refreshKey + board.rawValue) { await refresh(force: true) }
         .confirmationDialog("Suspendre " + (suspending?.name ?? "") + " ?", isPresented: Binding(get: { suspending != nil }, set: { if !$0 { suspending = nil } }), titleVisibility: .visible) {
             Button("Suspendre", role: .destructive) { if let row = suspending { suspend(row) } }
         } message: {
@@ -220,7 +220,7 @@ struct FriendsBoard: View {
             if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
             board
         }
-        .task(id: (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion)) { await refresh() }
+        .task(id: (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion)) { await refresh(force: true) }
     }
 
     @ViewBuilder private var board: some View {

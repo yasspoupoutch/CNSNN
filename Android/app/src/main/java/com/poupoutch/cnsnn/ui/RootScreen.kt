@@ -157,10 +157,19 @@ private fun AppNavigation(state: AppViewModel) {
         composable("main") {
             MainShell(state, { mode, category, difficulty ->
                 nav.navigate("game/${mode.name}?category=${category?.name ?: ""}&difficulty=${difficulty?.name ?: ""}")
-            }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") }, { day -> nav.navigate("catchup/$day") })
+            }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") }, { day -> nav.navigate("catchup/$day") },
+                { nav.navigate("tutorial") })
+        }
+        composable("tutorial") {
+            // "À vous de jouer": the real daily game opens in its place.
+            GameScreen(state, GameMode.DAILY, null, null, tutorial = { play ->
+                state.local.tutorialSeen = true
+                nav.popBackStack()
+                if (play) nav.navigate("game/${GameMode.DAILY.name}?category=&difficulty=")
+            }) { nav.popBackStack() }
         }
         composable("catchup/{day}", arguments = listOf(navArgument("day") { type = NavType.StringType })) { entry ->
-            GameScreen(state, GameMode.CLASSIC, null, null, catchUpDay = entry.arguments?.getString("day")) { nav.popBackStack() }
+            GameScreen(state, GameMode.DAILY, null, null, catchUpDay = entry.arguments?.getString("day")) { nav.popBackStack() }
         }
         composable("challenge/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             ChallengeScreen(state, entry.arguments?.getString("id") ?: "") { nav.popBackStack() }
@@ -191,7 +200,7 @@ private enum class Tab(val label: String, val icon: ImageVector, val selectedIco
 
 @Composable
 private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit,
-                      playCatchUp: (String) -> Unit) {
+                      playCatchUp: (String) -> Unit, playTutorial: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.PLAY) }
     // "Classement" on the home page.
     var seenRequest by rememberSaveable { mutableStateOf(state.leaderboardRequest) }
@@ -235,7 +244,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
             }
         }
         androidx.compose.animation.AnimatedVisibility(tutorial, enter = fadeIn(), exit = fadeOut()) {
-            TutorialOverlay(targets) { state.local.tutorialSeen = true; tutorial = false }
+            TutorialOverlay(targets, play = { tutorial = false; playTutorial() }, skip = { state.local.tutorialSeen = true; tutorial = false })
         }
     }
     ReminderOffer(state)

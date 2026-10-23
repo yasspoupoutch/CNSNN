@@ -1,5 +1,7 @@
 package com.poupoutch.cnsnn.ui
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -18,6 +20,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -67,6 +71,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
@@ -89,6 +94,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.CatchUp
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
@@ -105,9 +111,23 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, catchUpDay: String? = null, close: () -> Unit) {
+fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, catchUpDay: String? = null,
+               tutorial: ((Boolean) -> Unit)? = null, close: () -> Unit) {
     val game: GameViewModel = viewModel()
-    LaunchedEffect(Unit) { game.loadOnce(mode, category, difficulty, state, catchUpDay) }
+    LaunchedEffect(Unit) { if (tutorial != null) game.loadTutorial(TUTORIAL_CARD) else game.loadOnce(mode, category, difficulty, state, catchUpDay) }
+    // First-launch tutorial: this page with an example word (TR), explained step by step.
+    val targets = remember { TutorialTargets() }
+    val demo = remember { TutorialDemo() }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalTutorialTargets provides targets.takeIf { tutorial != null }, LocalTutorialDemo provides demo.takeIf { tutorial != null }) {
+            GameContent(state, game, mode, close)
+        }
+        if (tutorial != null) TutorialGameOverlay(targets, demo, revealHint = { game.revealHint(state) }, finish = tutorial)
+    }
+}
+
+@Composable
+private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode, close: () -> Unit) {
     // The local clock stops while the app is in the background (the daily clock is the server's).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -121,7 +141,7 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
     // A found daily word: the 12h reminder is offered once back on the home page.
-    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
+    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && game.catchUpDay == null && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
@@ -184,7 +204,7 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
         IconButton(close, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Fermer") }
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(game.catchUpDay?.let { "Mot du " + Format.weekday(it) } ?: if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            game.card?.let { Text("${it.category.label} · ${it.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary) }
+            game.card?.let { Text(it.difficulty.label, fontSize = 12.sp, color = Palette.tertiary) }
         }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
             val card = game.card
@@ -194,7 +214,7 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
             var tick by remember { mutableIntStateOf(0) }
             LaunchedEffect(Unit) { while (true) { delay(500); tick++ } }
             val ms = game.result?.timeMs ?: if (game.phase == GameViewModel.Phase.Playing) game.elapsedMs.also { tick } else 0
-            Surface(shape = RoundedCornerShape(50), color = Palette.fill1, modifier = Modifier.padding(end = 4.dp)) {
+            Surface(shape = RoundedCornerShape(50), color = Palette.fill1, modifier = Modifier.padding(end = 4.dp).tutorialTarget(TutorialTarget.CLOCK)) {
                 Text(Format.clock(ms), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
                     .semantics { contentDescription = "Chrono " + Format.clock(ms) })
             }
@@ -209,11 +229,21 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     val consonants = card.wordNoVowels
     // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
-            modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
-        Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
-        AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
-            Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
+        Column(Modifier.tutorialTarget(TutorialTarget.BOARD), horizontalAlignment = Alignment.CenterHorizontally) {
+            val demo = LocalTutorialDemo.current
+            if (demo != null) {
+                // The tutorial's example: the vowels slide in and out of TR.
+                Box(Modifier.padding(top = 28.dp).heightIn(min = 96.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.runtime.key(demo.step, demo.hintShown) { MorphWord(demo.word, demo.from, 80) }
+                }
+            } else {
+                Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
+                    modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
+            }
+            Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
+            AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
+                Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
+            }
         }
         FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             game.wrongGuesses.forEach { guess ->
@@ -222,29 +252,41 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     modifier = Modifier.background(Palette.redSoft, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
         }
-        if (game.catchUpDay != null && game.result == null) {
-            Text("Pour le plaisir : ce mot ne compte pas au classement.", fontSize = 12.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
-        }
+        // The theme, near the consonants where the eyes are (the difficulty stays under the title).
+        Text("Thème : " + card.category.label, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1, textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp).tutorialTarget(TutorialTarget.TITLE))
         if (mode == GameMode.DAILY && game.result == null) {
-            Text(when {
+            val line = when {
                 game.checking -> "Vérification…"
                 game.notice != null -> game.notice!!
-                game.ranked -> "Chrono officiel. Jusqu’à 20 essais pour trouver le mot."
-                else -> "Chrono officiel. Les erreurs ne terminent pas la partie."
-            }, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                game.catchUpDay != null -> "Rattrapage : compte dans la semaine avec 5 min en plus."
+                else -> null
+            }
+            if (line != null) Text(line, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             AnimatedVisibility(game.remainingText != null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
                 Text(game.remainingText ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
             }
         }
     }
+    // After a minute on the Mot du jour without the hint, a small bubble points at Indice.
+    var hintNudge by remember(card.id) { mutableStateOf(false) }
+    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id) {
+        while (!game.usedHint && game.result == null) {
+            if (game.elapsedMs >= 60_000) { hintNudge = true; break }
+            delay(1_000)
+        }
+    }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         AnswerLine(game)
+        AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
+            HintNudge()
+        }
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
                 // The hint costs a minute on the Mot du jour only; in Classique it is free.
                 Text(buildString { append("Indice"); if (game.usedHint) append("  révélé") else if (game.ranked) append("  +1 min") })
-            }, enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
+            }, Modifier.tutorialTarget(TutorialTarget.HINT), enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
             AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))
@@ -284,47 +326,78 @@ private fun Caret() {
     Box(Modifier.padding(start = 2.dp).width(2.5.dp).height(30.dp).alpha(if (visible) 1f else 0f).background(Palette.foreground, RoundedCornerShape(2.dp)))
 }
 
-/** AZERTY keyboard; vowels in gold, the whole game in one hand. */
+/**
+ * AZERTY keyboard laid out like the phone's French one (Gboard, iPhone): same rows and key sizes, ⌫ at the
+ * right end of the third row, a wide space bar with Valider where Enter goes, no dead zone between keys (a
+ * touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
+ */
 @Composable
 fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
-    Surface(Modifier.fillMaxWidth().padding(bottom = 6.dp), shape = RoundedCornerShape(28.dp), color = Palette.surface.copy(alpha = 0.9f)) {
-        BoxWithConstraints(Modifier.padding(horizontal = 6.dp, vertical = 10.dp)) {
-            val key = (maxWidth - 4.dp * 9) / 10
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                rows.forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                        row.forEach { letter ->
-                            Key(letter.toString(), isVowel(letter), key, enabled) { haptics.key(); press(letter.toString()) }
-                        }
-                        if (row == rows.last()) Key("⌫", false, key * 2 + 4.dp, enabled, label = "Effacer") { haptics.key(); delete() }
+    val rowHeight = 56.dp
+    // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
+    Box(Modifier.bleed(9.dp).fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+        BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
+            val unit = maxWidth / 10
+            Column {
+                rows.take(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth()) {
+                    // Where the phone has ⇧: left empty, so W to N sit where the thumb expects them.
+                    Spacer(Modifier.width(unit * 1.6f))
+                    rows[2].forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
+                    Spacer(Modifier.weight(1f))
+                    Key("⌫", false, unit * 1.35f, rowHeight, enabled, label = "Effacer") { haptics.key(); delete() }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    Key("espace", false, 110.dp, enabled, label = "Espace") { haptics.key(); press(" ") }
-                    androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).height(48.dp), enabled = enabled,
-                        shape = RoundedCornerShape(24.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    Key("espace", false, unit * 7, rowHeight, enabled, label = "Espace") { haptics.key(); press(" ") }
+                    androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).padding(horizontal = 3.dp).height(rowHeight - 10.dp),
+                        enabled = enabled, shape = RoundedCornerShape(24.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1) }
                 }
             }
         }
     }
 }
 
+/** Widens past the screen's 12 dp margin (padding can't be negative): the keyboard runs edge to edge like the phone's. */
+private fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
+    val extra = x.roundToPx() * 2
+    val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
+    layout(placeable.width - extra, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
+/** One key: the whole cell takes the touch, the cap sits inside it with the phone's gaps around. */
 @Composable
-private fun Key(text: String, vowel: Boolean, width: Dp, enabled: Boolean, label: String? = null, action: () -> Unit) {
+private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, action: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.width(width).height(46.dp).scale(if (pressed) 0.9f else 1f)
-        .then(if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
-              else Modifier.background(Palette.fill1, shape).border(1.dp, Palette.border, shape))
+    val shape = RoundedCornerShape(8.dp)
+    val letter = text.length == 1 && text != "⌫"
+    val face: Modifier = if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
+        else Modifier.background(if (pressed && !letter) Palette.fill2 else Palette.fill1, shape).border(1.dp, Palette.border, shape)
+    Box(Modifier.width(width).height(height)
         .clickable(interaction, indication = null, enabled = enabled, onClickLabel = label ?: text, onClick = action)
-        .semantics { contentDescription = label ?: text },
-        contentAlignment = Alignment.Center) {
-        if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)
-        else Text(text, fontSize = if (text.length > 1) 14.sp else 19.sp, fontWeight = FontWeight.Medium, color = if (vowel) Palette.onAccent else Palette.foreground)
+        .semantics { contentDescription = label ?: text }) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 5.dp).then(face), contentAlignment = Alignment.Center) {
+            if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)
+            else Text(text, fontSize = if (text.length > 1) 15.sp else 24.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
+        }
+        // The letter pops up above the finger, as on the phone's keyboard.
+        if (letter && pressed) {
+            Box(Modifier.align(Alignment.BottomCenter).offset(y = -height + 2.dp).width(width + 4.dp).height(56.dp).zIndex(1f)
+                .shadow(6.dp, shape)
+                .then(if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
+                      else Modifier.background(Palette.surface, shape).border(1.dp, Palette.border, shape)),
+                contentAlignment = Alignment.Center) {
+                Text(text, fontSize = 32.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
+            }
+        }
     }
 }
 
@@ -345,8 +418,9 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
             }
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (catchUp) {
-                    ResultTile(Format.clock(result.timeMs), "temps", Modifier.weight(1f))
-                    ResultTile(if (usedHint) "oui" else "non", "indice", Modifier.weight(1f))
+                    // Counted: the real time, the hint minute, then 5 minutes more.
+                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct)), "compté", Modifier.weight(1f))
+                    ResultTile(if (usedHint) "+1 min" else "non", "indice", Modifier.weight(1f))
                     ResultTile("${CatchUp.toPlay(state.catchUpDays())}", "à rattraper", Modifier.weight(1f))
                 } else if (mode == GameMode.DAILY) {
                     // The official time: the hint adds a minute, a lost day counts ten.
@@ -359,20 +433,29 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                     ResultTile("${state.progress.level}", "niveau", Modifier.weight(1f))
                 }
             }
-            if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
+            if (catchUp) { if (pending) OfficialLine(result, null, true) }
+            else if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
             else if (!catchUp && result.correct && result.timeMs == state.progress.bestTimeMs)
                 Text("🏆 Votre meilleur temps", color = Palette.mint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
-            if (mode == GameMode.DAILY && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
+            if (mode == GameMode.DAILY && !catchUp && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
                 ChallengePrompt(result.correct) { state.challengeRequest++; close() }
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!catchUp) FilledTonalButton({ Share.result(context, result, card, mode) }, Modifier.height(56.dp), shape = RoundedCornerShape(28.dp)) {
                     Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))
                 }
-                val ends = mode == GameMode.DAILY || catchUp
-                PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) { if (ends) close() else next() }
+                val ends = mode == GameMode.DAILY
+                PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) {
+                    // Today's word: straight to the day's ranking.
+                    if (ends && ranked && !catchUp) state.leaderboardRequest++
+                    if (ends) close() else next()
+                }
             }
-            if (catchUp) Text("Rattrapage pour le plaisir : il ne compte pas au classement.",
+            if (catchUp) Text(when {
+                    pending -> "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau."
+                    result.correct -> "Mot rattrapé : il compte au classement avec 5 min en plus."
+                    else -> "Ce jour compte comme joué, sans mot trouvé."
+                },
                 style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
             else if (mode == GameMode.CLASSIC) TextButton(close, Modifier.padding(top = 6.dp)) { Text("Retour à l’accueil", color = Palette.secondary) }
             else Text(if (pending) "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau." else "Votre défi du jour est enregistré. À demain !",
@@ -464,3 +547,18 @@ private fun ReportDialog(state: AppViewModel, card: Card?, dismiss: () -> Unit) 
         dismissButton = { TextButton(dismiss) { Text("Annuler") } })
 }
 
+/** "Besoin d’un indice ?": a light bubble whose arrow points down at the Indice button. */
+@Composable
+private fun HintNudge() {
+    Column(Modifier.padding(top = 6.dp).semantics(mergeDescendants = true) { contentDescription = "Besoin d’un indice ? Le bouton Indice est juste en dessous." },
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(shape = RoundedCornerShape(50), color = Palette.foreground, shadowElevation = 6.dp) {
+            Text("Besoin d’un indice ?", color = Palette.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+        }
+        val color = Palette.foreground
+        androidx.compose.foundation.Canvas(Modifier.width(16.dp).height(8.dp)) {
+            drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(0f, 0f); lineTo(size.width / 2, size.height); lineTo(size.width, 0f); close() }, color)
+        }
+    }
+}

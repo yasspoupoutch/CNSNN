@@ -36,9 +36,13 @@ public struct Attempt: Identifiable, Codable, Sendable {
     public var points: Int
     public var date: Date
     public var dailyKey: String?
-    public init(cardID: String, mode: GameMode, correct: Bool, timeMs: Int, points: Int, date: Date, dailyKey: String? = nil) {
+    /// A missed daily word of the week played later (see CatchUp): counts in the week only, not in the streak.
+    public var catchUp: Bool?
+    public init(cardID: String, mode: GameMode, correct: Bool, timeMs: Int, points: Int, date: Date, dailyKey: String? = nil, catchUp: Bool? = nil) {
         self.cardID = cardID; self.mode = mode; self.correct = correct; self.timeMs = timeMs; self.points = points; self.date = date; self.dailyKey = dailyKey
+        self.catchUp = catchUp
     }
+    public var onTime: Bool { catchUp != true }
 }
 public struct Submission: Identifiable, Codable, Sendable {
     public var id: String = UUID().uuidString
@@ -81,7 +85,7 @@ public struct Progress: Codable, Sendable {
     }
     public var dailyWins: Int { attempts.filter { $0.mode == .daily && $0.correct }.count }
     public func streak(at date: Date = Date()) -> Int {
-        let days = Set(attempts.filter { $0.mode == .daily && $0.correct }.compactMap(\.dailyKey))
+        let days = Set(attempts.filter { $0.mode == .daily && $0.correct && $0.onTime }.compactMap(\.dailyKey))
         var current = date
         if !days.contains(DailySchedule.key(current)) { current = DailySchedule.previousDay(current) }
         var count = 0

@@ -46,6 +46,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.Category
+import com.poupoutch.cnsnn.core.Difficulty
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,10 +90,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-/** The places on the home page the first-launch tutorial points at. */
-enum class TutorialTarget { DAILY, PLAY }
+/**
+ * The places the first-launch tutorial points at: the daily card on the home page, then the real
+ * Mot du jour page (played with an example word, never the real one).
+ */
+enum class TutorialTarget { DAILY, PLAY, TITLE, CLOCK, BOARD, HINT }
 
-/** Where the targets are on screen, filled by the home page and read by the overlay. */
+/** Where the targets are on screen, filled by the page and read by the overlay. */
 class TutorialTargets { val rects = mutableStateMapOf<TutorialTarget, Rect>() }
 
 val LocalTutorialTargets = staticCompositionLocalOf<TutorialTargets?> { null }
@@ -103,47 +110,98 @@ fun Modifier.tutorialTarget(target: TutorialTarget): Modifier = composed {
 
 /** A fixed example, never the real daily word, so the tutorial cannot give anything away. */
 private const val EXAMPLE = "TR"
-private const val THEME = "Général · Facile"
+val TUTORIAL_CARD = Card("seed-tutorial", "Auteur", "Il a écrit le livre.", Category.GENERAL, Difficulty.EASY)
 
-private enum class TutorialStep(val target: TutorialTarget?, val title: String, val message: String, val word: String? = null) {
-    PLAY(TutorialTarget.DAILY, "Le mot du jour",
-        "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"),
-    CONSONANTS(null, "J’ai enlevé les voyelles",
-        "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… Le thème vous met sur la piste. À vous de le retrouver !"),
-    FIRST(null, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
-    SECOND(null, "… ou AUTEUR…",
+enum class TutorialStep(val target: TutorialTarget, val title: String, val message: String, val word: String? = null) {
+    PLAY(TutorialTarget.DAILY, "Le mot du jour", "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer !"),
+    CONSONANTS(TutorialTarget.BOARD, "J’ai enlevé les voyelles",
+        "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… À vous de le retrouver !"),
+    FIRST(TutorialTarget.BOARD, "Ça peut être TROU…", "Les voyelles O et U reviennent se glisser entre T et R.", "TROU"),
+    SECOND(TutorialTarget.BOARD, "… ou AUTEUR…",
         "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !", "AUTEUR"),
-    HELP(null, "Si vous ne trouvez pas…",
-        "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour). En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer."),
+    TOP(TutorialTarget.TITLE, "Le thème et le chrono",
+        "Sous les consonnes, le thème du mot pour vous mettre sur la piste. Le chrono, en haut à droite, part dès que vous appuyez sur Jouer."),
+    HELP(TutorialTarget.HINT, "Si vous ne trouvez pas…", "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."),
+}
+
+/** The tutorial's progress on the Mot du jour page, shared by the board (which morphs the example) and the overlay. */
+class TutorialDemo {
+    var step by mutableStateOf(TutorialStep.CONSONANTS)
+    /** The last step: Indice was tapped, the hint shows and AUTEUR slides in. */
+    var hintShown by mutableStateOf(false)
+    val word: String? get() = if (hintShown) "AUTEUR" else step.word
+    val from: String? get() = if (step == TutorialStep.SECOND && !hintShown) TutorialStep.FIRST.word else null
+}
+
+val LocalTutorialDemo = staticCompositionLocalOf<TutorialDemo?> { null }
+
+/**
+ * First step, on the home page: the app dimmed around the daily card, Jouer ringed in pulsing gold.
+ * Jouer is the only way on: it opens the real Mot du jour page for the rest.
+ */
+@Composable
+fun TutorialOverlay(targets: TutorialTargets, play: () -> Unit, skip: () -> Unit) {
+    val haptics = rememberHaptics()
+    BackHandler(onBack = skip)
+    TutorialStage(targets.rects[TutorialTarget.DAILY], 34.dp, ring = targets.rects[TutorialTarget.PLAY], ringTag = "tutorial.play", ringLabel = "Jouer",
+        ringClick = { haptics.selection(); play() }, skip = skip) { arrowX, up ->
+        TutorialBubble(TutorialStep.PLAY, false, arrowX, up)
+    }
 }
 
 /**
- * First-launch tutorial: dims the app around the daily card with its Jouer button pulsing, then an
- * example (TR: TROU, but also AUTEUR) and where the theme, the hint and the clock are.
+ * The rest of the tutorial, over the real Mot du jour page: the consonants, the vowels sliding in, the
+ * theme and the clock, then Indice, which really reveals the example's hint. [finish] gets true on
+ * "À vous de jouer" (the real daily game opens next), false on "Passer".
  */
 @Composable
-fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
-    var index by rememberSaveable { mutableStateOf(0) }
-    val step = TutorialStep.entries[index]
-    // The last step: Indice was tapped, the hint is showing and AUTEUR slides in.
-    var hintShown by rememberSaveable(index) { mutableStateOf(false) }
+fun TutorialGameOverlay(targets: TutorialTargets, demo: TutorialDemo, revealHint: () -> Unit, finish: (Boolean) -> Unit) {
     val haptics = rememberHaptics()
-    fun next() { haptics.selection(); if (index == TutorialStep.entries.lastIndex) finish() else index++ }
-    fun back() { haptics.selection(); if (index > 0) index-- }
-    BackHandler { if (index > 0) back() else finish() }
+    fun next() {
+        haptics.selection()
+        if (demo.step == TutorialStep.HELP) finish(true)
+        else { demo.step = TutorialStep.entries[demo.step.ordinal + 1]; demo.hintShown = false }
+    }
+    fun back() {
+        haptics.selection()
+        if (demo.step != TutorialStep.CONSONANTS) { demo.step = TutorialStep.entries[demo.step.ordinal - 1]; demo.hintShown = false }
+    }
+    BackHandler { if (demo.step == TutorialStep.CONSONANTS) finish(false) else back() }
+    val rects = targets.rects
+    val hole = when {
+        // The theme line under the board; the bubble names the clock.
+        demo.step == TutorialStep.TOP -> rects[TutorialTarget.TITLE]
+        demo.step == TutorialStep.HELP && !demo.hintShown -> rects[TutorialTarget.HINT]
+        else -> rects[TutorialTarget.BOARD]
+    }
+    val blinking = demo.step == TutorialStep.HELP && !demo.hintShown
+    TutorialStage(hole, if (blinking) 24.dp else 26.dp, ring = if (blinking) rects[TutorialTarget.HINT] else null,
+        ringTag = "tutorial.hint", ringLabel = "Indice", ringClick = { haptics.selection(); revealHint(); demo.hintShown = true },
+        skip = { finish(false) }) { arrowX, up ->
+        TutorialBubble(demo.step, demo.hintShown, arrowX, up, ::back, ::next)
+    }
+}
 
+/**
+ * The screen behind dimmed, a rounded hole over the part being explained, "Passer" at the top, an
+ * optional gold ring to tap (Jouer, Indice), and the bubble right under the hole (or above it when the
+ * hole is low on the screen).
+ */
+@Composable
+private fun TutorialStage(target: Rect?, radiusDp: androidx.compose.ui.unit.Dp, ring: Rect?, ringTag: String, ringLabel: String,
+                          ringClick: () -> Unit, skip: () -> Unit, bubble: @Composable (arrowX: Float, up: Boolean) -> Unit) {
     val density = LocalDensity.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     var bounds by remember { mutableStateOf(Rect.Zero) }
-    val target = step.target?.let { targets.rects[it] }?.translate(-origin)
-    val hole = target?.inflate(with(density) { 6.dp.toPx() }) ?: Rect(bounds.center, bounds.center)
-    // The Jouer button, ringed in gold on the first step.
-    val play = if (step == TutorialStep.PLAY) targets.rects[TutorialTarget.PLAY]?.translate(-origin)?.inflate(with(density) { 6.dp.toPx() }) else null
+    val inset = with(density) { 8.dp.toPx() }
+    val hole = target?.translate(-origin)?.inflate(inset) ?: Rect(bounds.center, bounds.center)
+    val lit = ring?.translate(-origin)?.inflate(with(density) { 6.dp.toPx() })
     val reduce = rememberReduceMotion()
     val animatedHole by animateValueAsState(hole, Rect.VectorConverter, if (reduce) tween(0) else tween(420), label = "hole")
-    val radius by animateFloatAsState(if (step.target == null) 0f else with(density) { 34.dp.toPx() }, if (reduce) tween(0) else tween(420), label = "radius")
-    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(1f, if (reduce) 1f else 0.35f,
-        infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
+    val radius = with(density) { radiusDp.toPx() }
+    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(1f, if (reduce) 1f else 0.3f,
+        infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse")
+    val below = hole.center.y < bounds.height * 0.55f
 
     Box(Modifier.fillMaxSize()
         .onGloballyPositioned { origin = it.positionInRoot(); bounds = Rect(Offset.Zero, Offset(it.size.width.toFloat(), it.size.height.toFloat())) }
@@ -156,68 +214,39 @@ fun TutorialOverlay(targets: TutorialTargets, finish: () -> Unit) {
                 addRect(Rect(Offset.Zero, this@Canvas.size))
                 if (animatedHole.width > 1f) addRoundRect(RoundRect(animatedHole, CornerRadius(radius)))
             }
-            drawPath(path, Color.Black.copy(alpha = 0.76f))
-            if (play != null) {
-                drawRoundRect(Palette.accent.copy(alpha = pulse), play.topLeft, play.size, CornerRadius(play.height / 2), style = Stroke(2.5.dp.toPx()))
+            drawPath(path, Color.Black.copy(alpha = 0.82f))
+            if (animatedHole.width > 1f) drawRoundRect(Color.White.copy(alpha = 0.35f), animatedHole.topLeft, animatedHole.size, CornerRadius(radius), style = Stroke(1.dp.toPx()))
+            if (lit != null) {
+                drawRoundRect(Palette.accent.copy(alpha = 0.18f * pulse), lit.topLeft, lit.size, CornerRadius(lit.height / 2))
+                drawRoundRect(Palette.accent.copy(alpha = pulse), lit.topLeft, lit.size, CornerRadius(lit.height / 2), style = Stroke(2.5.dp.toPx()))
             }
         }
-        // The lit Jouer button can be tapped to go on, like the real one.
-        if (play != null) {
+        // The ringed button can be tapped, like the real one.
+        if (lit != null) {
             with(density) {
-                Box(Modifier.offset { IntOffset(play.left.roundToInt(), play.top.roundToInt()) }.size(play.width.toDp(), play.height.toDp())
-                    .clickable(role = Role.Button) { next() }
-                    .semantics { contentDescription = "Jouer" }
-                    .testTag("tutorial.play"))
+                Box(Modifier.offset { IntOffset(lit.left.roundToInt(), lit.top.roundToInt()) }.size(lit.width.toDp(), lit.height.toDp())
+                    .clickable(role = Role.Button, onClick = ringClick)
+                    .semantics { contentDescription = ringLabel }
+                    .testTag(ringTag))
             }
         }
-        TextButton(finish, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 8.dp).testTag("tutorial.skip")) {
-            Text("Passer", color = Palette.secondary, fontWeight = FontWeight.SemiBold)
+        TextButton(skip, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 8.dp)
+            .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(50)).testTag("tutorial.skip")) {
+            Text("Passer", color = Palette.foreground, fontWeight = FontWeight.SemiBold)
         }
-        if (step.target != null && target != null) {
-            val top = with(density) { (hole.bottom + 18.dp.toPx()).roundToInt() }
-            Box(Modifier.fillMaxWidth().offset { IntOffset(0, top) }.padding(horizontal = 20.dp), contentAlignment = Alignment.TopCenter) {
-                Callout(step, index, false, ::next, ::back)
-            }
-        } else {
-            // Centred, and scrolls on a small phone or with large text instead of being cut off.
-            BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(top = 48.dp)) {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight)
-                    .padding(horizontal = 26.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Example(step, hintShown) { haptics.selection(); hintShown = true }
-                    Spacer(Modifier.height(18.dp))
-                    Callout(step, index, hintShown, ::next, ::back)
+        if (target != null) {
+            val side = with(density) { 16.dp.toPx() }
+            val arrowX = hole.center.x - side
+            if (below) {
+                val top = (hole.bottom + with(density) { 12.dp.toPx() }).roundToInt()
+                Box(Modifier.fillMaxWidth().offset { IntOffset(0, top) }.padding(horizontal = 16.dp), contentAlignment = Alignment.TopCenter) {
+                    bubble(arrowX, true)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Callout(step: TutorialStep, index: Int, hintShown: Boolean, next: () -> Unit, back: () -> Unit) {
-    AnimatedContent(step, Modifier.widthIn(max = 560.dp), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "callout") { shown ->
-        SectionCard(radius = 28.dp) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.semantics {
-                contentDescription = "Étape ${shown.ordinal + 1} sur ${TutorialStep.entries.size}"
-            }) {
-                TutorialStep.entries.forEach { item ->
-                    Box(Modifier.height(6.dp).width(if (item == shown) 18.dp else 6.dp)
-                        .background(if (item == shown) Palette.accent else Palette.fill2, RoundedCornerShape(3.dp)))
-                }
-            }
-            Text(shown.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 14.dp).semantics { heading() })
-            Text(if (shown == TutorialStep.HELP && hintShown) "« Il a écrit le livre. » : c’est AUTEUR ! Le thème et le chrono sont en haut, comme ici." else shown.message,
-                color = Palette.secondary, modifier = Modifier.padding(top = 6.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (index > 0) TextButton(back) { Text("Retour", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
-                Spacer(Modifier.weight(1f))
-                // The button breathes, so it is clear a tap goes on.
-                val reduce = rememberReduceMotion()
-                val breath by rememberInfiniteTransition(label = "next").animateFloat(1f, if (reduce) 1f else 1.06f,
-                    infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "next")
-                Button(next, Modifier.heightIn(min = 48.dp).graphicsLayer { scaleX = breath; scaleY = breath }, shape = RoundedCornerShape(24.dp)) {
-                    Text(if (shown == TutorialStep.HELP) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            } else {
+                // Before the first measure the bounds are empty: never a negative padding.
+                val bottom = with(density) { (bounds.height - hole.top + 12.dp.toPx()).coerceAtLeast(0f).toDp() }
+                Box(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = bottom), contentAlignment = Alignment.BottomCenter) {
+                    bubble(arrowX, false)
                 }
             }
         }
@@ -225,59 +254,64 @@ private fun Callout(step: TutorialStep, index: Int, hintShown: Boolean, next: ()
 }
 
 /**
- * A small game screen: the title with the theme and the difficulty, the clock at the top right, the word,
- * then the Indice button. TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR (tap the
- * word to see it again). On the last step the theme, the clock and the hint get a gold ring.
+ * The tutorial's speech bubble: light, raised, with an arrow toward the hole, so it reads as a note
+ * laid over the app and not as one of its cards. On the home page Jouer is the only way on; on the hint
+ * step, Indice first.
  */
 @Composable
-private fun Example(step: TutorialStep, hintShown: Boolean, showHint: () -> Unit) {
-    val help = step == TutorialStep.HELP
-    val hint = help && hintShown
-    val pulse by rememberInfiniteTransition(label = "lit").animateFloat(1f, if (rememberReduceMotion()) 1f else 0.25f,
-        infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "lit")
-    // Steady around the theme and the clock; Indice blinks until it is tapped.
-    val ring = Modifier.border(2.dp, Palette.accent.copy(alpha = if (help) 1f else 0f), RoundedCornerShape(50))
-    val blinking = help && !hint
-    SectionCard(Modifier.widthIn(max = 560.dp), padding = 18.dp, radius = 30.dp) {
-        Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.align(Alignment.Center).then(ring).padding(horizontal = 14.dp, vertical = 6.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "Exemple, thème : $THEME" },
-                horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Exemple", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text(THEME, fontSize = 12.sp, fontWeight = if (help) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (help) Palette.accent else Palette.tertiary)
+private fun TutorialBubble(step: TutorialStep, hintShown: Boolean, arrowX: Float, up: Boolean, back: (() -> Unit)? = null, next: (() -> Unit)? = null) {
+    val ink = Palette.ink
+    Column(Modifier.widthIn(max = 560.dp)) {
+        if (up) Arrow(arrowX, true)
+        Surface(shape = RoundedCornerShape(22.dp), color = Palette.foreground, shadowElevation = 12.dp) {
+            AnimatedContent(step to hintShown, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "bubble") { (shown, hint) ->
+                Column(Modifier.padding(18.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.semantics {
+                        contentDescription = "Étape ${shown.ordinal + 1} sur ${TutorialStep.entries.size}"
+                    }) {
+                        TutorialStep.entries.forEach { item ->
+                            Box(Modifier.height(6.dp).width(if (item == shown) 18.dp else 6.dp)
+                                .background(if (item == shown) ink else ink.copy(alpha = 0.2f), RoundedCornerShape(3.dp)))
+                        }
+                    }
+                    Text(shown.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = ink,
+                        modifier = Modifier.padding(top = 12.dp).semantics { heading() })
+                    Text(if (shown == TutorialStep.HELP && hint) "« Il a écrit le livre. » : c’est AUTEUR ! À vous de trouver le mot du jour." else shown.message,
+                        color = ink.copy(alpha = 0.75f), modifier = Modifier.padding(top = 6.dp))
+                    if (next != null) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (back != null && shown != TutorialStep.CONSONANTS) TextButton(back) { Text("Retour", color = ink.copy(alpha = 0.6f), fontWeight = FontWeight.SemiBold) }
+                        Spacer(Modifier.weight(1f))
+                        if (shown != TutorialStep.HELP || hint) {
+                            // The button breathes, so it is clear a tap goes on.
+                            val reduce = rememberReduceMotion()
+                            val breath by rememberInfiniteTransition(label = "next").animateFloat(1f, if (reduce) 1f else 1.06f,
+                                infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "next")
+                            Button(next, Modifier.heightIn(min = 48.dp).graphicsLayer { scaleX = breath; scaleY = breath }, shape = RoundedCornerShape(24.dp)) {
+                                Text(if (shown == TutorialStep.HELP) "À vous de jouer" else "Suivant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                }
             }
-            ExampleClock(help, Modifier.align(Alignment.CenterEnd).then(ring))
         }
-        Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            // The last step starts again from TR; the hint brings AUTEUR in.
-            key(step, hint) {
-                MorphWord(if (hint) "AUTEUR" else step.word, if (step == TutorialStep.SECOND) TutorialStep.FIRST.word else null)
-            }
-        }
-        if (hint) Text("« Il a écrit le livre. »", style = Type.serifItalic(20), textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth())
-        Row(Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp)
-            .border(2.dp, Palette.accent.copy(alpha = if (blinking) pulse else 0f), RoundedCornerShape(50))
-            .background(if (blinking) Palette.accent.copy(alpha = 0.18f * pulse) else Palette.fill1, RoundedCornerShape(50))
-            .clickable(enabled = blinking, role = Role.Button, onClick = showHint)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .testTag("tutorial.hint"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Indice", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(if (hint) "révélé" else "+1 min", fontSize = 13.sp)
-        }
+        if (!up) Arrow(arrowX, false)
     }
 }
 
-/** The example's clock, like the game's: it runs on the last step, from 0:00. */
+/** The bubble's little arrow, pointing up at the hole (bubble below it) or down (bubble above it). */
 @Composable
-private fun ExampleClock(running: Boolean, modifier: Modifier) {
-    var seconds by remember { mutableStateOf(0) }
-    LaunchedEffect(running) { seconds = 0; while (running) { delay(1_000); seconds++ } }
-    Text("%d:%02d".format(seconds / 60, seconds % 60), fontWeight = FontWeight.Bold, fontSize = 14.sp,
-        modifier = modifier.background(Palette.fill1, RoundedCornerShape(50)).padding(horizontal = 13.dp, vertical = 8.dp)
-            .semantics { contentDescription = "Chrono" })
+private fun Arrow(x: Float, up: Boolean) {
+    val color = Palette.foreground
+    Canvas(Modifier.fillMaxWidth().height(10.dp)) {
+        val half = 10.dp.toPx()
+        val center = x.coerceIn(half + 14.dp.toPx(), size.width - half - 14.dp.toPx())
+        val path = Path().apply {
+            if (up) { moveTo(center - half, size.height); lineTo(center, 0f); lineTo(center + half, size.height) }
+            else { moveTo(center - half, 0f); lineTo(center, size.height); lineTo(center + half, 0f) }
+            close()
+        }
+        drawPath(path, color)
+    }
 }
 
 private const val OUT = 0.45f
@@ -291,7 +325,7 @@ private const val STAGGER = 0.1f
  * them. With `from`, that word's vowels first slide back out, so TROU turns back into TR before AUTEUR.
  */
 @Composable
-private fun MorphWord(word: String?, from: String?) {
+fun MorphWord(word: String?, from: String?, size: Int = 68) {
     val reduce = rememberReduceMotion()
     val clock = remember { Animatable(0f) }
     var replays by remember { mutableStateOf(0) }
@@ -311,7 +345,7 @@ private fun MorphWord(word: String?, from: String?) {
     }
     Row(Modifier.pointerInput(Unit) { detectTapGestures { replays++ } }
         .semantics(mergeDescendants = true) { contentDescription = word ?: "Consonnes : T, R" }) {
-        val style = Type.serif(68).copy(letterSpacing = 3.sp)
+        val style = Type.serif(size).copy(letterSpacing = 3.sp)
         shown.forEachIndexed { index, c ->
             if (isVowel(c)) {
                 val p = progress(index)

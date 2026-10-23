@@ -22,7 +22,7 @@ public struct Glance: Codable, Equatable, Sendable {
     /// Built from the player's history: the latest daily result and the current streak.
     public init(progress: Progress, streak: Int, now: Date = Date()) {
         let last = progress.attempts.filter { $0.mode == .daily && $0.dailyKey != nil }.max { ($0.dailyKey ?? "") < ($1.dailyKey ?? "") }
-        let lastWin = progress.attempts.filter { $0.mode == .daily && $0.correct }.compactMap(\.dailyKey).max()
+        let lastWin = progress.attempts.filter { $0.mode == .daily && $0.correct && $0.onTime }.compactMap(\.dailyKey).max()
         self.init(lastDailyKey: last?.dailyKey, lastDailyCorrect: last?.correct ?? false, lastDailyTimeMs: last?.timeMs ?? 0,
                   streak: streak, lastWinKey: lastWin)
     }
