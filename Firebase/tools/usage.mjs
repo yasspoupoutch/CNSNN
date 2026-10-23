@@ -34,7 +34,8 @@ async function perDay(kind) {
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
-        console.error(`Cloud Monitoring a refusé la lecture (${response.status}).`);
+        const detail = await response.json().catch(() => ({}));
+        console.error(`Cloud Monitoring a refusé la lecture (${response.status}) : ${detail.error?.message ?? ''}`);
         if (response.status === 403) console.error("Le compte de service doit avoir le rôle « Lecteur Monitoring » (roles/monitoring.viewer).");
         process.exit(1);
     }
