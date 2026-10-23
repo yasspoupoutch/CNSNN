@@ -18,6 +18,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -105,9 +107,23 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, catchUpDay: String? = null, close: () -> Unit) {
+fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, catchUpDay: String? = null,
+               tutorial: ((Boolean) -> Unit)? = null, close: () -> Unit) {
     val game: GameViewModel = viewModel()
-    LaunchedEffect(Unit) { game.loadOnce(mode, category, difficulty, state, catchUpDay) }
+    LaunchedEffect(Unit) { if (tutorial != null) game.loadTutorial(TUTORIAL_CARD) else game.loadOnce(mode, category, difficulty, state, catchUpDay) }
+    // First-launch tutorial: this page with an example word (TR), explained step by step.
+    val targets = remember { TutorialTargets() }
+    val demo = remember { TutorialDemo() }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalTutorialTargets provides targets.takeIf { tutorial != null }, LocalTutorialDemo provides demo.takeIf { tutorial != null }) {
+            GameContent(state, game, mode, close)
+        }
+        if (tutorial != null) TutorialGameOverlay(targets, demo, revealHint = { game.revealHint(state) }, finish = tutorial)
+    }
+}
+
+@Composable
+private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode, close: () -> Unit) {
     // The local clock stops while the app is in the background (the daily clock is the server's).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -121,7 +137,7 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
     // A found daily word: the 12h reminder is offered once back on the home page.
-    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && catchUpDay == null && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
+    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && game.catchUpDay == null && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
@@ -182,7 +198,7 @@ private fun Centered(content: @Composable androidx.compose.foundation.layout.Col
 private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, close: () -> Unit, report: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(56.dp)) {
         IconButton(close, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Fermer") }
-        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.align(Alignment.Center).tutorialTarget(TutorialTarget.TITLE), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(game.catchUpDay?.let { "Mot du " + Format.weekday(it) } ?: if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             game.card?.let { Text("${it.category.label} · ${it.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary) }
         }
@@ -194,7 +210,7 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
             var tick by remember { mutableIntStateOf(0) }
             LaunchedEffect(Unit) { while (true) { delay(500); tick++ } }
             val ms = game.result?.timeMs ?: if (game.phase == GameViewModel.Phase.Playing) game.elapsedMs.also { tick } else 0
-            Surface(shape = RoundedCornerShape(50), color = Palette.fill1, modifier = Modifier.padding(end = 4.dp)) {
+            Surface(shape = RoundedCornerShape(50), color = Palette.fill1, modifier = Modifier.padding(end = 4.dp).tutorialTarget(TutorialTarget.CLOCK)) {
                 Text(Format.clock(ms), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
                     .semantics { contentDescription = "Chrono " + Format.clock(ms) })
             }
@@ -209,11 +225,21 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     val consonants = card.wordNoVowels
     // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
-            modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
-        Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
-        AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
-            Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
+        Column(Modifier.tutorialTarget(TutorialTarget.BOARD), horizontalAlignment = Alignment.CenterHorizontally) {
+            val demo = LocalTutorialDemo.current
+            if (demo != null) {
+                // The tutorial's example: the vowels slide in and out of TR.
+                Box(Modifier.padding(top = 28.dp).heightIn(min = 96.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.runtime.key(demo.step, demo.hintShown) { MorphWord(demo.word, demo.from, 80) }
+                }
+            } else {
+                Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
+                    modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
+            }
+            Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
+            AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
+                Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
+            }
         }
         FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             game.wrongGuesses.forEach { guess ->
@@ -242,7 +268,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
                 // The hint costs a minute on the Mot du jour only; in Classique it is free.
                 Text(buildString { append("Indice"); if (game.usedHint) append("  révélé") else if (game.ranked) append("  +1 min") })
-            }, enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
+            }, Modifier.tutorialTarget(TutorialTarget.HINT), enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
             AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))

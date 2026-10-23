@@ -76,6 +76,13 @@ class GameViewModel : ViewModel() {
         load(state)
     }
 
+    /** The first-launch tutorial: the Mot du jour page with an example word, nothing recorded or sent. */
+    fun loadTutorial(example: Card) {
+        if (loaded) return
+        loaded = true; mode = GameMode.DAILY; card = example; phase = Phase.Playing; ranked = false
+        started = SystemClock.elapsedRealtime()
+    }
+
     private fun load(state: AppViewModel) {
         answer = ""; feedback = null; result = null; usedHint = false; wrongAnswers = 0; wrongGuesses.clear()
         started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null; lastGuess = null
