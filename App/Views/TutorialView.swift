@@ -144,7 +144,7 @@ struct TutorialGameOverlay: View {
         func frame(_ target: TutorialTarget) -> CGRect? { anchors[target].map { proxy[$0] } }
         switch demo.step {
         case .top:
-            // The theme under the consonants; the bubble names the clock.
+            // The theme line under the board; the bubble names the clock.
             let theme = frame(.title) ?? .zero
             return (theme.insetBy(dx: -8, dy: -8), theme.height / 2 + 8)
         case .help where !demo.hintShown:

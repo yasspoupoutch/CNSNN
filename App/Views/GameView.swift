@@ -117,6 +117,9 @@ struct GameView: View {
         .overlay {
             VStack(spacing: 1) {
                 Text(catchUpDay.map { "Mot du " + Format.weekday($0) } ?? (mode == .daily ? "Mot du jour" : "Classique")).scaledFont(16, .semibold)
+                if let card = session.card {
+                    Text(card.difficulty.rawValue).scaledFont(12).foregroundStyle(Palette.tertiary)
+                }
             }.lineLimit(1).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
         }
         .frame(minHeight: 48)
@@ -140,11 +143,7 @@ struct GameView: View {
                     .padding(.top, 40)
                     .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
             }
-            // The theme right under the consonants, where the eyes are (like Sprint, Survie and Défi).
-            Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
-                .lineLimit(1).padding(.horizontal, 12).frame(minHeight: 28).glassCapsule().padding(.top, 14)
-                .tutorialTarget(.title)
-            Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 18)
+            Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
             if session.usedHint {
                 Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
                     .padding(.horizontal, 10).padding(.top, 22)
@@ -161,6 +160,9 @@ struct GameView: View {
                     .accessibilityLabel("Essai incorrect : \(guess)")
             }
         }.frame(minHeight: 26).padding(.top, 16)
+        // The theme, near the consonants where the eyes are (the difficulty stays under the title).
+        Text("Thème : " + card.category.rawValue).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
+            .padding(.top, 6).tutorialTarget(.title)
         if mode == .daily && session.result == nil {
             Group {
                 if session.checking {

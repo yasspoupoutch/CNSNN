@@ -202,8 +202,10 @@ private fun Centered(content: @Composable androidx.compose.foundation.layout.Col
 private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, close: () -> Unit, report: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(56.dp)) {
         IconButton(close, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Fermer") }
-        Text(game.catchUpDay?.let { "Mot du " + Format.weekday(it) } ?: if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
-            modifier = Modifier.align(Alignment.Center))
+        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(game.catchUpDay?.let { "Mot du " + Format.weekday(it) } ?: if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            game.card?.let { Text(it.difficulty.label, fontSize = 12.sp, color = Palette.tertiary) }
+        }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
             val card = game.card
             if (card != null && game.result == null && listOf("seed-", "daily-", "secret-").none { card.id.startsWith(it) } && state.uid != null) {
@@ -238,10 +240,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
                     modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
             }
-            // The theme right under the consonants, where the eyes are (like Sprint, Survie and Défi).
-            Text("${card.category.label} · ${card.difficulty.label}", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Palette.secondary, maxLines = 1,
-                modifier = Modifier.padding(top = 14.dp).tutorialTarget(TutorialTarget.TITLE).background(Palette.fill1, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 5.dp))
-            Box(Modifier.padding(top = 16.dp).width(36.dp)) { Divider() }
+            Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
             AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
                 Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
             }
@@ -253,6 +252,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     modifier = Modifier.background(Palette.redSoft, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
         }
+        // The theme, near the consonants where the eyes are (the difficulty stays under the title).
+        Text("Thème : " + card.category.label, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1, textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 6.dp).tutorialTarget(TutorialTarget.TITLE))
         if (mode == GameMode.DAILY && game.result == null) {
             val line = when {
                 game.checking -> "Vérification…"

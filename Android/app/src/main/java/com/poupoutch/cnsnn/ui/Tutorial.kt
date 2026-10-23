@@ -169,7 +169,7 @@ fun TutorialGameOverlay(targets: TutorialTargets, demo: TutorialDemo, revealHint
     BackHandler { if (demo.step == TutorialStep.CONSONANTS) finish(false) else back() }
     val rects = targets.rects
     val hole = when {
-        // The theme under the consonants; the bubble names the clock.
+        // The theme line under the board; the bubble names the clock.
         demo.step == TutorialStep.TOP -> rects[TutorialTarget.TITLE]
         demo.step == TutorialStep.HELP && !demo.hintShown -> rects[TutorialTarget.HINT]
         else -> rects[TutorialTarget.BOARD]
