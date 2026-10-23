@@ -16,6 +16,11 @@ on:
           - dark
           - light
         default: dark
+      duo:
+        description: Vérifier aussi la mise en page sur l'iPhone Duo (lent, peut bloquer)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -282,6 +287,7 @@ jobs:
       # iPhone Duo (pliable, grand écran intérieur) : mêmes captures sur son simulateur s'il existe sur
       # ce runner, pour vérifier la mise en page. Elles restent en artefact, rien n'est publié.
       - name: Vérifier la mise en page sur l'iPhone Duo
+        if: ${{ inputs.duo }}
         continue-on-error: true
         # Un simulateur Duo qui ne répond pas ne doit pas bloquer la publication des captures.
         timeout-minutes: 8
@@ -312,7 +318,7 @@ jobs:
           xcrun simctl shutdown "$duo" || true
 
       - name: Conserver les captures iPhone Duo
-        if: ${{ always() && !cancelled() }}
+        if: ${{ inputs.duo && always() && !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cnsnn-screenshots-duo-${{ env.APPEARANCE }}
