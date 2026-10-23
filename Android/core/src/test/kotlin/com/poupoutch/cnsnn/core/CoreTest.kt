@@ -291,16 +291,28 @@ class CatchUpTest {
     @Test fun listsTheWeekBeforeToday() {
         // Friday 2026-10-23, 11:00 UTC: Thursday opens at 12:00 UTC (14 h in Paris).
         val now = Instant.parse("2026-10-23T11:00:00Z")
-        val days = CatchUp.days("2026-10-23", setOf("2026-10-19"), mapOf("2026-10-20" to false), now)
+        val days = CatchUp.days("2026-10-23", mapOf("2026-10-19" to true, "2026-10-20" to false), now)
         assertEquals(listOf("2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"), days.map { it.key })
-        assertEquals(listOf(CatchUp.Status.Played, CatchUp.Status.Done(false), CatchUp.Status.Open, CatchUp.Status.Later(Instant.parse("2026-10-23T12:00:00Z"))),
+        assertEquals(listOf(CatchUp.Status.Played(true), CatchUp.Status.Played(false), CatchUp.Status.Open, CatchUp.Status.Later(Instant.parse("2026-10-23T12:00:00Z"))),
             days.map { it.status })
         assertEquals(2, CatchUp.toPlay(days))
-        assertEquals(CatchUp.Status.Open, CatchUp.days("2026-10-23", emptySet(), emptyMap(), now.plusSeconds(3_600)).last().status)
+        assertEquals(CatchUp.Status.Open, CatchUp.days("2026-10-23", emptyMap(), now.plusSeconds(3_600)).last().status)
         // Monday: nothing to catch up yet; Sunday: the six days before.
-        assertTrue(CatchUp.days("2026-10-26", emptySet(), emptyMap(), now).isEmpty())
-        val sunday = CatchUp.days("2026-10-25", emptySet(), emptyMap(), now)
+        assertTrue(CatchUp.days("2026-10-26", emptyMap(), now).isEmpty())
+        val sunday = CatchUp.days("2026-10-25", emptyMap(), now)
         assertEquals(6, sunday.size); assertEquals("2026-10-19", sunday.first().key)
+        // The whole week, Monday to Sunday.
+        val week = CatchUp.week("2026-10-23", mapOf("2026-10-19" to true, "2026-10-23" to false), now)
+        assertEquals("2026-10-19", week.first().key); assertEquals("2026-10-25", week.last().key)
+        assertEquals(listOf(CatchUp.Status.Played(false), CatchUp.Status.Coming, CatchUp.Status.Coming), week.drop(4).map { it.status })
+        assertEquals(CatchUp.Status.Today, CatchUp.week("2026-10-22", emptyMap(), now)[3].status)
+        assertEquals(3, CatchUp.toPlay(CatchUp.week("2026-10-22", emptyMap(), now)))
         assertEquals("mardi", Format.weekday("2026-10-20")); assertEquals("Mardi 20 octobre", Format.day("2026-10-20"))
+    }
+    @Test fun costsFiveMinutesMore() {
+        assertEquals(340_000, DailyScore.catchUpScoreMs(40_000, false, true))
+        assertEquals(400_000, DailyScore.catchUpScoreMs(40_000, true, true))
+        assertEquals(600_000, DailyScore.catchUpScoreMs(500_000, false, true))
+        assertEquals(600_000, DailyScore.catchUpScoreMs(40_000, false, false))
     }
 }

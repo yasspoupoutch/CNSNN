@@ -82,7 +82,11 @@ data class Attempt(
     val points: Int = 0,
     @Serializable(with = AppleDateSerializer::class) val date: Instant,
     val dailyKey: String? = null,
-)
+    /** A missed daily word of the week played later (see CatchUp): counts in the week only, not in the streak. */
+    val catchUp: Boolean? = null,
+) {
+    val onTime: Boolean get() = catchUp != true
+}
 
 @Serializable
 data class Submission(
@@ -120,7 +124,7 @@ data class Progress(
 
     /** Daily words found in a row, up to today (or yesterday while today is not played yet). */
     fun streak(at: Instant = Instant.now()): Int {
-        val days = attempts.filter { it.mode == GameMode.DAILY && it.correct }.mapNotNull { it.dailyKey }.toSet()
+        val days = attempts.filter { it.mode == GameMode.DAILY && it.correct && it.onTime }.mapNotNull { it.dailyKey }.toSet()
         var current = DailySchedule.key(at)
         if (current !in days) current = DailySchedule.shift(current, -1)
         var count = 0

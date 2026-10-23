@@ -250,9 +250,14 @@ class CloudRepository(
         return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"),
             (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"))
     }
-    /** Starts today's clock on the server. Returns only once the server has recorded the start. */
-    suspend fun startDaily(uid: String, day: String, cardId: String): DailySession {
-        val ok = awaitWrite(sessionRef(uid, day).set(mapOf("userId" to uid, "day" to day, "cardId" to cardId, "startedAt" to FieldValue.serverTimestamp(), "hintUsed" to false)))
+    /**
+     * Starts today's clock on the server. Returns only once the server has recorded the start.
+     * [catchUp]: a missed day of the week, played later (see CatchUp).
+     */
+    suspend fun startDaily(uid: String, day: String, cardId: String, catchUp: Boolean = false): DailySession {
+        val data = mutableMapOf<String, Any>("userId" to uid, "day" to day, "cardId" to cardId, "startedAt" to FieldValue.serverTimestamp(), "hintUsed" to false)
+        if (catchUp) data["catchUp"] = true
+        val ok = awaitWrite(sessionRef(uid, day).set(data))
         if (!ok) throw CloudError(CloudError.Kind.OFFLINE)
         return dailySession(uid, day) ?: throw CloudError(CloudError.Kind.OFFLINE)
     }
@@ -320,19 +325,23 @@ class CloudRepository(
         val usedHint = s.getBoolean("hintUsed") ?: false
         val wrong = (s.getLong("wrongAnswers") ?: 0).toInt()
         val timeMs = (millis(finished) - millis(started)).toInt()
-        val scoreMs = DailyScore.scoreMs(timeMs, usedHint, correct)
-        val rank = DailyScore.rank(day, scoreMs, correct) ?: return null
+        // A caught-up day counts with 5 minutes more, and stays out of the day's ranking (rank 0).
+        val catchUp = s.getBoolean("catchUp") == true
+        val scoreMs = if (catchUp) DailyScore.catchUpScoreMs(timeMs, usedHint, correct) else DailyScore.scoreMs(timeMs, usedHint, correct)
+        val rank = if (catchUp) 0 else DailyScore.rank(day, scoreMs, correct) ?: return null
         val username = db.collection("users").document(uid).get(Source.SERVER).await().getString("username") ?: "Joueur"
         val old = leaderboardEntry(uid, Source.SERVER)
         // The whole line is replaced: an old `points` field goes, as the rules require.
-        val tally = LeaderboardEntry.tally(old, uid, username, day, correct, timeMs, scoreMs) + ("updatedAt" to FieldValue.serverTimestamp())
+        val tally = LeaderboardEntry.tally(old, uid, username, day, correct, timeMs, scoreMs, catchUp) + ("updatedAt" to FieldValue.serverTimestamp())
         val result = mapOf("userId" to uid, "username" to username, "day" to day, "cardId" to cardId, "correct" to correct, "usedHint" to usedHint,
-            "wrongAnswers" to wrong, "timeMs" to timeMs, "scoreMs" to scoreMs, "rank" to rank, "startedAt" to started, "finishedAt" to finished)
+            "wrongAnswers" to wrong, "timeMs" to timeMs, "scoreMs" to scoreMs, "rank" to rank, "startedAt" to started, "finishedAt" to finished) +
+            (if (catchUp) mapOf("catchUp" to true) else emptyMap())
         val batch = db.batch()
         batch.set(resultRef(uid, day), result)
         batch.set(db.collection("leaderboard").document(uid), tally)
         awaitWrite(batch.commit())
-        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = correct, timeMs = timeMs, date = finished.toInstant(), dailyKey = day)
+        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = correct, timeMs = timeMs, date = finished.toInstant(), dailyKey = day,
+            catchUp = if (catchUp) true else null)
     }
 
     // ---- Leaderboard
@@ -762,7 +771,8 @@ class CloudRepository(
         val cardId = d["cardId"] as? String ?: return null
         val timeMs = (d["timeMs"] as? Number)?.toInt() ?: return null
         val date = (d["finishedAt"] as? Timestamp)?.toInstant() ?: Instant.now()
-        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = d["correct"] as? Boolean ?: false, timeMs = timeMs, date = date, dailyKey = day)
+        return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = d["correct"] as? Boolean ?: false, timeMs = timeMs, date = date, dailyKey = day,
+            catchUp = if (d["catchUp"] == true) true else null)
     }
     /** A leaderboard line; an old one may still carry `points` (ignored) or lack the month fields (zeros). */
     private fun entry(uid: String, d: Map<String, Any>): LeaderboardEntry? {

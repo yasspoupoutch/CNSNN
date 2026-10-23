@@ -160,7 +160,7 @@ private fun AppNavigation(state: AppViewModel) {
             }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") }, { day -> nav.navigate("catchup/$day") })
         }
         composable("catchup/{day}", arguments = listOf(navArgument("day") { type = NavType.StringType })) { entry ->
-            GameScreen(state, GameMode.CLASSIC, null, null, catchUpDay = entry.arguments?.getString("day")) { nav.popBackStack() }
+            GameScreen(state, GameMode.DAILY, null, null, catchUpDay = entry.arguments?.getString("day")) { nav.popBackStack() }
         }
         composable("challenge/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             ChallengeScreen(state, entry.arguments?.getString("id") ?: "") { nav.popBackStack() }

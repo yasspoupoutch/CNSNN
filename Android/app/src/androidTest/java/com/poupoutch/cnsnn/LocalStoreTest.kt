@@ -11,14 +11,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The 1.2 settings kept on the phone: the 12h reminder offer and the Rattrapage results. */
+/** The 1.2 settings kept on the phone: the 12h reminder offer. */
 @RunWith(AndroidJUnit4::class)
 class LocalStoreTest {
     private val store = LocalStore(InstrumentationRegistry.getInstrumentation().targetContext)
-    private val saved = Triple(store.remindersEnabled, store.reminderOffered, store.catchUpDone)
+    private val saved = store.remindersEnabled to store.reminderOffered
 
     @After fun restore() {
-        store.remindersEnabled = saved.first; store.reminderOffered = saved.second; store.catchUpDone = saved.third
+        store.remindersEnabled = saved.first; store.reminderOffered = saved.second
     }
 
     @Test fun reminderIsOfferedOnceToPlayersWithoutIt() {
@@ -29,10 +29,5 @@ class LocalStoreTest {
         store.reminderOffered = false; store.remindersEnabled = true
         assertFalse("Already on", store.reminderOfferDue)
         assertEquals(12 * 60, Reminders.DEFAULT_MINUTES)
-    }
-
-    @Test fun catchUpResultsAreKept() {
-        store.catchUpDone = mapOf("2026-10-20" to true, "2026-10-21" to false)
-        assertEquals(mapOf("2026-10-20" to true, "2026-10-21" to false), store.catchUpDone)
     }
 }

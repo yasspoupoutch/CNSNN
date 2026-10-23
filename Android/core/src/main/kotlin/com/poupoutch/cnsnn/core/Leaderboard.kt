@@ -36,13 +36,14 @@ data class LeaderboardEntry(
      * without the server time. The map replaces the whole line, so an old `points` field goes away.
      */
     companion object {
-        fun tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Boolean, timeMs: Int, scoreMs: Int): Map<String, Any?> {
+        /** A caught-up day ([catchUp]) leaves the streak and the best time as they were (firestore.rules `tallies`). */
+        fun tally(old: LeaderboardEntry?, uid: String, username: String, day: String, correct: Boolean, timeMs: Int, scoreMs: Int, catchUp: Boolean = false): Map<String, Any?> {
             val lastWin = old?.lastWinDay ?: ""
             val oldStreak = old?.streak ?: 0
-            val laterWin = correct && day > lastWin
+            val laterWin = !catchUp && correct && day > lastWin
             val previous = lastWin.isNotEmpty() && DailySchedule.shift(day, -1) == lastWin
-            val streak = if (laterWin) (if (previous) oldStreak + 1 else 1) else (if (!correct && day > lastWin) 0 else oldStreak)
-            val best: Int? = if (correct) minOf(old?.bestTimeMs ?: timeMs, timeMs) else old?.bestTimeMs
+            val streak = if (catchUp) oldStreak else if (laterWin) (if (previous) oldStreak + 1 else 1) else (if (!correct && day > lastWin) 0 else oldStreak)
+            val best: Int? = if (!catchUp && correct) minOf(old?.bestTimeMs ?: timeMs, timeMs) else old?.bestTimeMs
             val month = DailyScore.tally(old?.monthTally ?: DailyScore.Month(), day, scoreMs)
             return mapOf(
                 "uid" to uid, "username" to username, "played" to (old?.played ?: 0) + 1,

@@ -121,7 +121,7 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
     // A found daily word: the 12h reminder is offered once back on the home page.
-    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
+    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && catchUpDay == null && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
@@ -222,13 +222,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     modifier = Modifier.background(Palette.redSoft, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
         }
-        if (game.catchUpDay != null && game.result == null) {
-            Text("Pour le plaisir : ce mot ne compte pas au classement.", fontSize = 12.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
-        }
         if (mode == GameMode.DAILY && game.result == null) {
             Text(when {
                 game.checking -> "Vérification…"
                 game.notice != null -> game.notice!!
+                game.catchUpDay != null -> "Rattrapage : compte dans la semaine avec 5 min en plus."
                 game.ranked -> "Chrono officiel. Jusqu’à 20 essais pour trouver le mot."
                 else -> "Chrono officiel. Les erreurs ne terminent pas la partie."
             }, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
@@ -345,8 +343,9 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
             }
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (catchUp) {
-                    ResultTile(Format.clock(result.timeMs), "temps", Modifier.weight(1f))
-                    ResultTile(if (usedHint) "oui" else "non", "indice", Modifier.weight(1f))
+                    // Counted: the real time, the hint minute, then 5 minutes more.
+                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct)), "compté", Modifier.weight(1f))
+                    ResultTile(if (usedHint) "+1 min" else "non", "indice", Modifier.weight(1f))
                     ResultTile("${CatchUp.toPlay(state.catchUpDays())}", "à rattraper", Modifier.weight(1f))
                 } else if (mode == GameMode.DAILY) {
                     // The official time: the hint adds a minute, a lost day counts ten.
@@ -359,20 +358,25 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                     ResultTile("${state.progress.level}", "niveau", Modifier.weight(1f))
                 }
             }
-            if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
+            if (catchUp) { if (pending) OfficialLine(result, null, true) }
+            else if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
             else if (!catchUp && result.correct && result.timeMs == state.progress.bestTimeMs)
                 Text("🏆 Votre meilleur temps", color = Palette.mint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
-            if (mode == GameMode.DAILY && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
+            if (mode == GameMode.DAILY && !catchUp && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
                 ChallengePrompt(result.correct) { state.challengeRequest++; close() }
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!catchUp) FilledTonalButton({ Share.result(context, result, card, mode) }, Modifier.height(56.dp), shape = RoundedCornerShape(28.dp)) {
                     Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))
                 }
-                val ends = mode == GameMode.DAILY || catchUp
+                val ends = mode == GameMode.DAILY
                 PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) { if (ends) close() else next() }
             }
-            if (catchUp) Text("Rattrapage pour le plaisir : il ne compte pas au classement.",
+            if (catchUp) Text(when {
+                    pending -> "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau."
+                    result.correct -> "Mot rattrapé : il compte au classement avec 5 min en plus."
+                    else -> "Ce jour compte comme joué, sans mot trouvé."
+                },
                 style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
             else if (mode == GameMode.CLASSIC) TextButton(close, Modifier.padding(top = 6.dp)) { Text("Retour à l’accueil", color = Palette.secondary) }
             else Text(if (pending) "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau." else "Votre défi du jour est enregistré. À demain !",
