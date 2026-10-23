@@ -17,6 +17,10 @@ struct GameView: View {
     var difficulty: Difficulty? = nil
     /// Rattrapage: a missed daily word of the week (mode is .daily), counted in the week with 5 minutes more.
     var catchUpDay: String? = nil
+    /// First-launch tutorial: this page with an example word (TR), explained step by step. Called with
+    /// true on "À vous de jouer", false on "Passer".
+    var tutorial: ((Bool) -> Void)? = nil
+    @State private var demo = TutorialDemo()
 
     var body: some View {
         ZStack {
@@ -63,7 +67,12 @@ struct GameView: View {
             if ReminderOffer.shouldOffer() { state.reminderPending = true }
             if ReviewPrompt.shouldAsk(dailyWins: state.progress.dailyWins) { state.reviewPending = true }
         }
-        .task { if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, catchUp: catchUpDay, state: state) } }
+        .overlayPreferenceValue(TutorialAnchors.self) { anchors in
+            if let tutorial {
+                TutorialGameOverlay(anchors: anchors, demo: demo, revealHint: { session.revealHint(state: state) }, finish: tutorial)
+            }
+        }
+        .task { if tutorial != nil { session.loadTutorial(Tutorial.card) } else if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, catchUp: catchUpDay, state: state) } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { session.resume() } else { session.pause() } }
         .confirmationDialog("Révéler le mot et terminer cette carte ?", isPresented: $confirmSkip, titleVisibility: .visible) {
             Button("Révéler le mot", role: .destructive) { finishedHere = true; session.finish(correct: false, mode: mode, state: state) }
@@ -90,6 +99,7 @@ struct GameView: View {
                         .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
                         .accessibilityLabel("Chrono")
                 }
+                .tutorialTarget(.clock)
             }
         }
         .overlay {
@@ -99,6 +109,7 @@ struct GameView: View {
                     Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary)
                 }
             }.lineLimit(1).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+            .tutorialTarget(.title)
         }
         .frame(minHeight: 48)
     }
@@ -107,17 +118,28 @@ struct GameView: View {
 
     @ViewBuilder private func board(_ card: Card) -> some View {
         let consonants = card.wordNoVowels
-        Text(consonants)
-            .font(Typo.serif(consonants.count > 5 ? 64 : 88)).tracking(3)
-            .lineLimit(1).minimumScaleFactor(0.35)
-            .padding(.top, 40)
-            .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
-        Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
-        if session.usedHint {
-            Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
-                .padding(.horizontal, 10).padding(.top, 22)
-                .transition(.opacity.combined(with: .offset(y: 8)))
+        VStack(spacing: 0) {
+            if tutorial != nil {
+                // The tutorial's example: the vowels slide in and out of TR.
+                MorphWord(word: demo.word, from: demo.from, size: 80)
+                    .id("\(demo.step)-\(demo.hintShown)")
+                    .frame(minHeight: 96)
+                    .padding(.top, 40)
+            } else {
+                Text(consonants)
+                    .font(Typo.serif(consonants.count > 5 ? 64 : 88)).tracking(3)
+                    .lineLimit(1).minimumScaleFactor(0.35)
+                    .padding(.top, 40)
+                    .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
+            }
+            Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
+            if session.usedHint {
+                Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
+                    .padding(.horizontal, 10).padding(.top, 22)
+                    .transition(.opacity.combined(with: .offset(y: 8)))
+            }
         }
+        .tutorialTarget(.board)
         FlowLayout(spacing: 6) {
             ForEach(Array(session.wrongGuesses.enumerated()), id: \.offset) { _, guess in
                 Text(WordEngine.normalize(guess)).scaledFont(12, .semibold).tracking(0.6)
@@ -156,6 +178,7 @@ struct GameView: View {
                 }.scaledFont(13, .medium).foregroundStyle(Palette.foreground)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
+            .tutorialTarget(.hint)
             Button { confirmSkip = true } label: {
                 Text("Passer").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()

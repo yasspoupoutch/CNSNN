@@ -1,8 +1,6 @@
-import SwiftUI
-import CNSNNCore
-
-/// The places on the home page the first-launch tutorial points at.
-enum TutorialTarget: Hashable { case daily, play }
+/// The places the first-launch tutorial points at: the daily card on the home page, then the real
+/// Mot du jour page (played with an example word, never the real one).
+enum TutorialTarget: Hashable { case daily, play, title, clock, board, hint }
 
 /// Frames of the tutorial targets, read by the overlay above the whole shell.
 struct TutorialAnchors: PreferenceKey {
@@ -27,32 +25,33 @@ enum Tutorial {
     }
     /// A fixed example, never the real daily word, so the tutorial cannot give anything away.
     static let consonants = "TR"
-    static let theme = "Général · Facile"
+    static let card = Card(id: "seed-tutorial", wordFull: "Auteur", hint: "Il a écrit le livre.", category: .general, difficulty: .easy)
 }
 
-private enum TutorialStep: Int, CaseIterable {
-    case play, consonants, first, second, help
+enum TutorialStep: Int, CaseIterable {
+    case play, consonants, first, second, top, help
 
-    var target: TutorialTarget? { self == .play ? .daily : nil }
     var title: String {
         switch self {
         case .play: "Le mot du jour"
         case .consonants: "J’ai enlevé les voyelles"
         case .first: "Ça peut être TROU…"
         case .second: "… ou AUTEUR…"
+        case .top: "Le thème et le chrono"
         case .help: "Si vous ne trouvez pas…"
         }
     }
     var message: String {
         switch self {
-        case .play: "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer pour lancer la partie !"
-        case .consonants: "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… Le thème vous met sur la piste. À vous de le retrouver !"
+        case .play: "Un nouveau mot chaque jour, le même pour tous. Appuyez sur Jouer !"
+        case .consonants: "Il ne reste que les consonnes, dans l’ordre. Ça peut être un mot, une ville, un pays, un film, un joueur… À vous de le retrouver !"
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
-        case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour). En haut, le thème du mot et le chrono, qui part dès que vous appuyez sur Jouer."
+        case .top: "En haut, le thème du mot pour vous mettre sur la piste, et le chrono, qui part dès que vous appuyez sur Jouer."
+        case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."
         }
     }
-    /// The word revealed under the consonants, vowels in gold.
+    /// What the board shows: the consonants, or the word with its vowels sliding in.
     var word: String? {
         switch self {
         case .first: "TROU"
@@ -60,92 +59,49 @@ private enum TutorialStep: Int, CaseIterable {
         default: nil
         }
     }
+    var target: TutorialTarget {
+        switch self {
+        case .play: .daily
+        case .consonants, .first, .second: .board
+        case .top: .title
+        case .help: .hint
+        }
+    }
 }
 
-/// First-launch tutorial: dims the app around the daily card with its Jouer button pulsing, then an
-/// example (TR: TROU, but also AUTEUR) and where the theme, the hint and the clock are.
+/// The tutorial's progress on the Mot du jour page, shared by the board (which morphs the example word)
+/// and the overlay.
+@MainActor @Observable final class TutorialDemo {
+    var step = TutorialStep.consonants
+    /// The last step: Indice was tapped, the hint shows and AUTEUR slides in.
+    var hintShown = false
+    var word: String? { hintShown ? "AUTEUR" : step.word }
+    var from: String? { step == .second && !hintShown ? TutorialStep.first.word : nil }
+}
+
+/// First step, on the home page: the app blurred and dimmed around the daily card, Jouer ringed in
+/// pulsing gold. Jouer is the only way on: it opens the real Mot du jour page for the rest.
 struct TutorialOverlay: View {
     var anchors: [TutorialTarget: Anchor<CGRect>]
-    var finish: () -> Void
-    @State private var step = TutorialStep.play
-    /// The last step: Indice was tapped, the hint is showing and AUTEUR slides in.
-    @State private var hintShown = false
+    var play: () -> Void
+    var skip: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AccessibilityFocusState private var titleFocused: Bool
 
     var body: some View {
-        ZStack {
-            // The dim covers the whole screen, status bar included.
-            GeometryReader { proxy in
-                let hole = spotlight(in: proxy)
-                SpotlightShape(hole: hole.rect, radius: hole.radius)
-                    .fill(Color.black.opacity(0.76), style: FillStyle(eoFill: true))
-                    .contentShape(Rectangle())
-                    .onTapGesture {}
-                    .accessibilityHidden(true)
+        GeometryReader { proxy in
+            let hole = anchors[.daily].map { proxy[$0].insetBy(dx: -6, dy: -6) } ?? .zero
+            TutorialStage(hole: hole, radius: 38, size: proxy.size, skip: skip) {
+                TutorialBubble(step: .play)
+            } extra: {
+                if let anchor = anchors[.play] { playButton(proxy[anchor]) }
             }
-            .ignoresSafeArea()
-            // The text and buttons stay inside the safe area, clear of the status bar and the Dynamic Island.
-            GeometryReader { proxy in
-                let hole = spotlight(in: proxy)
-                ZStack(alignment: .topLeading) {
-                    if step == .play, let anchor = anchors[.play] { playButton(proxy[anchor]) }
-                    VStack(spacing: 0) {
-                        HStack {
-                            Spacer()
-                            Button("Passer") { close() }
-                                .scaledFont(15, .semibold).foregroundStyle(Palette.secondary)
-                                .padding(.horizontal, 16).frame(minHeight: 44)
-                                .accessibilityIdentifier("tutorial.skip")
-                        }
-                        .padding(.horizontal, 8)
-                        if step.target == nil {
-                            // Centred, and scrolls on a small phone or with large text instead of being cut off.
-                            ScrollView {
-                                VStack(spacing: 18) {
-                                    example
-                                    callout
-                                }
-                                .padding(.horizontal, 26).padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - 56))
-                            }
-                            .scrollBounceBehavior(.basedOnSize).scrollIndicators(.hidden)
-                        } else {
-                            callout
-                                .padding(.horizontal, 20)
-                                .padding(.top, max(0, hole.rect.maxY + 18 - 44))
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    .padding(.bottom, 12)
-                    .frame(maxWidth: CNSNNTheme.readableWidth)
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: step)
-        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintShown)
-        .accessibilityAddTraits(.isModal)
-        .onAppear { titleFocused = true }
-    }
-
-    // MARK: Spotlight
-
-    private func spotlight(in proxy: GeometryProxy) -> (rect: CGRect, radius: CGFloat) {
-        guard let target = step.target, let anchor = anchors[target] else {
-            return (CGRect(x: proxy.size.width / 2, y: proxy.size.height / 2, width: 0, height: 0), 0)
-        }
-        let frame = proxy[anchor]
-        switch target {
-        case .daily: return (frame.insetBy(dx: -6, dy: -6), 38)
-        case .play: return (frame.insetBy(dx: -8, dy: -8), frame.height / 2 + 8)
         }
     }
 
-    /// The Jouer button gets a pulsing gold ring and can be tapped to go on, like the real one.
+    /// The Jouer button gets a pulsing gold ring and opens the game page, like the real one.
     private func playButton(_ frame: CGRect) -> some View {
         let ring = frame.insetBy(dx: -6, dy: -6)
-        return Button { next() } label: {
+        return Button { Haptics.selection(); play() } label: {
             Capsule()
                 .strokeBorder(Palette.accent, lineWidth: 2.5)
                 .modifier(Pulse(active: !reduceMotion))
@@ -157,109 +113,211 @@ struct TutorialOverlay: View {
         .accessibilityLabel("Jouer")
         .accessibilityIdentifier("tutorial.play")
     }
+}
 
-    // MARK: Text
+/// The rest of the tutorial, over the real Mot du jour page: the consonants, the vowels sliding in,
+/// the theme and the clock, then Indice, which really reveals the example's hint.
+struct TutorialGameOverlay: View {
+    var anchors: [TutorialTarget: Anchor<CGRect>]
+    var demo: TutorialDemo
+    var revealHint: () -> Void
+    /// true: "À vous de jouer", the real daily game opens next.
+    var finish: (Bool) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var callout: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                ForEach(TutorialStep.allCases, id: \.self) { item in
-                    Capsule().fill(item == step ? Palette.accent : Palette.fill2)
-                        .frame(width: item == step ? 18 : 6, height: 6)
-                }
+    var body: some View {
+        GeometryReader { proxy in
+            let (hole, radius) = spotlight(proxy)
+            TutorialStage(hole: hole, radius: radius, size: proxy.size, skip: { finish(false) }) {
+                TutorialBubble(step: demo.step, hintShown: demo.hintShown, back: back, next: next)
+            } extra: {
+                if demo.step == .help && !demo.hintShown, let anchor = anchors[.hint] { hintButton(proxy[anchor]) }
             }
-            .accessibilityElement().accessibilityLabel("Étape \(step.rawValue + 1) sur \(TutorialStep.allCases.count)")
-            Text(step.title).scaledFont(24, .bold).tracking(-0.3).padding(.top, 14)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($titleFocused)
-            Text(step == .help && hintShown ? "« Il a écrit le livre. » : c’est AUTEUR ! Le thème et le chrono sont en haut, comme ici." : step.message).scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 6)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                if step != .play {
-                    Button("Retour") { back() }
-                        .scaledFont(15, .semibold).foregroundStyle(Palette.secondary)
-                        .frame(minHeight: 44)
-                }
-                Spacer()
-                // The button breathes, so it is clear a tap goes on.
-                Button(step == .help ? "À vous de jouer" : "Suivant") { next() }
-                    .buttonStyle(PrimaryPillStyle(height: 48)).frame(width: step == .help ? 190 : 130)
-                    .modifier(Breathe(active: !reduceMotion))
-            }.padding(.top, 16)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(radius: 28, padding: 20)
-        .id(step)
-        .transition(.opacity)
+        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: demo.step)
+        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: demo.hintShown)
     }
 
-    /// A small game screen: the title with the theme and the difficulty, the clock at the top right, the
-    /// word, then the Indice button. TR alone, then the vowels slide into it: TROU, back to TR, then AUTEUR
-    /// (tap the word to see it again). The step being explained gets a gold ring.
-    private var example: some View {
-        let help = step == .help
-        let hint = help && hintShown
-        return VStack(spacing: 0) {
-            ZStack {
-                VStack(spacing: 2) {
-                    Text("Exemple").scaledFont(16, .semibold)
-                    Text(Tutorial.theme).scaledFont(12, help ? .semibold : .regular)
-                        .foregroundStyle(help ? Palette.accent : Palette.tertiary)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 6)
-                .modifier(Lit(on: help, blink: false))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Exemple, thème : " + Tutorial.theme)
-                ExampleClock(running: help)
-                    .modifier(Lit(on: help, blink: false))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            // The last step starts again from TR; the hint brings AUTEUR in.
-            MorphWord(word: hint ? "AUTEUR" : step.word, from: step == .second ? TutorialStep.first.word : nil)
-                .id("\(step)-\(hint)")
-                .frame(maxWidth: .infinity, minHeight: 96)
-                .padding(.top, 8)
-            if hint {
-                Text("« Il a écrit le livre. »").font(Typo.serifItalic(20)).multilineTextAlignment(.center)
-                    .transition(.opacity.combined(with: .offset(y: 6)))
-            }
-            // Blinks on the last step until it is tapped, like the game's button.
-            Button {
-                guard help, !hintShown else { return }
-                Haptics.selection()
-                hintShown = true
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Indice").fontWeight(.bold)
-                    Text(hint ? "révélé" : "+1 min")
-                }
-                .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
-                .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule()
-            }
-            .buttonStyle(PressStyle())
-            .modifier(Lit(on: help && !hint))
-            .padding(.top, 12)
-            .accessibilityIdentifier("tutorial.hint")
+    private func spotlight(_ proxy: GeometryProxy) -> (CGRect, CGFloat) {
+        func frame(_ target: TutorialTarget) -> CGRect? { anchors[target].map { proxy[$0] } }
+        switch demo.step {
+        case .top:
+            // The title with the theme, and the clock on the right.
+            let both = [frame(.title), frame(.clock)].compactMap { $0 }.reduce(CGRect.null) { $0.union($1) }
+            return (both.isNull ? .zero : both.insetBy(dx: -10, dy: -6), 24)
+        case .help where !demo.hintShown:
+            let hint = frame(.hint) ?? .zero
+            return (hint.insetBy(dx: -8, dy: -8), hint.height / 2 + 8)
+        default:
+            return ((frame(.board) ?? .zero).insetBy(dx: -12, dy: -10), 28)
         }
-        .glassCard(radius: 30, padding: 18)
+    }
+
+    /// Indice blinks in gold and really reveals the hint, as in a game.
+    private func hintButton(_ frame: CGRect) -> some View {
+        let ring = frame.insetBy(dx: -6, dy: -6)
+        return Button {
+            Haptics.selection()
+            revealHint()
+            demo.hintShown = true
+        } label: {
+            Capsule().fill(Palette.accentSoft).modifier(Pulse(active: !reduceMotion))
+                .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 2.5).modifier(Pulse(active: !reduceMotion)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(PressStyle(scale: 0.96))
+        .frame(width: ring.width, height: ring.height)
+        .position(x: ring.midX, y: ring.midY)
+        .accessibilityLabel("Indice")
+        .accessibilityIdentifier("tutorial.hint")
     }
 
     private func next() {
         Haptics.selection()
-        guard let following = TutorialStep(rawValue: step.rawValue + 1) else { close(); return }
-        step = following
-        hintShown = false
-        titleFocused = true
+        if demo.step == .help { finish(true); return }
+        if let following = TutorialStep(rawValue: demo.step.rawValue + 1) { demo.step = following; demo.hintShown = false }
     }
     private func back() {
         Haptics.selection()
-        if let previous = TutorialStep(rawValue: step.rawValue - 1) { step = previous; hintShown = false }
-        titleFocused = true
+        guard demo.step != .consonants, let previous = TutorialStep(rawValue: demo.step.rawValue - 1) else { return }
+        demo.step = previous; demo.hintShown = false
     }
-    private func close() {
-        Haptics.success()
-        finish()
+}
+
+/// The screen behind blurred and dimmed, a rounded hole over the part being explained, "Passer" at the
+/// top, and the bubble right under the hole (or above it, when the hole is low on the screen).
+private struct TutorialStage<Bubble: View, Extra: View>: View {
+    var hole: CGRect
+    var radius: CGFloat
+    var size: CGSize
+    var skip: () -> Void
+    @ViewBuilder var bubble: () -> Bubble
+    @ViewBuilder var extra: () -> Extra
+
+    var body: some View {
+        let below = hole.midY < size.height * 0.55
+        let arrowX = min(max(hole.midX, 40), size.width - 40)
+        ZStack(alignment: .topLeading) {
+            // Blurred and dimmed everywhere but the hole, past the safe area; taps outside go nowhere.
+            let margin: CGFloat = 120
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.black.opacity(0.55)
+            }
+            .frame(width: size.width + 2 * margin, height: size.height + 2 * margin)
+            .mask(SpotlightShape(hole: hole.offsetBy(dx: margin, dy: margin), radius: radius).fill(style: FillStyle(eoFill: true)))
+            .contentShape(Rectangle())
+            .position(x: size.width / 2, y: size.height / 2)
+            .onTapGesture {}
+            .accessibilityHidden(true)
+            // A thin light edge around the hole.
+            RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                .frame(width: max(0, hole.width), height: max(0, hole.height))
+                .position(x: hole.midX, y: hole.midY)
+                .allowsHitTesting(false)
+            extra()
+            VStack(spacing: 0) {
+                if !below { Spacer(minLength: 0) }
+                bubble()
+                    .modifier(BubbleArrow(up: below, x: arrowX - 16))
+                    .padding(.horizontal, 16)
+                    .padding(below ? .top : .bottom, below ? hole.maxY + 14 : size.height - hole.minY + 14)
+                if below { Spacer(minLength: 0) }
+            }
+            .frame(width: size.width, height: size.height)
+            .transition(.opacity)
+            Button("Passer", action: skip)
+                .scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
+                .padding(.horizontal, 16).frame(minHeight: 44)
+                .background(Capsule().fill(Color.black.opacity(0.35)))
+                .padding(.trailing, 12).padding(.top, 4)
+                .frame(width: size.width, alignment: .trailing)
+                .accessibilityIdentifier("tutorial.skip")
+        }
+        .accessibilityAddTraits(.isModal)
+    }
+}
+
+/// The tutorial's speech bubble: light, with a shadow and an arrow toward the hole, so it reads as a
+/// note laid over the app and not as one of its cards.
+struct TutorialBubble: View {
+    var step: TutorialStep
+    var hintShown = false
+    var back: (() -> Void)? = nil
+    var next: (() -> Void)? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AccessibilityFocusState private var titleFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                ForEach(TutorialStep.allCases, id: \.self) { item in
+                    Capsule().fill(item == step ? Palette.ink : Palette.ink.opacity(0.2))
+                        .frame(width: item == step ? 18 : 6, height: 6)
+                }
+            }
+            .accessibilityElement().accessibilityLabel("Étape \(step.rawValue + 1) sur \(TutorialStep.allCases.count)")
+            Text(step.title).scaledFont(22, .bold).tracking(-0.3).foregroundStyle(Palette.ink).padding(.top, 12)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($titleFocused)
+            Text(step == .help && hintShown ? "« Il a écrit le livre. » : c’est AUTEUR ! À vous de trouver le mot du jour." : step.message)
+                .scaledFont(15).foregroundStyle(Palette.ink.opacity(0.75)).padding(.top, 6)
+                .fixedSize(horizontal: false, vertical: true)
+            // On the home page, Jouer is the only way on; on the hint step, Indice first.
+            if let next, step != .help || hintShown {
+                HStack {
+                    if let back, step != .consonants {
+                        Button("Retour", action: back)
+                            .scaledFont(15, .semibold).foregroundStyle(Palette.ink.opacity(0.6))
+                            .frame(minHeight: 44)
+                    }
+                    Spacer()
+                    // The button breathes, so it is clear a tap goes on.
+                    Button(step == .help ? "À vous de jouer" : "Suivant", action: next)
+                        .buttonStyle(PrimaryPillStyle(height: 46)).frame(width: step == .help ? 190 : 130)
+                        .modifier(Breathe(active: !reduceMotion))
+                }.padding(.top, 14)
+            } else if let back, step == .help {
+                Button("Retour", action: back)
+                    .scaledFont(15, .semibold).foregroundStyle(Palette.ink.opacity(0.6))
+                    .frame(minHeight: 44).padding(.top, 8)
+            }
+        }
+        .frame(maxWidth: CNSNNTheme.readableWidth, alignment: .leading)
+        .padding(18)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Palette.foreground))
+        .shadow(color: .black.opacity(0.45), radius: 24, y: 10)
+        .id("\(step)-\(hintShown)")
+        .onAppear { titleFocused = true }
+    }
+}
+
+/// The bubble's little arrow, pointing up at the hole (bubble below it) or down (bubble above it).
+private struct BubbleArrow: ViewModifier {
+    var up: Bool
+    var x: CGFloat
+    func body(content: Content) -> some View {
+        content.overlay(alignment: up ? .topLeading : .bottomLeading) {
+            Triangle(up: up).fill(Palette.foreground)
+                .frame(width: 20, height: 10)
+                .offset(x: max(14, x - 10), y: up ? -9 : 9)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct Triangle: Shape {
+    var up: Bool
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        if up {
+            path.move(to: CGPoint(x: rect.minX, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.midX, y: rect.minY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        } else {
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY)); path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        }
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -296,9 +354,10 @@ private struct Pulse: ViewModifier {
 
 /// The example word, one big serif line: the consonants stay put and the gold vowels slide in between
 /// them. With `from`, that word's vowels first slide back out, so TROU turns back into TR before AUTEUR.
-private struct MorphWord: View {
+struct MorphWord: View {
     var word: String?
     var from: String?
+    var size: CGFloat = 68
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date()
     private static let out = 0.45, pause = 0.4, lead = 0.35, grow = 0.45, stagger = 0.1
@@ -333,45 +392,9 @@ private struct MorphWord: View {
                 }
             }
         }
-        .font(Typo.serif(68)).tracking(3).lineLimit(1).fixedSize()
+        .font(Typo.serif(size)).tracking(3).lineLimit(1).fixedSize()
     }
     private static func smooth(_ x: Double) -> CGFloat { let t = min(max(x, 0), 1); return CGFloat(t * t * (3 - 2 * t)) }
-}
-
-/// A gold ring that breathes around the part of the example being explained.
-/// A gold ring around a part of the example: steady to point at it, blinking (with a gold glow) where to tap.
-private struct Lit: ViewModifier {
-    var on: Bool
-    var blink = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    func body(content: Content) -> some View {
-        content
-            .background {
-                if on && blink { Capsule().fill(Palette.accentSoft).modifier(Pulse(active: !reduceMotion)) }
-            }
-            .overlay {
-                Capsule().strokeBorder(Palette.accent, lineWidth: 2)
-                    .modifier(Pulse(active: blink && !reduceMotion))
-                    .opacity(on ? 1 : 0)
-                    .padding(-3)
-            }
-    }
-}
-
-/// The example's clock, like the game's: it runs during the clock step, from 0:00.
-private struct ExampleClock: View {
-    var running: Bool
-    @State private var start = Date()
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let seconds = running ? max(0, Int(context.date.timeIntervalSince(start))) : 0
-            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                .scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.foreground)
-                .padding(.horizontal, 13).frame(minHeight: 36).glassCapsule()
-        }
-        .onChange(of: running) { _, now in if now { start = Date() } }
-        .accessibilityLabel("Chrono")
-    }
 }
 
 /// A gentle grow and shrink, so the button to tap catches the eye.

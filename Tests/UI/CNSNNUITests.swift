@@ -145,12 +145,14 @@ final class CNSNNUITests: XCTestCase {
         app.buttons["C’est parti"].tap()
 
         XCTAssertTrue(app.staticTexts["Le mot du jour"].waitForExistence(timeout: 5))
-        // The Jouer button, ringed in gold, goes on like Suivant.
+        // Only Jouer, ringed in gold, goes on: it opens the real Mot du jour page.
+        XCTAssertFalse(app.buttons["Suivant"].exists)
         let lit = app.buttons["tutorial.play"]
         XCTAssertTrue(lit.waitForExistence(timeout: 5))
         XCTAssertTrue(lit.isHittable)
         lit.tap()
         XCTAssertTrue(app.staticTexts["J’ai enlevé les voyelles"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Indice"].exists || app.staticTexts["Indice"].exists, "The real game page is behind")
         XCTAssertTrue(app.staticTexts["Consonnes : T, R"].exists)
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Ça peut être TROU…"].waitForExistence(timeout: 5))
@@ -161,13 +163,19 @@ final class CNSNNUITests: XCTestCase {
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["… ou AUTEUR…"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Le thème et le chrono"].waitForExistence(timeout: 5))
+        app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Si vous ne trouvez pas…"].waitForExistence(timeout: 5))
-        // Indice blinks; tapping it shows the hint.
+        // Indice blinks; tapping it really shows the hint on the game page.
         app.buttons["tutorial.hint"].tap()
         XCTAssertTrue(app.staticTexts["« Il a écrit le livre. »"].waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
-        XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout: 5))
+        // The real daily game opens next.
+        let close = app.buttons["Fermer"]
+        XCTAssertTrue(close.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.staticTexts["« Il a écrit le livre. »"].exists)
+        close.tap()
 
         app.buttons["Profil"].tap()
         let again = app.buttons["profile.tutorial"]

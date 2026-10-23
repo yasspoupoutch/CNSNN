@@ -58,6 +58,15 @@ import CNSNNCore
         }
     }
 
+    /// The first-launch tutorial: the Mot du jour page with an example word, nothing recorded or sent.
+    func loadTutorial(_ example: Card) {
+        guard card?.id != example.id else { return }
+        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
+        start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = nil
+        ranked = false; pendingOfficial = false; standing = nil; secret = false; checking = false; notice = nil
+        card = example; phase = .playing
+    }
+
     /// Without Firebase (tests, missing configuration): the start time is kept on this iPhone.
     private func loadLocalDaily(key: String, state: AppState) {
         if let existing = state.progress.attempts.first(where: { $0.dailyKey == key }) {

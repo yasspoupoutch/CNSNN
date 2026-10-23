@@ -55,8 +55,10 @@ struct GameRoute: Identifiable {
     var play: PlayMode? = nil
     /// A friend challenge.
     var challenge: Challenge? = nil
-    /// Rattrapage: a past daily word of the week, for fun.
+    /// Rattrapage: a missed daily word of the week, counted with 5 minutes more.
     var catchUpDay: String? = nil
+    /// The first-launch tutorial on the Mot du jour page, with an example word.
+    var tutorial = false
 }
 
 struct MainShell: View {
@@ -67,6 +69,8 @@ struct MainShell: View {
     @Environment(\.requestReview) private var requestReview
     @AppStorage(Tutorial.seenKey) private var tutorialSeen = false
     @State private var showTutorial = false
+    /// "À vous de jouer" at the end of the tutorial: the real daily game opens once it has closed.
+    @State private var dailyAfterTutorial = false
     @State private var askReminder = false
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -85,8 +89,11 @@ struct MainShell: View {
         // The first-launch tutorial, above the tab bar, pointing at the daily card.
         .overlayPreferenceValue(TutorialAnchors.self) { anchors in
             if showTutorial {
-                TutorialOverlay(anchors: anchors) { tutorialSeen = true; showTutorial = false }
-                    .transition(.opacity)
+                TutorialOverlay(anchors: anchors, play: {
+                    showTutorial = false
+                    game = GameRoute(mode: .daily, tutorial: true)
+                }, skip: { tutorialSeen = true; showTutorial = false })
+                .transition(.opacity)
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: tab)
@@ -111,6 +118,11 @@ struct MainShell: View {
         .fullScreenCover(item: $game, onDismiss: afterGame) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let play = route.play { ModeGameView(mode: play) }
+            else if route.tutorial {
+                GameView(mode: .daily, tutorial: { play in
+                    tutorialSeen = true; dailyAfterTutorial = play; game = nil
+                })
+            }
             else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty, catchUpDay: route.catchUpDay) }
         }
     }
@@ -126,6 +138,11 @@ struct MainShell: View {
     }
     /// Back on the home page after a found daily word: the reminder first (once), else the rating prompt.
     private func afterGame() {
+        if dailyAfterTutorial {
+            dailyAfterTutorial = false
+            Task { try? await Task.sleep(for: .seconds(0.3)); game = GameRoute(mode: .daily) }
+            return
+        }
         if state.reminderPending { offerReminder() } else { askReviewIfPending() }
     }
     private func offerReminder() {
