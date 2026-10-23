@@ -26,6 +26,8 @@ import java.time.ZonedDateTime
  */
 object Reminders {
     private const val CHANNEL = "daily"
+    /** 12:00, the time offered after the first found daily word. */
+    const val DEFAULT_MINUTES = 12 * 60
 
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
@@ -70,7 +72,7 @@ object Reminders {
         if (store.remindersEnabled && glance?.playedToday(now) != true) {
             val streak = glance?.currentStreak(now) ?: 0
             val evening = ZonedDateTime.now().hour >= 20
-            val title = if (evening) "Votre série est en jeu" else "Le mot du jour vous attend"
+            val title = if (evening) "Votre série est en jeu" else "N’oubliez pas le mot du jour"
             val body = when {
                 evening -> "$streak jour${if (streak > 1) "s" else ""} d’affilée : le mot du jour s’arrête à minuit."
                 streak > 0 -> "Gardez votre série de $streak jour${if (streak > 1) "s" else ""} : trouvez le mot avant ce soir."

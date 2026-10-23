@@ -286,3 +286,21 @@ class GlanceTest {
         assertEquals(glance, Glance.fromJson(glance.toJson()))
     }
 }
+
+class CatchUpTest {
+    @Test fun listsTheWeekBeforeToday() {
+        // Friday 2026-10-23, 11:00 UTC: Thursday opens at 12:00 UTC (14 h in Paris).
+        val now = Instant.parse("2026-10-23T11:00:00Z")
+        val days = CatchUp.days("2026-10-23", setOf("2026-10-19"), mapOf("2026-10-20" to false), now)
+        assertEquals(listOf("2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"), days.map { it.key })
+        assertEquals(listOf(CatchUp.Status.Played, CatchUp.Status.Done(false), CatchUp.Status.Open, CatchUp.Status.Later(Instant.parse("2026-10-23T12:00:00Z"))),
+            days.map { it.status })
+        assertEquals(2, CatchUp.toPlay(days))
+        assertEquals(CatchUp.Status.Open, CatchUp.days("2026-10-23", emptySet(), emptyMap(), now.plusSeconds(3_600)).last().status)
+        // Monday: nothing to catch up yet; Sunday: the six days before.
+        assertTrue(CatchUp.days("2026-10-26", emptySet(), emptyMap(), now).isEmpty())
+        val sunday = CatchUp.days("2026-10-25", emptySet(), emptyMap(), now)
+        assertEquals(6, sunday.size); assertEquals("2026-10-19", sunday.first().key)
+        assertEquals("mardi", Format.weekday("2026-10-20")); assertEquals("Mardi 20 octobre", Format.day("2026-10-20"))
+    }
+}

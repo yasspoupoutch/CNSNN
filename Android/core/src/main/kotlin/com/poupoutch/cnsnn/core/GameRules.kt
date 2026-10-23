@@ -122,6 +122,14 @@ object Format {
     fun ordinal(value: Int): String = if (value == 1) "1er" else "${number(value)}e"
     fun seconds(ms: Int?): String = ms?.let { String.format(java.util.Locale.FRENCH, "%.1f s", it / 1000.0) } ?: "—"
     fun countdown(seconds: Long): String { val s = maxOf(0, seconds); return "%02d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) }
+    /** "mardi" for a yyyy-MM-dd key. */
+    fun weekday(key: String): String = runCatching {
+        LocalDate.parse(key).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.FRENCH)
+    }.getOrDefault(key)
+    /** "Mardi 21 octobre" for a yyyy-MM-dd key. */
+    fun day(key: String): String = runCatching {
+        LocalDate.parse(key).format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM", java.util.Locale.FRENCH)).replaceFirstChar { it.uppercase() }
+    }.getOrDefault(key)
 }
 
 /** Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1). */
@@ -166,4 +174,45 @@ object Guesses {
             else -> "Plus que $left essais"
         }
     }
+}
+
+/**
+ * Rattrapage: the daily words of the week (Monday to yesterday) a player missed can be played for
+ * fun, outside every ranking. A day opens once it is over everywhere: its answer is public then
+ * (firestore.rules `dayOver`), so the word is checked on the phone and nothing is sent to the server.
+ * Same rule as CatchUp in Core/GameRules.swift.
+ */
+object CatchUp {
+    sealed interface Status {
+        /** Played on the day itself. */
+        data object Played : Status
+        /** Already caught up, found or not. */
+        data class Done(val found: Boolean) : Status
+        data object Open : Status
+        /** Not over everywhere yet: opens at that time. */
+        data class Later(val at: Instant) : Status
+    }
+    data class Day(val key: String, val status: Status)
+
+    /** 36 h after the day's midnight in UTC: the next day at 14 h in Paris (13 h in winter). */
+    fun opensAt(day: String): Instant? = runCatching { LocalDate.parse(day).atStartOfDay(ZoneId.of("UTC")).toInstant().plusSeconds(36 * 3_600L) }.getOrNull()
+
+    /** The days of today's week before today, Monday first (none on Monday). */
+    fun days(today: String, played: Set<String>, done: Map<String, Boolean>, now: Instant = Instant.now()): List<Day> {
+        val date = runCatching { LocalDate.parse(today) }.getOrNull() ?: return emptyList()
+        val back = date.dayOfWeek.value - 1
+        return (back downTo 1).map { offset ->
+            val key = date.minusDays(offset.toLong()).toString()
+            val opens = opensAt(key)
+            val found = done[key]
+            Day(key, when {
+                key in played -> Status.Played
+                found != null -> Status.Done(found)
+                opens != null && opens.isAfter(now) -> Status.Later(opens)
+                else -> Status.Open
+            })
+        }
+    }
+    /** Missed days still to play, open now or later today. */
+    fun toPlay(days: List<Day>): Int = days.count { it.status == Status.Open || it.status is Status.Later }
 }

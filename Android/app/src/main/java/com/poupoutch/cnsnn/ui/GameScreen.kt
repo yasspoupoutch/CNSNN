@@ -88,6 +88,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.CatchUp
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
@@ -104,9 +105,9 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, close: () -> Unit) {
+fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficulty: Difficulty?, catchUpDay: String? = null, close: () -> Unit) {
     val game: GameViewModel = viewModel()
-    LaunchedEffect(Unit) { game.loadOnce(mode, category, difficulty, state) }
+    LaunchedEffect(Unit) { game.loadOnce(mode, category, difficulty, state, catchUpDay) }
     // The local clock stops while the app is in the background (the daily clock is the server's).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -119,6 +120,8 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
     var confirmSkip by remember { mutableStateOf(false) }
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
+    // A found daily word: the 12h reminder is offered once back on the home page.
+    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
@@ -157,7 +160,8 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
             result?.let {
                 ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && !game.usedHint, game.standing,
-                    game.pendingOfficial, game.ranked, game.usedHint, game.wrongAnswers, game.officialMs(it), next = { game.next(state) }, close = close)
+                    game.pendingOfficial, game.ranked, game.usedHint, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
+                    next = { game.next(state) }, close = close)
             }
         }
     }
@@ -179,7 +183,7 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
     Box(Modifier.fillMaxWidth().height(56.dp)) {
         IconButton(close, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Fermer") }
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(game.catchUpDay?.let { "Mot du " + Format.weekday(it) } ?: if (mode == GameMode.DAILY) "Mot du jour" else "Classique", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             game.card?.let { Text("${it.category.label} · ${it.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary) }
         }
         Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
@@ -217,6 +221,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     textDecoration = TextDecoration.LineThrough,
                     modifier = Modifier.background(Palette.redSoft, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
+        }
+        if (game.catchUpDay != null && game.result == null) {
+            Text("Pour le plaisir : ce mot ne compte pas au classement.", fontSize = 12.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
         }
         if (mode == GameMode.DAILY && game.result == null) {
             Text(when {
@@ -325,7 +332,7 @@ private fun Key(text: String, vowel: Boolean, width: Dp, enabled: Boolean, label
 
 @Composable
 private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode: GameMode, firstTry: Boolean, standing: DailyStanding?,
-                        pending: Boolean, ranked: Boolean, usedHint: Boolean, wrongAnswers: Int, officialMs: Int, next: () -> Unit, close: () -> Unit) {
+                        pending: Boolean, ranked: Boolean, usedHint: Boolean, wrongAnswers: Int, officialMs: Int, catchUp: Boolean, next: () -> Unit, close: () -> Unit) {
     val context = LocalContext.current
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
@@ -337,7 +344,11 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                 Text("« ${card.hint} »", color = Palette.secondary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             }
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (mode == GameMode.DAILY) {
+                if (catchUp) {
+                    ResultTile(Format.clock(result.timeMs), "temps", Modifier.weight(1f))
+                    ResultTile(if (usedHint) "oui" else "non", "indice", Modifier.weight(1f))
+                    ResultTile("${CatchUp.toPlay(state.catchUpDays())}", "à rattraper", Modifier.weight(1f))
+                } else if (mode == GameMode.DAILY) {
                     // The official time: the hint adds a minute, a lost day counts ten.
                     ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
                     ResultTile("$wrongAnswers", if (wrongAnswers > 1) "erreurs" else "erreur", Modifier.weight(1f))
@@ -349,18 +360,21 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                 }
             }
             if (mode == GameMode.DAILY && ranked) OfficialLine(result, standing, pending)
-            else if (result.correct && result.timeMs == state.progress.bestTimeMs)
+            else if (!catchUp && result.correct && result.timeMs == state.progress.bestTimeMs)
                 Text("🏆 Votre meilleur temps", color = Palette.mint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             if (mode == GameMode.DAILY && state.uid != null) Box(Modifier.padding(top = 18.dp)) {
                 ChallengePrompt(result.correct) { state.challengeRequest++; close() }
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton({ Share.result(context, result, card, mode) }, Modifier.height(56.dp), shape = RoundedCornerShape(28.dp)) {
+                if (!catchUp) FilledTonalButton({ Share.result(context, result, card, mode) }, Modifier.height(56.dp), shape = RoundedCornerShape(28.dp)) {
                     Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Partager", Modifier.padding(start = 8.dp))
                 }
-                PrimaryButton(if (mode == GameMode.DAILY) "Terminer" else "Mot suivant", Modifier.weight(1f)) { if (mode == GameMode.DAILY) close() else next() }
+                val ends = mode == GameMode.DAILY || catchUp
+                PrimaryButton(if (ends) "Terminer" else "Mot suivant", Modifier.weight(1f)) { if (ends) close() else next() }
             }
-            if (mode == GameMode.CLASSIC) TextButton(close, Modifier.padding(top = 6.dp)) { Text("Retour à l’accueil", color = Palette.secondary) }
+            if (catchUp) Text("Rattrapage pour le plaisir : il ne compte pas au classement.",
+                style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+            else if (mode == GameMode.CLASSIC) TextButton(close, Modifier.padding(top = 6.dp)) { Text("Retour à l’accueil", color = Palette.secondary) }
             else Text(if (pending) "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau." else "Votre défi du jour est enregistré. À demain !",
                 style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
         }
@@ -380,8 +394,8 @@ private fun OfficialLine(result: Attempt, standing: DailyStanding?, pending: Boo
                 } else standing.topPercent?.let { Text("Top $it %", color = Palette.mint, fontWeight = FontWeight.Bold, fontSize = 17.sp) }
                 Text(Format.ordinal(rank) + " sur ${standing.players} aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
             }
-            standing != null && !result.correct && standing.players > 1 ->
-                Text("${standing.players} joueurs ont tenté ce mot aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
+            standing != null && !result.correct && standing.tried > 1 ->
+                Text("${standing.tried} joueurs ont tenté ce mot aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
         }
     }
 }

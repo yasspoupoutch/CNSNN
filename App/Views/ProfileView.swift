@@ -152,7 +152,7 @@ struct ReminderSettings: View {
         }
         .onChange(of: time) { _, value in
             let parts = Calendar.current.dateComponents([.hour, .minute], from: value)
-            Reminders.minutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0)
+            Reminders.minutes = (parts.hour ?? 12) * 60 + (parts.minute ?? 0)
             state.refreshGlance(force: true)
         }
     }

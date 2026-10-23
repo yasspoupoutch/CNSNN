@@ -131,8 +131,39 @@ class CloudRepositoryTest {
         // A lost day counts ten minutes: nothing saved this month, and it sorts after every found word.
         assertEquals(0, entry.streak); assertEquals(0, entry.monthSaved); assertEquals(1, entry.monthPlayed)
         assertTrue(repo.dailyRanking(day).none { it.uid == bob.uid })
-        assertEquals(1, repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false).players)
+        // Bob tried, but the "Nᵉ sur M" line only counts players who found the word, like the ranking.
+        val lost = repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false)
+        assertEquals(1, lost.tried); assertEquals(0, lost.players)
         assertEquals(1, repo.wrongOf(bob.uid, day))
+    }
+
+    /** Rattrapage: a day over everywhere gives its word to anyone signed in; today's stays secret. */
+    @Test fun catchUpReadsOnlyDaysOverEverywhere() = runBlocking<Unit> {
+        val today = DailySchedule.key()
+        val past = DailySchedule.shift(today, -3)
+        seedSecret(past, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        seedSecret(today, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        repo.bootstrap("Alice")
+        assertEquals("Chocolat", repo.dailySecret(past)!!.wordFull)
+        expectDenied { repo.dailySecret(today) }
+    }
+
+    @Test fun standingCountsTheFindersLikeTheRanking() = runBlocking<Unit> {
+        val day = DailySchedule.key()
+        seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        val alice = repo.bootstrap("Alice")
+        val official = win(alice.uid, day)
+        auth.signOut()
+        val bob = repo.bootstrap("Bob")
+        repo.startDaily(bob.uid, day, SecretDaily.cardId(day))
+        assertEquals(1, repo.registerGuess(bob.uid, day, "TARTE"))
+        assertTrue(repo.finishDaily(bob.uid, day, false, 1))
+        repo.publishDailyResult(bob.uid, day)
+        // "1er sur 1", like the ranking that only shows Alice; Bob counts among those who tried and those she beat.
+        val standing = repo.standing(day, DailyScore.rank(day, official.timeMs, true)!!, true)
+        assertEquals(1, standing.rank); assertEquals(1, standing.players); assertEquals(2, standing.tried)
+        assertEquals(100, standing.beatenPercent)
+        assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
     }
 
     @Test fun friendsCodeAndBoard() = runBlocking<Unit> {
@@ -354,6 +385,8 @@ class CloudRepositoryTest {
         assertTrue(repo.fastestPlayers().none { it.uid == alice.uid })
         assertTrue(repo.dailyRanking(day).none { it.uid == alice.uid })
         assertTrue(repo.suspiciousTimes(day).none { it.uid == alice.uid })
+        // The "Nᵉ sur M" line no longer counts her either.
+        assertEquals(0, repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false).tried)
         // Nothing is erased: totals and results stay.
         assertEquals(1, repo.leaderboardEntry(alice.uid, com.google.firebase.firestore.Source.SERVER)!!.monthPlayed)
         assertEquals(official.timeMs, repo.dailyResult(alice.uid, day)!!.first.timeMs)
@@ -362,6 +395,7 @@ class CloudRepositoryTest {
         assertFalse(repo.isSuspended(alice.uid))
         assertEquals(listOf(alice.uid), repo.monthlyPlayers(day).map { it.uid })
         assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
+        assertEquals(1, repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false).players)
     }
 
     @Test fun pseudoIsCheckedAndRenameUpdatesTheBoard() = runBlocking<Unit> {

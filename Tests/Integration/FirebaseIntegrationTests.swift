@@ -80,6 +80,25 @@ import CNSNNCore
         let rank = try await XCTUnwrapAsync(try await repo.weekRank(bobEntry, day: day))
         XCTAssertEqual(rank.rank, 1)
         XCTAssertEqual(rank.players, 2)
+
+        // A third player gives up: Alice stays "2e sur 2" like the ranking; the loss only counts among
+        // those who tried, and among the players Alice beat.
+        try repo.signOut()
+        let carol = try await repo.bootstrap(username: "Carol")
+        _ = try await repo.startDaily(uid: carol.uid, day: day, cardID: card.id)
+        _ = try await repo.registerGuess(uid: carol.uid, day: day, guess: "TARTE")
+        _ = try await repo.finishDaily(uid: carol.uid, day: day, correct: false, wrongAnswers: 1)
+        let carolResult = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: carol.uid, day: day))
+        XCTAssertFalse(carolResult.correct)
+        let lost = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(lost.tried, 3)
+        XCTAssertEqual(lost.players, 2)
+        let withLoser = try await repo.standing(day: day, scoreMs: aliceScore, correct: true)
+        XCTAssertEqual(withLoser.rank, 2)
+        XCTAssertEqual(withLoser.players, 2, "Only the players who found the word, as in the ranking")
+        XCTAssertEqual(withLoser.tried, 3)
+        XCTAssertEqual(withLoser.beatenPercent, 50)
+        XCTAssertNil(withLoser.topPercent, "2e sur 2 is the slower half")
     }
 
     func testSecretDailyWordIsCheckedByTheServer() async throws {
@@ -437,6 +456,10 @@ import CNSNNCore
         XCTAssertFalse(hiddenTop.contains { $0.uid == cheater.uid })
         let hiddenToday = try await repo.dailyRanking(day: day)
         XCTAssertFalse(hiddenToday.contains { $0.uid == cheater.uid })
+        // The "Nᵉ sur M" line no longer counts them either.
+        let hiddenCount = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(hiddenCount.players, 0)
+        XCTAssertEqual(hiddenCount.tried, 0)
         // Nothing was deleted.
         let kept = try await repo.leaderboardEntry(uid: cheater.uid, source: .server)
         XCTAssertEqual(kept?.monthSaved, saved)
@@ -448,6 +471,39 @@ import CNSNNCore
         XCTAssertEqual(back.first { $0.uid == cheater.uid }?.monthSaved, saved)
         let today = try await repo.dailyRanking(day: day)
         XCTAssertTrue(today.contains { $0.uid == cheater.uid })
+        let counted = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(counted.players, 1)
+        XCTAssertEqual(counted.tried, 1)
+    }
+
+    /// Rattrapage: a day over everywhere is played on the phone with its public word, outside every
+    /// ranking; today's word stays secret.
+    func testCatchUpPlaysAPastDayForFun() async throws {
+        let day = DailySchedule.key(Date().addingTimeInterval(-3 * 86_400))
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        for key in [day, DailySchedule.key()] {
+            try await emulator("PATCH", "\(docs)/dailySecrets/\(key)", body: #"{"fields":{"answer":{"stringValue":"CHOCOLAT"},"word":{"stringValue":"Chocolat"},"hint":{"stringValue":"Un carré gourmand."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+        }
+        let alice = try await repo.bootstrap(username: "Alice")
+        let state = AppState()
+        state.cloud = repo; state.uid = alice.uid
+        let session = GameSession()
+        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: day, state: state)
+        for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertEqual(session.phase, .playing)
+        XCTAssertEqual(session.card?.wordFull, "Chocolat")
+        session.answer = "chocolat"
+        await session.submit(mode: .classic, state: state)
+        XCTAssertEqual(session.result?.correct, true)
+        XCTAssertEqual(state.catchUpDone[day], true)
+        XCTAssertTrue(state.progress.attempts.isEmpty, "Not a daily result, not a Classique word")
+        let board = try await repo.leaderboardEntry(uid: alice.uid, source: .server)
+        XCTAssertNil(board, "Nothing reaches the rankings")
+
+        // Today is not over everywhere: its word stays hidden, so it cannot be caught up.
+        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: DailySchedule.key(), state: state)
+        for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
+        if case .failed = session.phase {} else { XCTFail("Today's word must stay secret") }
     }
 
     // MARK: Helpers

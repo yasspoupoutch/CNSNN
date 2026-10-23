@@ -143,3 +143,45 @@ public enum CardPicker {
         return [oldest]
     }
 }
+
+/// Rattrapage: the daily words of the week (Monday to yesterday) a player missed can be played for
+/// fun, outside every ranking. A day opens once it is over everywhere: its answer is public then
+/// (firestore.rules `dayOver`), so the word is checked on the phone and nothing is sent to the server.
+public enum CatchUp {
+    public enum Status: Equatable, Sendable {
+        /// Played on the day itself.
+        case played
+        /// Already caught up, found or not.
+        case done(found: Bool)
+        case open
+        /// Not over everywhere yet: opens at that time.
+        case later(Date)
+    }
+    public struct Day: Equatable, Sendable, Identifiable {
+        public let key: String
+        public let status: Status
+        public var id: String { key }
+        public init(key: String, status: Status) { self.key = key; self.status = status }
+    }
+
+    /// 36 h after the day's midnight in UTC: the next day at 14 h in Paris (13 h in winter).
+    public static func opensAt(_ day: String) -> Date? {
+        DailyScore.dayIndex(day).map { Date(timeIntervalSince1970: TimeInterval($0 * 86_400 + 36 * 3_600)) }
+    }
+    /// The days of today's week before today, Monday first (none on Monday).
+    public static func days(today: String, played: Set<String>, done: [String: Bool], now: Date = Date()) -> [Day] {
+        guard let index = DailyScore.dayIndex(today) else { return [] }
+        let utc = TimeZone(identifier: "UTC")!
+        return (1..<DailyScore.dayOfWeek(today)).reversed().map { back in
+            let key = DailySchedule.key(Date(timeIntervalSince1970: TimeInterval((index - back) * 86_400)), in: utc)
+            if played.contains(key) { return Day(key: key, status: .played) }
+            if let found = done[key] { return Day(key: key, status: .done(found: found)) }
+            if let opens = opensAt(key), opens > now { return Day(key: key, status: .later(opens)) }
+            return Day(key: key, status: .open)
+        }
+    }
+    /// Missed days still to play, open now or later today.
+    public static func toPlay(_ days: [Day]) -> Int {
+        days.filter { if case .open = $0.status { return true }; if case .later = $0.status { return true }; return false }.count
+    }
+}

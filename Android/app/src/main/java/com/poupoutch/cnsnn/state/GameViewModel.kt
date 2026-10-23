@@ -57,6 +57,8 @@ class GameViewModel : ViewModel() {
     val remainingText: String? get() = if (ranked && result == null) Guesses.remainingText(wrongAnswers) else null
 
     var mode = GameMode.CLASSIC; private set
+    /** Rattrapage: a past daily word of the week, played for fun (see CatchUp). */
+    var catchUpDay by mutableStateOf<String?>(null); private set
     private var category: Category? = null
     private var difficulty: Difficulty? = null
     private var dailyKey: String? = null
@@ -68,9 +70,9 @@ class GameViewModel : ViewModel() {
     /** The last guess the server counted, which a win must name. */
     private var lastGuess: String? = null
 
-    fun loadOnce(mode: GameMode, category: Category?, difficulty: Difficulty?, state: AppViewModel) {
+    fun loadOnce(mode: GameMode, category: Category?, difficulty: Difficulty?, state: AppViewModel, catchUp: String? = null) {
         if (loaded) return
-        loaded = true; this.mode = mode; this.category = category; this.difficulty = difficulty
+        loaded = true; this.mode = mode; this.category = category; this.difficulty = difficulty; catchUpDay = catchUp
         load(state)
     }
 
@@ -78,7 +80,20 @@ class GameViewModel : ViewModel() {
         answer = ""; feedback = null; result = null; usedHint = false; wrongAnswers = 0; wrongGuesses.clear()
         started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null; lastGuess = null
         ranked = false; pendingOfficial = false; standing = null; phase = Phase.Playing; checking = false; notice = null; finishedHere = false
-        if (mode == GameMode.DAILY) {
+        val catchUp = catchUpDay
+        if (catchUp != null) {
+            // The day is over everywhere, so its word is public: it is checked on this phone, nothing is sent.
+            phase = Phase.Loading
+            viewModelScope.launch {
+                if (state.uid == null) state.refreshAll()
+                if (state.uid == null) { phase = Phase.Failed(CloudError.Kind.OFFLINE.message); return@launch }
+                try {
+                    card = state.cloud.dailySecret(catchUp) ?: run { phase = Phase.Failed("Ce mot du jour n’est pas disponible."); return@launch }
+                    started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0
+                    phase = Phase.Playing
+                } catch (e: Exception) { phase = Phase.Failed(CloudError.message(e)) }
+            }
+        } else if (mode == GameMode.DAILY) {
             val key = DailySchedule.key(); dailyKey = key
             ranked = true; phase = Phase.Loading
             viewModelScope.launch {
@@ -285,7 +300,8 @@ class GameViewModel : ViewModel() {
         val shown = card ?: return
         val ms = elapsedMs
         val attempt = Attempt(cardID = shown.id, mode = mode, correct = correct, timeMs = ms, date = Instant.now(), dailyKey = day)
-        result = attempt; state.record(attempt)
+        result = attempt
+        catchUpDay?.let { state.recordCatchUp(it, correct) } ?: state.record(attempt)
         if (ranked && uid != null && day != null) {
             pendingOfficial = true
             viewModelScope.launch { makeOfficial(state.cloud, uid, day, correct, state, finished = alreadyFinished) }

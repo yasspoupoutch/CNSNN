@@ -93,4 +93,19 @@ final class DailyScheduleTests: XCTestCase {
         XCTAssertEqual(merged.rulesVersion, 1)
         XCTAssertEqual(cloud.merged(with: phone).submissions.first?.card.status, .approved)
     }
+
+    func testCatchUpListsTheWeekBeforeToday() {
+        // Friday 2026-10-23, at 12:00 UTC (14 h in Paris): Thursday opens at 12:00 UTC exactly.
+        let now = ISO8601DateFormatter().date(from: "2026-10-23T11:00:00Z")!
+        let days = CatchUp.days(today: "2026-10-23", played: ["2026-10-19"], done: ["2026-10-20": false], now: now)
+        XCTAssertEqual(days.map(\.key), ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"])
+        XCTAssertEqual(days.map(\.status), [.played, .done(found: false), .open, .later(ISO8601DateFormatter().date(from: "2026-10-23T12:00:00Z")!)])
+        XCTAssertEqual(CatchUp.toPlay(days), 2)
+        let later = CatchUp.days(today: "2026-10-23", played: [], done: [:], now: now.addingTimeInterval(3_600))
+        XCTAssertEqual(later.last?.status, .open)
+        // Monday: nothing to catch up yet; Sunday: the six days before.
+        XCTAssertTrue(CatchUp.days(today: "2026-10-26", played: [], done: [:], now: now).isEmpty)
+        XCTAssertEqual(CatchUp.days(today: "2026-10-25", played: [], done: [:], now: now).first?.key, "2026-10-19")
+        XCTAssertEqual(CatchUp.days(today: "2026-10-25", played: [], done: [:], now: now).count, 6)
+    }
 }

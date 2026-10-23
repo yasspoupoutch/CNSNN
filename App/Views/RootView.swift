@@ -55,6 +55,8 @@ struct GameRoute: Identifiable {
     var play: PlayMode? = nil
     /// A friend challenge.
     var challenge: Challenge? = nil
+    /// Rattrapage: a past daily word of the week, for fun.
+    var catchUpDay: String? = nil
 }
 
 struct MainShell: View {
@@ -65,6 +67,7 @@ struct MainShell: View {
     @Environment(\.requestReview) private var requestReview
     @AppStorage(Tutorial.seenKey) private var tutorialSeen = false
     @State private var showTutorial = false
+    @State private var askReminder = false
     var body: some View {
         ZStack(alignment: .bottom) {
             // Every page stays alive so it keeps its state, as with a native tab view.
@@ -96,13 +99,19 @@ struct MainShell: View {
         }
         .onChange(of: state.tutorialRequest) { _, _ in tab = .play; showTutorial = true }
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
+        .alert("Un rappel à 12h ?", isPresented: $askReminder) {
+            Button("Oui, me le rappeler") { Task { await turnOnReminder() } }
+            Button("Non merci", role: .cancel) {}
+        } message: {
+            Text("Chaque jour à midi : « N’oubliez pas le mot du jour », sauf si vous l’avez déjà joué. Vous pourrez changer l’heure dans Profil.")
+        }
         // Pages stay alive, so "Mes propositions" reloads its statuses each time it is shown.
         .onChange(of: tab) { _, page in if page == .propose { Task { await state.refreshSubmissions() } } }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
-        .fullScreenCover(item: $game, onDismiss: askReviewIfPending) { route in
+        .fullScreenCover(item: $game, onDismiss: afterGame) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let play = route.play { ModeGameView(mode: play) }
-            else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty) }
+            else { GameView(mode: route.mode, category: route.category, difficulty: route.difficulty, catchUpDay: route.catchUpDay) }
         }
     }
     @ViewBuilder private func content(_ page: AppTab) -> some View {
@@ -114,6 +123,26 @@ struct MainShell: View {
             case .profile: ProfileView()
             }
         }.readableWidth()
+    }
+    /// Back on the home page after a found daily word: the reminder first (once), else the rating prompt.
+    private func afterGame() {
+        if state.reminderPending { offerReminder() } else { askReviewIfPending() }
+    }
+    private func offerReminder() {
+        state.reminderPending = false
+        Task {
+            try? await Task.sleep(for: .seconds(0.8))
+            switch await ReminderOffer.start() {
+            case .systemPrompt: await turnOnReminder()
+            case .askInApp: askReminder = true
+            case .unavailable: break
+            }
+        }
+    }
+    private func turnOnReminder() async {
+        Reminders.minutes = Reminders.defaultMinutes
+        guard await Reminders.enable() else { return }
+        state.refreshGlance(force: true)
     }
     /// Apple's rating prompt, back on the home page after a found daily word, never during a game.
     private func askReviewIfPending() {
