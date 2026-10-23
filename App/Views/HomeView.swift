@@ -256,7 +256,8 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 4) {
             HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: Typo.serif(40)).tracking(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(attempt.correct ? "\(Format.clock(attempt.timeMs))" : "Raté cette fois")
+            // A day counts 10 minutes at most: past that, the real time stays here with what the ranking counts.
+            Text(attempt.correct ? Format.clock(attempt.timeMs) + (attempt.timeMs >= DailyScore.missedMs ? " · compté " + Format.clock(DailyScore.missedMs) + " au classement" : "") : "Raté cette fois")
                 .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.7)
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text("Prochain mot dans " + countdown(from: context.date))

@@ -91,6 +91,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.alpha
 import com.poupoutch.cnsnn.core.CatchUp
+import com.poupoutch.cnsnn.core.DailyScore
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -271,7 +272,8 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit, catc
         if (attempt != null) {
             val card = state.card(attempt.cardID)
             DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct, actions)
-            Text(if (attempt.correct) Format.clock(attempt.timeMs) else "Raté cette fois",
+            // A day counts 10 minutes at most: past that, the real time stays here with what the ranking counts.
+            Text(if (attempt.correct) Format.clock(attempt.timeMs) + (if (attempt.timeMs >= DailyScore.MISSED_MS) " · compté " + Format.clock(DailyScore.MISSED_MS) + " au classement" else "") else "Raté cette fois",
                 fontSize = 13.sp, color = Palette.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             Countdown()
         } else {
