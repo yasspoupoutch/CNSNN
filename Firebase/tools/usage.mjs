@@ -1,70 +1,43 @@
-// Firestore use against the free Spark quota (50,000 reads, 20,000 writes, 20,000 deletes a day), day by
-// day over the last week, from Cloud Monitoring. Prints counts only, never data: run logs become public
-// whenever the repository is. Exits with an error past WARN of a daily quota, so the run fails and
-// GitHub sends its failure email. Needs GOOGLE_APPLICATION_CREDENTIALS with monitoring read access.
-import { applicationDefault } from 'firebase-admin/app';
+// Firestore use against the free Spark quota (50,000 reads, 20,000 writes, 20,000 deletes a day). Google
+// shows the real counts only in the Firebase console (Usage tab): its Monitoring API needs billing, which
+// the project stays without. So this estimates them from activity: players of the daily word each day of
+// the last week, times a pessimistic cost per player (leaderboards opened several times, friends,
+// challenges, the cards catalogue when it changed). Counting costs about one read per 1,000 results.
+// Prints counts only, never data: run logs become public whenever the repository is. Exits with an error
+// past WARN of the daily read quota, so the run fails and GitHub sends its failure email.
+import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { shiftDay } from './daily.mjs';
 
-const PROJECT = 'cnsnn-9ctosy';
 const WARN = 0.6;
-const QUOTAS = { read: 50_000, write: 20_000, delete: 20_000 };
-const DAY = 86_400_000;
+const QUOTA = { read: 50_000, write: 20_000 };
+// Per active player and day, on the high side.
+const COST = { read: 250, write: 15 };
 
-const { access_token: token } = await applicationDefault().getAccessToken();
-// The quota resets at midnight Pacific time: count whole Pacific days.
-const pacificOffset = (date) => {
-    const local = new Date(date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    return date.getTime() - local.getTime();
-};
-const now = new Date();
-const todayPacific = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-todayPacific.setHours(0, 0, 0, 0);
-const end = new Date(todayPacific.getTime() + pacificOffset(now) + DAY);
-const start = new Date(end.getTime() - 7 * DAY);
+initializeApp({ credential: applicationDefault(), projectId: 'cnsnn-9ctosy' });
+const db = getFirestore();
 
-async function perDay(kind) {
-    const params = new URLSearchParams({
-        filter: `metric.type="firestore.googleapis.com/document/${kind}_count"`,
-        'interval.startTime': start.toISOString(),
-        'interval.endTime': end.toISOString(),
-        'aggregation.alignmentPeriod': '86400s',
-        'aggregation.perSeriesAligner': 'ALIGN_SUM',
-        'aggregation.crossSeriesReducer': 'REDUCE_SUM',
-    });
-    const response = await fetch(`https://monitoring.googleapis.com/v3/projects/${PROJECT}/timeSeries?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        console.error(`Cloud Monitoring a refusé la lecture (${response.status}) : ${detail.error?.message ?? ''}`);
-        if (response.status === 403) console.error("Le compte de service doit avoir le rôle « Lecteur Monitoring » (roles/monitoring.viewer).");
-        process.exit(1);
-    }
-    const body = await response.json();
-    const days = new Map();
-    for (const series of body.timeSeries ?? []) {
-        for (const point of series.points ?? []) {
-            const day = point.interval.endTime.slice(0, 10);
-            days.set(day, (days.get(day) ?? 0) + Number(point.value.int64Value ?? 0));
-        }
-    }
-    return days;
+const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
+const rows = [];
+for (let i = 7; i >= 1; i--) {
+    const day = shiftDay(today, -i);
+    const snap = await db.collection('dailyResults').where('day', '==', day).count().get();
+    rows.push({ day, players: snap.data().count });
 }
+const users = (await db.collection('users').count().get()).data().count;
 
-const counts = Object.fromEntries(await Promise.all(Object.keys(QUOTAS).map(async (kind) => [kind, await perDay(kind)])));
-const days = [...new Set(Object.values(counts).flatMap((map) => [...map.keys()]))].sort();
-let worst = 0;
-console.log('Jour (fin, UTC) | lectures | écritures | suppressions');
-for (const day of days) {
-    const cells = Object.entries(QUOTAS).map(([kind, quota]) => {
-        const value = counts[kind].get(day) ?? 0;
-        worst = Math.max(worst, value / quota);
-        return `${value} (${Math.round((100 * value) / quota)} %)`;
-    });
-    console.log(`${day} | ${cells.join(' | ')}`);
+const pct = (n, quota) => `${Math.round((n / quota) * 100)} %`;
+console.log(`Comptes : ${users}`);
+console.log('Jour        Joueurs  Lectures estimées    Écritures estimées');
+for (const { day, players } of rows) {
+    const reads = players * COST.read, writes = players * COST.write;
+    console.log(`${day}  ${String(players).padStart(7)}  ${String(reads).padStart(7)} (${pct(reads, QUOTA.read).padStart(5)})  ${String(writes).padStart(7)} (${pct(writes, QUOTA.write).padStart(5)})`);
 }
-if (days.length === 0) console.log('Aucune activité Firestore mesurée sur 7 jours.');
-console.log(`Pic sur 7 jours : ${Math.round(worst * 100)} % d'un quota journalier gratuit.`);
-if (worst >= WARN) {
-    console.log(`::error::Firestore a dépassé ${WARN * 100} % d'un quota journalier gratuit : prévoir de réduire les lectures ou de passer au plan Blaze.`);
+const peak = Math.max(...rows.map((row) => row.players));
+const ceiling = Math.floor((QUOTA.read * WARN) / COST.read);
+console.log(`Pic : ${peak} joueurs/jour. Seuil d'alerte : ~${ceiling} joueurs/jour (${WARN * 100} % des lectures gratuites).`);
+console.log('Chiffres réels : console Firebase > Firestore > Utilisation.');
+if (peak >= ceiling) {
+    console.log(`::error::Firestore approche du quota gratuit : ${peak} joueurs/jour, alerte à ${ceiling}. Vérifier l'onglet Utilisation et préparer la suite.`);
     process.exit(2);
 }

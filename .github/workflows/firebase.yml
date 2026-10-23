@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       usage:
-        description: Afficher l'usage Firestore des 7 derniers jours face au quota gratuit
+        description: Estimer l'usage Firestore des 7 derniers jours face au quota gratuit
         type: boolean
         default: false
       deploy:
