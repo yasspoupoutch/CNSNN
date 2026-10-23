@@ -339,10 +339,10 @@ import CNSNNCore
     var rankingsVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
-    /// Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh.
+    /// Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again.
     func rankingIsStale(_ key: String, force: Bool) -> Bool {
         guard let at = rankings.readAt[key] else { return true }
-        return Date().timeIntervalSince(at) > (force ? 30 : 300)
+        return Date().timeIntervalSince(at) > (force ? 10 : 300)
     }
 
     // MARK: Results

@@ -439,10 +439,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val readAt: Map<String, Long> = emptyMap(),
     )
     var rankings by mutableStateOf(Rankings())
-    /** Whether a ranking needs reading: after 5 minutes, or 30 seconds when the player pulls to refresh. */
+    /** Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again. */
     fun rankingIsStale(key: String, force: Boolean): Boolean {
         val at = rankings.readAt[key] ?: return true
-        return System.currentTimeMillis() - at > if (force) 30_000 else 300_000
+        return System.currentTimeMillis() - at > if (force) 10_000 else 300_000
     }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
