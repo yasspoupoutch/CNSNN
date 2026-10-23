@@ -91,6 +91,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.CatchUp
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.Category
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
