@@ -25,16 +25,21 @@ import CNSNNCore
     /// Why the last check could not reach the server (network), shown under the board.
     var notice: String?
     private var dailyKey: String?
+    /// Rattrapage: a past daily word of the week, played for fun (see CatchUp).
+    private(set) var catchUpDay: String?
     private var dailyStart: Date?
     private var start = ContinuousClock.now
     private var elapsedBeforePause: Duration = .zero
     private var paused = false
 
-    func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, state: AppState) {
+    func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, catchUp: String? = nil, state: AppState) {
         answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
-        start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil
+        start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = catchUp
         ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
-        if mode == .daily {
+        if let catchUp {
+            phase = .loading
+            Task { await loadCatchUp(day: catchUp, state: state) }
+        } else if mode == .daily {
             let key = DailySchedule.key(); dailyKey = key
             if state.cloud != nil {
                 // With a server, the daily game is always the official one: no offline replay to learn the word.
@@ -53,6 +58,18 @@ import CNSNNCore
             card = ScreenshotDemo.classicCard
         } else {
             card = CardPicker.candidates(cards: state.cards, category: category, difficulty: difficulty, recent: state.progress.recentCards).randomElement()
+        }
+    }
+
+    /// The day is over everywhere, so its word is public: it is checked on this iPhone, nothing is sent.
+    private func loadCatchUp(day: String, state: AppState) async {
+        if state.uid == nil { await state.connectIfConfigured() }
+        guard let cloud = state.cloud, state.uid != nil else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
+        do {
+            guard let word = try await cloud.dailySecret(day: day) else { phase = .failed("Ce mot du jour n’est pas disponible."); return }
+            card = word; start = .now; elapsedBeforePause = .zero; phase = .playing
+        } catch {
+            phase = .failed(CloudError.message(error))
         }
     }
 
@@ -130,7 +147,7 @@ import CNSNNCore
     }
 
     func retry(state: AppState) {
-        load(mode: .daily, category: nil, difficulty: nil, state: state)
+        load(mode: .daily, category: nil, difficulty: nil, catchUp: catchUpDay, state: state)
     }
 
     func revealHint(state: AppState) {
@@ -248,7 +265,8 @@ import CNSNNCore
         guard let card else { return }
         let ms = elapsedMs
         let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: 0, date: Date(), dailyKey: dailyKey)
-        result = attempt; state.record(attempt)
+        result = attempt
+        if let catchUpDay { state.recordCatchUp(day: catchUpDay, found: correct) } else { state.record(attempt) }
         if correct { Haptics.success() }
         if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey {
             pendingOfficial = true

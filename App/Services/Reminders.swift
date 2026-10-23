@@ -5,15 +5,16 @@ import CNSNNCore
 
 /// Local daily reminders for the Mot du jour (no server needed) and the home screen widget data.
 @MainActor enum Reminders {
-    static let enabledKey = "reminders.enabled"
+    nonisolated static let enabledKey = "reminders.enabled"
     static let minutesKey = "reminders.minutes"
     private static let prefix = "cnsnn.daily."
     private static var lastGlance: Glance?
 
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
-    /// Minutes after midnight, 9:00 by default.
+    /// Minutes after midnight, 12:00 by default.
+    nonisolated static let defaultMinutes = 12 * 60
     static var minutes: Int {
-        get { UserDefaults.standard.object(forKey: minutesKey) as? Int ?? 9 * 60 }
+        get { UserDefaults.standard.object(forKey: minutesKey) as? Int ?? defaultMinutes }
         set { UserDefaults.standard.set(newValue, forKey: minutesKey) }
     }
 
@@ -63,7 +64,7 @@ import CNSNNCore
                   let fire = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day),
                   fire > now, !(offset == 0 && playedToday) else { continue }
             let content = UNMutableNotificationContent()
-            content.title = "Le mot du jour vous attend"
+            content.title = "N’oubliez pas le mot du jour"
             if offset == 0 && streak > 0 {
                 content.body = "Gardez votre série de \(streak) jour\(streak > 1 ? "s" : "") : trouvez le mot avant ce soir."
             } else {
@@ -84,5 +85,44 @@ import CNSNNCore
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
         let request = UNNotificationRequest(identifier: id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
         UNUserNotificationCenter.current().add(request)
+    }
+}
+
+/// The reminder is offered once, when a game is closed after a found daily word, to every player
+/// who does not have it yet (new players and those from before 1.2). Refused, it is never asked again;
+/// it stays in Profil either way.
+enum ReminderOffer {
+    static let offeredKey = "reminders.offered"
+
+    enum Step: Equatable {
+        /// Notifications never asked: Apple's prompt alone, a yes turns the reminder on.
+        case systemPrompt
+        /// Notifications already allowed (friend challenges): CNSNN asks in its own words.
+        case askInApp
+        /// Notifications refused in Réglages: nothing to offer.
+        case unavailable
+    }
+
+    static func shouldOffer(defaults: UserDefaults = .standard) -> Bool {
+        guard !RuntimeFlags.isTesting else { return false }
+        return isDue(defaults: defaults)
+    }
+    /// The rule without the test guard, so the unit tests can check it.
+    static func isDue(defaults: UserDefaults) -> Bool {
+        !defaults.bool(forKey: Reminders.enabledKey) && !defaults.bool(forKey: offeredKey)
+    }
+    static func markOffered(defaults: UserDefaults = .standard) { defaults.set(true, forKey: offeredKey) }
+
+    static func step(for status: UNAuthorizationStatus) -> Step {
+        switch status {
+        case .notDetermined: .systemPrompt
+        case .denied: .unavailable
+        default: .askInApp
+        }
+    }
+    /// Marks the offer as made, then says how to make it.
+    @MainActor static func start() async -> Step {
+        markOffered()
+        return step(for: await UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
     }
 }

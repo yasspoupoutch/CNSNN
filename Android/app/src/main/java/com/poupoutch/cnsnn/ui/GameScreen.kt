@@ -119,6 +119,8 @@ fun GameScreen(state: AppViewModel, mode: GameMode, category: Category?, difficu
     var confirmSkip by remember { mutableStateOf(false) }
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
+    // A found daily word: the 12h reminder is offered once back on the home page.
+    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)

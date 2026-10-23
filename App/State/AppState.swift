@@ -8,6 +8,8 @@ import CNSNNCore
     var error: String?
     /// Set by a game won on the daily word when the rating prompt is due; shown once that game is closed.
     var reviewPending = false
+    /// Set by a found daily word while the 12h reminder was never offered; offered once that game is closed.
+    var reminderPending = false
     var isBusy = false
     var cloud: FirebaseRepository?
     var uid: String?
@@ -32,6 +34,9 @@ import CNSNNCore
     var inviteCode: String?
     /// Asks the shell to show the leaderboard (from the home page).
     var leaderboardRequest = 0
+    /// Rattrapage on this iPhone, day: found. Outside every ranking, never sent to the server.
+    var catchUpDone: [String: Bool] = RuntimeFlags.isTesting ? [:] : (UserDefaults.standard.dictionary(forKey: AppState.catchUpKey) as? [String: Bool] ?? [:])
+    static let catchUpKey = "catchUp.done"
     private var local: any ProgressRepository
     private var savingAllowed = true
     private var cloudSave: Task<Void, Never>?
@@ -348,6 +353,14 @@ import CNSNNCore
         progress.recentCards.append(attempt.cardID)
         progress.recentCards = Array(progress.recentCards.suffix(20))
         persist()
+    }
+    /// The week's daily words before today: played, caught up, or still to catch up.
+    func catchUpDays(now: Date = Date()) -> [CatchUp.Day] {
+        CatchUp.days(today: DailySchedule.key(now), played: Set(progress.attempts.compactMap(\.dailyKey)), done: catchUpDone, now: now)
+    }
+    func recordCatchUp(day: String, found: Bool) {
+        catchUpDone[day] = found
+        if !RuntimeFlags.isTesting { UserDefaults.standard.set(catchUpDone, forKey: Self.catchUpKey) }
     }
     /// The server's result replaces this device's measurement for that day.
     func recordOfficial(_ attempt: Attempt) {

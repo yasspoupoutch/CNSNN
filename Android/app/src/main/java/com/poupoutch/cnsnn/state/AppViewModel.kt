@@ -73,6 +73,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var leaderboardRequest by mutableStateOf(0)
     /** Shows the first-launch tutorial again (Profil). */
     var tutorialRequest by mutableStateOf(0)
+    /** Set by a found daily word while the 12h reminder was never offered; offered once back on the home page. */
+    var reminderPending by mutableStateOf(false)
 
     private var scope: String? = local.activeScope
     private var savingAllowed = true

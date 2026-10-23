@@ -445,6 +445,20 @@ enum Format {
     /// 1er, 2e, 3e…
     static func ordinal(_ value: Int) -> String { value == 1 ? "1er" : "\(number(value))e" }
     static func seconds(_ ms: Int?) -> String { ms.map { String(format: "%.1f s", Double($0) / 1000) } ?? "—" }
+    /// "Mardi 21 octobre" for a yyyy-MM-dd key.
+    static func day(_ key: String) -> String {
+        let text = dayText(key, "EEEE d MMMM")
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+    /// "mardi" for a yyyy-MM-dd key.
+    static func weekday(_ key: String) -> String { dayText(key, "EEEE") }
+    private static func dayText(_ key: String, _ pattern: String) -> String {
+        let utc = TimeZone(identifier: "UTC")
+        let parser = DateFormatter(); parser.dateFormat = "yyyy-MM-dd"; parser.timeZone = utc; parser.locale = Locale(identifier: "en_US_POSIX")
+        guard let date = parser.date(from: key) else { return key }
+        let format = DateFormatter(); format.locale = Locale(identifier: "fr_FR"); format.timeZone = utc; format.dateFormat = pattern
+        return format.string(from: date)
+    }
     /// The week's words found out of its days so far: "5/7 jours", "1/3 jour".
     static func weekDays(_ week: DailyScore.Week, on day: String = DailySchedule.key()) -> String {
         "\(week.found)/\(DailyScore.dayOfWeek(day)) " + (week.found > 1 ? "jours" : "jour")

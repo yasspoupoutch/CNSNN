@@ -10,6 +10,7 @@ import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ProgressJson
 import com.poupoutch.cnsnn.core.SprintGame
 import com.poupoutch.cnsnn.core.SurvivalGame
+import com.poupoutch.cnsnn.reminders.Reminders
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -56,10 +57,16 @@ class LocalStore(context: Context) {
     var remindersEnabled: Boolean
         get() = prefs.getBoolean("reminders.enabled", false)
         set(value) { prefs.edit().putBoolean("reminders.enabled", value).apply() }
-    /** Minutes after midnight, 9:00 by default. */
+    /** Minutes after midnight, 12:00 by default. */
     var reminderMinutes: Int
-        get() = prefs.getInt("reminders.minutes", 9 * 60)
+        get() = prefs.getInt("reminders.minutes", Reminders.DEFAULT_MINUTES)
         set(value) { prefs.edit().putInt("reminders.minutes", value).apply() }
+    /** The 12h reminder was offered once after a found daily word (accepted or not): never again. */
+    var reminderOffered: Boolean
+        get() = prefs.getBoolean("reminders.offered", false)
+        set(value) { prefs.edit().putBoolean("reminders.offered", value).apply() }
+    /** Offered once to every player without the reminder, new ones and those from before 1.2. */
+    val reminderOfferDue: Boolean get() = !remindersEnabled && !reminderOffered
 
     var glance: Glance?
         get() = Glance.fromJson(prefs.getString("glance", null))

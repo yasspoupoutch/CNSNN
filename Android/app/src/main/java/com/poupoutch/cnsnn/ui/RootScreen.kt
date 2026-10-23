@@ -1,5 +1,10 @@
 package com.poupoutch.cnsnn.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -71,6 +76,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -81,6 +87,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -92,6 +99,7 @@ import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.Site
+import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -226,6 +234,35 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
             TutorialOverlay(targets) { state.local.tutorialSeen = true; tutorial = false }
         }
     }
+    ReminderOffer(state)
+}
+
+/**
+ * Back on the home page after a found daily word, the 12h reminder is offered once: Android's
+ * permission prompt alone when it is needed (a yes turns it on), else CNSNN asks in its own words.
+ * Accepted or not, it is never asked again; it stays in Profil.
+ */
+@Composable
+private fun ReminderOffer(state: AppViewModel) {
+    val context = LocalContext.current
+    var asking by remember { mutableStateOf(false) }
+    fun turnOn() { state.local.reminderMinutes = Reminders.DEFAULT_MINUTES; state.local.remindersEnabled = true; state.refreshGlance(force = true) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) turnOn() }
+    LaunchedEffect(state.reminderPending) {
+        if (!state.reminderPending) return@LaunchedEffect
+        state.reminderPending = false
+        state.local.reminderOffered = true
+        delay(800)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else asking = true
+    }
+    if (asking) AlertDialog({ asking = false },
+        title = { Text("Un rappel à 12h ?") },
+        text = { Text("Chaque jour à midi : « N’oubliez pas le mot du jour », sauf si vous l’avez déjà joué. Vous pourrez changer l’heure dans Profil.") },
+        confirmButton = { TextButton({ asking = false; turnOn() }) { Text("Oui, me le rappeler") } },
+        dismissButton = { TextButton({ asking = false }) { Text("Non merci") } })
 }
 
 // ---- Onboarding

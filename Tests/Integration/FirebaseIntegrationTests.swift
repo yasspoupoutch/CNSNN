@@ -476,6 +476,36 @@ import CNSNNCore
         XCTAssertEqual(counted.tried, 1)
     }
 
+    /// Rattrapage: a day over everywhere is played on the phone with its public word, outside every
+    /// ranking; today's word stays secret.
+    func testCatchUpPlaysAPastDayForFun() async throws {
+        let day = DailySchedule.key(Date().addingTimeInterval(-3 * 86_400))
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        for key in [day, DailySchedule.key()] {
+            try await emulator("PATCH", "\(docs)/dailySecrets/\(key)", body: #"{"fields":{"answer":{"stringValue":"CHOCOLAT"},"word":{"stringValue":"Chocolat"},"hint":{"stringValue":"Un carré gourmand."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+        }
+        let alice = try await repo.bootstrap(username: "Alice")
+        let state = AppState()
+        state.cloud = repo; state.uid = alice.uid
+        let session = GameSession()
+        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: day, state: state)
+        for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertEqual(session.phase, .playing)
+        XCTAssertEqual(session.card?.wordFull, "Chocolat")
+        session.answer = "chocolat"
+        await session.submit(mode: .classic, state: state)
+        XCTAssertEqual(session.result?.correct, true)
+        XCTAssertEqual(state.catchUpDone[day], true)
+        XCTAssertTrue(state.progress.attempts.isEmpty, "Not a daily result, not a Classique word")
+        let board = try await repo.leaderboardEntry(uid: alice.uid, source: .server)
+        XCTAssertNil(board, "Nothing reaches the rankings")
+
+        // Today is not over everywhere: its word stays hidden, so it cannot be caught up.
+        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: DailySchedule.key(), state: state)
+        for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
+        if case .failed = session.phase {} else { XCTFail("Today's word must stay secret") }
+    }
+
     // MARK: Helpers
 
     /// Finds today's word as the app does: a registered guess, then the finish, then the official result.
