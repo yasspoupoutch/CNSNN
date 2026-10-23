@@ -54,9 +54,13 @@ data class LeaderboardEntry(
     }
 }
 
-/** Where a finished daily result stands among today's players. */
-data class DailyStanding(val rank: Int?, val players: Int, val beatenPercent: Int?) {
-    /** "Top X %" badge, rounded up to 1, 5, 10, 25 or 50 %. Null for number 1 and the slower half. */
+/**
+ * Where a finished daily result stands among today's players, suspended ones left out as in the ranking.
+ * [players] counts those who found the word (the lines of the day's ranking, so "3e sur 4" matches it);
+ * [tried] counts everyone who played, found or not.
+ */
+data class DailyStanding(val rank: Int?, val players: Int, val beatenPercent: Int?, val tried: Int = players) {
+    /** "Top X %" badge among the finders, rounded up to 1, 5, 10, 25 or 50 %. Null for number 1 and the slower half. */
     val topPercent: Int?
         get() {
             if (rank == null || rank <= 1 || players <= 1) return null

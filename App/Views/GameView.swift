@@ -358,8 +358,8 @@ private struct ResultSheet: View {
                 }
                 Text(Format.ordinal(rank) + " sur \(standing.players) aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
             }.accessibilityElement(children: .combine)
-        } else if let standing, !result.correct, standing.players > 1 {
-            Text("\(standing.players) joueurs ont tenté ce mot aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
+        } else if let standing, !result.correct, standing.tried > 1 {
+            Text("\(standing.tried) joueurs ont tenté ce mot aujourd’hui").scaledFont(13).foregroundStyle(Palette.secondary)
         }
     }
 

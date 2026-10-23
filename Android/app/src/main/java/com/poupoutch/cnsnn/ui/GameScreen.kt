@@ -380,8 +380,8 @@ private fun OfficialLine(result: Attempt, standing: DailyStanding?, pending: Boo
                 } else standing.topPercent?.let { Text("Top $it %", color = Palette.mint, fontWeight = FontWeight.Bold, fontSize = 17.sp) }
                 Text(Format.ordinal(rank) + " sur ${standing.players} aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
             }
-            standing != null && !result.correct && standing.players > 1 ->
-                Text("${standing.players} joueurs ont tenté ce mot aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
+            standing != null && !result.correct && standing.tried > 1 ->
+                Text("${standing.tried} joueurs ont tenté ce mot aujourd’hui", color = Palette.secondary, fontSize = 13.sp)
         }
     }
 }

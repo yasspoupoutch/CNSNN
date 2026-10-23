@@ -80,6 +80,25 @@ import CNSNNCore
         let rank = try await XCTUnwrapAsync(try await repo.weekRank(bobEntry, day: day))
         XCTAssertEqual(rank.rank, 1)
         XCTAssertEqual(rank.players, 2)
+
+        // A third player gives up: Alice stays "2e sur 2" like the ranking; the loss only counts among
+        // those who tried, and among the players Alice beat.
+        try repo.signOut()
+        let carol = try await repo.bootstrap(username: "Carol")
+        _ = try await repo.startDaily(uid: carol.uid, day: day, cardID: card.id)
+        _ = try await repo.registerGuess(uid: carol.uid, day: day, guess: "TARTE")
+        _ = try await repo.finishDaily(uid: carol.uid, day: day, correct: false, wrongAnswers: 1)
+        let carolResult = try await XCTUnwrapAsync(try await repo.publishDailyResult(uid: carol.uid, day: day))
+        XCTAssertFalse(carolResult.correct)
+        let lost = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(lost.tried, 3)
+        XCTAssertEqual(lost.players, 2)
+        let withLoser = try await repo.standing(day: day, scoreMs: aliceScore, correct: true)
+        XCTAssertEqual(withLoser.rank, 2)
+        XCTAssertEqual(withLoser.players, 2, "Only the players who found the word, as in the ranking")
+        XCTAssertEqual(withLoser.tried, 3)
+        XCTAssertEqual(withLoser.beatenPercent, 50)
+        XCTAssertNil(withLoser.topPercent, "2e sur 2 is the slower half")
     }
 
     func testSecretDailyWordIsCheckedByTheServer() async throws {
@@ -437,6 +456,10 @@ import CNSNNCore
         XCTAssertFalse(hiddenTop.contains { $0.uid == cheater.uid })
         let hiddenToday = try await repo.dailyRanking(day: day)
         XCTAssertFalse(hiddenToday.contains { $0.uid == cheater.uid })
+        // The "Nᵉ sur M" line no longer counts them either.
+        let hiddenCount = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(hiddenCount.players, 0)
+        XCTAssertEqual(hiddenCount.tried, 0)
         // Nothing was deleted.
         let kept = try await repo.leaderboardEntry(uid: cheater.uid, source: .server)
         XCTAssertEqual(kept?.monthSaved, saved)
@@ -448,6 +471,9 @@ import CNSNNCore
         XCTAssertEqual(back.first { $0.uid == cheater.uid }?.monthSaved, saved)
         let today = try await repo.dailyRanking(day: day)
         XCTAssertTrue(today.contains { $0.uid == cheater.uid })
+        let counted = try await repo.standing(day: day, scoreMs: DailyScore.missedMs, correct: false)
+        XCTAssertEqual(counted.players, 1)
+        XCTAssertEqual(counted.tried, 1)
     }
 
     // MARK: Helpers

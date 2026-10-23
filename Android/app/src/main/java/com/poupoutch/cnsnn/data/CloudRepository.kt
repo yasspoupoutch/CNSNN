@@ -375,19 +375,29 @@ class CloudRepository(
         return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct)
     }
     /**
-     * Where my result stands among everyone who played today (`rank` from DailyScore.rank): faster
-     * players, then slower or lost ones, counted on the single-field `rank`.
+     * "3e sur 4 aujourd'hui": my rank and the count among the players who found the word, like the day's
+     * ranking (`rank` from DailyScore.rank, counted on that single field); "plus rapide que 98 %" counts
+     * slower players and those who did not find it. Suspended players are hidden from the ranking, so
+     * they are taken off every count too.
      */
     suspend fun standing(day: String, rank: Long, correct: Boolean): DailyStanding {
         val base = DailyScore.dayBase(day) ?: return DailyStanding(null, 0, null)
         val results = db.collection("dailyResults")
-        val players = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK))
-        if (!correct) return DailyStanding(null, players, null)
-        val faster = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThan("rank", rank))
-        val slower = count(results.whereGreaterThan("rank", rank).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK))
-        val others = players - 1
-        return DailyStanding(faster + 1, players, if (others > 0) minOf(100, slower * 100 / others) else null)
+        val hidden = suspendedResults(day)
+        val tried = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK)) - hidden.size
+        val finders = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.MISSED_MS)) -
+            hidden.count { it <= base + DailyScore.MISSED_MS }
+        if (!correct) return DailyStanding(null, finders, null, tried)
+        val faster = count(results.whereGreaterThanOrEqualTo("rank", base).whereLessThan("rank", rank)) - hidden.count { it < rank }
+        val slower = count(results.whereGreaterThan("rank", rank).whereLessThanOrEqualTo("rank", base + DailyScore.LOST_RANK)) - hidden.count { it > rank }
+        val others = tried - 1
+        return DailyStanding(faster + 1, maxOf(finders, faster + 1), if (others > 0) minOf(100, maxOf(0, slower) * 100 / others) else null, tried)
     }
+    /** The `rank` of today's results of suspended players (rarely any): their totals carry the flag, a single-field query. */
+    private suspend fun suspendedResults(day: String): List<Long> =
+        db.collection("leaderboard").whereEqualTo("suspended", true).limit(100).get(Source.SERVER).await().documents.mapNotNull { player ->
+            resultRef(player.id, day).get(Source.SERVER).await().takeIf { it.getBoolean("suspended") == true }?.getLong("rank")
+        }
     private suspend fun count(query: Query): Int = query.count().get(AggregateSource.SERVER).await().count.toInt()
 
     // ---- Friends

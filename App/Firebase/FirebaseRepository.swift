@@ -93,13 +93,17 @@ struct DailyRank: Identifiable, Equatable {
     var scoreMs: Int { DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: true) }
 }
 
-/// Where a finished daily result stands among today's players.
+/// Where a finished daily result stands among today's players. Suspended players are left out,
+/// as in the ranking.
 struct DailyStanding: Equatable {
     let rank: Int?
+    /// Players who found today's word: the lines of the day's ranking, so "3e sur 4" matches it.
     let players: Int
     /// Share of the other players this result beat (slower or not found). Nil when alone.
     let beatenPercent: Int?
-    /// "Top X %" badge: the share of today's players at or above this rank, rounded up to
+    /// Everyone who played today, found or not ("5 joueurs ont tenté ce mot").
+    var tried = 0
+    /// "Top X %" badge: the share of today's finders at or above this rank, rounded up to
     /// 1, 5, 10, 25 or 50 %. Nil for the fastest player (shown as number 1) and the slower half.
     var topPercent: Int? {
         guard let rank, rank > 1, players > 1 else { return nil }
@@ -512,18 +516,33 @@ enum DailyGuesses {
         return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, usedHint: d["usedHint"] as? Bool ?? false,
                          wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
     }
-    /// "Plus rapide que 98 % des joueurs": players who were slower (hint minute included) or did not
-    /// find the word, among everyone else who played today.
+    /// "3e sur 4 aujourd'hui": the rank and count among the players who found the word, like the
+    /// day's ranking; "plus rapide que 98 %" counts slower players and those who did not find it.
+    /// Suspended players are hidden from the ranking, so they are taken off every count too.
     func standing(day: String, scoreMs: Int, correct: Bool) async throws -> DailyStanding {
-        guard let today = dayResults(day) else { return DailyStanding(rank: nil, players: 0, beatenPercent: nil) }
-        let players = try await Self.count(today)
+        guard let today = dayResults(day), let found = dayResults(day, to: DailyScore.missedMs)
+        else { return DailyStanding(rank: nil, players: 0, beatenPercent: nil) }
+        let hidden = try await suspendedResults(day: day)
+        let tried = try await Self.count(today) - hidden.count
+        let finders = try await Self.count(found) - hidden.filter { $0.correct }.count
         guard correct, let behind = dayResults(day, from: scoreMs + 1), let ahead = dayResults(day, to: scoreMs - 1)
-        else { return DailyStanding(rank: nil, players: players, beatenPercent: nil) }
-        let slowerOrMissed = try await Self.count(behind)
+        else { return DailyStanding(rank: nil, players: finders, beatenPercent: nil, tried: tried) }
+        let slowerOrMissed = try await Self.count(behind) - hidden.filter { !$0.correct || $0.scoreMs > scoreMs }.count
         var faster = 0
-        if scoreMs > 0 { faster = try await Self.count(ahead) }
-        let others = players - 1
-        return DailyStanding(rank: faster + 1, players: players, beatenPercent: others > 0 ? min(100, slowerOrMissed * 100 / others) : nil)
+        if scoreMs > 0 { faster = try await Self.count(ahead) - hidden.filter { $0.correct && $0.scoreMs < scoreMs }.count }
+        let others = tried - 1
+        return DailyStanding(rank: faster + 1, players: max(finders, faster + 1),
+                             beatenPercent: others > 0 ? min(100, max(0, slowerOrMissed) * 100 / others) : nil, tried: tried)
+    }
+    /// Today's results of suspended players (rarely any): their totals carry the flag, a single-field query.
+    private func suspendedResults(day: String) async throws -> [(correct: Bool, scoreMs: Int)] {
+        let players = try await db.collection("leaderboard").whereField("suspended", isEqualTo: true).limit(to: 100).getDocuments(source: .server).documents
+        var results: [(correct: Bool, scoreMs: Int)] = []
+        for player in players {
+            guard let d = try await resultRef(player.documentID, day).getDocument(source: .server).data(), d["suspended"] as? Bool == true else { continue }
+            results.append((d["correct"] as? Bool ?? false, d["scoreMs"] as? Int ?? DailyScore.missedMs))
+        }
+        return results
     }
     private static func count(_ query: Query) async throws -> Int {
         try await query.count.getAggregation(source: .server).count.intValue
