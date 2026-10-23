@@ -123,7 +123,6 @@ struct TutorialOverlay: View {
 struct TutorialGameOverlay: View {
     var anchors: [TutorialTarget: Anchor<CGRect>]
     var demo: TutorialDemo
-    var revealHint: () -> Void
     /// true: "À vous de jouer", the real daily game opens next.
     var finish: (Bool) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -131,7 +130,7 @@ struct TutorialGameOverlay: View {
     var body: some View {
         GeometryReader { proxy in
             let spot = spotlight(proxy)
-            TutorialStage(hole: spot.rect, radius: spot.radius, size: proxy.size, skip: { finish(false) }) {
+            TutorialStage(hole: spot.rect, radius: spot.radius, size: proxy.size, passThrough: demo.step == .help && !demo.hintShown, skip: { finish(false) }) {
                 TutorialBubble(step: demo.step, hintShown: demo.hintShown, back: back, next: next)
             } extra: {
                 if demo.step == .help && !demo.hintShown, let anchor = anchors[.hint] { hintButton(proxy[anchor]) }
@@ -156,23 +155,15 @@ struct TutorialGameOverlay: View {
         }
     }
 
-    /// Indice blinks in gold and really reveals the hint, as in a game.
+    /// Indice blinks in gold; the tap goes through to the real button, which reveals the hint as in a game.
     private func hintButton(_ frame: CGRect) -> some View {
         let ring = frame.insetBy(dx: -6, dy: -6)
-        return Button {
-            Haptics.selection()
-            revealHint()
-            demo.hintShown = true
-        } label: {
-            Capsule().fill(Palette.accentSoft).modifier(Pulse(active: !reduceMotion))
-                .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 2.5).modifier(Pulse(active: !reduceMotion)))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(PressStyle(scale: 0.96))
-        .frame(width: ring.width, height: ring.height)
-        .position(x: ring.midX, y: ring.midY)
-        .accessibilityLabel("Indice")
-        .accessibilityIdentifier("tutorial.hint")
+        return Capsule().fill(Palette.accentSoft).modifier(Pulse(active: !reduceMotion))
+            .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 2.5).modifier(Pulse(active: !reduceMotion)))
+            .frame(width: ring.width, height: ring.height)
+            .position(x: ring.midX, y: ring.midY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     private func next() {
@@ -193,6 +184,8 @@ private struct TutorialStage<Bubble: View, Extra: View>: View {
     var hole: CGRect
     var radius: CGFloat
     var size: CGSize
+    /// true: a tap in the hole reaches the real control under it (Indice).
+    var passThrough = false
     var skip: () -> Void
     @ViewBuilder var bubble: () -> Bubble
     @ViewBuilder var extra: () -> Extra
@@ -209,7 +202,7 @@ private struct TutorialStage<Bubble: View, Extra: View>: View {
             }
             .frame(width: size.width + 2 * margin, height: size.height + 2 * margin)
             .mask(SpotlightShape(hole: hole.offsetBy(dx: margin, dy: margin), radius: radius).fill(style: FillStyle(eoFill: true)))
-            .contentShape(Rectangle())
+            .contentShape(passThrough ? AnyShape(SpotlightShape(hole: hole.offsetBy(dx: margin, dy: margin), radius: radius)) : AnyShape(Rectangle()), eoFill: passThrough)
             .position(x: size.width / 2, y: size.height / 2)
             .onTapGesture {}
             .accessibilityHidden(true)

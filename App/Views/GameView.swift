@@ -64,6 +64,8 @@ struct GameView: View {
             }.disabled(!(5...300).contains(reportReason.count))
             Button("Annuler", role: .cancel) {}
         }
+        // In the tutorial, the real Indice moves the bubble on.
+        .onChange(of: session.usedHint) { _, used in if tutorial != nil && used { demo.hintShown = true } }
         .onChange(of: session.result?.id) { _, _ in
             guard mode == .daily, catchUpDay == nil, session.result?.correct == true else { return }
             if ReminderOffer.shouldOffer() { state.reminderPending = true }
@@ -71,7 +73,7 @@ struct GameView: View {
         }
         .overlayPreferenceValue(TutorialAnchors.self) { anchors in
             if let tutorial {
-                TutorialGameOverlay(anchors: anchors, demo: demo, revealHint: { session.revealHint(state: state) }, finish: tutorial)
+                TutorialGameOverlay(anchors: anchors, demo: demo, finish: tutorial)
             }
         }
         .task { if tutorial != nil { session.loadTutorial(Tutorial.card) } else if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, catchUp: catchUpDay, state: state) } }

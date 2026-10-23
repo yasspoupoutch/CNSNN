@@ -166,8 +166,8 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Le thème et le chrono"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Si vous ne trouvez pas…"].waitForExistence(timeout: 5))
-        // Indice blinks; tapping it really shows the hint on the game page.
-        app.buttons["tutorial.hint"].tap()
+        // Indice blinks; the real button shows the hint on the game page.
+        app.buttons["Indice"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["« Il a écrit le livre. »"].waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
