@@ -283,6 +283,8 @@ jobs:
       # ce runner, pour vérifier la mise en page. Elles restent en artefact, rien n'est publié.
       - name: Vérifier la mise en page sur l'iPhone Duo
         continue-on-error: true
+        # Un simulateur Duo qui ne répond pas ne doit pas bloquer la publication des captures.
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           duo=$(xcrun simctl list devices available -j | python3 -c '
