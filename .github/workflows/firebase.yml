@@ -6,6 +6,8 @@ name: CNSNN - Firebase
 on:
   schedule:
     - cron: '17 3 1 * *'
+    # Every morning: Firestore use against the free quota (fails, so GitHub emails, past 60 %).
+    - cron: '41 7 * * *'
   pull_request:
     paths: ['Firebase/**', 'Shared/**', '.github/workflows/firebase.yml']
   push:
@@ -13,6 +15,10 @@ on:
     paths: ['Firebase/**', 'Shared/**', '.github/workflows/firebase.yml']
   workflow_dispatch:
     inputs:
+      usage:
+        description: Afficher l'usage Firestore des 7 derniers jours face au quota gratuit
+        type: boolean
+        default: false
       deploy:
         description: Publier les règles et index Firestore sur cnsnn-9ctosy
         type: boolean
@@ -108,8 +114,8 @@ jobs:
   deploy:
     name: Publier sur Firebase
     needs: rules-tests
-    # Writes only from main. Printing the public key is harmless, so it also runs on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key)) }}
+    # Writes only from main. Printing the public key or the usage counts is harmless, so they also run on a branch.
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.usage)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -153,8 +159,11 @@ jobs:
         if: ${{ inputs.daily_public_key }}
         run: node tools/daily.mjs public-key
       - name: Publier les mots du jour
-        if: ${{ github.event_name == 'schedule' || (inputs.daily_seed && github.ref == 'refs/heads/main') }}
+        if: ${{ github.event.schedule == '17 3 1 * *' || (inputs.daily_seed && github.ref == 'refs/heads/main') }}
         run: node tools/daily.mjs seed
+      - name: Usage Firestore face au quota gratuit
+        if: ${{ github.event.schedule == '41 7 * * *' || inputs.usage }}
+        run: node tools/usage.mjs
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
