@@ -153,7 +153,7 @@ struct HomeView: View {
                     .accessibilityLabel((consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne.")
                         + (state.uid == nil ? " Une seule partie par jour, enregistrée sur cet iPhone." : " Le même mot pour tous, une seule partie classée par jour."))
             }
-            if state.cloud != nil, !ScreenshotDemo.isActive {
+            if state.cloud != nil || ScreenshotDemo.isActive {
                 Rectangle().fill(Palette.line).frame(height: 1).padding(.top, 16).padding(.bottom, 12)
                 weekRow
             }
