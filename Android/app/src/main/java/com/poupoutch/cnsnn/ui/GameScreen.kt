@@ -1,5 +1,7 @@
 package com.poupoutch.cnsnn.ui
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -320,47 +322,72 @@ private fun Caret() {
     Box(Modifier.padding(start = 2.dp).width(2.5.dp).height(30.dp).alpha(if (visible) 1f else 0f).background(Palette.foreground, RoundedCornerShape(2.dp)))
 }
 
-/** AZERTY keyboard; vowels in gold, the whole game in one hand. */
+/**
+ * AZERTY keyboard laid out like the phone's French one (Gboard, iPhone): same rows and key sizes, ⌫ at the
+ * right end of the third row, a wide space bar with Valider where Enter goes, no dead zone between keys (a
+ * touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
+ */
 @Composable
 fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
-    Surface(Modifier.fillMaxWidth().padding(bottom = 6.dp), shape = RoundedCornerShape(28.dp), color = Palette.surface.copy(alpha = 0.9f)) {
-        BoxWithConstraints(Modifier.padding(horizontal = 6.dp, vertical = 10.dp)) {
-            val key = (maxWidth - 4.dp * 9) / 10
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                rows.forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                        row.forEach { letter ->
-                            Key(letter.toString(), isVowel(letter), key, enabled) { haptics.key(); press(letter.toString()) }
-                        }
-                        if (row == rows.last()) Key("⌫", false, key * 2 + 4.dp, enabled, label = "Effacer") { haptics.key(); delete() }
+    val rowHeight = 52.dp
+    // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
+    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+        BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
+            val unit = maxWidth / 10
+            Column {
+                rows.take(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth()) {
+                    // Where the phone has ⇧: left empty, so W to N sit where the thumb expects them.
+                    Spacer(Modifier.width(unit * 1.5f))
+                    Spacer(Modifier.weight(1f))
+                    rows[2].forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
+                    Spacer(Modifier.weight(1f))
+                    Key("⌫", false, unit * 1.5f, rowHeight, enabled, label = "Effacer") { haptics.key(); delete() }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    Key("espace", false, 110.dp, enabled, label = "Espace") { haptics.key(); press(" ") }
-                    androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).height(48.dp), enabled = enabled,
-                        shape = RoundedCornerShape(24.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    Key("espace", false, unit * 7, rowHeight, enabled, label = "Espace") { haptics.key(); press(" ") }
+                    androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).padding(horizontal = 3.dp).height(rowHeight - 10.dp),
+                        enabled = enabled, shape = RoundedCornerShape(24.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1) }
                 }
             }
         }
     }
 }
 
+/** One key: the whole cell takes the touch, the cap sits inside it with the phone's gaps around. */
 @Composable
-private fun Key(text: String, vowel: Boolean, width: Dp, enabled: Boolean, label: String? = null, action: () -> Unit) {
+private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, action: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.width(width).height(46.dp).scale(if (pressed) 0.9f else 1f)
-        .then(if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
-              else Modifier.background(Palette.fill1, shape).border(1.dp, Palette.border, shape))
+    val shape = RoundedCornerShape(8.dp)
+    val letter = text.length == 1 && text != "⌫"
+    val face: Modifier = if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
+        else Modifier.background(if (pressed && !letter) Palette.fill2 else Palette.fill1, shape).border(1.dp, Palette.border, shape)
+    Box(Modifier.width(width).height(height)
         .clickable(interaction, indication = null, enabled = enabled, onClickLabel = label ?: text, onClick = action)
-        .semantics { contentDescription = label ?: text },
-        contentAlignment = Alignment.Center) {
-        if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)
-        else Text(text, fontSize = if (text.length > 1) 14.sp else 19.sp, fontWeight = FontWeight.Medium, color = if (vowel) Palette.onAccent else Palette.foreground)
+        .semantics { contentDescription = label ?: text }) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 5.dp).then(face), contentAlignment = Alignment.Center) {
+            if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)
+            else Text(text, fontSize = if (text.length > 1) 15.sp else 22.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
+        }
+        // The letter pops up above the finger, as on the phone's keyboard.
+        if (letter && pressed) {
+            Box(Modifier.align(Alignment.BottomCenter).offset(y = -height + 2.dp).width(width + 4.dp).height(56.dp).zIndex(1f)
+                .shadow(6.dp, shape)
+                .then(if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
+                      else Modifier.background(Palette.surface, shape).border(1.dp, Palette.border, shape)),
+                contentAlignment = Alignment.Center) {
+                Text(text, fontSize = 32.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
+            }
+        }
     }
 }
 

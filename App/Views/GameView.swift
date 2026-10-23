@@ -445,60 +445,108 @@ private struct ResultSheet: View {
 
 // MARK: - Keyboard
 
-/// AZERTY glass keyboard from the prototype; vowels are highlighted in gold.
+/// AZERTY glass keyboard laid out like the iPhone's French one: same rows and key sizes, ⌫ at the right
+/// end of the third row, a wide space bar with Valider where Return goes, no dead zone between keys (a
+/// touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
 struct LetterKeyboard: View {
     var press: (String) -> Void
     var delete: () -> Void
     var submit: () -> Void
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
+    /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
+    static let rowHeight: CGFloat = 52
     var body: some View {
-        VStack(spacing: 8) {
-            GeometryReader { geo in
-                let key = (geo.size.width - 9 * 4) / 10
-                VStack(spacing: 8) {
-                    ForEach(rows, id: \.self) { row in
-                        HStack(spacing: 4) {
-                            ForEach(Array(row), id: \.self) { letter in
-                                KeyCap(label: String(letter), vowel: Vowels.contains(letter), width: key) { press(String(letter)) }
-                            }
-                            if row == rows.last {
-                                KeyCap(label: "⌫", vowel: false, width: key * 2 + 4, action: delete)
-                                    .accessibilityLabel("Effacer")
-                            }
-                        }.frame(maxWidth: .infinity)
-                    }
+        GeometryReader { geo in
+            let unit = geo.size.width / 10
+            VStack(spacing: 0) {
+                letterRow(rows[0], unit)
+                letterRow(rows[1], unit)
+                HStack(spacing: 0) {
+                    // Where the iPhone has ⇧: left empty, so W to N sit where the thumb expects them.
+                    Color.clear.frame(width: unit * 1.5)
+                    Spacer(minLength: 0)
+                    letterRow(rows[2], unit)
+                    Spacer(minLength: 0)
+                    KeyCap(label: "⌫", width: unit * 1.5, action: delete)
+                        .accessibilityLabel("Effacer")
                 }
-            }.frame(height: 44 * 3 + 16)
-            // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-            HStack(spacing: 6) {
-                KeyCap(label: "espace", vowel: false, width: 110) { press(" ") }
-                    .accessibilityLabel("Espace")
-                Button("Valider") { Haptics.selection(); submit() }
-                    .buttonStyle(PrimaryPillStyle(height: 48))
-            }.padding(.horizontal, 4).padding(.top, 2)
+                HStack(spacing: 0) {
+                    // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
+                    KeyCap(label: "espace", width: geo.size.width - unit * 3) { press(" ") }
+                        .accessibilityLabel("Espace")
+                    Button("Valider") { Haptics.selection(); submit() }
+                        .buttonStyle(PrimaryPillStyle(height: Self.rowHeight - 10))
+                        .padding(.horizontal, 3)
+                        .frame(width: unit * 3, height: Self.rowHeight)
+                }
+            }
         }
-        .padding(.horizontal, 6).padding(.vertical, 10)
+        .frame(height: Self.rowHeight * 4)
+        .padding(.horizontal, 3).padding(.vertical, 6)
         .glassCard(radius: 30, padding: 0)
+    }
+
+    private func letterRow(_ row: String, _ unit: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(row), id: \.self) { letter in
+                KeyCap(label: String(letter), vowel: Vowels.contains(letter), width: unit) { press(String(letter)) }
+            }
+        }
     }
 }
 
+/// One key: the whole cell takes the touch, the cap sits inside it with the iPhone's gaps around.
 private struct KeyCap: View {
     var label: String
-    var vowel: Bool
+    var vowel = false
     var width: CGFloat
     var action: () -> Void
     var body: some View {
         Button { Haptics.key(); action() } label: {
-            Text(label).font(.system(size: 19, weight: .medium))
-                .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
-                .frame(width: max(width, 0), height: 44)
-                .background {
-                    let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    if vowel { shape.fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)) }
-                    else { shape.fill(Palette.fill1).overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1)) }
+            Group {
+                if label == "⌫" { Image(systemName: "delete.left").font(.system(size: 20, weight: .regular)) }
+                else { Text(label).font(.system(size: label.count > 1 ? 16 : 23, weight: .regular)) }
+            }
+            .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .buttonStyle(KeyStyle(vowel: vowel, popup: label.count == 1 && label != "⌫" ? label : nil))
+        .frame(width: max(width, 0), height: LetterKeyboard.rowHeight)
+    }
+}
+
+/// The cap, with the iPhone's popup: the letter shows larger above the finger while it is down.
+private struct KeyStyle: ButtonStyle {
+    var vowel: Bool
+    /// The letter shown above the finger; nil for ⌫ and the space bar, which darken instead.
+    var popup: String?
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let pressed = configuration.isPressed
+        configuration.label
+            .background {
+                if vowel { shape.fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)) }
+                else { shape.fill(pressed && popup == nil ? Palette.fill2 : Palette.fill1).overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1)) }
+            }
+            .padding(.horizontal, 3).padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if let popup, pressed {
+                    Text(popup).font(.system(size: 34, weight: .regular))
+                        .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background {
+                            if vowel { shape.fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)) }
+                            else { shape.fill(Palette.surface).overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1)) }
+                        }
+                        .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                        .padding(.horizontal, -2)
+                        .frame(height: 56)
+                        .offset(y: -50)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
-                .contentShape(Rectangle())
-        }.buttonStyle(PressStyle(scale: 0.88))
+            }
     }
 }
 
