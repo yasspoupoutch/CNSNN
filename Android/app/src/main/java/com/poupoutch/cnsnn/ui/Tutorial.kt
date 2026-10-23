@@ -243,7 +243,8 @@ private fun TutorialStage(target: Rect?, radiusDp: androidx.compose.ui.unit.Dp, 
                     bubble(arrowX, true)
                 }
             } else {
-                val bottom = with(density) { (bounds.height - hole.top + 12.dp.toPx()).toDp() }
+                // Before the first measure the bounds are empty: never a negative padding.
+                val bottom = with(density) { (bounds.height - hole.top + 12.dp.toPx()).coerceAtLeast(0f).toDp() }
                 Box(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = bottom), contentAlignment = Alignment.BottomCenter) {
                     bubble(arrowX, false)
                 }
