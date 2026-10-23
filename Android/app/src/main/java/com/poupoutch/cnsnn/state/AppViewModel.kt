@@ -29,6 +29,7 @@ import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.SeedCards
 import com.poupoutch.cnsnn.core.Submission
 import com.poupoutch.cnsnn.core.WordEngine
+import com.poupoutch.cnsnn.core.CatchUp
 import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.CloudProfile
 import com.poupoutch.cnsnn.data.CloudRepository
@@ -73,6 +74,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var leaderboardRequest by mutableStateOf(0)
     /** Shows the first-launch tutorial again (Profil). */
     var tutorialRequest by mutableStateOf(0)
+    /** Rattrapage on this phone, day to found (see CatchUp). */
+    var catchUpDone by mutableStateOf(local.catchUpDone); private set
+    /** The week's daily words before today: played, caught up, or still to catch up. */
+    fun catchUpDays(now: Instant = Instant.now()): List<CatchUp.Day> =
+        CatchUp.days(DailySchedule.key(now), progress.attempts.mapNotNull { it.dailyKey }.toSet(), catchUpDone, now)
+    fun recordCatchUp(day: String, found: Boolean) {
+        catchUpDone = catchUpDone + (day to found); local.catchUpDone = catchUpDone
+    }
     /** Set by a found daily word while the 12h reminder was never offered; offered once back on the home page. */
     var reminderPending by mutableStateOf(false)
 

@@ -137,6 +137,17 @@ class CloudRepositoryTest {
         assertEquals(1, repo.wrongOf(bob.uid, day))
     }
 
+    /** Rattrapage: a day over everywhere gives its word to anyone signed in; today's stays secret. */
+    @Test fun catchUpReadsOnlyDaysOverEverywhere() = runBlocking<Unit> {
+        val today = DailySchedule.key()
+        val past = DailySchedule.shift(today, -3)
+        seedSecret(past, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        seedSecret(today, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
+        repo.bootstrap("Alice")
+        assertEquals("Chocolat", repo.dailySecret(past)!!.wordFull)
+        expectDenied { repo.dailySecret(today) }
+    }
+
     @Test fun standingCountsTheFindersLikeTheRanking() = runBlocking<Unit> {
         val day = DailySchedule.key()
         seedSecret(day, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")

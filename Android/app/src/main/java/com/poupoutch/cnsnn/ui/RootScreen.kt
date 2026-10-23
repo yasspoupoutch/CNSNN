@@ -157,7 +157,10 @@ private fun AppNavigation(state: AppViewModel) {
         composable("main") {
             MainShell(state, { mode, category, difficulty ->
                 nav.navigate("game/${mode.name}?category=${category?.name ?: ""}&difficulty=${difficulty?.name ?: ""}")
-            }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") })
+            }, { mode -> nav.navigate("mode/${mode.key}") }, { id -> nav.navigate("challenge/$id") }, { day -> nav.navigate("catchup/$day") })
+        }
+        composable("catchup/{day}", arguments = listOf(navArgument("day") { type = NavType.StringType })) { entry ->
+            GameScreen(state, GameMode.CLASSIC, null, null, catchUpDay = entry.arguments?.getString("day")) { nav.popBackStack() }
         }
         composable("challenge/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             ChallengeScreen(state, entry.arguments?.getString("id") ?: "") { nav.popBackStack() }
@@ -187,7 +190,8 @@ private enum class Tab(val label: String, val icon: ImageVector, val selectedIco
 }
 
 @Composable
-private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit) {
+private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit,
+                      playCatchUp: (String) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.PLAY) }
     // "Classement" on the home page.
     var seenRequest by rememberSaveable { mutableStateOf(state.leaderboardRequest) }
@@ -221,7 +225,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
                 AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
                     holder.SaveableStateProvider(page.name) {
                         when (page) {
-                            Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge)
+                            Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge, playCatchUp)
                             Tab.STATS -> StatsScreen(state)
                             Tab.PROPOSE -> ProposeScreen(state)
                             Tab.PROFILE -> ProfileScreen(state)

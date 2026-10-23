@@ -65,6 +65,12 @@ class LocalStore(context: Context) {
     var reminderOffered: Boolean
         get() = prefs.getBoolean("reminders.offered", false)
         set(value) { prefs.edit().putBoolean("reminders.offered", value).apply() }
+    /** Rattrapage on this phone, day to found. Outside every ranking, never sent to the server. */
+    var catchUpDone: Map<String, Boolean>
+        get() = prefs.getStringSet("catchUp.done", emptySet())!!.mapNotNull { entry ->
+            entry.split("=").takeIf { it.size == 2 }?.let { it[0] to (it[1] == "1") }
+        }.toMap()
+        set(value) { prefs.edit().putStringSet("catchUp.done", value.map { "${it.key}=${if (it.value) 1 else 0}" }.toSet()).apply() }
     /** Offered once to every player without the reminder, new ones and those from before 1.2. */
     val reminderOfferDue: Boolean get() = !remindersEnabled && !reminderOffered
 

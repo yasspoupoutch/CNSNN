@@ -81,6 +81,10 @@ import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.share.Share
 import com.poupoutch.cnsnn.state.AppViewModel
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EventRepeat
+import com.poupoutch.cnsnn.core.CatchUp
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -90,8 +94,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit) {
+fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> Unit, playMode: (PlayMode) -> Unit, playChallenge: (String) -> Unit,
+               playCatchUp: (String) -> Unit) {
     var classic by rememberSaveable { mutableStateOf(false) }
+    var catchUp by rememberSaveable { mutableStateOf(false) }
     var challenges by rememberSaveable { mutableStateOf(false) }
     // "Défier un ami" on the daily result opens the sheet once back here.
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
@@ -116,6 +122,8 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Header(state)
         DailyCard(state, today) { play(GameMode.DAILY, null, null) }
+        val missed = remember(today, state.progress, state.catchUpDone) { CatchUp.toPlay(state.catchUpDays()) }
+        if (missed > 0) CatchUpRow(missed) { catchUp = true }
         Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
@@ -128,6 +136,15 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
         ModalBottomSheet({ classic = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
             ClassicCard(state) { c, d ->
                 scope.launch { sheet.hide() }.invokeOnCompletion { classic = false; play(GameMode.CLASSIC, c, d) }
+            }
+        }
+    }
+    if (catchUp) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val scope = rememberCoroutineScope()
+        ModalBottomSheet({ catchUp = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
+            CatchUpSheet(state) { day ->
+                scope.launch { sheet.hide() }.invokeOnCompletion { catchUp = false; playCatchUp(day) }
             }
         }
     }
@@ -307,6 +324,62 @@ private fun Countdown() {
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
     val seconds = Duration.between(Instant.ofEpochMilli(now), DailySchedule.nextDay(Instant.ofEpochMilli(now))).seconds
     Text("Prochain mot dans " + Format.countdown(seconds), fontSize = 12.sp, color = Palette.tertiary, maxLines = 2)
+}
+
+/** Rattrapage: the week's missed daily words, for fun. */
+@Composable
+private fun CatchUpRow(missed: Int, open: () -> Unit) {
+    val plural = if (missed > 1) "s" else ""
+    SectionCard(Modifier.clickable(onClickLabel = "Rattraper la semaine", onClick = open).testTag("catchUp.open"), padding = 16.dp, radius = 24.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.EventRepeat, null, tint = Palette.secondary)
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text("Rattraper la semaine", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("$missed mot$plural du jour manqué$plural depuis lundi", fontSize = 13.sp, color = Palette.secondary)
+            }
+            Icon(Icons.Filled.ChevronRight, null, tint = Palette.tertiary)
+        }
+    }
+}
+
+/**
+ * Rattrapage: the days of the week before today. Played days are done; the others can be played
+ * once, for fun, outside every ranking. A day opens once it is over everywhere (14 h in Paris the next day).
+ */
+@Composable
+private fun CatchUpSheet(state: AppViewModel, play: (String) -> Unit) {
+    // Days played on another phone, found on the server when the sheet opens.
+    var playedElsewhere by remember { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(state.uid) {
+        val uid = state.uid ?: return@LaunchedEffect
+        state.catchUpDays().filter { it.status == CatchUp.Status.Open }.forEach { day ->
+            if (runCatching { state.cloud.dailyResult(uid, day.key) }.getOrNull() != null) playedElsewhere = playedElsewhere + day.key
+        }
+    }
+    val days = state.catchUpDays().map { if (it.key in playedElsewhere) it.copy(status = CatchUp.Status.Played) else it }
+    Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 28.dp)) {
+        Kicker("Rattrapage")
+        Text("Les mots de la semaine", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 10.dp))
+        Text("Pour le plaisir : un mot rattrapé ne compte pas au classement.", color = Palette.secondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        SectionCard(Modifier.padding(top = 18.dp), padding = 0.dp, radius = 24.dp) {
+            days.forEachIndexed { index, day ->
+                if (index > 0) Divider()
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(Format.day(day.key), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    when (val status = day.status) {
+                        CatchUp.Status.Played -> Text("joué le jour même", fontSize = 13.sp, color = Palette.tertiary)
+                        is CatchUp.Status.Done -> Text(if (status.found) "✓ rattrapé" else "pas trouvé", fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            color = if (status.found) Palette.mint else Palette.secondary)
+                        is CatchUp.Status.Later -> Text("dès " + status.at.atZone(DailySchedule.zone).format(DateTimeFormatter.ofPattern("H'h'mm")),
+                            fontSize = 13.sp, color = Palette.tertiary)
+                        CatchUp.Status.Open -> Button({ play(day.key) }, Modifier.height(40.dp), shape = RoundedCornerShape(20.dp)) {
+                            Text("Jouer", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
