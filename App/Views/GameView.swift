@@ -21,6 +21,8 @@ struct GameView: View {
     /// true on "À vous de jouer", false on "Passer".
     var tutorial: ((Bool) -> Void)? = nil
     @State private var demo = TutorialDemo()
+    /// "Besoin d’un indice ?" over the Indice button, after a minute on the Mot du jour.
+    @State private var hintNudge = false
 
     var body: some View {
         ZStack {
@@ -73,6 +75,14 @@ struct GameView: View {
             }
         }
         .task { if tutorial != nil { session.loadTutorial(Tutorial.card) } else if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, catchUp: catchUpDay, state: state) } }
+        .task(id: session.card?.id) {
+            hintNudge = false
+            guard mode == .daily, tutorial == nil else { return }
+            while !Task.isCancelled, !session.usedHint, session.result == nil {
+                if session.phase == .playing, session.card != nil, session.elapsedMs >= 60_000 { hintNudge = true; return }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { session.resume() } else { session.pause() } }
         .confirmationDialog("Révéler le mot et terminer cette carte ?", isPresented: $confirmSkip, titleVisibility: .visible) {
             Button("Révéler le mot", role: .destructive) { finishedHere = true; session.finish(correct: false, mode: mode, state: state) }
@@ -159,9 +169,6 @@ struct GameView: View {
                     Text(left).foregroundStyle(Palette.secondary)
                 } else if catchUpDay != nil {
                     Text("Rattrapage : compte dans la semaine avec 5 min en plus.").foregroundStyle(Palette.tertiary)
-                } else {
-                    Text(session.secret ? "Chrono officiel. 20 essais pour trouver le mot." : session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
-                        .foregroundStyle(Palette.tertiary)
                 }
             }.scaledFont(12).padding(.top, 6)
         }
@@ -179,6 +186,14 @@ struct GameView: View {
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
             .tutorialTarget(.hint)
+            .overlay(alignment: .top) {
+                // After a minute without the hint, a small bubble points at it.
+                if hintNudge && !session.usedHint && session.result == nil && tutorial == nil {
+                    HintNudge().alignmentGuide(.top) { $0[.bottom] + 6 }
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+                }
+            }
+            .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintNudge)
             Button { confirmSkip = true } label: {
                 Text("Passer").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
@@ -592,5 +607,21 @@ struct VowelReveal: View {
         guard !reduceMotion else { return nil }
         let delay = Self.firstDelay + Double(order) * Self.step
         return correct ? .spring(response: 0.42, dampingFraction: 0.62).delay(delay) : .easeOut(duration: 0.5).delay(delay)
+    }
+}
+
+/// "Besoin d’un indice ?": a light bubble whose arrow points down at the Indice button.
+private struct HintNudge: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Besoin d’un indice ?").scaledFont(14, .semibold).foregroundStyle(Palette.ink)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(Palette.foreground))
+            Triangle(up: false).fill(Palette.foreground).frame(width: 16, height: 8)
+        }
+        .fixedSize()
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        .allowsHitTesting(false)
+        .accessibilityLabel("Besoin d’un indice ? Le bouton Indice est juste en dessous.")
     }
 }

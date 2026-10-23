@@ -310,7 +310,8 @@ private struct BubbleArrow: ViewModifier {
     }
 }
 
-private struct Triangle: Shape {
+/// The little arrow of a speech bubble, pointing up or down.
+struct Triangle: Shape {
     var up: Bool
     func path(in rect: CGRect) -> Path {
         var path = Path()

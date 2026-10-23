@@ -250,21 +250,32 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             }
         }
         if (mode == GameMode.DAILY && game.result == null) {
-            Text(when {
+            val line = when {
                 game.checking -> "Vérification…"
                 game.notice != null -> game.notice!!
                 game.catchUpDay != null -> "Rattrapage : compte dans la semaine avec 5 min en plus."
-                game.ranked -> "Chrono officiel. Jusqu’à 20 essais pour trouver le mot."
-                else -> "Chrono officiel. Les erreurs ne terminent pas la partie."
-            }, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                else -> null
+            }
+            if (line != null) Text(line, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             AnimatedVisibility(game.remainingText != null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
                 Text(game.remainingText ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
             }
         }
     }
+    // After a minute on the Mot du jour without the hint, a small bubble points at Indice.
+    var hintNudge by remember(card.id) { mutableStateOf(false) }
+    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id) {
+        while (!game.usedHint && game.result == null) {
+            if (game.elapsedMs >= 60_000) { hintNudge = true; break }
+            delay(1_000)
+        }
+    }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         AnswerLine(game)
+        AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
+            HintNudge()
+        }
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
                 // The hint costs a minute on the Mot du jour only; in Classique it is free.
@@ -495,3 +506,18 @@ private fun ReportDialog(state: AppViewModel, card: Card?, dismiss: () -> Unit) 
         dismissButton = { TextButton(dismiss) { Text("Annuler") } })
 }
 
+/** "Besoin d’un indice ?": a light bubble whose arrow points down at the Indice button. */
+@Composable
+private fun HintNudge() {
+    Column(Modifier.padding(top = 6.dp).semantics(mergeDescendants = true) { contentDescription = "Besoin d’un indice ? Le bouton Indice est juste en dessous." },
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(shape = RoundedCornerShape(50), color = Palette.foreground, shadowElevation = 6.dp) {
+            Text("Besoin d’un indice ?", color = Palette.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+        }
+        val color = Palette.foreground
+        androidx.compose.foundation.Canvas(Modifier.width(16.dp).height(8.dp)) {
+            drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(0f, 0f); lineTo(size.width / 2, size.height); lineTo(size.width, 0f); close() }, color)
+        }
+    }
+}
