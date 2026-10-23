@@ -9,7 +9,10 @@ struct HomeView: View {
     @State private var showClassic = false
     @State private var pending: GameRoute?
     @State private var showChallenges = false
-    @State private var showCatchUp = false
+    /// The missed day the player tapped in the week strip, asked before its clock starts.
+    @State private var catchUpChoice: String?
+    /// Days of this week played on another phone, found on the server (day to found).
+    @State private var playedElsewhere: [String: Bool] = [:]
     @Environment(\.scenePhase) private var scenePhase
     /// Bumped when a saved game changes, so "Partie en cours" stays right.
     @State private var savedRuns = ModeRunStore.inProgress()
@@ -31,7 +34,7 @@ struct HomeView: View {
             VStack(spacing: 16) {
                 header
                 dailyCard
-                if state.cloud != nil, !ScreenshotDemo.isActive, CatchUp.toPlay(state.catchUpDays()) > 0 { catchUpRow }
+                if state.cloud != nil, !ScreenshotDemo.isActive { weekStrip }
                 modes
                 Label(syncLabel, systemImage: state.uid == nil ? "iphone" : "checkmark.icloud")
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.top, 4)
@@ -54,12 +57,20 @@ struct HomeView: View {
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
                 .presentationBackground(.ultraThinMaterial)
         }
-        .sheet(isPresented: $showCatchUp, onDismiss: {
-            if let route = pending { pending = nil; play(route) }
-        }) {
-            CatchUpSheet { pending = GameRoute(mode: .classic, catchUpDay: $0); showCatchUp = false }
-                .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
-                .presentationBackground(.ultraThinMaterial)
+        .confirmationDialog(catchUpChoice.map { "Rattraper le mot du " + Format.weekday($0) + " ?" } ?? "",
+                            isPresented: Binding(get: { catchUpChoice != nil }, set: { if !$0 { catchUpChoice = nil } }),
+                            titleVisibility: .visible, presenting: catchUpChoice) { day in
+            Button("Jouer") { play(GameRoute(mode: .daily, catchUpDay: day)) }
+            Button("Annuler", role: .cancel) {}
+        } message: { _ in
+            Text("Il compte au classement de la semaine avec 5 minutes en plus. Le chrono démarre dès l’ouverture.")
+        }
+        .task(id: "\(todayKey)|\(state.uid ?? "")") {
+            // A missed day may have been played on another phone.
+            guard let cloud = state.cloud, let uid = state.uid else { return }
+            for day in state.catchUpDays() where day.status == .open && playedElsewhere[day.key] == nil {
+                if let result = try? await cloud.dailyResult(uid: uid, day: day.key) { playedElsewhere[day.key] = result.correct }
+            }
         }
         // "Défier un ami" on the daily result: opens the sheet once the game has closed.
         .onChange(of: state.challengeRequest) { _, _ in
@@ -135,23 +146,82 @@ struct HomeView: View {
         }.glassCard(radius: 32, padding: 20).tutorialTarget(.daily).padding(.top, 2)
     }
 
-    /// Rattrapage: the week's missed daily words, for fun.
-    private var catchUpRow: some View {
-        let missed = CatchUp.toPlay(state.catchUpDays())
-        return Button { Haptics.selection(); showCatchUp = true } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "calendar.badge.clock").font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.secondary).frame(width: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Rattraper la semaine").scaledFont(16, .semibold).foregroundStyle(Palette.foreground)
-                    Text("\(missed) mot\(missed > 1 ? "s" : "") du jour manqué\(missed > 1 ? "s" : "") depuis lundi").scaledFont(13).foregroundStyle(Palette.secondary)
+    /// This week's daily words, Monday to Sunday, like the 7 days in Stats: a green check for a found word,
+    /// a red cross for a lost one. A missed day can be caught up: it counts in the week with 5 minutes more.
+    private var weekStrip: some View {
+        let days = state.dailyWeek().map { day in playedElsewhere[day.key].map { CatchUp.Day(key: day.key, status: .played(found: $0)) } ?? day }
+        let letters = ["L", "M", "M", "J", "V", "S", "D"]
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Cette semaine").scaledFont(15, .semibold)
+                Spacer()
+                Text(weekLine(days)).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(2).multilineTextAlignment(.trailing)
+            }
+            HStack {
+                ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
+                    Button { tap(day) } label: {
+                        VStack(spacing: 6) {
+                            weekCell(day.status)
+                            Text(letters[index]).scaledFont(12, day.status == .today ? .bold : .regular)
+                                .foregroundStyle(day.status == .today ? Palette.foreground : Palette.tertiary)
+                        }.frame(maxWidth: .infinity).contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressStyle(scale: 0.92))
+                    .allowsHitTesting(playable(day.status))
+                    .accessibilityLabel(Format.day(day.key) + " : " + spoken(day.status))
+                    .accessibilityIdentifier("week.\(day.key)")
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tertiary)
-            }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            }
         }
-        .buttonStyle(PressStyle(scale: 0.98))
-        .glassPanel(radius: 24, padding: 16)
-        .accessibilityIdentifier("catchUp.open")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(radius: 26, padding: 16)
+    }
+
+    private func weekCell(_ status: CatchUp.Status) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let (color, symbol, ink): (Color, String?, Color) = switch status {
+        case .played(true): (Palette.mint, "checkmark", Palette.ink)
+        case .played(false): (Palette.red, "xmark", Palette.ink)
+        case .open: (Palette.fill1, "play.fill", Palette.foreground)
+        case .later: (Palette.fill1, "clock", Palette.tertiary)
+        case .today, .coming: (Palette.fill1, nil, Palette.foreground)
+        }
+        return shape.fill(color).frame(width: 36, height: 36)
+            .overlay(shape.strokeBorder(status == .today ? Palette.foreground : Palette.line, lineWidth: status == .today ? 1.5 : 1))
+            .overlay {
+                // A symbol as well as the colour, so the week reads without colour vision.
+                if let symbol { Image(systemName: symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(ink) }
+            }
+            .opacity(status == .coming ? 0.45 : 1)
+    }
+
+    private func playable(_ status: CatchUp.Status) -> Bool {
+        switch status { case .open, .today: true; default: false }
+    }
+    private func tap(_ day: CatchUp.Day) {
+        Haptics.selection()
+        switch day.status {
+        case .open: catchUpChoice = day.key
+        case .today: play(GameRoute(mode: .daily))
+        default: break
+        }
+    }
+    private func weekLine(_ days: [CatchUp.Day]) -> String {
+        let open = days.filter { $0.status == .open }.count
+        if open > 0 { return "\(open) jour\(open > 1 ? "s" : "") à rattraper (+5 min)" }
+        for day in days { if case .later(let date) = day.status { return "À rattraper dès " + Format.hour(date) } }
+        let found = days.filter { $0.status == .played(found: true) }.count
+        return "\(found) mot\(found > 1 ? "s" : "") trouvé\(found > 1 ? "s" : "")"
+    }
+    private func spoken(_ status: CatchUp.Status) -> String {
+        switch status {
+        case .played(true): "trouvé"
+        case .played(false): "raté"
+        case .open: "manqué, à rattraper avec 5 minutes en plus"
+        case .later(let date): "manqué, à rattraper dès " + Format.hour(date)
+        case .today: "aujourd’hui, à jouer"
+        case .coming: "à venir"
+        }
     }
 
     private func dailyKicker(done: Bool) -> some View {
@@ -436,58 +506,5 @@ struct ShareResultLink<Label: View>: View {
             }
         }
         .task(id: attempt.id + (card?.wordNoVowels ?? "")) { image = ShareCard.image(attempt, card: card, mode: mode) }
-    }
-}
-
-/// Rattrapage: the days of the week before today. Played days are done; the others can be played
-/// once, for fun, outside every ranking. A day opens once it is over everywhere (14 h in Paris the next day).
-struct CatchUpSheet: View {
-    @Environment(AppState.self) private var state
-    var play: (String) -> Void
-    /// Days played on another phone, found on the server when the sheet opens.
-    @State private var playedElsewhere: Set<String> = []
-
-    var body: some View {
-        let days = state.catchUpDays().map { day in playedElsewhere.contains(day.key) ? CatchUp.Day(key: day.key, status: .played) : day }
-        VStack(alignment: .leading, spacing: 0) {
-            SectionKicker(text: "Rattrapage", color: Palette.secondary)
-            Text("Les mots de la semaine").scaledFont(24, .bold).tracking(-0.2).padding(.top, 10)
-            Text("Pour le plaisir : un mot rattrapé ne compte pas au classement.").scaledFont(14).foregroundStyle(Palette.secondary).padding(.top, 6)
-            VStack(spacing: 0) {
-                ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
-                    if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
-                    row(day)
-                }
-            }.glassPanel(radius: 24, padding: 0).padding(.top, 18)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 22).padding(.top, 26).padding(.bottom, 16)
-        .environment(\.colorScheme, .dark)
-        .task {
-            guard let cloud = state.cloud, let uid = state.uid else { return }
-            for day in state.catchUpDays() where day.status == .open {
-                if (try? await cloud.dailyResult(uid: uid, day: day.key)) != nil { playedElsewhere.insert(day.key) }
-            }
-        }
-    }
-
-    @ViewBuilder private func row(_ day: CatchUp.Day) -> some View {
-        HStack(spacing: 12) {
-            Text(Format.day(day.key)).scaledFont(16, .semibold).foregroundStyle(Palette.foreground)
-            Spacer(minLength: 8)
-            switch day.status {
-            case .played:
-                Label("joué le jour même", systemImage: "checkmark").scaledFont(13).foregroundStyle(Palette.tertiary)
-            case .done(let found):
-                Label(found ? "rattrapé" : "pas trouvé", systemImage: found ? "checkmark" : "xmark").scaledFont(13, .semibold)
-                    .foregroundStyle(found ? Palette.mint : Palette.secondary)
-            case .later(let date):
-                Text("dès " + date.formatted(.dateTime.hour().minute().locale(Locale(identifier: "fr_FR")))).scaledFont(13).foregroundStyle(Palette.tertiary)
-            case .open:
-                Button("Jouer") { Haptics.selection(); play(day.key) }
-                    .buttonStyle(PrimaryPillStyle(height: 40)).frame(width: 96)
-                    .accessibilityLabel("Jouer le mot du \(Format.day(day.key))")
-            }
-        }.padding(.horizontal, 18).frame(minHeight: 56)
     }
 }

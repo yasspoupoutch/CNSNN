@@ -476,34 +476,57 @@ import CNSNNCore
         XCTAssertEqual(counted.tried, 1)
     }
 
-    /// Rattrapage: a day over everywhere is played on the phone with its public word, outside every
-    /// ranking; today's word stays secret.
-    func testCatchUpPlaysAPastDayForFun() async throws {
-        let day = DailySchedule.key(Date().addingTimeInterval(-3 * 86_400))
-        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
-        for key in [day, DailySchedule.key()] {
-            try await emulator("PATCH", "\(docs)/dailySecrets/\(key)", body: #"{"fields":{"answer":{"stringValue":"CHOCOLAT"},"word":{"stringValue":"Chocolat"},"hint":{"stringValue":"Un carré gourmand."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+    /// Rattrapage: a missed day of the week is played like the daily word (secret answer, checked by the
+    /// server) and counts in the week with 5 minutes more, out of the day's ranking and the streak.
+    func testCatchUpCountsInTheWeek() async throws {
+        guard let day = CatchUp.days(today: DailySchedule.key()).first(where: { $0.status == .open })?.key else {
+            throw XCTSkip("No day of this week can be caught up yet (Monday, or Tuesday before 12:00 UTC).")
         }
+        let docs = "http://127.0.0.1:8080/v1/projects/\(project)/databases/(default)/documents"
+        try await emulator("PATCH", "\(docs)/dailyPuzzles/\(day)", body: #"{"fields":{"consonants":{"stringValue":"CHCLT"},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
+        try await emulator("PATCH", "\(docs)/dailySecrets/\(day)", body: #"{"fields":{"answer":{"stringValue":"CHOCOLAT"},"word":{"stringValue":"Chocolat"},"hint":{"stringValue":"Un carré gourmand."},"category":{"stringValue":"Général"},"difficulty":{"stringValue":"Facile"}}}"#)
         let alice = try await repo.bootstrap(username: "Alice")
+        // The answer stays secret until the week is over: a missed day can still be caught up.
+        await assertThrows { _ = try await self.repo.dailySecret(day: day) }
         let state = AppState()
         state.cloud = repo; state.uid = alice.uid
+        XCTAssertEqual(state.catchUpDays().first { $0.key == day }?.status, .open)
         let session = GameSession()
-        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: day, state: state)
+        session.load(mode: .daily, category: nil, difficulty: nil, catchUp: day, state: state)
         for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertEqual(session.phase, .playing)
-        XCTAssertEqual(session.card?.wordFull, "Chocolat")
+        XCTAssertTrue(session.secret)
+        XCTAssertEqual(session.card?.wordNoVowels, "CHCLT")
+        try await Task.sleep(for: .milliseconds(2200))
         session.answer = "chocolat"
-        await session.submit(mode: .classic, state: state)
+        await session.submit(mode: .daily, state: state)
         XCTAssertEqual(session.result?.correct, true)
-        XCTAssertEqual(state.catchUpDone[day], true)
-        XCTAssertTrue(state.progress.attempts.isEmpty, "Not a daily result, not a Classique word")
-        let board = try await repo.leaderboardEntry(uid: alice.uid, source: .server)
-        XCTAssertNil(board, "Nothing reaches the rankings")
+        XCTAssertEqual(session.card?.wordFull, "Chocolat")
+        for _ in 0..<100 where session.pendingOfficial { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertFalse(session.pendingOfficial)
+        XCTAssertNil(session.standing, "Out of the day's ranking")
+        let attempt = try XCTUnwrap(state.progress.attempts.first { $0.dailyKey == day })
+        XCTAssertEqual(attempt.catchUp, true)
+        XCTAssertEqual(state.catchUpDays().first { $0.key == day }?.status, .played(found: true))
+        XCTAssertEqual(state.progress.streak(), 0, "A caught-up day does not make a streak")
 
-        // Today is not over everywhere: its word stays hidden, so it cannot be caught up.
-        session.load(mode: .classic, category: nil, difficulty: nil, catchUp: DailySchedule.key(), state: state)
-        for _ in 0..<100 where session.phase == .loading { try await Task.sleep(for: .milliseconds(100)) }
-        if case .failed = session.phase {} else { XCTFail("Today's word must stay secret") }
+        let result = try await XCTUnwrapAsync(try await repo.dailyResult(uid: alice.uid, day: day))
+        XCTAssertEqual(result.catchUp, true)
+        let ranking = try await repo.dailyRanking(day: day)
+        XCTAssertFalse(ranking.contains { $0.uid == alice.uid })
+        let board = try await XCTUnwrapAsync(try await repo.leaderboardEntry(uid: alice.uid, source: .server))
+        XCTAssertEqual(board.weekFound, 1)
+        XCTAssertEqual(board.weekTimeMs, DailyScore.catchUpScoreMs(timeMs: result.timeMs, usedHint: false, correct: true))
+        XCTAssertGreaterThanOrEqual(board.weekTimeMs, DailyScore.catchUpPenaltyMs)
+        XCTAssertEqual(board.streak, 0)
+        XCTAssertNil(board.bestTimeMs)
+        let weekLines = try await repo.weekPlayers(day: DailySchedule.key())
+        XCTAssertTrue(weekLines.contains { $0.uid == alice.uid })
+
+        // Once: a day caught up cannot be started again, and today cannot be "caught up".
+        await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: day, cardID: FirebaseRepository.secretCardID(day: day), catchUp: true) }
+        let today = DailySchedule.key()
+        await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: today, cardID: FirebaseRepository.secretCardID(day: today), catchUp: true) }
     }
 
     // MARK: Helpers

@@ -15,7 +15,7 @@ struct GameView: View {
     let mode: GameMode
     var category: CNSNNCore.Category? = nil
     var difficulty: Difficulty? = nil
-    /// Rattrapage: a past daily word of the week, for fun (mode is .classic).
+    /// Rattrapage: a missed daily word of the week (mode is .daily), counted in the week with 5 minutes more.
     var catchUpDay: String? = nil
 
     var body: some View {
@@ -59,7 +59,7 @@ struct GameView: View {
             Button("Annuler", role: .cancel) {}
         }
         .onChange(of: session.result?.id) { _, _ in
-            guard mode == .daily, session.result?.correct == true else { return }
+            guard mode == .daily, catchUpDay == nil, session.result?.correct == true else { return }
             if ReminderOffer.shouldOffer() { state.reminderPending = true }
             if ReviewPrompt.shouldAsk(dailyWins: state.progress.dailyWins) { state.reviewPending = true }
         }
@@ -127,9 +127,6 @@ struct GameView: View {
                     .accessibilityLabel("Essai incorrect : \(guess)")
             }
         }.frame(minHeight: 26).padding(.top, 16)
-        if catchUpDay != nil && session.result == nil {
-            Text("Pour le plaisir : ce mot ne compte pas au classement.").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 6)
-        }
         if mode == .daily && session.result == nil {
             Group {
                 if session.checking {
@@ -138,6 +135,8 @@ struct GameView: View {
                     Text(notice).foregroundStyle(Palette.secondary).multilineTextAlignment(.center)
                 } else if let left = session.guessesNotice {
                     Text(left).foregroundStyle(Palette.secondary)
+                } else if catchUpDay != nil {
+                    Text("Rattrapage : compte dans la semaine avec 5 min en plus.").foregroundStyle(Palette.tertiary)
                 } else {
                     Text(session.secret ? "Chrono officiel. 20 essais pour trouver le mot." : session.ranked ? "Chrono officiel. Les erreurs ne terminent pas la partie." : "Les erreurs ne terminent pas la partie.")
                         .foregroundStyle(Palette.tertiary)
@@ -290,8 +289,9 @@ private struct ResultSheet: View {
             }
             HStack(spacing: 10) {
                 if catchUp {
-                    tile(Format.clock(result.timeMs), "temps", Palette.foreground)
-                    tile(usedHint ? "oui" : "non", "indice", Palette.foreground)
+                    // Counted in the week: the real time, the hint minute, then 5 minutes more.
+                    tile(Format.clock(DailyScore.catchUpScoreMs(timeMs: result.timeMs, usedHint: usedHint, correct: result.correct)), "compté", Palette.foreground)
+                    tile(usedHint ? "+1 min" : "non", "indice", Palette.foreground)
                     tile("\(CatchUp.toPlay(state.catchUpDays()))", "à rattraper", Palette.foreground)
                 } else if mode == .daily {
                     // The ranked time: the hint adds a minute, a lost word counts ten.
@@ -304,12 +304,14 @@ private struct ResultSheet: View {
                     tile(Format.number(state.progress.correctAnswers), "mots trouvés", Palette.foreground)
                 }
             }.padding(.top, 18)
-            if mode == .daily && ranked {
+            if catchUp {
+                if pending { officialLine.padding(.top, 12) }
+            } else if mode == .daily && ranked {
                 officialLine.padding(.top, 12)
             } else if !catchUp, result.correct, result.timeMs == state.progress.bestTimeMs {
                 Label("Votre meilleur temps", systemImage: "trophy").scaledFont(13, .semibold).foregroundStyle(Palette.mint).padding(.top, 12)
             }
-            if mode == .daily && state.uid != nil {
+            if mode == .daily && !catchUp && state.uid != nil {
                 ChallengePrompt(correct: result.correct) { state.challengeRequest += 1; close() }.padding(.top, 18)
             }
             HStack(spacing: 10) {
@@ -318,14 +320,15 @@ private struct ResultSheet: View {
                         Text("Partager")
                     }.buttonStyle(GlassPillStyle(height: 54))
                 }
-                Button(mode == .daily || catchUp ? "Terminer" : "Mot suivant") {
+                Button(mode == .daily ? "Terminer" : "Mot suivant") {
                     Haptics.selection()
-                    if mode == .daily || catchUp { close() } else { next() }
+                    if mode == .daily { close() } else { next() }
                 }
                     .buttonStyle(PrimaryPillStyle(height: 54)).layoutPriority(1)
             }.padding(.top, 20)
             if catchUp {
-                Text("Rattrapage pour le plaisir : il ne compte pas au classement.")
+                Text(pending ? "Votre partie est gardée sur cet iPhone et sera validée au retour du réseau."
+                     : result.correct ? "Mot rattrapé : il compte au classement de la semaine avec 5 min en plus." : "Ce jour compte comme joué, sans mot trouvé.")
                     .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 14)
             } else if mode == .classic {
                 Button("Retour à l’accueil", action: close).scaledFont(15, .medium).foregroundStyle(Palette.secondary).padding(.top, 14)

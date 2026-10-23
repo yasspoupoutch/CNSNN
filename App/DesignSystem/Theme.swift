@@ -450,6 +450,10 @@ enum Format {
         let text = dayText(key, "EEEE d MMMM")
         return text.prefix(1).uppercased() + text.dropFirst()
     }
+    /// "14:00", in the phone's time zone.
+    static func hour(_ date: Date) -> String {
+        date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute().locale(Locale(identifier: "fr_FR")))
+    }
     /// "mardi" for a yyyy-MM-dd key.
     static func weekday(_ key: String) -> String { dayText(key, "EEEE") }
     private static func dayText(_ key: String, _ pattern: String) -> String {
