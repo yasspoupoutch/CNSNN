@@ -193,7 +193,8 @@ struct GameView: View {
             .overlay(alignment: .top) {
                 // After a minute without the hint, a small bubble points at it.
                 if hintNudge && !session.usedHint && session.result == nil && tutorial == nil {
-                    HintNudge().alignmentGuide(.top) { $0[.bottom] + 6 }
+                    // A zero-height frame on the button's top edge, the bubble rising from it: always above.
+                    HintNudge().frame(height: 0, alignment: .bottom).offset(y: -4)
                         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
                 }
             }
