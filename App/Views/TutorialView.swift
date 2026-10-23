@@ -82,7 +82,7 @@ enum TutorialStep: Int, CaseIterable {
     var from: String? { step == .second && !hintShown ? TutorialStep.first.word : nil }
 }
 
-/// First step, on the home page: the app blurred and dimmed around the daily card, Jouer ringed in
+/// First step, on the home page: the app dimmed around the daily card, Jouer ringed in
 /// pulsing gold. Jouer is the only way on: it opens the real Mot du jour page for the rest.
 struct TutorialOverlay: View {
     var anchors: [TutorialTarget: Anchor<CGRect>]
@@ -178,7 +178,7 @@ struct TutorialGameOverlay: View {
     }
 }
 
-/// The screen behind blurred and dimmed, a rounded hole over the part being explained, "Passer" at the
+/// The screen behind dimmed, a rounded hole over the part being explained, "Passer" at the
 /// top, and the bubble right under the hole (or above it, when the hole is low on the screen).
 private struct TutorialStage<Bubble: View, Extra: View>: View {
     var hole: CGRect
@@ -194,12 +194,10 @@ private struct TutorialStage<Bubble: View, Extra: View>: View {
         let below = hole.midY < size.height * 0.55
         let arrowX = min(max(hole.midX, 40), size.width - 40)
         ZStack(alignment: .topLeading) {
-            // Blurred and dimmed everywhere but the hole, past the safe area; taps outside go nowhere.
+            // Dimmed (not blurred, so the app stays recognisable) everywhere but the hole, past the safe
+            // area; taps outside go nowhere.
             let margin: CGFloat = 120
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Color.black.opacity(0.55)
-            }
+            Color.black.opacity(0.5)
             .frame(width: size.width + 2 * margin, height: size.height + 2 * margin)
             .mask(SpotlightShape(hole: hole.offsetBy(dx: margin, dy: margin), radius: radius).fill(style: FillStyle(eoFill: true)))
             .contentShape(passThrough ? AnyShape(SpotlightShape(hole: hole.offsetBy(dx: margin, dy: margin), radius: radius)) : AnyShape(Rectangle()), eoFill: passThrough)

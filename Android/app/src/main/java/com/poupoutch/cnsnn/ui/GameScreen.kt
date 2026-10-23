@@ -4,6 +4,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -279,10 +281,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         AnswerLine(game)
-        AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
-            HintNudge()
-        }
-        Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // After a minute without the hint, a small bubble on its left points at it (no room above,
+            // under the answer); the buttons slide right to make room.
+            AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+                HintNudge()
+            }
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
                 // The hint costs a minute on the Mot du jour only; in Classique it is free.
                 Text(buildString { append("Indice"); if (game.usedHint) append("  révélé") else if (game.ranked) append("  +1 min") })
@@ -547,18 +551,25 @@ private fun ReportDialog(state: AppViewModel, card: Card?, dismiss: () -> Unit) 
         dismissButton = { TextButton(dismiss) { Text("Annuler") } })
 }
 
-/** "Besoin d’un indice ?": a light bubble whose arrow points down at the Indice button. */
+/** "Un indice ?": a light bubble whose arrow points right at the Indice button. It blinks for its first 5 seconds, then stays. */
 @Composable
 private fun HintNudge() {
-    Column(Modifier.padding(top = 6.dp).semantics(mergeDescendants = true) { contentDescription = "Besoin d’un indice ? Le bouton Indice est juste en dessous." },
-        horizontalAlignment = Alignment.CenterHorizontally) {
+    val alpha = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(Unit) {
+        repeat(5) {
+            alpha.animateTo(0.25f, androidx.compose.animation.core.tween(500))
+            alpha.animateTo(1f, androidx.compose.animation.core.tween(500))
+        }
+    }
+    Row(Modifier.alpha(alpha.value).semantics(mergeDescendants = true) { contentDescription = "Un indice ? Le bouton Indice est juste à droite." },
+        verticalAlignment = Alignment.CenterVertically) {
         Surface(shape = RoundedCornerShape(50), color = Palette.foreground, shadowElevation = 6.dp) {
-            Text("Besoin d’un indice ?", color = Palette.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+            Text("Un indice ?", color = Palette.ink, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
         }
         val color = Palette.foreground
-        androidx.compose.foundation.Canvas(Modifier.width(16.dp).height(8.dp)) {
-            drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(0f, 0f); lineTo(size.width / 2, size.height); lineTo(size.width, 0f); close() }, color)
+        androidx.compose.foundation.Canvas(Modifier.width(6.dp).height(12.dp)) {
+            drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(0f, 0f); lineTo(size.width, size.height / 2); lineTo(0f, size.height); close() }, color)
         }
     }
 }

@@ -214,7 +214,7 @@ private fun TutorialStage(target: Rect?, radiusDp: androidx.compose.ui.unit.Dp, 
                 addRect(Rect(Offset.Zero, this@Canvas.size))
                 if (animatedHole.width > 1f) addRoundRect(RoundRect(animatedHole, CornerRadius(radius)))
             }
-            drawPath(path, Color.Black.copy(alpha = 0.82f))
+            drawPath(path, Color.Black.copy(alpha = 0.5f))
             if (animatedHole.width > 1f) drawRoundRect(Color.White.copy(alpha = 0.35f), animatedHole.topLeft, animatedHole.size, CornerRadius(radius), style = Stroke(1.dp.toPx()))
             if (lit != null) {
                 drawRoundRect(Palette.accent.copy(alpha = 0.18f * pulse), lit.topLeft, lit.size, CornerRadius(lit.height / 2))
