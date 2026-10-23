@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Bolt
@@ -48,12 +49,12 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -127,8 +128,7 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Header(state)
-        DailyCard(state, today) { play(GameMode.DAILY, null, null) }
-        WeekStrip(state, today, playToday = { play(GameMode.DAILY, null, null) }, catchUp = { catchUp = it })
+        DailyCard(state, today, play = { play(GameMode.DAILY, null, null) }, catchUp = { catchUp = it })
         Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(if (state.uid == null) Icons.Filled.CloudOff else Icons.Filled.CloudDone, null, Modifier.size(16.dp), tint = Palette.tertiary)
@@ -257,41 +257,30 @@ private fun Header(state: AppViewModel) {
 }
 
 @Composable
-private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
+private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit, catchUp: (String) -> Unit) {
     val attempt = state.progress.attempts.firstOrNull { it.dailyKey == today }
     // The consonants show only once the daily card is locked, so the clock is already running.
     val started = state.progress.dailyStarted[today]?.let { state.card(it) }
-    // Compact, so the challenge and the modes stay on screen.
+    val context = LocalContext.current
+    // One card for the day: Classement and Partager at the top right, the word with Jouer, then the week.
+    val actions: @Composable RowScope.() -> Unit = {
+        if (state.uid != null || attempt != null) CornerIcon(Icons.Filled.Leaderboard, "Classement") { state.leaderboardRequest++ }
+        if (attempt != null) CornerIcon(Icons.Filled.Share, "Partager") { Share.result(context, attempt, state.card(attempt.cardID), GameMode.DAILY) }
+    }
     SectionCard(Modifier.tutorialTarget(TutorialTarget.DAILY), radius = 28.dp, padding = 18.dp) {
         if (attempt != null) {
             val card = state.card(attempt.cardID)
-            val context = LocalContext.current
-            // Three rows: the kicker, the word on the whole width (smaller if long), then the time and
-            // the countdown beside Classement and Partager, so nothing gets squeezed into a column.
-            DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(if (attempt.correct) Format.clock(attempt.timeMs) else "Raté cette fois",
-                        fontSize = 13.sp, color = Palette.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Countdown()
-                }
-                FilledTonalButton({ state.leaderboardRequest++ }, Modifier.height(40.dp), shape = RoundedCornerShape(20.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) { Text("Classement", fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false) }
-                androidx.compose.material3.IconButton({ Share.result(context, attempt, card, GameMode.DAILY) }) { Icon(Icons.Filled.Share, "Partager") }
-            }
+            DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct, actions)
+            Text(if (attempt.correct) Format.clock(attempt.timeMs) else "Raté cette fois",
+                fontSize = 13.sp, color = Palette.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            Countdown()
         } else {
             val consonants = started?.wordNoVowels
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Kicker("Mot du jour", Palette.foreground)
-                        Text(LocalDate.now(DailySchedule.zone).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)), style = MaterialTheme.typography.bodySmall,
-                            color = Palette.tertiary, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
-                    }
-                    Text(consonants ?: "· · ·", style = Type.serif(if (consonants == null) 34 else 46), letterSpacing = if (consonants == null) 6.sp else 3.sp, maxLines = 1,
-                        softWrap = false, color = if (consonants == null) Palette.tertiary else Palette.foreground, modifier = Modifier.padding(top = 4.dp)
-                            .semantics { contentDescription = consonants?.let { "Consonnes : " + it.toList().joinToString(", ") } ?: "Mot masqué" })
-                }
+            DailyHeader(found = false, actions = actions)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 4.dp)) {
+                Text(consonants ?: "· · ·", style = Type.serif(if (consonants == null) 34 else 46), letterSpacing = if (consonants == null) 6.sp else 3.sp, maxLines = 1,
+                    softWrap = false, color = if (consonants == null) Palette.tertiary else Palette.foreground, modifier = Modifier.weight(1f)
+                        .semantics { contentDescription = consonants?.let { "Consonnes : " + it.toList().joinToString(", ") } ?: "Mot masqué" })
                 Button(play, Modifier.height(54.dp).width(128.dp).tutorialTarget(TutorialTarget.PLAY), shape = RoundedCornerShape(27.dp)) {
                     Text(if (consonants == null) "Jouer" else "Reprendre", fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
                 }
@@ -301,17 +290,45 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit) {
                     .semantics { contentDescription = (if (consonants == null) "Un mot, un indice, un chrono." else "Votre chrono tourne.") +
                         if (state.uid == null) " Connectez-vous à Internet pour jouer le mot du jour." else " Le même mot pour tous, une seule partie classée par jour." })
         }
+        if (state.uid != null) {
+            Box(Modifier.padding(top = 16.dp, bottom = 12.dp).fillMaxWidth().height(1.dp).background(Palette.border))
+            WeekRow(state, today, playToday = play, catchUp = catchUp)
+        }
+    }
+}
+
+/** A small round button in the card's top right corner, with a 48 dp touch area. */
+@Composable
+private fun CornerIcon(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Box(Modifier.size(48.dp).clickable(onClickLabel = label, onClick = onClick).semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
+        Box(Modifier.size(36.dp).background(Palette.fill1, RoundedCornerShape(18.dp)).border(1.dp, Palette.border, RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = Palette.foreground)
+        }
+    }
+}
+
+/** "Mot du jour" with the date (or "✓ trouvé"), and the corner buttons on the right. */
+@Composable
+private fun DailyHeader(found: Boolean, actions: @Composable RowScope.() -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        Kicker("Mot du jour", Palette.foreground)
+        if (found) Text("✓ trouvé", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint, maxLines = 1, softWrap = false,
+            modifier = Modifier.padding(start = 8.dp).testTag("dailyFound"))
+        else Text(LocalDate.now(DailySchedule.zone).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.FRENCH)), style = MaterialTheme.typography.bodySmall,
+            color = Palette.tertiary, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+        Spacer(Modifier.weight(1f))
+        actions()
     }
 }
 
 /** The kicker with "✓ trouvé", then the word on the card's whole width. */
 @Composable
-internal fun DailyFoundTitle(word: String, correct: Boolean) {
+internal fun DailyFoundTitle(word: String, correct: Boolean, actions: @Composable RowScope.() -> Unit = {}) {
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Kicker("Mot du jour", Palette.foreground)
-            if (correct) Text("✓ trouvé", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint, maxLines = 1, softWrap = false,
-                modifier = Modifier.padding(start = 8.dp).testTag("dailyFound"))
+        if (correct) DailyHeader(found = true, actions = actions)
+        else Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Kicker("Mot du jour", Palette.foreground); Spacer(Modifier.weight(1f)); actions()
         }
         BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             // About 0.68 em per serif capital (a margin): shrink so the whole word fits, never under 22 sp.
@@ -335,7 +352,7 @@ private fun Countdown() {
  * cross for a lost one. A missed day can be caught up: it counts in the ranking with 5 minutes more.
  */
 @Composable
-private fun WeekStrip(state: AppViewModel, today: String, playToday: () -> Unit, catchUp: (String) -> Unit) {
+private fun WeekRow(state: AppViewModel, today: String, playToday: () -> Unit, catchUp: (String) -> Unit) {
     // Days played on another phone, found on the server (day to found).
     var playedElsewhere by remember { mutableStateOf(emptyMap<String, Boolean>()) }
     LaunchedEffect(state.uid, today) {
@@ -348,12 +365,8 @@ private fun WeekStrip(state: AppViewModel, today: String, playToday: () -> Unit,
         state.dailyWeek().map { day -> playedElsewhere[day.key]?.let { day.copy(status = CatchUp.Status.Played(it)) } ?: day }
     }
     val letters = listOf("L", "M", "M", "J", "V", "S", "D")
-    SectionCard(padding = 16.dp, radius = 26.dp) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Cette semaine", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text(weekLine(days), fontSize = 12.sp, color = Palette.tertiary, textAlign = TextAlign.End)
-        }
-        Row(Modifier.padding(top = 12.dp)) {
+    Column {
+        Row {
             days.forEachIndexed { index, day ->
                 val status = day.status
                 val action: (() -> Unit)? = when (status) {
@@ -365,9 +378,9 @@ private fun WeekStrip(state: AppViewModel, today: String, playToday: () -> Unit,
                     .testTag("week.${day.key}").semantics(mergeDescendants = true) { contentDescription = Format.day(day.key) + " : " + spoken(status) },
                     horizontalAlignment = Alignment.CenterHorizontally) {
                     val isToday = status == CatchUp.Status.Today
-                    Box(Modifier.size(36.dp).alpha(if (status == CatchUp.Status.Coming) 0.45f else 1f)
-                        .background(when (status) { is CatchUp.Status.Played -> if (status.found) Palette.mint else Palette.red; else -> Palette.fill1 }, RoundedCornerShape(12.dp))
-                        .border(if (isToday) 1.5.dp else 1.dp, if (isToday) Palette.foreground else Palette.border, RoundedCornerShape(12.dp)),
+                    Box(Modifier.size(30.dp).alpha(if (status == CatchUp.Status.Coming) 0.45f else 1f)
+                        .background(when (status) { is CatchUp.Status.Played -> if (status.found) Palette.mint else Palette.red; else -> Palette.fill1 }, RoundedCornerShape(10.dp))
+                        .border(if (isToday) 1.5.dp else 1.dp, if (isToday) Palette.foreground else Palette.border, RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center) {
                         // A symbol as well as the colour, so the week reads without colour vision.
                         when (status) {
@@ -377,11 +390,12 @@ private fun WeekStrip(state: AppViewModel, today: String, playToday: () -> Unit,
                             else -> {}
                         }
                     }
-                    Text(letters[index], fontSize = 12.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isToday) Palette.foreground else Palette.tertiary, modifier = Modifier.padding(top = 6.dp))
+                    Text(letters[index], fontSize = 11.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isToday) Palette.foreground else Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
+        Text(weekLine(days), fontSize = 12.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     }
 }
 

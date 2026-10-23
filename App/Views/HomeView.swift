@@ -34,7 +34,6 @@ struct HomeView: View {
             VStack(spacing: 16) {
                 header
                 dailyCard
-                if state.cloud != nil, !ScreenshotDemo.isActive { weekStrip }
                 modes
                 Label(syncLabel, systemImage: state.uid == nil ? "iphone" : "checkmark.icloud")
                     .font(.footnote).foregroundStyle(Palette.tertiary).padding(.top, 4)
@@ -116,53 +115,68 @@ struct HomeView: View {
         }.padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4)
     }
 
-    /// Compact, so the challenge and the modes stay on screen: the consonants (or dots) with Jouer,
-    /// then the result once played.
+    /// One card for the day: the kicker with Classement and Partager at the top right, the consonants
+    /// (or the found word) with Jouer, then this week's 7 days at the bottom.
     private var dailyCard: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
+                dailyKicker(done: todayAttempt?.correct == true)
+                Spacer(minLength: 4)
+                if state.cloud != nil || todayAttempt != nil {
+                    Button { Haptics.selection(); state.leaderboardRequest += 1 } label: {
+                        cornerIcon("chart.bar.fill")
+                    }.buttonStyle(PressStyle()).accessibilityLabel("Classement")
+                }
+                if let attempt = todayAttempt {
+                    ShareResultLink(attempt: attempt, card: state.card(id: attempt.cardID), mode: .daily) {
+                        cornerIcon("square.and.arrow.up")
+                    }.buttonStyle(PressStyle()).accessibilityLabel("Partager")
+                }
+            }
             if let attempt = todayAttempt {
                 dailyDone(attempt)
             } else {
                 let consonants = startedDailyCard?.wordNoVowels
                 HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        dailyKicker(done: false)
-                        Text(consonants ?? "· · ·")
-                            .font(Typo.serif(consonants == nil ? 34 : 46)).tracking(consonants == nil ? 6 : 3)
-                            .lineLimit(1).minimumScaleFactor(0.4)
-                            .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
-                            .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
-                    }
+                    Text(consonants ?? "· · ·")
+                        .font(Typo.serif(consonants == nil ? 34 : 46)).tracking(consonants == nil ? 6 : 3)
+                        .lineLimit(1).minimumScaleFactor(0.4)
+                        .foregroundStyle(consonants == nil ? Palette.tertiary : Palette.foreground)
+                        .accessibilityLabel(consonants.map { "Consonnes : " + $0.map(String.init).joined(separator: ", ") } ?? "Mot masqué")
                     Spacer(minLength: 4)
                     Button(consonants == nil ? "Jouer" : "Reprendre") { Haptics.selection(); play(GameRoute(mode: .daily)) }
                         .buttonStyle(PrimaryPillStyle(height: 54)).frame(width: 128)
                         .tutorialTarget(.play)
-                }
+                }.padding(.top, 4)
                 Text(consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne. Reprenez la partie.")
                     .font(Typo.serifItalic(18)).foregroundStyle(Palette.secondary).padding(.top, 8)
                     .accessibilityLabel((consonants == nil ? "Un mot, un indice, un chrono." : "Votre chrono tourne.")
                         + (state.uid == nil ? " Une seule partie par jour, enregistrée sur cet iPhone." : " Le même mot pour tous, une seule partie classée par jour."))
             }
+            if state.cloud != nil, !ScreenshotDemo.isActive {
+                Rectangle().fill(Palette.line).frame(height: 1).padding(.top, 16).padding(.bottom, 12)
+                weekRow
+            }
         }.glassCard(radius: 32, padding: 20).tutorialTarget(.daily).padding(.top, 2)
+    }
+
+    private func cornerIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.foreground)
+            .frame(width: 36, height: 36).glassCapsule().frame(minWidth: 44, minHeight: 44)
     }
 
     /// This week's daily words, Monday to Sunday, like the 7 days in Stats: a green check for a found word,
     /// a red cross for a lost one. A missed day can be caught up: it counts in the week with 5 minutes more.
-    private var weekStrip: some View {
+    private var weekRow: some View {
         let days = state.dailyWeek().map { day in playedElsewhere[day.key].map { CatchUp.Day(key: day.key, status: .played(found: $0)) } ?? day }
         let letters = ["L", "M", "M", "J", "V", "S", "D"]
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Cette semaine").scaledFont(15, .semibold)
-                Spacer()
-                Text(weekLine(days)).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(2).multilineTextAlignment(.trailing)
-            }
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
                     Button { tap(day) } label: {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 4) {
                             weekCell(day.status)
-                            Text(letters[index]).scaledFont(12, day.status == .today ? .bold : .regular)
+                            Text(letters[index]).scaledFont(11, day.status == .today ? .bold : .regular)
                                 .foregroundStyle(day.status == .today ? Palette.foreground : Palette.tertiary)
                         }.frame(maxWidth: .infinity).contentShape(Rectangle())
                     }
@@ -172,13 +186,13 @@ struct HomeView: View {
                     .accessibilityIdentifier("week.\(day.key)")
                 }
             }
+            Text(weekLine(days)).scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(radius: 26, padding: 16)
     }
 
     private func weekCell(_ status: CatchUp.Status) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         let (color, symbol, ink): (Color, String?, Color) = switch status {
         case .played(true): (Palette.mint, "checkmark", Palette.ink)
         case .played(false): (Palette.red, "xmark", Palette.ink)
@@ -186,11 +200,11 @@ struct HomeView: View {
         case .later: (Palette.fill1, "clock", Palette.tertiary)
         case .today, .coming: (Palette.fill1, nil, Palette.foreground)
         }
-        return shape.fill(color).frame(width: 36, height: 36)
+        return shape.fill(color).frame(width: 30, height: 30)
             .overlay(shape.strokeBorder(status == .today ? Palette.foreground : Palette.line, lineWidth: status == .today ? 1.5 : 1))
             .overlay {
                 // A symbol as well as the colour, so the week reads without colour vision.
-                if let symbol { Image(systemName: symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(ink) }
+                if let symbol { Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(ink) }
             }
             .opacity(status == .coming ? 0.45 : 1)
     }
@@ -236,34 +250,19 @@ struct HomeView: View {
         }
     }
 
-    /// Three rows so nothing sets the card wider than the screen: the kicker, the word on the whole
-    /// width (shrunk if long), then the time and countdown beside Classement and Partager.
+    /// The word on the whole width (shrunk if long), then the time and the countdown.
     @ViewBuilder private func dailyDone(_ attempt: Attempt) -> some View {
         let card = state.card(id: attempt.cardID)
         VStack(alignment: .leading, spacing: 4) {
-            if attempt.correct { dailyKicker(done: true) } else {
-                SectionKicker(text: "Mot du jour", color: Palette.foreground).fixedSize()
-            }
             HighlightedWord(word: (card?.wordFull ?? "").uppercased(), font: Typo.serif(40)).tracking(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(attempt.correct ? "\(Format.clock(attempt.timeMs))" : "Raté cette fois")
-                        .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.7)
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text("Prochain mot dans " + countdown(from: context.date))
-                            .scaledFont(12).monospacedDigit().foregroundStyle(Palette.tertiary).lineLimit(2).minimumScaleFactor(0.8)
-                    }
-                }
-                Spacer(minLength: 0)
-                Button("Classement") { Haptics.selection(); state.leaderboardRequest += 1 }
-                    .buttonStyle(GlassPillStyle(height: 40)).frame(width: 118)
-                ShareResultLink(attempt: attempt, card: card, mode: .daily) {
-                    Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.foreground)
-                        .frame(width: 40, height: 40).glassCapsule()
-                }.buttonStyle(PressStyle()).accessibilityLabel("Partager")
-            }.padding(.top, 6)
-        }
+            Text(attempt.correct ? "\(Format.clock(attempt.timeMs))" : "Raté cette fois")
+                .scaledFont(13).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.7)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text("Prochain mot dans " + countdown(from: context.date))
+                    .scaledFont(12).monospacedDigit().foregroundStyle(Palette.tertiary).lineLimit(2).minimumScaleFactor(0.8)
+            }
+        }.padding(.top, 4)
     }
 
     // MARK: Modes
