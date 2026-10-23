@@ -124,7 +124,7 @@ struct HomeView: View {
                 Spacer(minLength: 4)
                 if state.cloud != nil || todayAttempt != nil {
                     Button { Haptics.selection(); state.leaderboardRequest += 1 } label: {
-                        cornerIcon("chart.bar.fill")
+                        podiumIcon
                     }.buttonStyle(PressStyle()).accessibilityLabel("Classement")
                 }
                 if let attempt = todayAttempt {
@@ -163,6 +163,18 @@ struct HomeView: View {
     private func cornerIcon(_ symbol: String) -> some View {
         Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.foreground)
             .frame(width: 36, height: 36).glassCapsule().frame(minWidth: 44, minHeight: 44)
+    }
+
+    /// A podium (2nd, 1st, 3rd), which reads as a ranking better than bars: SF Symbols has none.
+    private var podiumIcon: some View {
+        HStack(alignment: .bottom, spacing: 1.5) {
+            ForEach([10.0, 15.0, 7.0], id: \.self) { height in
+                UnevenRoundedRectangle(topLeadingRadius: 1.5, topTrailingRadius: 1.5, style: .continuous)
+                    .frame(width: 5, height: height)
+            }
+        }
+        .foregroundStyle(Palette.foreground)
+        .frame(width: 36, height: 36).glassCapsule().frame(minWidth: 44, minHeight: 44)
     }
 
     /// This week's daily words, Monday to Sunday, like the 7 days in Stats: a green check for a found word,

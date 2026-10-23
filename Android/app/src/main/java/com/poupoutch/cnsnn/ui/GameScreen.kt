@@ -331,9 +331,9 @@ private fun Caret() {
 fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
-    val rowHeight = 52.dp
+    val rowHeight = 57.dp
     // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
-    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+    Box(Modifier.fillMaxWidth().padding(bottom = 14.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
         BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
             val unit = maxWidth / 10
             Column {
@@ -376,7 +376,7 @@ private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Bo
         .semantics { contentDescription = label ?: text }) {
         Box(Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 5.dp).then(face), contentAlignment = Alignment.Center) {
             if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)
-            else Text(text, fontSize = if (text.length > 1) 15.sp else 22.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
+            else Text(text, fontSize = if (text.length > 1) 15.sp else 24.sp, color = if (vowel) Palette.onAccent else Palette.foreground)
         }
         // The letter pops up above the finger, as on the phone's keyboard.
         if (letter && pressed) {

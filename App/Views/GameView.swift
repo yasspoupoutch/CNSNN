@@ -454,7 +454,7 @@ struct LetterKeyboard: View {
     var submit: () -> Void
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
-    static let rowHeight: CGFloat = 52
+    static let rowHeight: CGFloat = 57
     var body: some View {
         GeometryReader { geo in
             let unit = geo.size.width / 10
@@ -484,6 +484,8 @@ struct LetterKeyboard: View {
         .frame(height: Self.rowHeight * 4)
         .padding(.horizontal, 3).padding(.vertical, 6)
         .glassCard(radius: 30, padding: 0)
+        // The iPhone keeps a strip under its keys (globe, dictation): the keys sit as high as there.
+        .padding(.bottom, 8)
     }
 
     private func letterRow(_ row: String, _ unit: CGFloat) -> some View {
@@ -505,7 +507,7 @@ private struct KeyCap: View {
         Button { Haptics.key(); action() } label: {
             Group {
                 if label == "⌫" { Image(systemName: "delete.left").font(.system(size: 20, weight: .regular)) }
-                else { Text(label).font(.system(size: label.count > 1 ? 16 : 23, weight: .regular)) }
+                else { Text(label).font(.system(size: label.count > 1 ? 16 : 25, weight: .regular)) }
             }
             .foregroundStyle(vowel ? Palette.onAccent : Palette.foreground)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
