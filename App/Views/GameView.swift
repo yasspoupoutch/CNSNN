@@ -454,7 +454,7 @@ struct LetterKeyboard: View {
     var submit: () -> Void
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
-    static let rowHeight: CGFloat = 56
+    static let rowHeight: CGFloat = 57.5
     var body: some View {
         GeometryReader { geo in
             let unit = geo.size.width / 10
@@ -462,12 +462,12 @@ struct LetterKeyboard: View {
                 letterRow(rows[0], unit)
                 letterRow(rows[1], unit)
                 HStack(spacing: 0) {
-                    // Where the iPhone has ⇧: left empty, so W to N sit where the thumb expects them.
-                    Color.clear.frame(width: unit * 1.5)
-                    Spacer(minLength: 0)
+                    // Where the iPhone has ⇧: left empty, so W to N sit where the thumb expects them, and
+                    // the slot of its ´ key stays empty before ⌫.
+                    Color.clear.frame(width: unit * 1.6)
                     letterRow(rows[2], unit)
                     Spacer(minLength: 0)
-                    KeyCap(label: "⌫", width: unit * 1.5, action: delete)
+                    KeyCap(label: "⌫", width: unit * 1.35, action: delete)
                         .accessibilityLabel("Effacer")
                 }
                 HStack(spacing: 0) {
@@ -484,8 +484,10 @@ struct LetterKeyboard: View {
         .frame(height: Self.rowHeight * 4)
         .padding(.horizontal, 3).padding(.vertical, 6)
         .glassCard(radius: 30, padding: 0)
+        // Edge to edge like the iPhone's: A and P reach the sides of the screen (the game has 16 points of margin).
+        .padding(.horizontal, -14)
         // The iPhone keeps a strip under its keys (globe, dictation): the keys sit as high as there.
-        .padding(.bottom, 34)
+        .padding(.bottom, 25)
     }
 
     private func letterRow(_ row: String, _ unit: CGFloat) -> some View {
@@ -530,7 +532,7 @@ private struct KeyStyle: ButtonStyle {
                 if vowel { shape.fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)) }
                 else { shape.fill(pressed && popup == nil ? Palette.fill2 : Palette.fill1).overlay(shape.strokeBorder(Palette.glassBorder, lineWidth: 1)) }
             }
-            .padding(.horizontal, 3).padding(.vertical, 5.5)
+            .padding(.horizontal, 3).padding(.vertical, 6.25)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if let popup, pressed {

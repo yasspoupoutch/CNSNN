@@ -71,6 +71,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
@@ -333,7 +334,7 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
     val rowHeight = 56.dp
     // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
-    Box(Modifier.fillMaxWidth().padding(bottom = 40.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+    Box(Modifier.bleed(9.dp).fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
         BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
             val unit = maxWidth / 10
             Column {
@@ -344,11 +345,10 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
                 }
                 Row(Modifier.fillMaxWidth()) {
                     // Where the phone has ⇧: left empty, so W to N sit where the thumb expects them.
-                    Spacer(Modifier.width(unit * 1.5f))
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(unit * 1.6f))
                     rows[2].forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
                     Spacer(Modifier.weight(1f))
-                    Key("⌫", false, unit * 1.5f, rowHeight, enabled, label = "Effacer") { haptics.key(); delete() }
+                    Key("⌫", false, unit * 1.35f, rowHeight, enabled, label = "Effacer") { haptics.key(); delete() }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
@@ -360,6 +360,13 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
             }
         }
     }
+}
+
+/** Widens past the screen's 12 dp margin (padding can't be negative): the keyboard runs edge to edge like the phone's. */
+private fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
+    val extra = x.roundToPx() * 2
+    val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
+    layout(placeable.width - extra, placeable.height) { placeable.place(-extra / 2, 0) }
 }
 
 /** One key: the whole cell takes the touch, the cap sits inside it with the phone's gaps around. */
