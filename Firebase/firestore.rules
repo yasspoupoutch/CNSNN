@@ -236,7 +236,8 @@ service cloud.firestore {
   // missed day can be caught up, so its answer stays secret.
   function weekEnd(day) { return dayDate(day) + duration.value(7 - (dayIndex(day) + 3) % 7, 'd') + duration.value(12, 'h'); }
   function weekOver(day) { return validDayKey(day) && request.time >= weekEnd(day); }
-  function catchUpOpen(day) { return dayOver(day) && !weekOver(day); }
+  // A missed day opens at the player's midnight: from the end of that day in the first time zone (UTC+14).
+  function catchUpOpen(day) { return validDayKey(day) && request.time >= dayDate(day) + duration.value(10, 'h') && !weekOver(day); }
 
   // ---- Secret daily words, written only by the publishing tool (Admin SDK).
   // Consonants: today and past days. Hint: once the player revealed it or finished.
