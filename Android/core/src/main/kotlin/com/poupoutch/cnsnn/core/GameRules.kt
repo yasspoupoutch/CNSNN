@@ -183,7 +183,7 @@ object Guesses {
 /**
  * Rattrapage: the daily words of the week (Monday to yesterday) a player missed can be played later.
  * They count in the week's ranking with 5 minutes more, and stay out of the day's ranking. A day opens
- * once it is over everywhere (firestore.rules `catchUpOpen`): the next day at 14 h in Paris (13 h in winter).
+ * at the player's own midnight (firestore.rules `catchUpOpen` accepts it once the day is over somewhere).
  * Same rule as CatchUp in Core/GameRules.swift.
  */
 object CatchUp {
@@ -192,7 +192,7 @@ object CatchUp {
         data class Played(val found: Boolean) : Status
         /** Missed, can be caught up now. */
         data object Open : Status
-        /** Missed, not over everywhere yet: opens at that time. */
+        /** Missed, not over on this phone yet: opens at that time. */
         data class Later(val at: Instant) : Status
         /** Today, not played yet. */
         data object Today : Status
@@ -201,17 +201,17 @@ object CatchUp {
     }
     data class Day(val key: String, val status: Status)
 
-    /** 36 h after the day's midnight in UTC: the next day at 14 h in Paris (13 h in winter). */
-    fun opensAt(day: String): Instant? = runCatching { LocalDate.parse(day).atStartOfDay(ZoneId.of("UTC")).toInstant().plusSeconds(36 * 3_600L) }.getOrNull()
+    /** The midnight that ends the day in `zone`. */
+    fun opensAt(day: String, zone: ZoneId = ZoneId.systemDefault()): Instant? = runCatching { LocalDate.parse(day).plusDays(1).atStartOfDay(zone).toInstant() }.getOrNull()
 
     /** Monday to Sunday of today's week. `results`: day to found. */
-    fun week(today: String, results: Map<String, Boolean>, now: Instant = Instant.now()): List<Day> {
+    fun week(today: String, results: Map<String, Boolean>, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): List<Day> {
         val date = runCatching { LocalDate.parse(today) }.getOrNull() ?: return emptyList()
         val monday = date.minusDays(date.dayOfWeek.value - 1L)
         return (0L until 7L).map { offset ->
             val day = monday.plusDays(offset)
             val key = day.toString()
-            val opens = opensAt(key)
+            val opens = opensAt(key, zone)
             val found = results[key]
             Day(key, when {
                 found != null -> Status.Played(found)
@@ -223,9 +223,9 @@ object CatchUp {
         }
     }
     /** The days of today's week before today, Monday first (none on Monday). */
-    fun days(today: String, results: Map<String, Boolean>, now: Instant = Instant.now()): List<Day> {
+    fun days(today: String, results: Map<String, Boolean>, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): List<Day> {
         val date = runCatching { LocalDate.parse(today) }.getOrNull() ?: return emptyList()
-        return week(today, results, now).take(date.dayOfWeek.value - 1)
+        return week(today, results, now, zone).take(date.dayOfWeek.value - 1)
     }
     /** Missed days still to play, open now or later today. */
     fun toPlay(days: List<Day>): Int = days.count { it.status == Status.Open || it.status is Status.Later }

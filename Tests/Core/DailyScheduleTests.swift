@@ -95,13 +95,14 @@ final class DailyScheduleTests: XCTestCase {
     }
 
     func testCatchUpListsTheWeekBeforeToday() {
-        // Friday 2026-10-23, at 11:00 UTC: Thursday opens at 12:00 UTC (14 h in Paris).
-        let now = ISO8601DateFormatter().date(from: "2026-10-23T11:00:00Z")!
-        let days = CatchUp.days(today: "2026-10-23", results: ["2026-10-19": true, "2026-10-20": false], now: now)
+        // Friday 2026-10-23 in Paris, at 23:30 on Thursday (Paris): Thursday opens at Paris midnight.
+        let paris = TimeZone(identifier: "Europe/Paris")!
+        let now = ISO8601DateFormatter().date(from: "2026-10-22T21:30:00Z")!
+        let days = CatchUp.days(today: "2026-10-23", results: ["2026-10-19": true, "2026-10-20": false], now: now, in: paris)
         XCTAssertEqual(days.map(\.key), ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"])
-        XCTAssertEqual(days.map(\.status), [.played(found: true), .played(found: false), .open, .later(ISO8601DateFormatter().date(from: "2026-10-23T12:00:00Z")!)])
+        XCTAssertEqual(days.map(\.status), [.played(found: true), .played(found: false), .open, .later(ISO8601DateFormatter().date(from: "2026-10-22T22:00:00Z")!)])
         XCTAssertEqual(CatchUp.toPlay(days), 2)
-        let later = CatchUp.days(today: "2026-10-23", results: [:], now: now.addingTimeInterval(3_600))
+        let later = CatchUp.days(today: "2026-10-23", results: [:], now: now.addingTimeInterval(1_800), in: paris)
         XCTAssertEqual(later.last?.status, .open)
         // Monday: nothing to catch up yet; Sunday: the six days before.
         XCTAssertTrue(CatchUp.days(today: "2026-10-26", results: [:], now: now).isEmpty)

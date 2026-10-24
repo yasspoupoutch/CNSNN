@@ -151,14 +151,14 @@ public enum CardPicker {
 
 /// Rattrapage: the daily words of the week (Monday to yesterday) a player missed can be played later.
 /// They count in the week's ranking with 5 minutes more, and stay out of the day's ranking. A day opens
-/// once it is over everywhere (firestore.rules `catchUpOpen`): the next day at 14 h in Paris (13 h in winter).
+/// at the player's own midnight (firestore.rules `catchUpOpen` accepts it once the day is over somewhere).
 public enum CatchUp {
     public enum Status: Equatable, Sendable {
         /// Played, on the day or caught up: found or not.
         case played(found: Bool)
         /// Missed, can be caught up now.
         case open
-        /// Missed, not over everywhere yet: opens at that time.
+        /// Missed, not over on this phone yet: opens at that time.
         case later(Date)
         /// Today, not played yet.
         case today
@@ -172,12 +172,17 @@ public enum CatchUp {
         public init(key: String, status: Status) { self.key = key; self.status = status }
     }
 
-    /// 36 h after the day's midnight in UTC.
-    public static func opensAt(_ day: String) -> Date? {
-        DailyScore.dayIndex(day).map { Date(timeIntervalSince1970: TimeInterval($0 * 86_400 + 36 * 3_600)) }
+    /// The midnight that ends the day in `timeZone`.
+    public static func opensAt(_ day: String, in timeZone: TimeZone = .current) -> Date? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+            .flatMap { calendar.date(byAdding: .day, value: 1, to: $0) }
     }
     /// Monday to Sunday of today's week. `results`: day to found.
-    public static func week(today: String, results: [String: Bool], now: Date = Date()) -> [Day] {
+    public static func week(today: String, results: [String: Bool], now: Date = Date(), in timeZone: TimeZone = .current) -> [Day] {
         guard let index = DailyScore.dayIndex(today) else { return [] }
         let utc = TimeZone(identifier: "UTC")!
         let position = DailyScore.dayOfWeek(today)
@@ -186,13 +191,13 @@ public enum CatchUp {
             if let found = results[key] { return Day(key: key, status: .played(found: found)) }
             if weekday > position { return Day(key: key, status: .coming) }
             if weekday == position { return Day(key: key, status: .today) }
-            if let opens = opensAt(key), opens > now { return Day(key: key, status: .later(opens)) }
+            if let opens = opensAt(key, in: timeZone), opens > now { return Day(key: key, status: .later(opens)) }
             return Day(key: key, status: .open)
         }
     }
     /// The days of today's week before today, Monday first (none on Monday).
-    public static func days(today: String, results: [String: Bool], now: Date = Date()) -> [Day] {
-        Array(week(today: today, results: results, now: now).prefix(DailyScore.dayOfWeek(today) - 1))
+    public static func days(today: String, results: [String: Bool], now: Date = Date(), in timeZone: TimeZone = .current) -> [Day] {
+        Array(week(today: today, results: results, now: now, in: timeZone).prefix(DailyScore.dayOfWeek(today) - 1))
     }
     /// Missed days still to play, open now or later today.
     public static func toPlay(_ days: [Day]) -> Int {

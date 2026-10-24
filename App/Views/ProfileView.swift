@@ -138,6 +138,12 @@ struct ReminderSettings: View {
             }
         }
         .glassPanel(radius: 24, padding: 0)
+        // The Profil tab stays alive: the reminder may have been turned on elsewhere since (the offer
+        // after the first daily word), so read it again each time the page shows.
+        .onAppear {
+            if enabled != Reminders.isEnabled { enabled = Reminders.isEnabled }
+            time = ReminderSettings.date(minutes: Reminders.minutes)
+        }
         .onChange(of: enabled) { _, on in
             Task {
                 if on {

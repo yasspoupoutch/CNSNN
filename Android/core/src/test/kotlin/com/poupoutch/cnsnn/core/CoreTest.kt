@@ -289,14 +289,15 @@ class GlanceTest {
 
 class CatchUpTest {
     @Test fun listsTheWeekBeforeToday() {
-        // Friday 2026-10-23, 11:00 UTC: Thursday opens at 12:00 UTC (14 h in Paris).
-        val now = Instant.parse("2026-10-23T11:00:00Z")
-        val days = CatchUp.days("2026-10-23", mapOf("2026-10-19" to true, "2026-10-20" to false), now)
+        // Friday 2026-10-23 in Paris, at 23:30 on Thursday: Thursday opens at Paris midnight.
+        val paris = java.time.ZoneId.of("Europe/Paris")
+        val now = Instant.parse("2026-10-22T21:30:00Z")
+        val days = CatchUp.days("2026-10-23", mapOf("2026-10-19" to true, "2026-10-20" to false), now, paris)
         assertEquals(listOf("2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"), days.map { it.key })
-        assertEquals(listOf(CatchUp.Status.Played(true), CatchUp.Status.Played(false), CatchUp.Status.Open, CatchUp.Status.Later(Instant.parse("2026-10-23T12:00:00Z"))),
+        assertEquals(listOf(CatchUp.Status.Played(true), CatchUp.Status.Played(false), CatchUp.Status.Open, CatchUp.Status.Later(Instant.parse("2026-10-22T22:00:00Z"))),
             days.map { it.status })
         assertEquals(2, CatchUp.toPlay(days))
-        assertEquals(CatchUp.Status.Open, CatchUp.days("2026-10-23", emptyMap(), now.plusSeconds(3_600)).last().status)
+        assertEquals(CatchUp.Status.Open, CatchUp.days("2026-10-23", emptyMap(), now.plusSeconds(1_800), paris).last().status)
         // Monday: nothing to catch up yet; Sunday: the six days before.
         assertTrue(CatchUp.days("2026-10-26", emptyMap(), now).isEmpty())
         val sunday = CatchUp.days("2026-10-25", emptyMap(), now)
