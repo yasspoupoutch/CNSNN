@@ -36,6 +36,8 @@ const weekRank=(w,found,ms)=>w*100000000+found*10000000+(9999999-ms);
 const catchUpScore=(timeMs,usedHint,correct)=>correct?Math.min(score(timeMs,usedHint,true)+300000,600000):600000;
 const hour=3600000;
 // A missed day opens once it is over in the first time zone (UTC+14).
+// Over everywhere (after UTC-12's midnight): the day can no longer be played on time.
+const dayOverAt=key=>Date.parse(`${key}T00:00:00Z`)+36*hour;
 const catchUpOpenAt=key=>Date.parse(`${key}T00:00:00Z`)+10*hour;
 // The week's answers become public once its Sunday is over everywhere (Monday 12:00 UTC).
 const weekEndAt=key=>Date.parse(`${key}T00:00:00Z`)+(7-(dayIndex(key)+3)%7)*24*hour+12*hour;
@@ -786,8 +788,8 @@ test('a missed day of the week is caught up: answer secret until the week ends, 
  await assertSucceeds(getDoc(doc(user('bob'),`dailyPuzzles/${day}`)));
  const start=(uid,d,extra={catchUp:true})=>setDoc(doc(user(uid),`dailySessions/${uid}_${d}`),{userId:uid,day:d,cardId:'secret-x',startedAt:serverTimestamp(),hintUsed:false,...extra});
  // Only as a catch-up, only this week, only once the day is over everywhere.
- await assertFails(start('alice',day,{}));
- await assertFails(start('alice',day,{catchUp:false}));
+ // Until the day is over everywhere, it can still be played on time somewhere (after that, only caught up).
+ if(Date.now()>=dayOverAt(day)){ await assertFails(start('alice',day,{})); await assertFails(start('alice',day,{catchUp:false})); }
  await assertFails(start('alice',lastWeek));
  await assertFails(start('alice',shiftKey(today,1)));
  await assertSucceeds(start('alice',day));
