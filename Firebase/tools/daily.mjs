@@ -73,8 +73,8 @@ export function validate(words) {
 // The Mot du jour is one word: an answer with a space (an expression) stays out of the schedule.
 export const singleWord = (w) => !/\s/.test(w.word.trim());
 
-// The game is general knowledge: football keeps at most one word in ten of each difficulty.
-export const footballShare = 0.1;
+// The game is general knowledge: no football word in the Mot du jour, it shuts too many players out.
+export const footballShare = 0;
 export function limitFootball(words) {
   const out = [];
   for (const level of Object.values(difficulties)) {
@@ -92,7 +92,7 @@ export function limitFootball(words) {
 export function parseChanges(changes) {
   const days = changes.days ?? [], drop = changes.drop ?? [];
   for (const d of days) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.day ?? '') || !singleWord(d) || !categories.includes(d.category)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.day ?? '') || !singleWord(d) || !categories.includes(d.category) || d.category === 'Football'
       || d.difficulty !== difficultyOf(d.day)) throw new Error(`Remplacement invalide : ${d.day}`);
   }
   validate(days);
