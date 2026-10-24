@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Gavel
@@ -93,6 +94,7 @@ fun ProfileScreen(state: AppViewModel) {
     var account by rememberSaveable { mutableStateOf(false) }
     var addFriend by rememberSaveable { mutableStateOf(false) }
     var moderation by rememberSaveable { mutableStateOf(false) }
+    var attendance by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
     var rules by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -114,7 +116,10 @@ fun ProfileScreen(state: AppViewModel) {
             NavRow(if (state.isAnonymous) "Sauvegarder mon compte" else "Mon compte", Icons.Outlined.AccountCircle) { account = true }
             Divider()
             NavRow("Ajouter un ami", Icons.Outlined.PersonAdd) { addFriend = true }
-            if (state.isAdmin) { Divider(); NavRow("Modération", Icons.Outlined.Shield) { moderation = true } }
+            if (state.isAdmin) {
+                Divider(); NavRow("Modération", Icons.Outlined.Shield) { moderation = true }
+                Divider(); NavRow("Fréquentation", Icons.Outlined.BarChart) { attendance = true }
+            }
         }
         if (state.isSuspended) SectionCard(radius = 24.dp) { Text(AppViewModel.SUSPENDED_TEXT, color = Palette.red, fontSize = 14.sp) }
         ReminderSettings(state)
@@ -145,6 +150,7 @@ fun ProfileScreen(state: AppViewModel) {
     if (account) FullScreen("Votre compte", { account = false }) { AccountContent(state) { account = false } }
     if (addFriend) FullScreen("Ajouter un ami", { addFriend = false }) { AddFriendContent(state) }
     if (moderation) FullScreen("Modération", { moderation = false }) { ModerationContent(state) }
+    if (attendance) FullScreen("Fréquentation", { attendance = false }) { AttendanceContent(state) }
     if (privacy) FullScreen("Confidentialité", { privacy = false }) { PrivacyContent() }
     if (rules) FullScreen(CommunityRules.TITLE, { rules = false }) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -330,6 +336,7 @@ private fun PrivacyContent() {
     val sections = listOf(
         "Ce que nous enregistrons" to "Votre pseudo, vos parties (mots du jour, temps, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter.",
         "Ce qui est public" to "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché.",
+        "Statistiques anonymes" to "L’app compte, chaque jour, combien de téléphones l’ont ouverte et combien de parties ont été jouées dans chaque mode. Ces totaux ne contiennent ni pseudo, ni identifiant, ni appareil : personne ne peut savoir qui a joué.",
         "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et Crashlytics), et sur votre téléphone. Aucune publicité, aucun traceur, aucune revente de données.",
         "Rapports de plantage" to "Si l’application plante, un rapport technique (modèle et version du téléphone, version de l’app, détail de l’erreur) est envoyé à Firebase Crashlytics pour corriger le problème. Il ne contient ni votre pseudo ni votre email et ne sert jamais à la publicité ni au suivi.",
         "Notifications et widget" to "Le rappel du mot du jour et le widget sont calculés sur votre téléphone : rien n’est envoyé par un serveur.",

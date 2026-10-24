@@ -12,6 +12,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
 import com.poupoutch.cnsnn.core.Attempt
@@ -46,6 +47,8 @@ data class CardReport(val id: String, val cardId: String, val reason: String, va
 data class PlayerReport(val id: String, val playerId: String, val username: String, val reason: String)
 /** A player a moderator suspended. */
 data class SuspendedPlayer(val id: String, val username: String, val reason: String)
+/** One day of anonymous attendance (`stats/{day}`): counter name to value. */
+data class DayUsage(val day: String, val counts: Map<String, Int>)
 /** One line of the day's ranking. `scoreMs` is the official time: the hint minute included, 10 min for a lost day. */
 data class DailyRank(val uid: String, val username: String, val timeMs: Int, val scoreMs: Int, val usedHint: Boolean, val wrongAnswers: Int, val correct: Boolean = true)
 /** Server state of today's Mot du jour for the signed-in player. */
@@ -695,6 +698,23 @@ class CloudRepository(
     }
     /** Today's wins under 5 seconds, fastest first, for a moderator to check. Suspended players are left out. */
     /** Words found today in under 5 seconds (a hint adds a minute, so these never used one). */
+    // ---- Attendance
+
+    /**
+     * Adds this phone's anonymous counts to the days' totals (`stats/{day}`, see core Usage.kt).
+     * Firestore keeps the write on the phone until it reaches the server: nothing is lost offline.
+     */
+    fun addUsage(counts: Map<String, Map<String, Int>>) {
+        for ((day, fields) in counts) {
+            db.collection("stats").document(day).set(fields.mapValues { FieldValue.increment(it.value.toLong()) }, SetOptions.merge())
+        }
+    }
+    /** The counts of the days from `day` on, most recent first (admins only: one read per day). */
+    suspend fun usage(since: String): List<DayUsage> =
+        db.collection("stats").whereGreaterThanOrEqualTo(FieldPath.documentId(), since).get(Source.SERVER).await().documents
+            .map { doc -> DayUsage(doc.id, doc.data.orEmpty().mapNotNull { (k, v) -> (v as? Number)?.let { k to it.toInt() } }.toMap()) }
+            .sortedByDescending { it.day }
+
     suspend fun suspiciousTimes(day: String): List<DailyRank> {
         val base = DailyScore.dayBase(day) ?: return emptyList()
         return db.collection("dailyResults").whereGreaterThanOrEqualTo("rank", base).whereLessThan("rank", base + 5000).orderBy("rank").limit(20)

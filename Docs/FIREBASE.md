@@ -66,6 +66,7 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 | cards/{MOTNORMALISÉ} | proposition ou carte publiée (avec le pseudo de l’auteur) ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |
 | reports/{uid_card} | signalement unique par joueur et carte | création propriétaire, résolution modérateur |
 | admins/{uid} | rôle modérateur | console ou workflow uniquement |
+| stats/{jour} | fréquentation anonyme du jour : téléphones ayant ouvert l’app (`opensIos`, `opensAndroid`), nouveaux (`newIos`, `newAndroid`), joueurs (`players`, `newPlayers`), parties par mode (`daily`, `classic`, `sprint`, `survival`, `duo`, `challenge`) ; aucun nom ni identifiant | chaque téléphone ajoute des incréments bornés (au plus 1 pour les téléphones, quelques parties), jusqu’à 3 jours après ; sans compte seulement l’ouverture ; lecture par les modérateurs (Profil → Fréquentation) |
 
 Index composites : `cards` (createdBy, createdAt desc), `dailyResults` (day, correct, timeMs) et (userId, day desc).
 

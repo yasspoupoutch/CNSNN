@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var account = false
     @State private var addFriend = false
     @State private var moderation = false
+    @State private var attendance = false
     @State private var privacy = false
     @State private var rules = false
     /// Signature at the bottom of the profile.
@@ -44,6 +45,8 @@ struct ProfileView: View {
                     if state.isAdmin {
                         Rectangle().fill(Palette.line).frame(height: 1)
                         Button { moderation = true } label: { row("Modération", symbol: "checkmark.shield") }
+                        Rectangle().fill(Palette.line).frame(height: 1)
+                        Button { attendance = true } label: { row("Fréquentation", symbol: "chart.bar") }
                     }
                 }.glassPanel(radius: 24, padding: 0).buttonStyle(PressStyle(scale: 0.99))
                 if state.isSuspended {
@@ -71,6 +74,7 @@ struct ProfileView: View {
                     .presentationBackground(.ultraThinMaterial)
             }
             .sheet(isPresented: $moderation) { NavigationStack { ModerationView() } }
+            .sheet(isPresented: $attendance) { NavigationStack { AttendanceView() } }
             .sheet(isPresented: $privacy) { PrivacyView() }
             .sheet(isPresented: $rules) { CommunityRulesView() }
             .alert("Modifier le pseudo", isPresented: $editingName) {
@@ -284,6 +288,7 @@ struct PrivacyView: View {
     private let sections: [(String, String)] = [
         ("Ce que nous enregistrons", "Votre pseudo, vos parties (mots du jour, temps, indices, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter."),
         ("Ce qui est public", "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché."),
+        ("Statistiques anonymes", "L’app compte, chaque jour, combien de téléphones l’ont ouverte et combien de parties ont été jouées dans chaque mode. Ces totaux ne contiennent ni pseudo, ni identifiant, ni appareil : personne ne peut savoir qui a joué."),
         ("Où sont les données", "Sur les serveurs Firebase de Google (Authentication et Cloud Firestore), et sur votre iPhone. Aucune publicité, aucun traceur, aucune revente de données."),
         ("Notifications et widget", "Le rappel du mot du jour et le widget sont calculés sur votre iPhone : rien n’est envoyé par un serveur."),
         ("Supprimer vos données", "Profil > Mon compte > Supprimer mon compte efface votre profil, vos résultats, votre place au classement, vos amis, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom."),
