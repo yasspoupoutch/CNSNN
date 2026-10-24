@@ -337,6 +337,9 @@ import CNSNNCore
     var rankings = Rankings()
     /// Bumped when the server confirms a daily result, so an open ranking reads again at once.
     var rankingsVersion = 0
+    /// Bumped when the reminder is turned on outside Profil (the offer after the first daily word):
+    /// every page stays alive, so Profil never appears again and must hear it.
+    var remindersVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
     /// Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again.
