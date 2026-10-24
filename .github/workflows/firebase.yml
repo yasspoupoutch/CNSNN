@@ -43,6 +43,11 @@ on:
         description: Publier les mots du jour secrets (Firebase/daily/words.enc.json)
         type: boolean
         default: false
+      daily_change:
+        description: "Mots du jour trop durs : voir (aujourd'hui et 14 jours, chiffré) ou appliquer (Firebase/daily/changes.enc.json)"
+        type: choice
+        options: ['', voir, appliquer]
+        default: ''
       android_app:
         description: Enregistrer l'application Android et afficher son google-services.json
         type: boolean
@@ -115,7 +120,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key or the usage counts is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.usage)) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -161,6 +166,12 @@ jobs:
       - name: Publier les mots du jour
         if: ${{ github.event.schedule == '17 3 1 * *' || (inputs.daily_seed && github.ref == 'refs/heads/main') }}
         run: node tools/daily.mjs seed
+      - name: Voir les mots du jour à venir (chiffrés)
+        if: ${{ inputs.daily_change == 'voir' }}
+        run: node tools/daily.mjs preview daily/preview.pem
+      - name: Remplacer des mots du jour
+        if: ${{ inputs.daily_change == 'appliquer' && github.ref == 'refs/heads/main' }}
+        run: node tools/daily.mjs replace
       - name: Usage Firestore face au quota gratuit
         if: ${{ github.event.schedule == '41 7 * * *' || inputs.usage }}
         run: node tools/usage.mjs
