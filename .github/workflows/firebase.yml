@@ -19,6 +19,10 @@ on:
         description: Estimer l'usage Firestore des 7 derniers jours face au quota gratuit
         type: boolean
         default: false
+      players:
+        description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
+        type: boolean
+        default: false
       deploy:
         description: Publier les règles et index Firestore sur cnsnn-9ctosy
         type: boolean
@@ -119,8 +123,8 @@ jobs:
   deploy:
     name: Publier sur Firebase
     needs: rules-tests
-    # Writes only from main. Printing the public key or the usage counts is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage)) }}
+    # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage || inputs.players)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -175,6 +179,9 @@ jobs:
       - name: Usage Firestore face au quota gratuit
         if: ${{ github.event.schedule == '41 7 * * *' || inputs.usage }}
         run: node tools/usage.mjs
+      - name: Liste des joueurs (chiffrée)
+        if: ${{ inputs.players }}
+        run: node tools/players.mjs tools/players.pem
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
