@@ -76,6 +76,10 @@ class ChallengeGame(val cards: List<Card>) {
     var found = 0; private set
     var skips = 0; private set
     var errors = 0; private set
+    /** Positions of the words passed. */
+    private val skipped: MutableList<Int> = mutableListOf()
+    /** The words passed, shown at the end. */
+    val missed: List<String> get() = skipped.mapNotNull { cards.getOrNull(it)?.wordFull }
     val finished: Boolean get() = index >= cards.size
     val card: Card? get() = if (finished) null else cards[index]
 
@@ -90,20 +94,25 @@ class ChallengeGame(val cards: List<Card>) {
 
     fun skip() {
         if (finished) return
-        skips++; index++
+        skips++; skipped += index; index++
     }
 
     /** The time shown and compared: play time plus 20 s per skipped word. */
     fun scoreMs(elapsed: Long): Long = elapsed + skips * ChallengeRules.SKIP_PENALTY_MS
 
-    /** "index,found,skips,errors", to pick a closed game up at the same word. */
-    fun saved(): String = "$index,$found,$skips,$errors"
+    /** "index,found,skips,errors,passed;positions", to pick a closed game up at the same word. */
+    fun saved(): String = "$index,$found,$skips,$errors," + skipped.joinToString(";")
 
     companion object {
         fun restore(cards: List<Card>, saved: String): ChallengeGame? {
-            val parts = saved.split(",").mapNotNull { it.toIntOrNull() }
-            if (parts.size != 4 || parts[0] !in 0..cards.size) return null
-            return ChallengeGame(cards).apply { index = parts[0]; found = parts[1]; skips = parts[2]; errors = parts[3] }
+            val raw = saved.split(",")
+            // Older versions saved the first four numbers only.
+            val parts = raw.take(4).mapNotNull { it.toIntOrNull() }
+            if (parts.size != 4 || raw.size > 5 || parts[0] !in 0..cards.size) return null
+            return ChallengeGame(cards).apply {
+                index = parts[0]; found = parts[1]; skips = parts[2]; errors = parts[3]
+                raw.getOrNull(4)?.split(";")?.mapNotNull { it.toIntOrNull() }?.let { skipped += it }
+            }
         }
     }
 }

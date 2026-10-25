@@ -24,6 +24,9 @@ import CNSNNCore
     var lifeGainedTick = 0
     /// "+60 · ×3" after a right Sprint answer.
     var gain: String?
+    /// The answer of the word just passed, shown for a moment (Sprint and Survie).
+    var passed: String?
+    var passedTick = 0
     /// The game picked up from a save.
     var resumed = false
     /// Results screen, with the records the game beat and the ones before it.
@@ -44,7 +47,7 @@ import CNSNNCore
 
     /// Picks up the saved game of this mode, or starts a new one.
     func begin(state: AppState) {
-        answer = ""; gain = nil; over = false; beaten = []; recorded = false
+        answer = ""; gain = nil; passed = nil; over = false; beaten = []; recorded = false
         previous = state.progress.records(mode)
         if mode != .sprint, let run = ModeRunStore.load(mode), !run.finished {
             sprint = nil; survival = run.survival; duo = run.duo
@@ -112,6 +115,7 @@ import CNSNNCore
     func skip(state: AppState) {
         guard !finished else { return }
         answer = ""
+        if let word = sprint?.card?.wordFull ?? survival?.card?.wordFull { passed = word; passedTick += 1 }
         switch mode {
         case .sprint: sprint?.skip(elapsed: elapsedMs); gain = nil
         case .survival: survival?.skip(); lifeLostTick += 1; Haptics.failure()

@@ -14,6 +14,9 @@ import CNSNNCore
     var answer = ""
     var mistakeTick = 0
     var successTick = 0
+    /// The answer of the word just passed, shown for a moment.
+    var passed: String?
+    var passedTick = 0
     private var start = ContinuousClock.now
     private var baseMs = 0
 
@@ -70,6 +73,7 @@ import CNSNNCore
     func skip(state: AppState) {
         guard phase == .playing, var game else { return }
         answer = ""
+        if let word = game.card?.wordFull { passed = word; passedTick += 1 }
         game.skip()
         self.game = game
         afterMove(state: state)

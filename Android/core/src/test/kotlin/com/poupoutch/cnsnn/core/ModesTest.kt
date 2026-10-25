@@ -147,6 +147,17 @@ class SprintTest {
         assertEquals(75, game.accuracy)
     }
 
+    @Test fun passedWordsAreKeptForTheEnd() {
+        val game = SprintGame(41uL)
+        val first = game.card!!.wordFull
+        game.skip(1000); right(game, 2000)
+        val second = game.card!!.wordFull
+        game.skip(3000)
+        assertEquals(listOf(first, second), game.missed)
+        val copy = ProgressJson.decodeFromString(SprintGame.serializer(), ProgressJson.encodeToString(SprintGame.serializer(), game))
+        assertEquals(game.missed, copy.missed)
+    }
+
     @Test fun aSavedGameResumesIdentically() {
         val game = SprintGame(31uL)
         right(game, 1000); game.answer("NON", 2000)
@@ -163,7 +174,9 @@ class SurvivalTest {
     @Test fun threeMistakesEndTheGame() {
         val game = SurvivalGame(1uL)
         assertEquals(SurvivalGame.Outcome.Wrong(2), game.answer("NON"))
+        val passed = game.card!!.wordFull
         game.skip()
+        assertEquals(listOf(passed), game.missed)
         assertEquals(1, game.lives); assertFalse(game.finished)
         assertEquals(SurvivalGame.Outcome.Wrong(0), game.answer("NON"))
         assertTrue(game.finished); assertEquals(3, game.mistakes)

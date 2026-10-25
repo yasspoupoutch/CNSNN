@@ -80,6 +80,8 @@ public struct SprintGame: Codable, Sendable {
     public var bestCombo = 0
     public var wrong = 0
     public var skips = 0
+    /// The words passed, shown at the end (optional: games saved by older versions have none).
+    public var missed: [String]?
     public var penaltyMs = 0
     public var finished = false
 
@@ -105,6 +107,7 @@ public struct SprintGame: Codable, Sendable {
     public mutating func skip(elapsed: Int) {
         guard !finished, remainingMs(elapsed: elapsed) > 0 else { finished = true; return }
         skips += 1; streak = 0; penaltyMs += Self.skipPenaltyMs
+        if let card { missed = (missed ?? []) + [card.wordFull] }
         if remainingMs(elapsed: elapsed) == 0 { finished = true } else { draw() }
     }
 
@@ -147,6 +150,8 @@ public struct SurvivalGame: Codable, Sendable {
     public var found = 0
     public var wrong = 0
     public var skips = 0
+    /// The words passed, shown at the end (optional: games saved by older versions have none).
+    public var missed: [String]?
     public var livesGained = 0
     public var finished = false
 
@@ -179,6 +184,7 @@ public struct SurvivalGame: Codable, Sendable {
     public mutating func skip() {
         guard !finished else { return }
         skips += 1; lives -= 1
+        if let card { missed = (missed ?? []) + [card.wordFull] }
         if lives == 0 { finished = true } else { draw() }
     }
 

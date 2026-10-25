@@ -444,7 +444,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     current.card?.let {
         Text("Mot ${current.index + 1} sur ${ChallengeRules.WORDS}", fontSize = 12.sp, color = Palette.tertiary,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp))
-        Clue(it)
+        Clue(it, game.passed, game.passedTick)
     }
     AnswerLine(game.answer, game.mistakeTick, true)
     SkipChip("Passer · +20 s", "Passer ce mot, 20 secondes de pénalité") { game.skip(state) }
@@ -494,6 +494,9 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                         }
                     }
                 }
+            }
+            missedSentence(game.game?.missed.orEmpty())?.let {
+                Text(it, fontSize = 13.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
             }
             Text(when {
                 result != null -> "Le temps officiel est mesuré par le serveur."

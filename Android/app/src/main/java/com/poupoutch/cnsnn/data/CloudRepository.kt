@@ -349,7 +349,7 @@ class CloudRepository(
     suspend fun leaderboardEntry(uid: String, source: Source = Source.DEFAULT): LeaderboardEntry? =
         db.collection("leaderboard").document(uid).get(source).await().data?.let { entry(uid, it) }
     /** This month's ranking: the most time saved first, so the lowest month total (single-field `monthRank`). */
-    suspend fun monthlyPlayers(today: String = DailySchedule.key(), limit: Int = 25): List<LeaderboardEntry> {
+    suspend fun monthlyPlayers(today: String = DailySchedule.key(), limit: Int = 50): List<LeaderboardEntry> {
         val month = DailyScore.monthIndex(today) ?: return emptyList()
         return visible(monthRange(month).orderBy("monthRank", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
     }
