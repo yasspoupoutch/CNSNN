@@ -61,7 +61,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -202,6 +204,24 @@ private fun Hearts(lives: Int, lost: Int, gained: Int) {
     }
 }
 
+/** The answers not found: the words passed, then the one the time or the last life ended on. */
+private fun missedText(game: ModeViewModel): String? {
+    val words = mutableListOf<String>()
+    game.sprint?.let { sprint ->
+        words += sprint.missed
+        sprint.card?.let { if (sprint.remainingMs(game.elapsedMs) == 0 && words.lastOrNull() != it.wordFull) words += it.wordFull }
+    }
+    game.survival?.let { survival ->
+        words += survival.missed
+        survival.card?.let { if (survival.lives == 0 && words.lastOrNull() != it.wordFull) words += it.wordFull }
+    }
+    return missedSentence(words)
+}
+
+internal fun missedSentence(words: List<String>): String? =
+    if (words.isEmpty()) null
+    else (if (words.size > 1) "Les réponses manquées : " else "La réponse manquée : ") + words.joinToString(", ") { "« $it »" } + "."
+
 // ---- Boards
 
 @Composable
@@ -215,7 +235,7 @@ private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sp
         LaunchedEffect(game.successTick) { if (game.successTick > 0) { showGain = true; delay(900); showGain = false } }
         Stat(if (showGain) game.gain ?: "" else "${sprint.accuracy} %", if (showGain) "trouvé" else "précision", Modifier.weight(1f), highlight = showGain)
     }
-    sprint.card?.let { Clue(it) }
+    sprint.card?.let { Clue(it, game.passed, game.passedTick) }
     Controls(state, game, "Passer · −5 s", "Passer ce mot, 5 secondes de pénalité")
 }
 
@@ -253,7 +273,7 @@ private fun ColumnScope.SurvivalBoard(state: AppViewModel, game: ModeViewModel, 
     val left = SurvivalGame.BONUS_EVERY - survival.found % SurvivalGame.BONUS_EVERY
     Text(if (left == 1) "Encore 1 mot pour regagner une vie" else "Une vie regagnée tous les ${SurvivalGame.BONUS_EVERY} mots",
         fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
-    survival.card?.let { Clue(it) }
+    survival.card?.let { Clue(it, game.passed, game.passedTick) }
     Controls(state, game, "Passer · −1 vie", "Passer ce mot, une vie en moins")
 }
 
@@ -301,10 +321,31 @@ private fun DuoClue(number: Int, word: DuoWord, found: Boolean, revealed: Boolea
     }
 }
 
+/** "C'était : TOURNESOL" for two seconds after a pass, over the bottom of the clue so nothing moves. */
 @Composable
-internal fun ColumnScope.Clue(card: Card) {
+internal fun ColumnScope.Clue(card: Card, passed: String? = null, passedTick: Int = 0) {
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+        ClueText(card)
+        PassedBadge(passed, passedTick, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+    }
+}
+
+@Composable
+private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
+    AnimatedVisibility(visible && passed != null, modifier, enter = fadeIn(), exit = fadeOut()) {
+        Surface(shape = RoundedCornerShape(50), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
+            Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
+        }
+    }
+}
+
+@Composable
+private fun ClueText(card: Card) {
     val reduce = rememberReduceMotion()
-    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         AnimatedContent(card, transitionSpec = {
             if (reduce) fadeIn() togetherWith fadeOut() else (fadeIn(tween(220)) + slideInVertically { it / 8 }) togetherWith fadeOut(tween(120))
         }, contentKey = { it.id }, label = "card") { shown ->
@@ -398,9 +439,8 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
                         color = Palette.secondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
-            val survival = game.survival
-            if (mode == PlayMode.SURVIVAL && survival != null && survival.lives == 0) survival.card?.let {
-                Text("Le dernier mot était « ${it.wordFull} ».", fontSize = 13.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+            missedText(game)?.let {
+                Text(it, fontSize = 13.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TonalButton("Accueil", Modifier.weight(1f), onClick = close)

@@ -39,6 +39,7 @@ struct LeaderboardView: View {
                 }.scrollIndicators(.hidden)
                 if board == .friends { FriendsBoard(refreshToken: refreshToken) } else {
                     if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
+                    Text(caption).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
                     list
                     if !hidden.isEmpty {
                         Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
@@ -127,6 +128,15 @@ struct LeaderboardView: View {
     }
 
     private var refreshKey: String { (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion) }
+
+    /// The rankings show only their first lines: says how many, so nobody looks for a missing name.
+    private var caption: String {
+        switch board {
+        case .today: "Top 25 des plus rapides du jour"
+        case .week: "Top 50 de la semaine"
+        case .fastest, .friends: "Top 25 des meilleurs temps"
+        }
+    }
 
     private var emptyText: String {
         switch board {

@@ -70,6 +70,8 @@ public struct ChallengeGame: Codable, Sendable {
     public var found = 0
     public var skips = 0
     public var errors = 0
+    /// Positions of the words passed (optional: games saved by older versions have none).
+    public var skipped: [Int]?
     public var finished: Bool { index >= cards.count }
 
     public init(cards: [Card]) { self.cards = cards }
@@ -87,8 +89,10 @@ public struct ChallengeGame: Codable, Sendable {
 
     public mutating func skip() {
         guard !finished else { return }
-        skips += 1; index += 1
+        skips += 1; skipped = (skipped ?? []) + [index]; index += 1
     }
+    /// The words passed, shown at the end.
+    public var missed: [String] { (skipped ?? []).compactMap { cards.indices.contains($0) ? cards[$0].wordFull : nil } }
 
     /// The time shown and compared: play time plus 20 s per skipped word.
     public func scoreMs(elapsed: Int) -> Int { elapsed + skips * ChallengeRules.skipPenaltyMs }

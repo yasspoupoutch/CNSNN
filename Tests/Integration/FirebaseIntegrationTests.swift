@@ -523,10 +523,14 @@ import CNSNNCore
         let weekLines = try await repo.weekPlayers(day: DailySchedule.key())
         XCTAssertTrue(weekLines.contains { $0.uid == alice.uid })
 
-        // Once: a day caught up cannot be started again, and today cannot be "caught up".
+        // Once: a day caught up cannot be started again, and today cannot be "caught up" until it is
+        // over somewhere (10:00 UTC, midnight in UTC+14).
         await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: day, cardID: FirebaseRepository.secretCardID(day: day), catchUp: true) }
         let today = DailySchedule.key()
-        await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: today, cardID: FirebaseRepository.secretCardID(day: today), catchUp: true) }
+        let opens = ISO8601DateFormatter().date(from: today + "T10:00:00Z") ?? .distantPast
+        if Date() < opens {
+            await assertThrows { _ = try await self.repo.startDaily(uid: alice.uid, day: today, cardID: FirebaseRepository.secretCardID(day: today), catchUp: true) }
+        }
     }
 
     // MARK: Helpers

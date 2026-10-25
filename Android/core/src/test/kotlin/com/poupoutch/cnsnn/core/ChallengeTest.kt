@@ -26,7 +26,12 @@ class ChallengeTest {
         val game = ChallengeGame(ChallengeRules.cards(ChallengeRules.draw(7uL))!!)
         assertEquals(ChallengeGame.Outcome.WRONG, game.answer("ZZZ"))
         assertEquals(ChallengeGame.Outcome.RIGHT, game.answer(game.card!!.wordFull))
+        val passed = game.card!!.wordFull
         game.skip()
+        assertEquals(listOf(passed), game.missed)
+        // A closed game picks up with its passed words; one saved by an older version without them.
+        assertEquals(listOf(passed), ChallengeGame.restore(game.cards, game.saved())!!.missed)
+        assertEquals(emptyList<String>(), ChallengeGame.restore(game.cards, "2,1,1,1")!!.missed)
         while (true) { val card = game.card ?: break; game.answer(card.wordFull) }
         assertTrue(game.finished)
         assertEquals(ChallengeGame.Outcome.OVER, game.answer("X"))

@@ -420,6 +420,7 @@ struct ChallengeGameView: View {
     @State private var session: ChallengeSession
     @State private var confirmQuit = false
     @State private var shakes: CGFloat = 0
+    @State private var showPassed = false
 
     init(challenge: Challenge) { _session = State(initialValue: ChallengeSession(challenge: challenge)) }
 
@@ -461,6 +462,12 @@ struct ChallengeGameView: View {
             withAnimation(reduceMotion ? nil : .linear(duration: 0.42)) { shakes += 1 }
             AccessibilityNotification.Announcement("Ce n’est pas le mot").post()
         }
+        .onChange(of: session.passedTick) { _, tick in
+            guard let word = session.passed else { return }
+            showPassed = true
+            AccessibilityNotification.Announcement("C’était " + word).post()
+            Task { try? await Task.sleep(for: .seconds(2)); if session.passedTick == tick { showPassed = false } }
+        }
         .confirmationDialog("Quitter le défi ?", isPresented: $confirmQuit, titleVisibility: .visible) {
             Button("Reprendre plus tard") { dismiss() }
             Button("Abandonner", role: .destructive) { session.abandon(state: state) }
@@ -501,7 +508,15 @@ struct ChallengeGameView: View {
         }.padding(.top, 10).padding(.horizontal, 30)
             .accessibilityElement().accessibilityLabel("Mot \(min(game.index + 1, game.cards.count)) sur \(game.cards.count)")
         if let card = game.card { clue(card, number: game.index + 1) }
-        Spacer(minLength: 8)
+        // "C'était : …" over the free space for two seconds after a pass, so the board never moves.
+        Spacer(minLength: 8).overlay {
+            Text("C’était : " + (session.passed ?? "").uppercased())
+                .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+                .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                .opacity(showPassed && session.passed != nil ? 1 : 0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+                .accessibilityHidden(true)
+        }
         answerLine
         Button { Haptics.selection(); session.skip(state: state) } label: {
             Text("Passer · +20 s").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
@@ -574,6 +589,10 @@ private struct ChallengeResultView: View {
                 tile("\(ChallengeRules.words - me.skips)/\(ChallengeRules.words)", "mots trouvés")
                 tile(Mistakes.text(me.errors), "réponses")
             }.padding(.top, 18)
+            if let missed = session.game?.missed, !missed.isEmpty {
+                Text((missed.count > 1 ? "Les réponses manquées : " : "La réponse manquée : ") + missed.map { "« \($0) »" }.joined(separator: ", ") + ".")
+                    .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 10)
+            }
             Text(c.isOpen && result == nil ? "Envoyez le lien : le premier qui l’ouvre a 48 h pour battre votre temps, qui reste caché jusque-là." : footer(result, other: other)).scaledFont(13).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).padding(.top, 14)
             HStack(spacing: 10) {
                 if result == nil, c.isOpen, let code = c.code {

@@ -485,8 +485,9 @@ enum DailyGuesses {
         return db.collection("leaderboard").whereField("weekRank", isGreaterThanOrEqualTo: DailyScore.weekRank(week: week, found: 0, timeMs: DailyScore.weekTimeCap))
             .whereField("weekRank", isLessThan: DailyScore.weekRank(week: week + 1, found: 0, timeMs: DailyScore.weekTimeCap))
     }
-    // Rankings show 25 lines: a few more are read so suspended players can be left out.
-    func weekPlayers(day: String, limit: Int = 25) async throws -> [LeaderboardEntry] {
+    // Rankings show 25 lines (the week 50, so who played only a day or two still appears): a few more
+    // are read so suspended players can be left out.
+    func weekPlayers(day: String, limit: Int = 50) async throws -> [LeaderboardEntry] {
         guard let board = weekBoard(day) else { return [] }
         let docs = try await board.order(by: "weekRank", descending: true).limit(to: limit + 10).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))

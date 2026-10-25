@@ -152,8 +152,9 @@ class CloudRepositoryTest {
         seedSecret(today, "CHCLT", "Chocolat", "CHOCOLAT", "Un carré gourmand.")
         val alice = repo.bootstrap("Alice")
         expectDenied { repo.dailySecret(day) }
-        // Today cannot be "caught up".
-        expectDenied { repo.startDaily(alice.uid, today, SecretDaily.cardId(today), catchUp = true) }
+        // Today cannot be "caught up" until it is over somewhere (10:00 UTC, midnight in UTC+14).
+        if (java.time.Instant.now().isBefore(java.time.LocalDate.parse(today).atStartOfDay(java.time.ZoneOffset.UTC).plusHours(10).toInstant()))
+            expectDenied { repo.startDaily(alice.uid, today, SecretDaily.cardId(today), catchUp = true) }
         repo.startDaily(alice.uid, day, SecretDaily.cardId(day), catchUp = true)
         delay(2100)
         assertEquals(1, repo.registerGuess(alice.uid, day, "CHOCOLAT"))

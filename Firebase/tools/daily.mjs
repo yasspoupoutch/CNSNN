@@ -5,6 +5,9 @@
 //   node tools/daily.mjs encrypt words.tsv [name]   encrypts a list into daily/<name>.enc.json (local, default words)
 //   node tools/daily.mjs seed [--dry]               decrypts the lists and publishes the next 364 days (CI)
 //   node tools/daily.mjs overlap words.txt [key.pem] fails if a card or duo of the app is a secret word (CI)
+//   node tools/daily.mjs encrypt-changes changes.json  encrypts day replacements into daily/changes.enc.json (local)
+//   node tools/daily.mjs preview key.pem            prints today and the next 14 days, encrypted for key.pem (CI)
+//   node tools/daily.mjs replace                    publishes the replacements of daily/changes.enc.json (CI)
 //
 // words.tsv: one word per line, tab separated: F|M|D, category, word, hint. Every daily/words*.enc.json
 // is used: a new list adds words without needing the older ones in clear. The monthly run of the
@@ -70,8 +73,8 @@ export function validate(words) {
 // The Mot du jour is one word: an answer with a space (an expression) stays out of the schedule.
 export const singleWord = (w) => !/\s/.test(w.word.trim());
 
-// The game is general knowledge: football keeps at most one word in ten of each difficulty.
-export const footballShare = 0.1;
+// The game is general knowledge: no football word in the Mot du jour, it shuts too many players out.
+export const footballShare = 0;
 export function limitFootball(words) {
   const out = [];
   for (const level of Object.values(difficulties)) {
@@ -81,6 +84,25 @@ export function limitFootball(words) {
     out.push(...others, ...shuffle(pool.filter((w) => w.category === 'Football'), `${level} football`).slice(0, allowed));
   }
   return out;
+}
+
+// A word judged too hard can be replaced on a given day without an app update.
+// changes.json: { "days": [{ day, word, hint, category, difficulty }], "drop": ["word"] }. A replaced
+// or dropped word never comes back, and the monthly seed keeps the replacements of the days ahead.
+export function parseChanges(changes) {
+  const days = changes.days ?? [], drop = changes.drop ?? [];
+  for (const d of days) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.day ?? '') || !singleWord(d) || !categories.includes(d.category) || d.category === 'Football'
+      || d.difficulty !== difficultyOf(d.day)) throw new Error(`Remplacement invalide : ${d.day}`);
+  }
+  validate(days);
+  if (new Set(days.map((d) => d.day)).size !== days.length) throw new Error('Deux remplacements le même jour');
+  return { days, drop: new Set([...drop.map(normalize), ...days.map((d) => normalize(d.word))]) };
+}
+export function applyChanges(words, days, changes) {
+  const kept = words.filter((w) => !changes.drop.has(normalize(w.word)));
+  const byDay = new Map(changes.days.map((d) => [d.day, d]));
+  return { words: kept, days: days.map((d) => (byDay.has(d.day) ? { ...byDay.get(d.day) } : d)) };
 }
 
 // Several lists become one; a word already in an earlier list is skipped.
@@ -143,38 +165,89 @@ async function serviceAccount() {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 
+async function readChanges(privateKey) {
+  const file = new URL('changes.enc.json', listDir);
+  const box = await readFile(file, 'utf8').catch(() => null);
+  return parseChanges(box ? decrypt(JSON.parse(box), privateKey) : {});
+}
+async function firestore() {
+  const { initializeApp, applicationDefault } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+  initializeApp({ credential: applicationDefault(), projectId });
+  return getFirestore();
+}
+function publish(batch, db, d) {
+  batch.set(db.doc(`dailyPuzzles/${d.day}`), { consonants: consonants(d.word), category: d.category, difficulty: d.difficulty });
+  batch.set(db.doc(`dailyHints/${d.day}`), { hint: d.hint });
+  batch.set(db.doc(`dailySecrets/${d.day}`), { answer: normalize(d.word), word: d.word, hint: d.hint, category: d.category, difficulty: d.difficulty });
+}
+
 async function seed(dry) {
   const { private_key: privateKey } = await serviceAccount();
   const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
   const lists = await Promise.all(files.map(async (name) => decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)));
   const { words: all, skipped } = combine(lists);
   const single = all.filter(singleWord);
-  const words = limitFootball(single);
+  const changes = await readChanges(privateKey);
+  const words = applyChanges(limitFootball(single), [], changes).words;
   validate(words);
-  const { initializeApp, applicationDefault } = await import('firebase-admin/app');
-  const { getFirestore, FieldPath } = await import('firebase-admin/firestore');
-  initializeApp({ credential: applicationDefault(), projectId });
-  const db = getFirestore();
+  const { FieldPath } = await import('firebase-admin/firestore');
+  const db = await firestore();
   const today = latestDay();
   // Words already played (today included) wait for the others before coming back.
   const past = await db.collection('dailySecrets').where(FieldPath.documentId(), '<=', today).get();
   const played = new Map(past.docs.map((d) => [d.get('answer'), d.id]));
   // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
-  const days = schedule(words, shiftDay(today, 1), scheduledDays, played);
+  const days = applyChanges(words, schedule(words, shiftDay(today, 1), scheduledDays, played), changes).days;
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
   console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots et ${single.length - words.length} mot(s) de football écartés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
   if (dry) return;
   for (let i = 0; i < days.length; i += 150) {
     const batch = db.batch();
-    for (const d of days.slice(i, i + 150)) {
-      batch.set(db.doc(`dailyPuzzles/${d.day}`), { consonants: consonants(d.word), category: d.category, difficulty: d.difficulty });
-      batch.set(db.doc(`dailyHints/${d.day}`), { hint: d.hint });
-      batch.set(db.doc(`dailySecrets/${d.day}`), { answer: normalize(d.word), word: d.word, hint: d.hint, category: d.category, difficulty: d.difficulty });
-    }
+    for (const d of days.slice(i, i + 150)) publish(batch, db, d);
     await batch.commit();
   }
   console.log('Mots du jour publiés.');
+}
+
+// The days still being played somewhere (the earliest time zone's today) and the next 14, with how many
+// players finished each one, printed only encrypted for the given public key (the logs may become public).
+async function preview(keyFile) {
+  const db = await firestore();
+  const start = shiftDay(latestDay(), -1);
+  const out = [];
+  for (let i = 0; i < 16; i++) {
+    const day = shiftDay(start, i);
+    const secret = (await db.doc(`dailySecrets/${day}`).get()).data();
+    const results = i < 3 ? (await db.collection('dailyResults').where('day', '==', day).count().get()).data().count : 0;
+    out.push({ day, word: secret?.word, hint: secret?.hint, category: secret?.category, difficulty: secret?.difficulty, results });
+  }
+  console.log(JSON.stringify(encrypt(out, await readFile(keyFile, 'utf8'))));
+}
+
+// Publishes the replacements of the days not over yet. Who started a replaced day without finishing
+// it starts again on the new word (the old consonants would no longer accept any answer).
+async function replace() {
+  const { private_key: privateKey } = await serviceAccount();
+  const changes = await readChanges(privateKey);
+  const days = changes.days.filter((d) => d.day >= shiftDay(latestDay(), -1));
+  if (!days.length) { console.log('Aucun remplacement à publier.'); return; }
+  const db = await firestore();
+  const answers = new Map((await db.collection('dailySecrets').get()).docs.map((d) => [d.get('answer'), d.id]));
+  for (const d of days) {
+    const other = answers.get(normalize(d.word));
+    if (other && other !== d.day) throw new Error(`Le remplacement du ${d.day} est déjà le mot du ${other}`);
+  }
+  for (const d of days) {
+    const batch = db.batch();
+    publish(batch, db, d);
+    const sessions = await db.collection('dailySessions').where('day', '==', d.day).get();
+    const open = sessions.docs.filter((s) => !s.get('finishedAt'));
+    for (const s of open) batch.delete(s.ref);
+    await batch.commit();
+    console.log(`${d.day} remplacé : ${open.length} partie(s) en cours relancée(s), ${sessions.size - open.length} terminée(s) gardée(s).`);
+  }
 }
 
 // The app ships its Classique cards and Double sens words in clear: none of them may be a secret
@@ -210,6 +283,15 @@ if (command === 'public-key') {
   await seed(arg === '--dry');
 } else if (command === 'overlap') {
   await overlap(arg, process.argv[4]);
+} else if (command === 'encrypt-changes') {
+  const changes = JSON.parse(await readFile(arg, 'utf8'));
+  parseChanges(changes);
+  await writeFile(new URL('changes.enc.json', listDir), JSON.stringify(encrypt(changes, await readFile(publicKeyFile, 'utf8')), null, 1) + '\n');
+  console.log(`${changes.days?.length ?? 0} remplacement(s) chiffré(s) dans daily/changes.enc.json`);
+} else if (command === 'preview') {
+  await preview(arg);
+} else if (command === 'replace') {
+  await replace();
 } else if (command) {
   console.error(`Commande inconnue : ${command}`); process.exit(1);
 }

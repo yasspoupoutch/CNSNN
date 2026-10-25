@@ -24,7 +24,9 @@ final class ChallengeTests: XCTestCase {
         var game = ChallengeGame(cards: ChallengeRules.cards(ChallengeRules.draw(seed: 7))!)
         XCTAssertEqual(game.answer("ZZZ"), .wrong)
         XCTAssertEqual(game.answer(game.card!.wordFull), .right)
+        let passed = game.card!.wordFull
         game.skip()
+        XCTAssertEqual(game.missed, [passed])
         while let card = game.card { game.answer(card.wordFull) }
         XCTAssertTrue(game.finished)
         XCTAssertEqual(game.answer("X"), .over)

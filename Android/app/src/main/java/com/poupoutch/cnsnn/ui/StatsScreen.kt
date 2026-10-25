@@ -288,6 +288,9 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     }
     if (board == Board.FRIENDS) { FriendsBoard(state, refreshToken); return }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
+    // The rankings show only their first lines: says how many, so nobody looks for a missing name.
+    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; else -> "Top 25 des meilleurs temps" },
+        fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     val hidden = state.hiddenPlayers
     val rows = when (board) {
         // The official time: a hint adds a minute.
