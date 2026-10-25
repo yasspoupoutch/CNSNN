@@ -326,13 +326,18 @@ private fun DuoClue(number: Int, word: DuoWord, found: Boolean, revealed: Boolea
 internal fun ColumnScope.Clue(card: Card, passed: String? = null, passedTick: Int = 0) {
     Box(Modifier.weight(1f).fillMaxWidth()) {
         ClueText(card)
-        var visible by remember { mutableStateOf(false) }
-        LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
-        AnimatedVisibility(visible && passed != null, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), enter = fadeIn(), exit = fadeOut()) {
-            Surface(shape = RoundedCornerShape(50), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
-                Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
-            }
+        PassedBadge(passed, passedTick, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+    }
+}
+
+@Composable
+private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
+    AnimatedVisibility(visible && passed != null, modifier, enter = fadeIn(), exit = fadeOut()) {
+        Surface(shape = RoundedCornerShape(50), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
+            Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
         }
     }
 }
