@@ -127,6 +127,24 @@ final class CNSNNUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(element.frame.minX, screen.minX, "\(name) dépasse à gauche")
             XCTAssertLessThanOrEqual(element.frame.maxX, screen.maxX, "\(name) dépasse à droite")
         }
+
+        // Classique shows every category and difficulty as a chip, all on screen, and the one tapped is selected.
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Classique.")).firstMatch.tap()
+        let launch = app.buttons["Lancer une partie"]
+        XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "Toutes").count, 2)
+        for title in ["Général", "Cinéma", "Géographie", "Animaux", "Objets", "Facile", "Moyen", "Difficile"] {
+            let chip = app.buttons[title]
+            XCTAssertTrue(chip.isHittable, title)
+            XCTAssertLessThanOrEqual(chip.frame.maxX, screen.maxX, "\(title) dépasse à droite")
+        }
+        XCTAssertTrue(app.buttons.matching(identifier: "Toutes").firstMatch.isSelected)
+        let easy = app.buttons["Facile"]
+        easy.tap()
+        XCTAssertTrue(easy.isSelected)
+        XCTAssertFalse(app.buttons.matching(identifier: "Toutes").element(boundBy: 1).isSelected)
+        launch.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
     }
 
     /// First-launch tutorial: the daily card and its Jouer button (tapped through the spotlight), then TR:

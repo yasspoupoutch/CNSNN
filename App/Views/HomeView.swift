@@ -46,7 +46,7 @@ struct HomeView: View {
         .sheet(isPresented: $showClassic, onDismiss: {
             if let route = pending { pending = nil; play(route) }
         }) {
-            classicSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+            classicSheet.presentationDetents([.large]).presentationDragIndicator(.visible)
                 .presentationBackground(.ultraThinMaterial)
         }
         .sheet(isPresented: $showChallenges, onDismiss: {
@@ -321,16 +321,23 @@ struct HomeView: View {
                 Text("\(ClassicLevel.wordsPerLevel - level.into) mots avant le niveau \(level.number + 1)")
             }.scaledFont(13).foregroundStyle(Palette.secondary).padding(.top, 16)
             ProgressBar(value: Double(level.into) / Double(ClassicLevel.wordsPerLevel), color: Palette.foreground).padding(.top, 8)
-            HStack(spacing: 8) {
-                FilterMenu(title: category?.rawValue ?? "Toutes catégories") {
-                    Button("Toutes catégories") { category = nil }
-                    ForEach(CNSNNCore.Category.allCases) { item in Button(item.rawValue) { category = item } }
+            // Every choice is shown at once, so players see they can pick a theme or a level.
+            VStack(alignment: .leading, spacing: 10) {
+                SectionKicker(text: "Catégorie", color: Palette.secondary)
+                FlowLayout(spacing: 8, centred: false) {
+                    Chip(title: "Toutes", selected: category == nil) { category = nil }
+                    ForEach(CNSNNCore.Category.allCases) { item in
+                        Chip(title: item.rawValue, selected: category == item) { category = item }
+                    }
                 }
-                FilterMenu(title: difficulty?.rawValue ?? "Toutes difficultés") {
-                    Button("Toutes difficultés") { difficulty = nil }
-                    ForEach(Difficulty.allCases) { item in Button(item.rawValue) { difficulty = item } }
+                SectionKicker(text: "Difficulté", color: Palette.secondary).padding(.top, 10)
+                FlowLayout(spacing: 8, centred: false) {
+                    Chip(title: "Toutes", selected: difficulty == nil) { difficulty = nil }
+                    ForEach(Difficulty.allCases) { item in
+                        Chip(title: item.rawValue, selected: difficulty == item) { difficulty = item }
+                    }
                 }
-            }.padding(.top, 18)
+            }.padding(.top, 22)
             Spacer(minLength: 20)
             Button("Lancer une partie") {
                 Haptics.selection()
@@ -418,24 +425,6 @@ extension PlayMode {
         case .sprint: "90 secondes pour battre votre record."
         case .survival: "Jusqu’où irez-vous avec 3 vies ?"
         case .duo: "Deux mots, les mêmes consonnes."
-        }
-    }
-}
-
-struct FilterMenu<Content: View>: View {
-    var title: String
-    @ViewBuilder var content: () -> Content
-    var body: some View {
-        Menu(content: content) {
-            HStack(spacing: 6) {
-                Text(title).lineLimit(1)
-                Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
-            }
-            .scaledFont(13, .medium).foregroundStyle(Palette.foreground)
-            .padding(.horizontal, 12).frame(minHeight: 32)
-            .background(Capsule().fill(Palette.fill1))
-            .overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1))
-            .hitTarget()
         }
     }
 }
