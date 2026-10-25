@@ -90,6 +90,8 @@ class SprintGame private constructor(
     var bestCombo = 0; private set
     var wrong = 0; private set
     var skips = 0; private set
+    /** The words passed, shown at the end (empty in games saved by older versions). */
+    val missed: MutableList<String> = mutableListOf()
     var penaltyMs = 0; private set
     var finished = false; private set
 
@@ -111,6 +113,7 @@ class SprintGame private constructor(
     fun skip(elapsed: Int) {
         if (finished || remainingMs(elapsed) <= 0) { finished = true; return }
         skips++; streak = 0; penaltyMs += SKIP_PENALTY_MS
+        card?.let { missed += it.wordFull }
         if (remainingMs(elapsed) == 0) finished = true else draw()
     }
 
@@ -157,6 +160,8 @@ class SurvivalGame private constructor(
     var found = 0; private set
     var wrong = 0; private set
     var skips = 0; private set
+    /** The words passed, shown at the end (empty in games saved by older versions). */
+    val missed: MutableList<String> = mutableListOf()
     var livesGained = 0; private set
     var finished = false; private set
 
@@ -185,6 +190,7 @@ class SurvivalGame private constructor(
     fun skip() {
         if (finished) return
         skips++; lives--
+        card?.let { missed += it.wordFull }
         if (lives == 0) finished = true else draw()
     }
 

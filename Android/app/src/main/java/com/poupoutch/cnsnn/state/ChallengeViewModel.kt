@@ -37,6 +37,9 @@ class ChallengeViewModel : ViewModel() {
     var version by mutableIntStateOf(0); private set
     var mistakeTick by mutableIntStateOf(0); private set
     var successTick by mutableIntStateOf(0); private set
+    /** The answer of the word just passed, shown for a moment. */
+    var passed by mutableStateOf<String?>(null); private set
+    var passedTick by mutableIntStateOf(0); private set
     private var start = SystemClock.elapsedRealtime()
     private var baseMs = 0L
     private var loaded = false
@@ -99,7 +102,9 @@ class ChallengeViewModel : ViewModel() {
     fun skip(state: AppViewModel) {
         val current = game ?: return
         if (phase != Phase.Playing) return
-        answer = ""; current.skip()
+        answer = ""
+        current.card?.let { passed = it.wordFull; passedTick++ }
+        current.skip()
         afterMove(state)
     }
 

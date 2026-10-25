@@ -147,6 +147,18 @@ final class SprintTests: XCTestCase {
         XCTAssertEqual(game.used.count, Set(game.used).count)
     }
 
+    func testPassedWordsAreKeptForTheEnd() throws {
+        var game = SprintGame(seed: 41)
+        let first = game.card!.wordFull
+        game.skip(elapsed: 1000); right(&game, 2000)
+        let second = game.card!.wordFull
+        game.skip(elapsed: 3000)
+        XCTAssertEqual(game.missed, [first, second])
+        // A game saved by an older version has no list.
+        let old = try JSONDecoder().decode(SprintGame.self, from: JSONEncoder().encode(SprintGame(seed: 41)))
+        XCTAssertNil(old.missed)
+    }
+
     func testASavedGameResumesIdentically() throws {
         var game = SprintGame(seed: 31)
         right(&game, 1000); game.answer("NON", elapsed: 2000)
@@ -164,7 +176,9 @@ final class SurvivalTests: XCTestCase {
     func testThreeMistakesEndTheGame() {
         var game = SurvivalGame(seed: 1)
         XCTAssertEqual(game.answer("NON"), .wrong(livesLeft: 2))
+        let passed = game.card!.wordFull
         game.skip()
+        XCTAssertEqual(game.missed, [passed])
         XCTAssertEqual(game.lives, 1)
         XCTAssertEqual(game.answer("NON"), .wrong(livesLeft: 0))
         XCTAssertTrue(game.finished)
