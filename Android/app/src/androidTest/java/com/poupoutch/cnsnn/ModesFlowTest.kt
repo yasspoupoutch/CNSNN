@@ -123,7 +123,7 @@ class ModesFlowTest {
         rule.onNodeWithText("Passer · −1 vie").performClick()
         rule.onNodeWithText("Passer · −1 vie").performClick()
         waitFor("Plus de vies…")
-        waitFor("Le dernier mot était", substring = true)
+        waitFor("Les réponses manquées", substring = true)
         rule.onNodeWithText("Accueil").performClick()
         waitFor("Record niveau 1", substring = true)
     }
