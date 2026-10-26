@@ -477,6 +477,16 @@ test('friend codes: create own, look up any, list only own',async()=>{
  await assertFails(deleteDoc(doc(bob,'friendCodes/ABC2Z9')));
  await assertSucceeds(deleteDoc(doc(alice,'friendCodes/ABC2Z9')));
 });
+test('friend codes: a chosen one has 4 to 12 letters or digits and no rude word',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const alice=user('alice'),bob=user('bob'),code=(c,u='alice')=>({uid:u,username:u==='alice'?'Alice':'Bob',createdAt:serverTimestamp()});
+ await assertSucceeds(setDoc(doc(alice,'friendCodes/YASIN10'),code()));
+ await assertFails(setDoc(doc(bob,'friendCodes/YASIN10'),code(0,'bob')));
+ for(const bad of ['ABC','ABCDEFGHJKLMN','yasin10','YA-SIN','MERDE12','C0NNARD']) await assertFails(setDoc(doc(bob,`friendCodes/${bad}`),code(0,'bob')));
+ // A chosen code proves the friendship like a drawn one.
+ await assertSucceeds(setDoc(doc(bob,'users/bob/friends/alice'),{username:'Alice',addedAt:serverTimestamp()}));
+ await assertSucceeds(setDoc(doc(bob,'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp(),code:'YASIN10'}));
+});
 test('friends list is private to its owner',async()=>{
  await signUp(); await signUp('bob','Bob');
  await assertSucceeds(setDoc(doc(user('alice'),'users/alice/friends/bob'),{username:'Bob',addedAt:serverTimestamp()}));

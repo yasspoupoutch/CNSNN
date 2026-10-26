@@ -138,8 +138,11 @@ object Format {
 
 /** Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1). */
 object FriendCode {
+    /** Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1): the drawn codes. */
     const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    fun normalize(text: String): String = text.uppercase().filter { it in ALPHABET }.take(6)
+    /** A code the player chooses ("YASIN10") may use any letter or digit, 4 to 12 of them. */
+    val LENGTH = 4..12
+    fun normalize(text: String): String = text.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }.take(LENGTH.last)
     fun random(): String = (1..6).map { ALPHABET.random() }.joinToString("")
 }
 

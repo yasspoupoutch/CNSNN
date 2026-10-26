@@ -116,7 +116,7 @@ service cloud.firestore {
     allow create, update: if active() && friendId == request.auth.uid && friendId != uid
      && request.resource.data.keys().hasOnly(['username','addedAt','code'])
      && validName(request.resource.data.username) && request.resource.data.addedAt == request.time
-     && request.resource.data.code is string && request.resource.data.code.matches('^[A-HJ-NP-Z2-9]{6}$')
+     && request.resource.data.code is string && request.resource.data.code.matches('^[A-Z0-9]{4,12}$')
      && exists(at('friendCodes/' + request.resource.data.code))
      && get(at('friendCodes/' + request.resource.data.code)).data.uid == uid
      && exists(at('users/' + friendId + '/friends/' + uid));
@@ -137,7 +137,8 @@ service cloud.firestore {
   match /friendCodes/{code} {
    allow get: if signedIn();
    allow list: if signedIn() && resource.data.uid == request.auth.uid;
-   allow create: if active() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
+   // A drawn code (6 characters, no I, O, 0, 1) or one the player chose: 4 to 12 letters or digits, no rude word.
+   allow create: if active() && code.matches('^[A-Z0-9]{4,12}$') && cleanName(code)
     && request.resource.data.keys().hasOnly(['uid','username','createdAt'])
     && request.resource.data.uid == request.auth.uid && validName(request.resource.data.username)
     && request.resource.data.createdAt == request.time;

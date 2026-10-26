@@ -563,10 +563,31 @@ enum DailyGuesses {
 
     // MARK: Friends
 
-    /// Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1).
+    /// Letters and digits that cannot be confused when read aloud or typed (no I, O, 0, 1): the drawn codes.
     nonisolated static let friendCodeAlphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    /// A code the player chooses ("YASIN10") may use any letter or digit, 4 to 12 of them.
+    nonisolated static let friendCodeLength = 4...12
     nonisolated static func normalizedFriendCode(_ text: String) -> String {
-        String(text.uppercased().filter { friendCodeAlphabet.contains($0) }.prefix(6))
+        String(text.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.prefix(friendCodeLength.upperBound))
+    }
+    /// Replaces the player's friend code by one they chose. The new code is taken first (refused if
+    /// someone holds it), then the old one freed: friends already added stay friends.
+    func chooseFriendCode(_ text: String, uid: String, username: String) async throws -> String {
+        let code = Self.normalizedFriendCode(text)
+        guard Self.friendCodeLength.contains(code.count), NameFilter.isAllowed(code) else { throw CloudError.friendCodeInvalid }
+        let mine = try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents
+        if mine.contains(where: { $0.documentID == code }) { return code }
+        let ref = db.collection("friendCodes").document(code)
+        do {
+            let saved = try await Self.awaitWrite { done in
+                ref.setData(["uid": uid, "username": username, "createdAt": FieldValue.serverTimestamp()], completion: done)
+            }
+            guard saved else { throw CloudError.offline }
+        } catch where CloudError.code(error) == .permissionDenied {
+            throw CloudError.friendCodeTaken
+        }
+        try await commit(mine.map { BatchWrite.delete($0.reference) })
+        return code
     }
     /// The player's friend code, created on first use. The code is the document id, so it is unique.
     func friendCode(uid: String, username: String) async throws -> String {
@@ -591,7 +612,7 @@ enum DailyGuesses {
     /// see each other at once. Returns the friend's pseudo.
     func addFriend(code: String, uid: String, username: String) async throws -> String {
         let code = Self.normalizedFriendCode(code)
-        guard code.count == 6 else { throw CloudError.friendNotFound }
+        guard Self.friendCodeLength.contains(code.count) else { throw CloudError.friendNotFound }
         let doc = try await db.collection("friendCodes").document(code).getDocument(source: .server)
         guard let data = doc.data(), let friend = data["uid"] as? String else { throw CloudError.friendNotFound }
         guard friend != uid else { throw CloudError.friendIsYou }
@@ -1040,6 +1061,8 @@ enum CloudError: LocalizedError {
     case inviteExpired
     case usernameTaken
     case usernameInvalid
+    case friendCodeTaken
+    case friendCodeInvalid
 
     /// The few Firebase error codes the app reacts to.
     enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
@@ -1083,7 +1106,7 @@ enum CloudError: LocalizedError {
         case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
         case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
         case .alreadyReported: "Votre signalement est déjà envoyé. Merci !"
-        case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
+        case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez-le."
         case .friendIsYou: "C’est votre propre code. Envoyez-le à vos amis !"
         case .noGuessesLeft: "Vous avez utilisé vos 20 essais pour aujourd’hui."
         case .suspended: "Votre compte est suspendu : les défis ne sont pas disponibles."
@@ -1095,6 +1118,8 @@ enum CloudError: LocalizedError {
         case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
         case .usernameTaken: "Ce pseudo est déjà pris. Choisissez-en un autre."
         case .usernameInvalid: "Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."
+        case .friendCodeTaken: "Ce code est déjà pris. Choisissez-en un autre."
+        case .friendCodeInvalid: "Un code ami fait de 4 à 12 lettres ou chiffres, sans gros mot."
         }
     }
 }

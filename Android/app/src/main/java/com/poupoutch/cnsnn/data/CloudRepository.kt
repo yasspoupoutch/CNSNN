@@ -29,6 +29,7 @@ import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.LeaderboardEntry
+import com.poupoutch.cnsnn.core.NameFilter
 import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
 import com.poupoutch.cnsnn.core.SecretDaily
@@ -431,12 +432,32 @@ class CloudRepository(
         throw CloudError(CloudError.Kind.OFFLINE)
     }
     /**
+     * Replaces the player's friend code by one they chose. The new code is taken first (refused if
+     * someone holds it), then the old one freed: friends already added stay friends.
+     */
+    suspend fun chooseFriendCode(text: String, uid: String, username: String): String {
+        val code = FriendCode.normalize(text)
+        if (code.length !in FriendCode.LENGTH || !NameFilter.isAllowed(code)) throw CloudError(CloudError.Kind.FRIEND_CODE_INVALID)
+        val mine = db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents
+        if (mine.any { it.id == code }) return code
+        try {
+            if (!awaitWrite(db.collection("friendCodes").document(code).set(mapOf("uid" to uid, "username" to username, "createdAt" to FieldValue.serverTimestamp())))) {
+                throw CloudError(CloudError.Kind.OFFLINE)
+            }
+        } catch (error: Exception) {
+            if (CloudError.code(error) == CloudError.Code.PERMISSION_DENIED) throw CloudError(CloudError.Kind.FRIEND_CODE_TAKEN)
+            throw error
+        }
+        if (mine.isNotEmpty()) db.batch().apply { mine.forEach { delete(it.reference) } }.commit().await()
+        return code
+    }
+    /**
      * Adds the owner of a friend code to the player's friends, and the player to theirs, so both
      * see each other at once. Returns the friend's pseudo.
      */
     suspend fun addFriendByCode(code: String, uid: String, username: String): String {
         val clean = FriendCode.normalize(code)
-        if (clean.length != 6) throw CloudError(CloudError.Kind.FRIEND_NOT_FOUND)
+        if (clean.length !in FriendCode.LENGTH) throw CloudError(CloudError.Kind.FRIEND_NOT_FOUND)
         val doc = db.collection("friendCodes").document(clean).get(Source.SERVER).await()
         val friend = doc.getString("uid") ?: throw CloudError(CloudError.Kind.FRIEND_NOT_FOUND)
         if (friend == uid) throw CloudError(CloudError.Kind.FRIEND_IS_YOU)

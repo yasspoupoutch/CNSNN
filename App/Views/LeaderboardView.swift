@@ -334,6 +334,8 @@ struct FriendCodeCards: View {
     @State private var busy = false
     @State private var message: String?
     @FocusState private var focused: Bool
+    @State private var choosing = false
+    @State private var chosen = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -348,7 +350,11 @@ struct FriendCodeCards: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Votre code ami").scaledFont(13).foregroundStyle(Palette.secondary)
                 Text(code ?? "······").scaledFont(26, .bold).monospaced().tracking(3)
-                    .textSelection(.enabled)
+                    .textSelection(.enabled).lineLimit(1).minimumScaleFactor(0.6)
+                if code != nil {
+                    Button("Personnaliser") { chosen = code ?? ""; choosing = true }
+                        .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).disabled(busy)
+                }
             }
             Spacer(minLength: 8)
             if let code {
@@ -358,7 +364,14 @@ struct FriendCodeCards: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
-        .accessibilityElement(children: .combine)
+        .alert("Votre code ami", isPresented: $choosing) {
+            TextField("YASIN10", text: $chosen)
+                .textInputAutocapitalization(.characters).autocorrectionDisabled()
+            Button("Annuler", role: .cancel) {}
+            Button("Enregistrer", action: choose)
+        } message: {
+            Text("De 4 à 12 lettres ou chiffres. Vos amis restent, l’ancien code ne marchera plus.")
+        }
     }
 
     private var addCard: some View {
@@ -375,7 +388,7 @@ struct FriendCodeCards: View {
                     }
                     .submitLabel(.done).onSubmit(add)
                 Button("Ajouter", action: add).buttonStyle(PrimaryPillStyle(height: 48)).frame(width: 112)
-                    .disabled(friendCode.count != 6 || busy)
+                    .disabled(!FirebaseRepository.friendCodeLength.contains(friendCode.count) || busy)
             }
             if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true) }
         }.glassPanel(radius: 24, padding: 14)
@@ -387,8 +400,22 @@ struct FriendCodeCards: View {
         let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
         state.rankings.friendCode = try? await cloud.friendCode(uid: uid, username: name)
     }
+    /// A code the player picks instead of the drawn one (see FirebaseRepository.chooseFriendCode).
+    private func choose() {
+        guard let cloud = state.cloud, let uid = state.uid, !busy else { return }
+        busy = true; message = nil
+        Task {
+            defer { busy = false }
+            do {
+                let name = state.progress.username.isEmpty ? "Joueur" : state.progress.username
+                state.rankings.friendCode = try await cloud.chooseFriendCode(chosen, uid: uid, username: name)
+                message = "Votre nouveau code ami est enregistré."
+                Haptics.success()
+            } catch { message = CloudError.message(error); Haptics.retry() }
+        }
+    }
     private func add() {
-        guard let cloud = state.cloud, let uid = state.uid, friendCode.count == 6, !busy else { return }
+        guard let cloud = state.cloud, let uid = state.uid, FirebaseRepository.friendCodeLength.contains(friendCode.count), !busy else { return }
         busy = true; message = nil; focused = false
         Task {
             defer { busy = false }

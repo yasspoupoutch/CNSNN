@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -442,6 +443,7 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
     var friendCode by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var chosen by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val haptics = rememberHaptics()
@@ -452,8 +454,19 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
     LaunchedEffect(uid) {
         if (state.rankings.friendCode == null) runCatching { state.cloud.friendCode(uid, name) }.onSuccess { state.rankings = state.rankings.copy(friendCode = it) }
     }
+    /** A code the player picks instead of the drawn one (see CloudRepository.chooseFriendCode). */
+    fun choose(text: String) {
+        if (busy) return
+        busy = true; message = null; chosen = null
+        scope.launch {
+            try {
+                state.rankings = state.rankings.copy(friendCode = state.cloud.chooseFriendCode(text, uid, name))
+                message = "Votre nouveau code ami est enregistré."; haptics.success()
+            } catch (e: Exception) { message = CloudError.message(e); haptics.retry() } finally { busy = false }
+        }
+    }
     fun add() {
-        if (friendCode.length != 6 || busy) return
+        if (friendCode.length !in FriendCode.LENGTH || busy) return
         busy = true; message = null; focus.clearFocus()
         scope.launch {
             try {
@@ -468,7 +481,10 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Votre code ami", fontSize = 13.sp, color = Palette.secondary)
-                Text(code ?: "······", fontSize = 26.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Text(code ?: "······", fontSize = 26.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp, maxLines = 1)
+                if (code != null) TextButton({ chosen = code }, enabled = !busy, contentPadding = PaddingValues(0.dp)) {
+                    Text("Personnaliser", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary)
+                }
             }
             code?.let { c ->
                 IconButton({
@@ -484,9 +500,23 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
                 placeholder = { Text("Code d’un ami") }, textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { add() }), shape = RoundedCornerShape(14.dp))
-            Button(::add, enabled = friendCode.length == 6 && !busy, shape = RoundedCornerShape(24.dp)) { Text("Ajouter") }
+            Button(::add, enabled = friendCode.length in FriendCode.LENGTH && !busy, shape = RoundedCornerShape(24.dp)) { Text("Ajouter") }
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)) }
+    }
+    chosen?.let { text ->
+        AlertDialog({ chosen = null }, title = { Text("Votre code ami") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("De 4 à 12 lettres ou chiffres. Vos amis restent, l’ancien code ne marchera plus.")
+                    OutlinedTextField(text, { chosen = FriendCode.normalize(it) }, Modifier.testTag("choose-code-field"), singleLine = true,
+                        placeholder = { Text("YASIN10") }, textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { choose(text) }), shape = RoundedCornerShape(14.dp))
+                }
+            },
+            confirmButton = { TextButton({ choose(text) }, enabled = text.length in FriendCode.LENGTH) { Text("Enregistrer") } },
+            dismissButton = { TextButton({ chosen = null }) { Text("Annuler") } })
     }
 }
 

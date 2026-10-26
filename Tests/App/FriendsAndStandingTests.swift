@@ -14,9 +14,11 @@ final class FriendsAndStandingTests: XCTestCase {
         XCTAssertEqual(top(2, of: 4), 50)
     }
 
-    func testFriendCodesIgnoreConfusingCharacters() {
-        XCTAssertEqual(FirebaseRepository.normalizedFriendCode(" ab-c2 z9x "), "ABC2Z9")
-        XCTAssertEqual(FirebaseRepository.normalizedFriendCode("o0i1l"), "L")
+    func testFriendCodesKeepLettersAndDigitsOnly() {
+        XCTAssertEqual(FirebaseRepository.normalizedFriendCode(" ab-c2 z9 "), "ABC2Z9")
+        XCTAssertEqual(FirebaseRepository.normalizedFriendCode("Yasin 10 !"), "YASIN10")
+        XCTAssertEqual(FirebaseRepository.normalizedFriendCode("ABCDEFGHIJKLMNOP").count, 12)
+        XCTAssertEqual(FirebaseRepository.normalizedFriendCode("éa"), "A")
     }
 
     func testFriendsFoundTodayComeFirstByTime() {

@@ -20,7 +20,7 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         PROPOSAL_TOO_SOON("Patientez quelques secondes avant une nouvelle proposition."),
         PROPOSAL_QUOTA("Vous avez atteint la limite de 10 propositions par jour. Revenez demain."),
         ALREADY_REPORTED("Votre signalement est déjà envoyé. Merci !"),
-        FRIEND_NOT_FOUND("Aucun joueur n’a ce code. Vérifiez les 6 caractères."),
+        FRIEND_NOT_FOUND("Aucun joueur n’a ce code. Vérifiez-le."),
         FRIEND_IS_YOU("C’est votre propre code. Envoyez-le à vos amis !"),
         GUESS_TOO_SOON("Patientez une seconde avant de réessayer."),
         GUESS_LIMIT("Vous avez utilisé vos 20 essais du jour."),
@@ -34,6 +34,8 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         INVITE_EXPIRED("Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."),
         USERNAME_TAKEN("Ce pseudo est déjà pris. Choisissez-en un autre."),
         USERNAME_INVALID("Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."),
+        FRIEND_CODE_TAKEN("Ce code est déjà pris. Choisissez-en un autre."),
+        FRIEND_CODE_INVALID("Un code ami fait de 4 à 12 lettres ou chiffres, sans gros mot."),
     }
 
     enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }

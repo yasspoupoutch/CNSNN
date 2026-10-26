@@ -119,7 +119,9 @@ class GameRulesTest {
         assertEquals("1er", Format.ordinal(1)); assertEquals("12e", Format.ordinal(12))
         assertEquals("12 345", Format.number(12345))
         assertEquals("sans faute", Mistakes.text(0)); assertEquals("1 erreur", Mistakes.text(1)); assertEquals("3 erreurs", Mistakes.text(3))
-        assertEquals("L", FriendCode.normalize("o0i1l"))
+        assertEquals("O0I1L", FriendCode.normalize("o0i1l"))
+        assertEquals("YASIN10", FriendCode.normalize("Yasin 10 !"))
+        assertEquals(12, FriendCode.normalize("ABCDEFGHIJKLMNOP").length)
     }
     @Test fun remainingGuessesAndSite() {
         assertNull(Guesses.remainingText(0)); assertNull(Guesses.remainingText(14))
