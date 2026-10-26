@@ -182,4 +182,11 @@ class ChallengeTest {
         assertEquals("Carol", joined.opponentName("alice"))
         assertEquals(Challenge.State.YourTurn, joined.state("carol", hour))
     }
+
+    @Test fun renamingShowsTheCurrentPseudos() {
+        val c = challenge().renaming(mapOf("bob" to "Bobby", "zoe" to "Zoé", "alice" to ""))
+        assertEquals("Alice", c.from.name)
+        assertEquals("Bobby", c.to.name)
+        assertEquals("Bobby", c.opponentName("alice"))
+    }
 }

@@ -155,9 +155,12 @@ struct LeaderboardView: View {
         var color: Int { id.unicodeScalars.reduce(0) { $0 + Int($1.value) } }
     }
     private var rows: [Row] { allRows.filter { !hidden.contains($0.id) } }
+    /// Current pseudos, for the day's ranking only (see AppState.currentNames).
+    private var names: [String: String] { board == .today ? state.currentNames : [:] }
     private var allRows: [Row] {
         switch board {
-        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.scoreMs),
+        // A day's result keeps the pseudo of when it was played: the current one when known.
+        case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.scoreMs),
                                      detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice +1 min" : "")) }
         case .week: players.map { p in
             let week = p.thisWeek() ?? .none

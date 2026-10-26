@@ -137,6 +137,14 @@ public struct Challenge: Codable, Sendable, Equatable, Identifiable {
     public var isOpen: Bool { to.uid.isEmpty }
     /// The other player's name, or what stands for it while nobody has joined.
     public func opponentName(_ uid: String) -> String { isOpen && from.uid == uid ? "Défi par lien" : theirs(uid).name }
+    /// The same challenge under the players' current pseudos: the names are saved when it is made,
+    /// so a player who renamed since would otherwise keep their old pseudo here.
+    public func renaming(_ names: [String: String]) -> Challenge {
+        var copy = self
+        if let name = names[from.uid], !name.isEmpty { copy.from.name = name }
+        if let name = names[to.uid], !name.isEmpty { copy.to.name = name }
+        return copy
+    }
 
     /// Time left for the friend to start, then for everyone to finish.
     public func startDeadlineMs() -> Int { createdMs + ChallengeRules.startWindowMs }

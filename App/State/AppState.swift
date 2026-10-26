@@ -246,6 +246,9 @@ import CNSNNCore
             if let cloud, let uid { try await cloud.rename(uid: uid, username: name) }
             progress.username = name
             persist()
+            // The kept rankings still show the old pseudo: read them again.
+            rankings.readAt = [:]
+            if let uid { challenges = challenges.map { $0.renaming([uid: name]) } }
             await refreshOfficial()
         } catch { self.error = CloudError.message(error) }
     }
@@ -339,6 +342,16 @@ import CNSNNCore
     var rankingsVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
+    /// Current pseudos, by player: the totals (leaderboard) are renamed with the profile, whereas a
+    /// day's result, a challenge or a friend keeps the pseudo of when it was saved.
+    var currentNames: [String: String] {
+        var names: [String: String] = [:]
+        for entry in rankings.fastest + rankings.players { names[entry.uid] = entry.username }
+        for friend in rankings.friends { names[friend.uid] = friend.username }
+        if let official { names[official.uid] = official.username }
+        if let uid, !progress.username.isEmpty { names[uid] = progress.username }
+        return names
+    }
     /// Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again.
     func rankingIsStale(_ key: String, force: Bool) -> Bool {
         guard let at = rankings.readAt[key] else { return true }
@@ -410,16 +423,17 @@ import CNSNNCore
         if !force, let challengesReadAt, Date().timeIntervalSince(challengesReadAt) < 30 { return }
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let cached = ChallengeCache.load(uid: uid)
-        let list: [Challenge]
+        let read: [Challenge]
         var fullAt = cached?.fullAtMs ?? 0
         if let cached, now - cached.fullAtMs < ChallengeRules.fullRefreshMs {
             guard let recent = try? await cloud.recentChallenges(uid: uid, nowMs: now) else { return }
-            list = ChallengeRules.merge(cached: cached.challenges, recent: recent, nowMs: now)
+            read = ChallengeRules.merge(cached: cached.challenges, recent: recent, nowMs: now)
         } else {
             guard let all = try? await cloud.challenges(uid: uid) else { return }
-            list = all; fullAt = now
+            read = all; fullAt = now
         }
         guard self.uid == uid else { return }
+        let list = read.map { $0.renaming(currentNames) }
         challengesReadAt = Date()
         ChallengeWatch.noteRead()
         ChallengeCache.save(.init(challenges: list, fullAtMs: fullAt), uid: uid)

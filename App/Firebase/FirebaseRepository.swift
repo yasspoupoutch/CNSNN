@@ -196,6 +196,9 @@ enum DailyGuesses {
             batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("leaderboard").document(uid))
         }
         try await batch.commit()
+        // Today's result too, if played (the ranking of the day shows it). Best effort, no read:
+        // without a result today the write is simply refused.
+        resultRef(uid, DailySchedule.key()).updateData(["username": username], completion: nil)
     }
 
     // MARK: Unique pseudos
@@ -634,6 +637,12 @@ enum DailyGuesses {
                     continue
                 }
                 if doc.data()?["suspended"] as? Bool == true { continue }
+            }
+            // A friend who renamed: their totals carry the new pseudo, the list saved the old one.
+            // Writing it back (rarely) keeps the challenge list and new challenges up to date too.
+            if player.uid != uid, let current = entry?.username, current != player.name {
+                db.collection("users").document(uid).collection("friends").document(player.uid)
+                    .setData(["username": current, "addedAt": FieldValue.serverTimestamp()], completion: nil)
             }
             let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
             let today = data.flatMap { Self.attempt(day: day, $0) }
