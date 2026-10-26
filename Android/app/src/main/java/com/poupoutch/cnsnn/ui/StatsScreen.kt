@@ -294,7 +294,8 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     val hidden = state.hiddenPlayers
     val rows = when (board) {
         // The official time: a hint adds a minute.
-        Board.TODAY -> today.map { Line(it.uid, it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") }
+        // A day's result keeps the pseudo of when it was played: the current one when known.
+        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") } }
         // The month total: 10 min for every day not found or not played, so the lowest wins.
         Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }

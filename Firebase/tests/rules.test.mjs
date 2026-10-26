@@ -426,6 +426,18 @@ test('leaderboard rename follows the profile only',async()=>{
  await assertSucceeds(b.commit());
  await assertFails(updateDoc(doc(db,'leaderboard/alice'),{username:'Zorro',updatedAt:serverTimestamp()}));
 });
+test('a day\'s result takes the new pseudo after a rename, nothing else',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const day=parisKey();
+ await seed(`dailyResults/alice_${day}`,{userId:'alice',username:'Alice',day,correct:true,usedHint:false,timeMs:9000,scoreMs:9000,rank:dailyRank(day,9000,true)});
+ const db=user();
+ await assertFails(updateDoc(doc(db,`dailyResults/alice_${day}`),{username:'Alicia'}));
+ await assertSucceeds(renameBatch('alice','Alice','Alicia',db).commit());
+ await assertFails(updateDoc(doc(db,`dailyResults/alice_${day}`),{username:'Alicia',timeMs:1000}));
+ await assertFails(updateDoc(doc(user('bob'),`dailyResults/alice_${day}`),{username:'Alicia'}));
+ await assertSucceeds(updateDoc(doc(db,`dailyResults/alice_${day}`),{username:'Alicia'}));
+ assert.equal((await read(`dailyResults/alice_${day}`)).username,'Alicia');
+});
 test('ranking and percentile queries are public to players, on single fields',async()=>{
  const day=parisKey(),base=dailyRank(day,0,true);
  // b took the hint: 9 s + 1 min puts them behind c. d lost, yesterday's player is another day.

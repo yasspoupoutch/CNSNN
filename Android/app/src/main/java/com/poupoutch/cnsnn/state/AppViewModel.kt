@@ -312,6 +312,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         try {
             uid?.let { cloud.rename(it, clean) }
             update { it.copy(username = clean) }
+            // The kept rankings still show the old pseudo: read them again.
+            forgetRankings()
+            uid?.let { me -> challenges = challenges.map { it.renaming(mapOf(me to clean)) } }
             refreshOfficial()
         } catch (e: Exception) { error = CloudError.message(e) }
     }
@@ -439,6 +442,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val readAt: Map<String, Long> = emptyMap(),
     )
     var rankings by mutableStateOf(Rankings())
+    /**
+     * Current pseudos, by player: the totals (leaderboard) are renamed with the profile, whereas a
+     * day's result, a challenge or a friend keeps the pseudo of when it was saved.
+     */
+    val currentNames: Map<String, String> get() {
+        val names = mutableMapOf<String, String>()
+        (rankings.fastest + rankings.players).forEach { names[it.uid] = it.username }
+        rankings.friends.forEach { names[it.uid] = it.username }
+        official?.let { names[it.uid] = it.username }
+        val me = uid
+        if (me != null && progress.username.isNotEmpty()) names[me] = progress.username
+        return names
+    }
     /** Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again. */
     fun rankingIsStale(key: String, force: Boolean): Boolean {
         val at = rankings.readAt[key] ?: return true
@@ -468,7 +484,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val all = runCatching { cloud.challenges(user) }.getOrNull() ?: return
             fullAt = now
             all
-        }
+        }.map { it.renaming(currentNames) }
         if (uid != user) return
         challengesReadAt = now
         local.challengesReadAt = now

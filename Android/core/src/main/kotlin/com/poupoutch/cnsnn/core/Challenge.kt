@@ -149,6 +149,14 @@ data class Challenge(
     val isOpen: Boolean get() = to.uid.isEmpty()
     /** The other player's name, or what stands for it while nobody has joined. */
     fun opponentName(uid: String): String = if (isOpen && from.uid == uid) "Défi par lien" else theirs(uid).name
+    /**
+     * The same challenge under the players' current pseudos: the names are saved when it is made,
+     * so a player who renamed since would otherwise keep their old pseudo here.
+     */
+    fun renaming(names: Map<String, String>): Challenge = copy(
+        from = names[from.uid]?.takeIf { it.isNotEmpty() }?.let { from.copy(name = it) } ?: from,
+        to = names[to.uid]?.takeIf { it.isNotEmpty() }?.let { to.copy(name = it) } ?: to,
+    )
     val startDeadlineMs: Long get() = createdMs + ChallengeRules.START_WINDOW_MS
     val finishDeadlineMs: Long get() = createdMs + ChallengeRules.FINISH_WINDOW_MS
 

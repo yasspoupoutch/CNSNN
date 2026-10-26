@@ -265,10 +265,13 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
                     Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou invitez-le ci-dessous.",
                         fontSize = 14.sp, color = Palette.tertiary)
                 }
+                val names = state.currentNames
                 friends.forEachIndexed { index, (friend, name) ->
+                    // The friend's current pseudo when known (the list keeps the one saved when added).
+                    val shown = names[friend] ?: name
                     if (index > 0) Divider()
-                    PersonRow(name, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
-                        DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $name" }, enabled = sending == null, busy = sending == friend) {
+                    PersonRow(shown, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
+                        DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $shown" }, enabled = sending == null, busy = sending == friend) {
                             haptics.selection(); sending = friend; message = null
                             scope.launch {
                                 try { play(state.sendChallenge(friend, name)) }

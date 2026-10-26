@@ -233,11 +233,13 @@ struct ChallengeSheet: View {
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
             }
             ForEach(Array(friends.enumerated()), id: \.element.uid) { index, friend in
+                // The friend's current pseudo when known (the list keeps the one saved when added).
+                let name = state.currentNames[friend.uid] ?? friend.name
                 if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
                 HStack(spacing: 12) {
-                    AvatarView(name: friend.name, colorIndex: avatarIndex(friend.uid), size: 34)
+                    AvatarView(name: name, colorIndex: avatarIndex(friend.uid), size: 34)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(friend.name).scaledFont(15, .semibold).lineLimit(1)
+                        Text(name).scaledFont(15, .semibold).lineLimit(1)
                         Text(state.challengeTally(friend: friend.uid).label ?? "Aucun défi pour l’instant")
                             .scaledFont(12).foregroundStyle(Palette.duelSoft.opacity(0.85)).lineLimit(1)
                     }
@@ -248,7 +250,7 @@ struct ChallengeSheet: View {
                         if sending == friend.uid { ProgressView().tint(Palette.duelText) } else { Text("Défier") }
                     }
                     .buttonStyle(DuelButtonStyle(height: 38)).disabled(sending != nil)
-                    .accessibilityLabel("Défier \(friend.name)")
+                    .accessibilityLabel("Défier \(name)")
                 }.padding(.horizontal, 14).frame(minHeight: 60)
             }
         }.glassPanel(radius: 22, padding: 0)

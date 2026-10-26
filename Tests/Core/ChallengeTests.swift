@@ -195,4 +195,11 @@ final class ChallengeTests: XCTestCase {
         XCTAssertEqual(c.opponentName("alice"), "Carol")
         XCTAssertEqual(c.state(for: "carol", now: hour), .yourTurn)
     }
+
+    func testRenamingShowsTheCurrentPseudos() {
+        let c = challenge().renaming(["bob": "Bobby", "zoe": "Zoé", "alice": ""])
+        XCTAssertEqual(c.from.name, "Alice")
+        XCTAssertEqual(c.to.name, "Bobby")
+        XCTAssertEqual(c.opponentName("alice"), "Bobby")
+    }
 }

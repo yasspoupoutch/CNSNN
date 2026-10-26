@@ -116,6 +116,9 @@ class CloudRepository(
             batch.update(db.collection("leaderboard").document(uid), mapOf("username" to username, "updatedAt" to FieldValue.serverTimestamp()))
         }
         batch.commit().await()
+        // Today's result too, if played (the ranking of the day shows it). Best effort, no read:
+        // without a result today the write is simply refused.
+        resultRef(uid, DailySchedule.key()).update("username", username)
     }
 
     // ---- Unique pseudos: usernames/{pseudo in lower case} names the player holding it, whatever the case.
@@ -469,6 +472,13 @@ class CloudRepository(
                     runCatching { removeFriend(uid, player) }
                     continue
                 }
+            }
+            // A friend who renamed: their totals carry the new pseudo, the list saved the old one.
+            // Writing it back (rarely) keeps the challenge list and new challenges up to date too.
+            val current = entry?.username
+            if (player != uid && current != null && current != name) {
+                db.collection("users").document(uid).collection("friends").document(player)
+                    .set(mapOf("username" to current, "addedAt" to FieldValue.serverTimestamp()))
             }
             val result = resultRef(player, day).get(Source.SERVER).await()
             val today = result.data?.let { attempt(day, it) }
