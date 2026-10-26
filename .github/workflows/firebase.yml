@@ -23,6 +23,10 @@ on:
         description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
         type: boolean
         default: false
+      pseudo_history:
+        description: "Pseudos portés par le compte qui a ce pseudo : nouveau joueur ou ancien renommé (chiffré)"
+        type: string
+        default: ''
       deploy:
         description: Publier les règles et index Firestore sur cnsnn-9ctosy
         type: boolean
@@ -124,7 +128,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage || inputs.players)) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage || inputs.players || inputs.pseudo_history != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -182,6 +186,11 @@ jobs:
       - name: Liste des joueurs (chiffrée)
         if: ${{ inputs.players }}
         run: node tools/players.mjs tools/players.pem
+      - name: Pseudos d'un compte (chiffrés)
+        if: ${{ inputs.pseudo_history != '' }}
+        env:
+          PSEUDO: ${{ inputs.pseudo_history }}
+        run: node tools/pseudos.mjs tools/players.pem "$PSEUDO"
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
