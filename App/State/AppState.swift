@@ -73,6 +73,7 @@ import CNSNNCore
     func syncProgress() async {
         guard let cloud, let uid else { return }
         guard let merged = try? await cloud.saveCloudProgress(progress, uid: uid), self.uid == uid else { return }
+        syncedAt = Date()
         adopt(merged)
     }
     /// Takes in what another device saved. Saved on this device only: the cloud already has it.
@@ -102,9 +103,12 @@ import CNSNNCore
                 try activate(profile, preservingGuest: true)
             } catch let error as CloudError where [.usernameTaken, .usernameInvalid].contains(error) {
                 self.error = CloudError.message(error); return
+            } catch where CloudError.code(error) == .serverFull {
+                // The free quota is used up for today: enter as a guest, the account is made at the next launch.
+                note(error)
             } catch { self.error = "Connexion impossible : " + CloudError.message(error); return }
         }
-        if cloud == nil { progress.username = name }
+        if uid == nil { progress.username = name }
         // Interface tests: today's word already found, the longest one and in hours, to check the home card fits.
         if RuntimeFlags.isTesting, ProcessInfo.processInfo.arguments.contains("--daily-found"),
            let card = ModeCatalogue.cards.max(by: { $0.wordFull.count < $1.wordFull.count }) {
@@ -131,7 +135,8 @@ import CNSNNCore
             await resumeDeletion(); return
         } catch {
             // Offline launches stay quiet: Classique works and the home screen says it is offline.
-            if ![CloudError.Code.network, .unavailable].contains(CloudError.code(error)), !(error is CloudError) { self.error = CloudError.message(error) }
+            note(error)
+            if ![CloudError.Code.network, .unavailable, .serverFull].contains(CloudError.code(error)), !(error is CloudError) { self.error = CloudError.message(error) }
             return
         }
         await refreshAll()
@@ -254,13 +259,19 @@ import CNSNNCore
     }
     /// Classic plays the built-in cards plus every approved community card. The community cards are kept
     /// on this device and downloaded again only when a moderator changed the catalogue (`meta/cards`),
-    /// so a launch costs one read instead of one per card on the free plan.
-    func refreshCards() async {
+    /// so a launch costs one read instead of one per card on the free plan. A player downloads them at most
+    /// every 12 hours (a busy moderation day would otherwise cost every player the whole catalogue each time);
+    /// the moderator (`force`) sees a change at once.
+    func refreshCards(force: Bool = false) async {
         guard let cloud, uid != nil else { return }
         do {
             let cached = CardCache.load()
+            if !force, let cached, Date().timeIntervalSince(cached.savedAt) < 12 * 3600 { cards = Self.catalogue(community: cached.cards); return }
             let version = try await cloud.cardsVersion()
-            if let cached, cached.isCurrent(version: version) { cards = Self.catalogue(community: cached.cards); return }
+            if let cached, cached.isCurrent(version: version) {
+                if version != nil { CardCache.save(CardCache(version: cached.version, savedAt: Date(), cards: cached.cards)) }
+                cards = Self.catalogue(community: cached.cards); return
+            }
             let community = try await cloud.cards()
             CardCache.save(CardCache(version: version ?? 0, savedAt: Date(), cards: community))
             cards = Self.catalogue(community: community)
@@ -321,7 +332,26 @@ import CNSNNCore
     }
     func refreshOfficial() async {
         guard let cloud, let uid else { return }
-        if let entry = try? await cloud.leaderboardEntry(uid: uid) { official = entry; refreshGlance() }
+        do {
+            if let entry = try await cloud.leaderboardEntry(uid: uid) { official = entry; refreshGlance() }
+            serverFullUntil = nil
+        } catch { note(error) }
+    }
+
+    /// Set when Firestore refused a request because the free daily quota is used up: until it starts
+    /// again, the app says so once instead of failing everywhere, and reads nothing more.
+    var serverFullUntil: Date?
+    var isServerFull: Bool { serverFullUntil.map { Date() < $0 } ?? false }
+    func note(_ error: Error) {
+        if CloudError.code(error) == .serverFull { serverFullUntil = CloudError.quotaReset() }
+    }
+    private var syncedAt: Date?
+    /// Back in the app: the progress is merged again after a while (changes made here are saved at once),
+    /// and a launch refused by a full server tries again once the quota is back.
+    func returnToApp() async {
+        if cloud != nil, uid == nil, !progress.username.isEmpty, !isServerFull { await connectIfConfigured(); return }
+        if let syncedAt, Date().timeIntervalSince(syncedAt) < 600 { return }
+        await syncProgress()
     }
 
     /// The public rankings, kept a few minutes: everybody reads the same lines, so opening the page
@@ -352,11 +382,15 @@ import CNSNNCore
         if let uid, !progress.username.isEmpty { names[uid] = progress.username }
         return names
     }
-    /// Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again.
+    /// Whether a ranking needs reading: after 3 minutes, or 30 seconds when the player pulls to refresh.
+    /// The player's own result shows at once: its confirmation forgets the kept rankings (recordOfficial).
     func rankingIsStale(_ key: String, force: Bool) -> Bool {
+        guard !isServerFull else { return false }
         guard let at = rankings.readAt[key] else { return true }
-        return Date().timeIntervalSince(at) > (force ? 10 : 300)
+        return Date().timeIntervalSince(at) > (force ? Self.rankingRefreshSeconds : Self.rankingKeepSeconds)
     }
+    static let rankingKeepSeconds: TimeInterval = 180
+    static let rankingRefreshSeconds: TimeInterval = 30
 
     // MARK: Results
 

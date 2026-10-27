@@ -1040,10 +1040,12 @@ enum CloudError: LocalizedError {
     case inviteExpired
     case usernameTaken
     case usernameInvalid
+    case serverFull
 
     /// The few Firebase error codes the app reacts to.
-    enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
+    enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, serverFull, other }
     static func code(_ error: Error) -> Code {
+        if (error as? CloudError) == .serverFull { return .serverFull }
         let error = error as NSError
         switch (error.domain, error.code) {
         case ("FIRAuthErrorDomain", 17007), ("FIRAuthErrorDomain", 17025), ("FIRAuthErrorDomain", 17012): return .emailInUse
@@ -1054,6 +1056,7 @@ enum CloudError: LocalizedError {
         case ("FIRAuthErrorDomain", 17020): return .network
         case ("FIRAuthErrorDomain", 17010): return .tooManyRequests
         case ("FIRFirestoreErrorDomain", 7): return .permissionDenied
+        case ("FIRFirestoreErrorDomain", 8): return .serverFull
         case ("FIRFirestoreErrorDomain", 14), ("FIRFirestoreErrorDomain", 4): return .unavailable
         default: return .other
         }
@@ -1070,6 +1073,7 @@ enum CloudError: LocalizedError {
         case .network, .unavailable: return CloudError.offline.errorDescription ?? ""
         case .tooManyRequests: return "Trop de tentatives. Réessayez dans quelques minutes."
         case .permissionDenied: return "Action refusée par le serveur. Mettez l’application à jour puis réessayez."
+        case .serverFull: return CloudError.serverFull.errorDescription ?? ""
         case .other: return error.localizedDescription
         }
     }
@@ -1095,6 +1099,18 @@ enum CloudError: LocalizedError {
         case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
         case .usernameTaken: "Ce pseudo est déjà pris. Choisissez-en un autre."
         case .usernameInvalid: "Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."
+        case .serverFull: "Beaucoup de joueurs aujourd’hui : le serveur gratuit de CNSNN est plein. Le mot du jour classé et les classements reviennent à " + Self.quotaResetText() + ". Les autres modes restent jouables."
         }
+    }
+    /// Firestore's free daily quota starts again at midnight in California (9 h in Paris most of the year).
+    static func quotaReset(after now: Date = Date()) -> Date {
+        var california = Calendar(identifier: .gregorian)
+        california.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        return california.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime) ?? now.addingTimeInterval(3600)
+    }
+    /// "9 h", in the phone's time zone.
+    static func quotaResetText(after now: Date = Date()) -> String {
+        let time = Calendar.current.dateComponents([.hour, .minute], from: quotaReset(after: now))
+        return "\(time.hour ?? 9) h" + ((time.minute ?? 0) > 0 ? String(format: "%02d", time.minute ?? 0) : "")
     }
 }

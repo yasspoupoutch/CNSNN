@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.core.ModeStat
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.records
@@ -129,6 +130,10 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Header(state)
+        // The free Firestore quota is used up for today: one calm line instead of errors everywhere.
+        if (state.isServerFull) SectionCard(Modifier.testTag("home.serverFull"), radius = 24.dp, padding = 16.dp) {
+            Text(CloudError.serverFull(), fontSize = 14.sp, color = Palette.secondary)
+        }
         DailyCard(state, today, play = { play(GameMode.DAILY, null, null) }, catchUp = { catchUp = it })
         Modes(state, openClassic = { classic = true }, playMode = playMode, openChallenges = { challenges = true }, playChallenge = { playChallenge(it.id) })
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -233,7 +238,7 @@ private fun ModeTile(icon: ImageVector, tint: Color, title: String, tagline: Str
 }
 
 private fun syncLabel(state: AppViewModel): String = when {
-    state.uid == null -> "Hors connexion · progression gardée sur ce téléphone"
+    state.uid == null -> (if (state.isServerFull) "Serveur plein" else "Hors connexion") + " · progression gardée sur ce téléphone"
     state.isAnonymous -> "Sauvegardé en ligne · compte invité"
     else -> "Sauvegardé en ligne · " + (state.email ?: "compte permanent")
 }
