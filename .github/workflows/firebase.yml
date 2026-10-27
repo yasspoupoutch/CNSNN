@@ -188,6 +188,8 @@ jobs:
       - name: Publier le site
         if: ${{ inputs.site && github.ref == 'refs/heads/main' }}
         # No APK: the free Spark plan refuses executable files on Hosting.
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node tools/hosting.mjs
       - name: Effacer la clé
         if: ${{ always() }}
