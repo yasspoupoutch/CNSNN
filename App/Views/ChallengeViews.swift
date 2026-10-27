@@ -325,7 +325,7 @@ struct ChallengeSheet: View {
 
     private var invite: some View {
         let text = "Je te défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne !"
-            + (code.map { " Ajoute-moi avec mon code ami " + $0 + "." } ?? "") + " " + Site.home.absoluteString
+            + (code.map { " Ajoute-moi avec mon code ami " + $0 + "." } ?? "") + " " + Site.appStore.absoluteString
         return ShareLink(item: text) {
             Label("Inviter par message", systemImage: "square.and.arrow.up").scaledFont(15, .semibold)
         }.buttonStyle(GlassPillStyle(height: 50)).padding(.top, 6)
@@ -601,7 +601,7 @@ private struct ChallengeResultView: View {
                     ShareLink(item: ChallengeInvite.shareText(code: code)) { Text("Envoyer le lien") }
                         .buttonStyle(GlassPillStyle(height: 54)).accessibilityIdentifier("shareChallengeLink")
                 } else if result == nil {
-                    ShareLink(item: "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! " + Site.home.absoluteString) {
+                    ShareLink(item: "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! " + Site.appStore.absoluteString) {
                         Text("Prévenir \(other.name)")
                     }.buttonStyle(GlassPillStyle(height: 54))
                 }
