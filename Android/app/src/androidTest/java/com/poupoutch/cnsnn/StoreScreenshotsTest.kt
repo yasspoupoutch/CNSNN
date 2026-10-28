@@ -42,6 +42,10 @@ class StoreScreenshotsTest {
     private fun waitFor(text: String, timeout: Long = 20_000) = rule.waitUntil(timeout) { has(text) }
 
     @Test fun takeStoreScreenshots() {
+        try { takeAll() } catch (e: Throwable) { runCatching { shot("zz-echec") }; throw e }
+    }
+
+    private fun takeAll() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("storeScreenshots") == "true")
         Cloud.useEmulators(context, host)
         FirebaseAuth.getInstance(Cloud.app!!).signOut()
@@ -69,6 +73,8 @@ class StoreScreenshotsTest {
         "PARAP".forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
         shot("02-mot-du-jour")
         "LUIE".forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
+        // The rules refuse an answer in the first two seconds of the game.
+        Thread.sleep(2_500)
         rule.onNodeWithText("Valider").performClick()
         waitFor("Terminer")
         rule.waitUntil(20_000) { !has("Validation du temps officiel…") }

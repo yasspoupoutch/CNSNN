@@ -112,6 +112,7 @@ jobs:
         if: failure()
         run: tail -50 "$RUNNER_TEMP/emulators.log" || true
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: cnsnn-screenshots-android
           path: ${{ runner.temp }}/shots/*.png
@@ -120,6 +121,8 @@ jobs:
   publier-captures:
     name: Publier les captures sur la branche store-screenshots
     needs: captures
+    # Aussi après un échec : la capture zz-echec.png montre où le parcours s'est arrêté.
+    if: always() && needs.captures.result != 'skipped' && needs.captures.result != 'cancelled'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

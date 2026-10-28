@@ -17,9 +17,9 @@ demo notifications -e visible false
 ./gradlew --no-daemon :app:installDebug :app:installDebugAndroidTest
 adb shell am instrument -w -e class com.poupoutch.cnsnn.StoreScreenshotsTest -e storeScreenshots true \
   com.poupoutch.cnsnn.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/instrument.log"
-grep -q '^OK (1 test)' "$out/instrument.log" || { echo "::error::Les captures Google Play ont échoué."; exit 1; }
-rm "$out/instrument.log"
-for name in $(adb shell run-as com.poupoutch.cnsnn ls files/shots); do
+for name in $(adb shell run-as com.poupoutch.cnsnn ls files/shots 2>/dev/null | tr -d "\r" || true); do
   adb exec-out run-as com.poupoutch.cnsnn cat "files/shots/$name" > "$out/$name"
 done
 ls -l "$out"
+grep -q '^OK (1 test)' "$out/instrument.log" || { echo "::error::Les captures Google Play ont échoué (zz-echec.png montre l'écran)."; exit 1; }
+rm "$out/instrument.log"
