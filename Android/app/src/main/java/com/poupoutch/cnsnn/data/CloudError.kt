@@ -8,6 +8,8 @@ import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import java.time.Instant
+import java.time.ZoneId
 
 /** Errors the app explains itself, with the same French wording as the iPhone app. */
 class CloudError(val kind: Kind) : Exception(kind.message) {
@@ -34,12 +36,14 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         INVITE_EXPIRED("Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."),
         USERNAME_TAKEN("Ce pseudo est déjà pris. Choisissez-en un autre."),
         USERNAME_INVALID("Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."),
+        SERVER_FULL("Beaucoup de joueurs aujourd’hui : le serveur gratuit de CNSNN est plein."),
     }
 
-    enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, OTHER }
+    enum class Code { EMAIL_IN_USE, WRONG_CREDENTIALS, WEAK_PASSWORD, INVALID_EMAIL, RECENT_LOGIN, NETWORK, TOO_MANY, PERMISSION_DENIED, UNAVAILABLE, SERVER_FULL, OTHER }
 
     companion object {
         fun code(error: Throwable): Code = when (error) {
+            is CloudError -> if (error.kind == Kind.SERVER_FULL) Code.SERVER_FULL else Code.OTHER
             is FirebaseAuthUserCollisionException -> Code.EMAIL_IN_USE
             is FirebaseAuthWeakPasswordException -> Code.WEAK_PASSWORD
             is FirebaseAuthInvalidCredentialsException ->
@@ -50,6 +54,7 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
             is FirebaseTooManyRequestsException -> Code.TOO_MANY
             is FirebaseFirestoreException -> when (error.code) {
                 FirebaseFirestoreException.Code.PERMISSION_DENIED -> Code.PERMISSION_DENIED
+                FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED -> Code.SERVER_FULL
                 FirebaseFirestoreException.Code.UNAVAILABLE, FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> Code.UNAVAILABLE
                 else -> Code.OTHER
             }
@@ -58,6 +63,7 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
 
         /** A short French explanation for any error shown to the player. */
         fun message(error: Throwable): String {
+            if (code(error) == Code.SERVER_FULL) return serverFull()
             if (error is CloudError) return error.kind.message
             return when (code(error)) {
                 Code.EMAIL_IN_USE -> "Cette adresse a déjà un compte CNSNN. Choisissez « J’ai déjà un compte » pour vous y connecter."
@@ -68,8 +74,21 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
                 Code.NETWORK, Code.UNAVAILABLE -> Kind.OFFLINE.message
                 Code.TOO_MANY -> "Trop de tentatives. Réessayez dans quelques minutes."
                 Code.PERMISSION_DENIED -> "Action refusée par le serveur. Mettez l’application à jour puis réessayez."
+                Code.SERVER_FULL -> serverFull()
                 Code.OTHER -> "Une erreur est survenue. Réessayez."
             }
+        }
+
+        /** The full-server notice, with the hour the free quota starts again. */
+        fun serverFull(now: Instant = Instant.now()): String =
+            Kind.SERVER_FULL.message + " Le mot du jour classé et les classements reviennent à " + quotaResetText(now) + ". Les autres modes restent jouables."
+        /** Firestore's free daily quota starts again at midnight in California (9 h in Paris most of the year). */
+        fun quotaReset(now: Instant = Instant.now()): Instant =
+            now.atZone(ZoneId.of("America/Los_Angeles")).toLocalDate().plusDays(1).atStartOfDay(ZoneId.of("America/Los_Angeles")).toInstant()
+        /** "9 h", in the phone's time zone. */
+        fun quotaResetText(now: Instant = Instant.now()): String {
+            val time = quotaReset(now).atZone(ZoneId.systemDefault())
+            return "${time.hour} h" + if (time.minute > 0) "%02d".format(time.minute) else ""
         }
     }
 }

@@ -86,6 +86,10 @@ class LocalStore(context: Context) {
         get() = prefs.getString("cards", null)?.let { json -> runCatching { ProgressJson.decodeFromString(ListSerializer(Card.serializer()), json) }.getOrNull() }
     val cardsVersion: Long get() = prefs.getLong("cards.version", -1)
     val cardsFetchedAt: Long get() = prefs.getLong("cards.fetchedAt", 0)
+    /** The last time the catalogue version was checked: at most every 12 hours (see AppViewModel.refreshCards). */
+    var cardsCheckedAt: Long
+        get() = prefs.getLong("cards.checkedAt", 0)
+        set(value) { prefs.edit().putLong("cards.checkedAt", value).apply() }
     fun storeCards(cards: List<Card>, version: Long, fetchedAt: Long) {
         prefs.edit().putString("cards", ProgressJson.encodeToString(ListSerializer(Card.serializer()), cards))
             .putLong("cards.version", version).putLong("cards.fetchedAt", fetchedAt).apply()

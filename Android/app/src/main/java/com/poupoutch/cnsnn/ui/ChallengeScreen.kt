@@ -265,10 +265,13 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
                     Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou invitez-le ci-dessous.",
                         fontSize = 14.sp, color = Palette.tertiary)
                 }
+                val names = state.currentNames
                 friends.forEachIndexed { index, (friend, name) ->
+                    // The friend's current pseudo when known (the list keeps the one saved when added).
+                    val shown = names[friend] ?: name
                     if (index > 0) Divider()
-                    PersonRow(name, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
-                        DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $name" }, enabled = sending == null, busy = sending == friend) {
+                    PersonRow(shown, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
+                        DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $shown" }, enabled = sending == null, busy = sending == friend) {
                             haptics.selection(); sending = friend; message = null
                             scope.launch {
                                 try { play(state.sendChallenge(friend, name)) }
@@ -444,7 +447,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     current.card?.let {
         Text("Mot ${current.index + 1} sur ${ChallengeRules.WORDS}", fontSize = 12.sp, color = Palette.tertiary,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp))
-        Clue(it)
+        Clue(it, game.passed, game.passedTick)
     }
     AnswerLine(game.answer, game.mistakeTick, true)
     SkipChip("Passer · +20 s", "Passer ce mot, 20 secondes de pénalité") { game.skip(state) }
@@ -494,6 +497,9 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                         }
                     }
                 }
+            }
+            missedSentence(game.game?.missed.orEmpty())?.let {
+                Text(it, fontSize = 13.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
             }
             Text(when {
                 result != null -> "Le temps officiel est mesuré par le serveur."

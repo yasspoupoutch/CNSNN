@@ -93,7 +93,7 @@ class GameViewModel : ViewModel() {
             ranked = true; phase = Phase.Loading
             viewModelScope.launch {
                 if (state.uid == null) state.refreshAll()
-                val uid = state.uid ?: run { phase = Phase.Failed(CloudError.Kind.OFFLINE.message); return@launch }
+                val uid = state.uid ?: run { phase = Phase.Failed(if (state.isServerFull) CloudError.serverFull() else CloudError.Kind.OFFLINE.message); return@launch }
                 if (state.isSuspended && runCatching { state.cloud.dailySession(uid, key) }.getOrNull() == null) {
                     phase = Phase.Failed(AppViewModel.SUSPENDED_TEXT); return@launch
                 }
@@ -155,6 +155,7 @@ class GameViewModel : ViewModel() {
             }
             phase = if (card == null) Phase.Failed("Cette carte n’existe pas dans cette version. Mettez l’application à jour.") else Phase.Playing
         } catch (e: Exception) {
+            state.note(e)
             phase = Phase.Failed(CloudError.message(e))
         }
     }
@@ -249,7 +250,7 @@ class GameViewModel : ViewModel() {
                     CloudError.Kind.GUESS_LIMIT -> { wrongAnswers = Guesses.MAX; outOfGuesses(state, uid, day) }
                     // Finished on another device: show the official result.
                     CloudError.Kind.DAILY_FINISHED -> { checking = false; load(state) }
-                    else -> notice = CloudError.message(e)
+                    else -> { state.note(e); notice = CloudError.message(e) }
                 }
             } finally { checking = false }
         }

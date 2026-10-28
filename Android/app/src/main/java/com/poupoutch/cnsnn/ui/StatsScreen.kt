@@ -232,6 +232,9 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     }
     var board by rememberSaveable { mutableStateOf(Board.TODAY) }
     var seenToken by remember { mutableIntStateOf(refreshToken) }
+    // Arriving on the page reads the ranking again (at most every 30 s), while switching boards or
+    // coming back to the app keeps the copy of the last 3 minutes.
+    var arrived by remember { mutableStateOf(false) }
     val today = state.rankings.today
     val players = state.rankings.players
     val fastest = state.rankings.fastest
@@ -245,9 +248,10 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     /** Reads only the ranking on screen, and only when the kept copy is old (see AppViewModel.rankings). */
     suspend fun refresh() {
         if (board == Board.FRIENDS) return
-        // Every open, tab switch and return to the app reads again (at most every 10 s, see rankingIsStale).
-        val force = true
-        seenToken = refreshToken
+        if (state.isServerFull) { failed = true; return }
+        // Kept 3 minutes; arriving on the page or a pull to refresh reads again after 30 s (see rankingIsStale).
+        val force = !arrived || refreshToken != seenToken
+        seenToken = refreshToken; arrived = true
         val day = DailySchedule.key()
         val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); else -> board.name }
         val summary = state.rankingIsStale("summary", force)
@@ -268,7 +272,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                 }
                 state.rankingRead(key)
             }
-        } catch (_: Exception) { failed = true } finally { loading = false }
+        } catch (e: Exception) { failed = true; state.note(e) } finally { loading = false }
     }
     val resumes = rememberResumeCount()
     LaunchedEffect(state.uid, refreshToken, board, resumes) { refresh() }
@@ -286,19 +290,24 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Palette.foreground, selectedLabelColor = Palette.ink))
         }
     }
+    if (state.isServerFull) Text(CloudError.serverFull(), fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     if (board == Board.FRIENDS) { FriendsBoard(state, refreshToken); return }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
+    // The rankings show only their first lines: says how many, so nobody looks for a missing name.
+    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; else -> "Top 25 des meilleurs temps" },
+        fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     val hidden = state.hiddenPlayers
     val rows = when (board) {
         // The official time: a hint adds a minute.
-        Board.TODAY -> today.map { Line(it.uid, it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") }
+        // A day's result keeps the pseudo of when it was played: the current one when known.
+        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") } }
         // The month total: 10 min for every day not found or not played, so the lowest wins.
         Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
         Board.FRIENDS -> emptyList()
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
-        if (rows.isEmpty()) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else
+        if (rows.isEmpty()) EmptyLine(loading, if (failed) unavailable(state) else
             when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.MONTH -> "Personne n’a encore joué ce mois-ci."; else -> "Aucun résultat pour le moment." })
         rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
@@ -380,8 +389,9 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     val name = state.progress.username.ifEmpty { "Joueur" }
     /** Two reads per friend: kept a few minutes like the other rankings (see AppViewModel.rankings). */
     suspend fun refresh() {
-        // Every open, tab switch and return to the app reads again (at most every 10 s, see rankingIsStale).
-        val force = true
+        if (state.isServerFull) { failed = true; return }
+        // Kept 3 minutes; a pull to refresh reads again after 30 s (see rankingIsStale).
+        val force = refreshToken != seenToken
         seenToken = refreshToken
         val key = "friends-" + DailySchedule.key()
         // A friend who typed my code since the last read: one count, then the list at once.
@@ -395,7 +405,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
             state.rankings = state.rankings.copy(friendCount = runCatching { state.cloud.friendCount(uid) }.getOrNull())
             state.rankingRead(key)
             state.refreshChallenges(force)
-        } catch (_: Exception) { failed = true } finally { loading = false }
+        } catch (e: Exception) { failed = true; state.note(e) } finally { loading = false }
     }
     // A friend added here: the ranking was marked to read again, so this reads it at once.
     val resumes = rememberResumeCount()
@@ -404,7 +414,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     FriendCodeCards(state) { reload++ }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp)) }
     SectionCard(padding = 0.dp, radius = 24.dp) {
-        if (rows.size <= 1) EmptyLine(loading, if (failed) "Classement indisponible hors connexion." else "Ajoutez un ami avec son code pour comparer vos temps chaque jour.")
+        if (rows.size <= 1) EmptyLine(loading, if (failed) unavailable(state) else "Ajoutez un ami avec son code pour comparer vos temps chaque jour.")
         else rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
             val mine = row.uid == uid
@@ -485,6 +495,9 @@ fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
         message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(top = 8.dp)) }
     }
 }
+
+private fun unavailable(state: AppViewModel): String =
+    if (state.isServerFull) "Classement en pause jusqu’à " + CloudError.quotaResetText() + "." else "Classement indisponible hors connexion."
 
 /** Counts the returns to the app while this screen is shown, so the ranking on screen reads again. */
 @Composable

@@ -12,6 +12,7 @@ struct ModeGameView: View {
     @State private var confirmQuit = false
     @State private var shakes: CGFloat = 0
     @State private var showGain = false
+    @State private var showPassed = false
     let mode: PlayMode
 
     init(mode: PlayMode) {
@@ -49,6 +50,12 @@ struct ModeGameView: View {
         .onChange(of: session.mistakeTick) { _, _ in
             withAnimation(reduceMotion ? nil : .linear(duration: 0.42)) { shakes += 1 }
             AccessibilityNotification.Announcement("Ce n’est pas le mot").post()
+        }
+        .onChange(of: session.passedTick) { _, tick in
+            guard let word = session.passed else { return }
+            showPassed = true
+            AccessibilityNotification.Announcement("C’était " + word).post()
+            Task { try? await Task.sleep(for: .seconds(2)); if session.passedTick == tick { showPassed = false } }
         }
         .onChange(of: session.successTick) { _, _ in
             guard mode == .sprint else { return }
@@ -147,7 +154,8 @@ struct ModeGameView: View {
             stat(showGain ? (session.gain ?? "") : "\(game.accuracy) %", showGain ? "trouvé" : "précision", highlight: showGain)
         }.padding(.top, 12)
         if let card = game.card { clue(card) }
-        Spacer(minLength: 8)
+        // Over the free space, so the board never moves.
+        Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −5 s", skipLabel: "Passer ce mot, 5 secondes de pénalité")
         LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
@@ -162,7 +170,8 @@ struct ModeGameView: View {
         Text(SurvivalGame.bonusEvery - game.found % SurvivalGame.bonusEvery == 1 ? "Encore 1 mot pour regagner une vie" : "Une vie regagnée tous les \(SurvivalGame.bonusEvery) mots")
             .scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 8)
         if let card = game.card { clue(card) }
-        Spacer(minLength: 8)
+        // Over the free space, so the board never moves.
+        Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −1 vie", skipLabel: "Passer ce mot, une vie en moins")
         LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
@@ -190,6 +199,16 @@ struct ModeGameView: View {
                 LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
             }
         }
+    }
+
+    /// "C'était : TOURNESOL" for two seconds after a pass, so the answer is never lost.
+    private var passedLine: some View {
+        Text("C’était : " + (session.passed ?? "").uppercased())
+            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+            .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+            .opacity(showPassed && session.passed != nil ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+            .accessibilityHidden(true)
     }
 
     private func clue(_ card: Card) -> some View {
@@ -435,10 +454,22 @@ private struct ModeResultView: View {
         }
     }
 
-    /// Survie: the word that ended the run.
+    /// The answers not found: the words passed, then the one the time or the last life ended on.
     private var missed: String? {
-        guard session.mode == .survival, let game = session.survival, game.lives == 0, let card = game.card else { return nil }
-        return "Le dernier mot était « \(card.wordFull) »."
+        var words: [String]
+        switch session.mode {
+        case .sprint:
+            guard let game = session.sprint else { return nil }
+            words = game.missed ?? []
+            if let card = game.card, game.remainingMs(elapsed: session.elapsedMs) == 0, words.last != card.wordFull { words.append(card.wordFull) }
+        case .survival:
+            guard let game = session.survival else { return nil }
+            words = game.missed ?? []
+            if game.lives == 0, let card = game.card, words.last != card.wordFull { words.append(card.wordFull) }
+        case .duo: return nil
+        }
+        guard !words.isEmpty else { return nil }
+        return (words.count > 1 ? "Les réponses manquées : " : "La réponse manquée : ") + words.map { "« \($0) »" }.joined(separator: ", ") + "."
     }
 
     @ViewBuilder private var recordLine: some View {

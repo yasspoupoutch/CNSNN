@@ -198,6 +198,9 @@ enum DailyGuesses {
             batch.updateData(["username":username,"updatedAt":FieldValue.serverTimestamp()], forDocument: db.collection("leaderboard").document(uid))
         }
         try await batch.commit()
+        // Today's result too, if played (the ranking of the day shows it). Best effort, no read:
+        // without a result today the write is simply refused.
+        resultRef(uid, DailySchedule.key()).updateData(["username": username], completion: nil)
     }
 
     // MARK: Unique pseudos
@@ -487,8 +490,9 @@ enum DailyGuesses {
         return db.collection("leaderboard").whereField("weekRank", isGreaterThanOrEqualTo: DailyScore.weekRank(week: week, found: 0, timeMs: DailyScore.weekTimeCap))
             .whereField("weekRank", isLessThan: DailyScore.weekRank(week: week + 1, found: 0, timeMs: DailyScore.weekTimeCap))
     }
-    // Rankings show 25 lines: a few more are read so suspended players can be left out.
-    func weekPlayers(day: String, limit: Int = 25) async throws -> [LeaderboardEntry] {
+    // Rankings show 25 lines (the week 50, so who played only a day or two still appears): a few more
+    // are read so suspended players can be left out.
+    func weekPlayers(day: String, limit: Int = 50) async throws -> [LeaderboardEntry] {
         guard let board = weekBoard(day) else { return [] }
         let docs = try await board.order(by: "weekRank", descending: true).limit(to: limit + 10).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap { Self.entry(uid: $0.documentID, $0.data()) }.prefix(limit))
@@ -652,6 +656,12 @@ enum DailyGuesses {
                     continue
                 }
                 if doc.data()?["suspended"] as? Bool == true { continue }
+            }
+            // A friend who renamed: their totals carry the new pseudo, the list saved the old one.
+            // Writing it back (rarely) keeps the challenge list and new challenges up to date too.
+            if player.uid != uid, let current = entry?.username, current != player.name {
+                db.collection("users").document(uid).collection("friends").document(player.uid)
+                    .setData(["username": current, "addedAt": FieldValue.serverTimestamp()], completion: nil)
             }
             let data = try await resultRef(player.uid, day).getDocument(source: .server).data()
             let today = data.flatMap { Self.attempt(day: day, $0) }
@@ -1049,10 +1059,12 @@ enum CloudError: LocalizedError {
     case inviteExpired
     case usernameTaken
     case usernameInvalid
+    case serverFull
 
     /// The few Firebase error codes the app reacts to.
-    enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, other }
+    enum Code { case emailInUse, wrongCredentials, weakPassword, invalidEmail, requiresRecentLogin, network, tooManyRequests, permissionDenied, unavailable, serverFull, other }
     static func code(_ error: Error) -> Code {
+        if (error as? CloudError) == .serverFull { return .serverFull }
         let error = error as NSError
         switch (error.domain, error.code) {
         case ("FIRAuthErrorDomain", 17007), ("FIRAuthErrorDomain", 17025), ("FIRAuthErrorDomain", 17012): return .emailInUse
@@ -1063,6 +1075,7 @@ enum CloudError: LocalizedError {
         case ("FIRAuthErrorDomain", 17020): return .network
         case ("FIRAuthErrorDomain", 17010): return .tooManyRequests
         case ("FIRFirestoreErrorDomain", 7): return .permissionDenied
+        case ("FIRFirestoreErrorDomain", 8): return .serverFull
         case ("FIRFirestoreErrorDomain", 14), ("FIRFirestoreErrorDomain", 4): return .unavailable
         default: return .other
         }
@@ -1079,6 +1092,7 @@ enum CloudError: LocalizedError {
         case .network, .unavailable: return CloudError.offline.errorDescription ?? ""
         case .tooManyRequests: return "Trop de tentatives. Réessayez dans quelques minutes."
         case .permissionDenied: return "Action refusée par le serveur. Mettez l’application à jour puis réessayez."
+        case .serverFull: return CloudError.serverFull.errorDescription ?? ""
         case .other: return error.localizedDescription
         }
     }
@@ -1104,6 +1118,18 @@ enum CloudError: LocalizedError {
         case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
         case .usernameTaken: "Ce pseudo est déjà pris. Choisissez-en un autre."
         case .usernameInvalid: "Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."
+        case .serverFull: "Beaucoup de joueurs aujourd’hui : le serveur gratuit de CNSNN est plein. Le mot du jour classé et les classements reviennent à " + Self.quotaResetText() + ". Les autres modes restent jouables."
         }
+    }
+    /// Firestore's free daily quota starts again at midnight in California (9 h in Paris most of the year).
+    static func quotaReset(after now: Date = Date()) -> Date {
+        var california = Calendar(identifier: .gregorian)
+        california.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        return california.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime) ?? now.addingTimeInterval(3600)
+    }
+    /// "9 h", in the phone's time zone.
+    static func quotaResetText(after now: Date = Date()) -> String {
+        let time = Calendar.current.dateComponents([.hour, .minute], from: quotaReset(after: now))
+        return "\(time.hour ?? 9) h" + ((time.minute ?? 0) > 0 ? String(format: "%02d", time.minute ?? 0) : "")
     }
 }

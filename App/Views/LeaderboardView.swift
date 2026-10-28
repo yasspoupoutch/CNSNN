@@ -13,6 +13,10 @@ struct LeaderboardView: View {
     var refreshToken = 0
     @State private var board: Board = .today
     @State private var seenToken = 0
+    /// Bumped each time the page shows: arriving on it reads the ranking again (at most every 30 s),
+    /// while switching boards or coming back to the app keeps the copy of the last 3 minutes.
+    @State private var arrival = 0
+    @State private var seenArrival = 0
     private var today: [DailyRank] { state.rankings.today }
     private var players: [LeaderboardEntry] { state.rankings.players }
     private var fastest: [LeaderboardEntry] { state.rankings.fastest }
@@ -32,6 +36,9 @@ struct LeaderboardView: View {
                     .scaledFont(15).foregroundStyle(Palette.secondary).frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
             } else {
                 summary
+                if state.isServerFull {
+                    Text(CloudError.serverFull.errorDescription ?? "").scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
+                }
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
                         ForEach(Board.allCases) { item in Chip(title: item.rawValue, selected: board == item) { board = item } }
@@ -39,6 +46,7 @@ struct LeaderboardView: View {
                 }.scrollIndicators(.hidden)
                 if board == .friends { FriendsBoard(refreshToken: refreshToken) } else {
                     if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
+                    Text(caption).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
                     list
                     if !hidden.isEmpty {
                         Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
@@ -47,7 +55,8 @@ struct LeaderboardView: View {
                 }
             }
         }
-        .task(id: refreshKey + board.rawValue) { await refresh(force: true) }
+        .onAppear { arrival += 1 }
+        .task(id: refreshKey + board.rawValue + "-" + String(arrival)) { await refresh() }
         .confirmationDialog("Suspendre " + (suspending?.name ?? "") + " ?", isPresented: Binding(get: { suspending != nil }, set: { if !$0 { suspending = nil } }), titleVisibility: .visible) {
             Button("Suspendre", role: .destructive) { if let row = suspending { suspend(row) } }
         } message: {
@@ -84,7 +93,7 @@ struct LeaderboardView: View {
             if rows.isEmpty {
                 HStack {
                     if loading { ProgressView().tint(Palette.secondary) }
-                    Text(loading ? "Chargement…" : (failed ? "Classement indisponible hors connexion." : emptyText))
+                    Text(loading ? "Chargement…" : (failed ? (state.isServerFull ? "Classement en pause jusqu’à " + CloudError.quotaResetText() + "." : "Classement indisponible hors connexion.") : emptyText))
                         .scaledFont(14).foregroundStyle(Palette.tertiary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
             }
@@ -128,6 +137,15 @@ struct LeaderboardView: View {
 
     private var refreshKey: String { (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion) }
 
+    /// The rankings show only their first lines: says how many, so nobody looks for a missing name.
+    private var caption: String {
+        switch board {
+        case .today: "Top 25 des plus rapides du jour"
+        case .week: "Top 50 de la semaine"
+        case .fastest, .friends: "Top 25 des meilleurs temps"
+        }
+    }
+
     private var emptyText: String {
         switch board {
         case .today: "Personne n’a encore trouvé le mot du jour."
@@ -145,9 +163,12 @@ struct LeaderboardView: View {
         var color: Int { id.unicodeScalars.reduce(0) { $0 + Int($1.value) } }
     }
     private var rows: [Row] { allRows.filter { !hidden.contains($0.id) } }
+    /// Current pseudos, for the day's ranking only (see AppState.currentNames).
+    private var names: [String: String] { board == .today ? state.currentNames : [:] }
     private var allRows: [Row] {
         switch board {
-        case .today: today.map { Row(id: $0.uid, name: $0.username, value: Format.clock($0.scoreMs),
+        // A day's result keeps the pseudo of when it was played: the current one when known.
+        case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.scoreMs),
                                      detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice +1 min" : "")) }
         case .week: players.map { p in
             let week = p.thisWeek() ?? .none
@@ -176,12 +197,13 @@ struct LeaderboardView: View {
     /// Reads only the ranking on screen, and only when the kept copy is old (see AppState.rankings).
     private func refresh(force: Bool = false) async {
         guard let cloud = state.cloud, state.uid != nil else { return }
-        let force = force || refreshToken != seenToken
-        seenToken = refreshToken
+        if state.isServerFull { failed = true; return }
+        guard board != .friends else { return }
+        let force = force || refreshToken != seenToken || arrival != seenArrival
+        seenToken = refreshToken; seenArrival = arrival
         let day = DailySchedule.key()
         // Today's and the week's rankings change with the day.
         let key = board == .today || board == .week ? board.rawValue + "-" + day : board.rawValue
-        guard board != .friends else { return }
         let summary = state.rankingIsStale("summary", force: force)
         guard summary || state.rankingIsStale(key, force: force) else { return }
         loading = true; failed = false
@@ -200,7 +222,7 @@ struct LeaderboardView: View {
             case .friends: return
             }
             state.rankings.readAt[key] = Date()
-        } catch { failed = true }
+        } catch { failed = true; state.note(error) }
     }
 }
 
@@ -220,7 +242,7 @@ struct FriendsBoard: View {
             if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
             board
         }
-        .task(id: (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion)) { await refresh(force: true) }
+        .task(id: (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion)) { await refresh() }
     }
 
     @ViewBuilder private var board: some View {
@@ -228,7 +250,7 @@ struct FriendsBoard: View {
             if rows.count <= 1 {
                 HStack {
                     if loading { ProgressView().tint(Palette.secondary) }
-                    Text(loading ? "Chargement…" : (failed ? "Classement indisponible hors connexion." : "Ajoutez un ami avec son code pour comparer vos temps chaque jour."))
+                    Text(loading ? "Chargement…" : (failed ? (state.isServerFull ? "Classement en pause jusqu’à " + CloudError.quotaResetText() + "." : "Classement indisponible hors connexion.") : "Ajoutez un ami avec son code pour comparer vos temps chaque jour."))
                         .scaledFont(14).foregroundStyle(Palette.tertiary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
             }
@@ -281,6 +303,7 @@ struct FriendsBoard: View {
     /// Two reads per friend: kept a few minutes like the other rankings (see AppState.rankings).
     private func refresh(force: Bool = false) async {
         guard let cloud = state.cloud, let uid = state.uid else { return }
+        if state.isServerFull { failed = true; return }
         let force = force || refreshToken != seenToken
         seenToken = refreshToken
         let key = "friends-" + DailySchedule.key()
@@ -296,7 +319,7 @@ struct FriendsBoard: View {
             state.rankings.friendCount = try? await cloud.friendCount(uid: uid)
             state.rankings.readAt[key] = Date()
             await state.refreshChallenges(force: force)
-        } catch { failed = true }
+        } catch { failed = true; state.note(error) }
     }
     private func remove(_ row: FriendStanding) {
         guard let cloud = state.cloud, let uid = state.uid else { return }
@@ -339,7 +362,7 @@ struct FriendCodeCards: View {
             }
             Spacer(minLength: 8)
             if let code {
-                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.home.absoluteString) {
+                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.appStore.absoluteString) {
                     Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
                 }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
             }

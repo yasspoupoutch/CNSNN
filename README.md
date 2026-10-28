@@ -1,6 +1,8 @@
 # CNSNN
 
-Jeu de mots iPhone en SwiftUI : retrouver un mot à partir de ses seules consonnes. Firebase gère les comptes, la synchronisation et les classements. L'app reste entièrement sur l'offre gratuite Spark : pas de Cloud Functions, aucun service payant.
+**Disponible sur l'App Store** : [télécharger CNSNN sur iPhone](https://apps.apple.com/app/id6823569042) (version 1.2). La version Android arrive bientôt sur Google Play.
+
+Jeu de mots en SwiftUI (iPhone) et Kotlin (Android) : retrouver un mot à partir de ses seules consonnes. Firebase gère les comptes, la synchronisation et les classements. L'app reste entièrement sur l'offre gratuite Spark : pas de Cloud Functions, aucun service payant.
 
 ## Fonctionnalités
 
@@ -21,14 +23,12 @@ Jeu de mots iPhone en SwiftUI : retrouver un mot à partir de ses seules consonn
 - **Widget** écran d'accueil (petit et moyen) : mot du jour à jouer, trouvé ou raté, série et temps avant le prochain mot.
 - **Design** Liquid Glass : effets natifs sur iOS 26, matériaux système sur iOS 17 à 25. Retours haptiques, Dynamic Type, cibles de 44 pt. Les réglages « Réduire les animations » et « Réduire la transparence » sont respectés.
 
-## Installer sur iPhone (sans compte Apple payant)
+## Installer
 
-1. Dans l'onglet **Actions** du dépôt, lancer **CNSNN - IPA iPhone non signe** sur `main`.
-2. Télécharger l'artefact **CNSNN-iPhone-unsigned-IPA** (disponible 24 h) et le décompresser.
-3. Installer `CNSNN-unsigned.ipa` avec [Sideloadly](https://sideloadly.io) et un identifiant Apple gratuit. Si Sideloadly refuse le partage de données du widget, installer `CNSNN-sans-widget-partage.ipa` à la place : le widget n'affichera alors que la difficulté du jour.
-4. Avec un compte gratuit, l'app expire au bout de 7 jours. Il suffit de la réinstaller, rien n'est perdu.
+- **iPhone** : [CNSNN sur l'App Store](https://apps.apple.com/app/id6823569042), gratuit, iOS 17 ou plus récent.
+- **Android** : bientôt sur Google Play (application dans `Android/`).
 
-TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne sont pas utilisés.
+Les versions de test passent par TestFlight (workflow **CNSNN - iPhone TestFlight**). Le workflow **CNSNN - IPA iPhone non signe** reste disponible pour installer une version de développement avec [Sideloadly](https://sideloadly.io).
 
 ## Firebase
 
@@ -42,7 +42,7 @@ TestFlight et l'App Store exigent le programme Apple Developer payant : ils ne s
 
 ## Site public
 
-https://cnsnn-9ctosy.web.app : présentation (sans APK : le plan gratuit refuse les fichiers exécutables), [règles de la communauté](https://cnsnn-9ctosy.web.app/regles), [politique de confidentialité](https://cnsnn-9ctosy.web.app/confidentialite) et [suppression de compte](https://cnsnn-9ctosy.web.app/suppression). Sources dans `Firebase/hosting`, publiées par le workflow **CNSNN - Firebase** (case `site`). Ce qu'il reste pour l'App Store et Google Play : `Docs/PUBLICATION.md`.
+https://cnsnn-9ctosy.web.app : présentation (sans APK : le plan gratuit refuse les fichiers exécutables), [règles de la communauté](https://cnsnn-9ctosy.web.app/regles), [politique de confidentialité](https://cnsnn-9ctosy.web.app/confidentialite) et [suppression de compte](https://cnsnn-9ctosy.web.app/suppression). Sources dans `Firebase/hosting`, publiées par le workflow **CNSNN - Firebase** (case `site`). Publication sur l'App Store et Google Play : `Docs/PUBLICATION.md`.
 
 ## Développer et tester
 

@@ -68,7 +68,7 @@ fun ModerationContent(state: AppViewModel) {
         if (busy) return
         busy = true; message = null
         scope.launch {
-            try { work(); haptics.success(); refresh(); state.refreshCards(); state.refreshSubmissions() } catch (e: Exception) { message = CloudError.message(e) } finally { busy = false }
+            try { work(); haptics.success(); refresh(); state.refreshCards(force = true); state.refreshSubmissions() } catch (e: Exception) { message = CloudError.message(e) } finally { busy = false }
         }
     }
     LaunchedEffect(Unit) { refresh() }

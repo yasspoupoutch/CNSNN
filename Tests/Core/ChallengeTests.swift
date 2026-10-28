@@ -24,7 +24,9 @@ final class ChallengeTests: XCTestCase {
         var game = ChallengeGame(cards: ChallengeRules.cards(ChallengeRules.draw(seed: 7))!)
         XCTAssertEqual(game.answer("ZZZ"), .wrong)
         XCTAssertEqual(game.answer(game.card!.wordFull), .right)
+        let passed = game.card!.wordFull
         game.skip()
+        XCTAssertEqual(game.missed, [passed])
         while let card = game.card { game.answer(card.wordFull) }
         XCTAssertTrue(game.finished)
         XCTAssertEqual(game.answer("X"), .over)
@@ -192,5 +194,12 @@ final class ChallengeTests: XCTestCase {
         XCTAssertFalse(c.isOpen)
         XCTAssertEqual(c.opponentName("alice"), "Carol")
         XCTAssertEqual(c.state(for: "carol", now: hour), .yourTurn)
+    }
+
+    func testRenamingShowsTheCurrentPseudos() {
+        let c = challenge().renaming(["bob": "Bobby", "zoe": "Zoé", "alice": ""])
+        XCTAssertEqual(c.from.name, "Alice")
+        XCTAssertEqual(c.to.name, "Bobby")
+        XCTAssertEqual(c.opponentName("alice"), "Bobby")
     }
 }

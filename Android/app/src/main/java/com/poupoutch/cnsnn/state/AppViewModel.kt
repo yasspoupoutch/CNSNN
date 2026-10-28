@@ -156,9 +156,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             saveOnline(user)
         } catch (_: Exception) { /* Offline: the next change, launch or return to the app syncs again. */ }
     }
-    /** Back in the app: anything saved while offline, or played on another device, is synced again. */
+    /**
+     * Back in the app: anything played on another device is synced again after a while (changes made
+     * here are saved at once), and a launch refused by a full server tries again once the quota is back.
+     */
     fun onForeground() {
-        if (uid == null || System.currentTimeMillis() - lastSync < 30_000) return
+        if (uid == null) {
+            if (progress.username.isNotEmpty() && !isServerFull && !isBusy) viewModelScope.launch { connect() }
+            return
+        }
+        if (System.currentTimeMillis() - lastSync < 600_000) return
         viewModelScope.launch { syncProgress() }
     }
 
@@ -177,6 +184,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             progress = progress.copy(rulesVersion = maxOf(progress.rulesVersion ?: 0, CommunityRules.VERSION))
             activate(cloud.bootstrap(name, CommunityRules.VERSION), preservingGuest = true)
         } catch (e: Exception) {
+            if (CloudError.code(e) == CloudError.Code.SERVER_FULL) {
+                // The free quota is used up for today: enter as a guest, the account is made at the next launch.
+                note(e); update { it.copy(username = name) }; return@launch
+            }
             val pseudo = e is CloudError && e.kind in listOf(CloudError.Kind.USERNAME_TAKEN, CloudError.Kind.USERNAME_INVALID)
             error = (if (pseudo) "" else "Connexion impossible : ") + CloudError.message(e); return@launch
         } finally { isBusy = false }
@@ -191,8 +202,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 if (e is CloudError && e.kind == CloudError.Kind.DELETION_PENDING) { resumeDeletion(); return }
                 // Offline launches stay quiet: Classique works and the home screen says it is offline.
+                note(e)
                 val code = CloudError.code(e)
-                if (code != CloudError.Code.NETWORK && code != CloudError.Code.UNAVAILABLE && e !is CloudError) error = CloudError.message(e)
+                if (code !in listOf(CloudError.Code.NETWORK, CloudError.Code.UNAVAILABLE, CloudError.Code.SERVER_FULL) && e !is CloudError) error = CloudError.message(e)
                 return
             } finally { isBusy = false }
             refreshAll()
@@ -313,19 +325,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         try {
             uid?.let { cloud.rename(it, clean) }
             update { it.copy(username = clean) }
+            // The kept rankings still show the old pseudo: read them again.
+            forgetRankings()
+            uid?.let { me -> challenges = challenges.map { it.renaming(mapOf(me to clean)) } }
             refreshOfficial()
         } catch (e: Exception) { error = CloudError.message(e) }
     }
     /**
      * Classique plays the built-in cards plus every approved community card. The catalogue is
      * downloaded again only when its version (`meta/cards`) moved: one read instead of up to 500.
+     * A player checks it at most every 12 hours (a busy moderation day would otherwise cost every
+     * player the whole catalogue each time); the moderator (`force`) sees a change at once.
      */
-    suspend fun refreshCards() {
+    suspend fun refreshCards(force: Boolean = false) {
         if (uid == null) return
         try {
-            val version = cloud.cardsVersion()
             val cached = local.cachedCards
             val now = System.currentTimeMillis()
+            if (!force && cached != null && now - local.cardsCheckedAt < 12 * 3600 * 1000L) { cards = withCommunity(cached); return }
+            val version = cloud.cardsVersion()
             val stale = when {
                 cached == null -> true
                 // No version on the server yet: download at most once a day.
@@ -333,6 +351,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else -> version != local.cardsVersion
             }
             val community = if (stale || cached == null) cloud.cards().also { local.storeCards(it, version ?: 0L, now) } else cached
+            if (version != null) local.cardsCheckedAt = now
             cards = withCommunity(community)
         } catch (_: Exception) { /* Offline: the built-in and cached cards remain. */ }
     }
@@ -369,7 +388,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     suspend fun refreshOfficial() {
         val user = uid ?: return
-        runCatching { cloud.leaderboardEntry(user) }.getOrNull()?.let { official = it; refreshGlance() }
+        try {
+            cloud.leaderboardEntry(user)?.let { official = it; refreshGlance() }
+            serverFullUntil = 0L
+        } catch (e: Exception) { note(e) }
+    }
+
+    /**
+     * Set when Firestore refused a request because the free daily quota is used up: until it starts
+     * again, the app says so once instead of failing everywhere, and reads nothing more.
+     */
+    var serverFullUntil by mutableStateOf(0L); private set
+    val isServerFull: Boolean get() = System.currentTimeMillis() < serverFullUntil
+    fun note(error: Throwable) {
+        if (CloudError.code(error) == CloudError.Code.SERVER_FULL) serverFullUntil = CloudError.quotaReset().toEpochMilli()
     }
 
     // ---- Results
@@ -415,8 +447,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         local.usage = local.usage.open(DailySchedule.key(), "Android", returning = progress.username.isNotEmpty() || progress.attempts.isNotEmpty())
     }
     private fun notePlayed(mode: String) { local.usage = local.usage.play(mode, DailySchedule.key()) }
-    /** Sends what is waiting: once signed in, and when the app leaves the screen (one write a day or so). */
+    /** Sends what is waiting: once signed in, and when the app leaves the screen (one write a day or so). While the free quota is used up, the counts wait on the phone. */
     fun sendUsage() {
+        if (isServerFull) return
         val (counts, left) = local.usage.take(DailySchedule.shift(DailySchedule.key(), -3), signedIn = uid != null)
         if (counts.isEmpty()) return
         runCatching { cloud.addUsage(counts) }.onSuccess { local.usage = left }
@@ -456,10 +489,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val readAt: Map<String, Long> = emptyMap(),
     )
     var rankings by mutableStateOf(Rankings())
-    /** Whether a ranking needs reading: after 5 minutes, or 10 seconds when the player opens it again. */
+    /**
+     * Current pseudos, by player: the totals (leaderboard) are renamed with the profile, whereas a
+     * day's result, a challenge or a friend keeps the pseudo of when it was saved.
+     */
+    val currentNames: Map<String, String> get() {
+        val names = mutableMapOf<String, String>()
+        (rankings.fastest + rankings.players).forEach { names[it.uid] = it.username }
+        rankings.friends.forEach { names[it.uid] = it.username }
+        official?.let { names[it.uid] = it.username }
+        val me = uid
+        if (me != null && progress.username.isNotEmpty()) names[me] = progress.username
+        return names
+    }
+    /**
+     * Whether a ranking needs reading: after 3 minutes, or 30 seconds when the player pulls to refresh.
+     * The player's own result shows at once: its confirmation forgets the kept rankings (recordOfficial).
+     */
     fun rankingIsStale(key: String, force: Boolean): Boolean {
+        if (isServerFull) return false
         val at = rankings.readAt[key] ?: return true
-        return System.currentTimeMillis() - at > if (force) 10_000 else 300_000
+        return System.currentTimeMillis() - at > if (force) RANKING_REFRESH_MS else RANKING_KEEP_MS
     }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
@@ -485,7 +535,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val all = runCatching { cloud.challenges(user) }.getOrNull() ?: return
             fullAt = now
             all
-        }
+        }.map { it.renaming(currentNames) }
         if (uid != user) return
         challengesReadAt = now
         local.challengesReadAt = now
@@ -602,6 +652,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun showAllPlayers() { hiddenPlayers = emptySet(); local.hiddenPlayers = emptySet() }
 
     companion object {
+        const val RANKING_KEEP_MS = 180_000L
+        const val RANKING_REFRESH_MS = 30_000L
         const val REFUSED_NAME = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
         const val SUSPENDED_TEXT = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
     }

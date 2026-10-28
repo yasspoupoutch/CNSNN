@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball } from '../tools/daily.mjs';
+import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
 
 const list = parseList([
  'F\tGénéral\tBonbon\tUne douceur sucrée.', 'F\tAnimaux\tŒuf\tUn indice assez long.',
@@ -55,9 +55,18 @@ test('the Mot du jour is a single word', () => {
   assert.throws(() => parseList('F\tGénéral\tCoup de pied\tUn geste au football.'), /un seul mot/);
 });
 
-test('football keeps at most one word in ten', () => {
+test('the Mot du jour has no football word', () => {
   const make = (category, n) => Array.from({ length: n }, (_, i) => ({ word: `${category}${i}`, hint: 'Un indice.', category, difficulty: 'Difficile' }));
   const kept = limitFootball([...make('Football', 30), ...make('Général', 45)]);
-  assert.equal(kept.filter((w) => w.category === 'Football').length, 5);
+  assert.equal(kept.filter((w) => w.category === 'Football').length, 0);
   assert.equal(kept.filter((w) => w.category === 'Général').length, 45);
+});
+test('a too hard word is replaced on its day and never comes back', () => {
+ const changes = parseChanges({ days: [{ day: '2026-10-18', word: 'Hérisson', hint: 'Un petit animal piquant.', category: 'Animaux', difficulty: 'Difficile' }], drop: ['Évasion'] });
+ const { words, days } = applyChanges(list, schedule(list, '2026-10-14', 7), changes);
+ assert.ok(!words.some((w) => normalize(w.word) === 'EVASION'));
+ assert.equal(days.find((d) => d.day === '2026-10-18').word, 'Hérisson');
+ assert.equal(days.length, 7);
+ assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Hérisson', hint: 'Un petit animal piquant.', category: 'Animaux', difficulty: 'Facile' }] }));
+ assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Cerf volant', hint: 'Il vole au bout d’un fil.', category: 'Objets', difficulty: 'Difficile' }] }));
 });

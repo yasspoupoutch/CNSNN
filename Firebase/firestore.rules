@@ -263,6 +263,9 @@ service cloud.firestore {
    // A suspension hides the results without deleting them, so lifting it gives everything back.
    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suspended'])
     && (!('suspended' in request.resource.data) || request.resource.data.suspended == true);
+   // A player who renamed takes the new pseudo onto the day's result, and nothing else.
+   allow update: if active() && owner(resource.data.userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username'])
+    && request.resource.data.username == get(at('users/' + request.auth.uid)).data.username;
    allow delete: if (owner(resource.data.userId) && leaving()) || admin();
   }
   function createsResult(id, r, s) {

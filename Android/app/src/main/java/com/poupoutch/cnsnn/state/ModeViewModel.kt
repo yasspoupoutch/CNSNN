@@ -42,6 +42,9 @@ class ModeViewModel : ViewModel() {
     var lifeGainedTick by mutableIntStateOf(0); private set
     /** "+1" after a right Sprint answer. */
     var gain by mutableStateOf<String?>(null); private set
+    /** The answer of the word just passed, shown for a moment (Sprint and Survie). */
+    var passed by mutableStateOf<String?>(null); private set
+    var passedTick by mutableIntStateOf(0); private set
     var resumed by mutableStateOf(false); private set
     var over by mutableStateOf(false); private set
     var beaten by mutableStateOf<Set<String>>(emptySet()); private set
@@ -62,7 +65,7 @@ class ModeViewModel : ViewModel() {
 
     /** Picks up the saved game of this mode, or starts a new one. */
     fun begin(state: AppViewModel) {
-        answer = ""; gain = null; over = false; beaten = emptySet(); recorded = false
+        answer = ""; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false
         previous = state.progress.records(mode)
         val run = if (mode != PlayMode.SPRINT) state.local.loadRun(mode) else null
         if (run != null && !run.finished) {
@@ -121,6 +124,7 @@ class ModeViewModel : ViewModel() {
     fun skip(state: AppViewModel) {
         if (finished) return
         answer = ""
+        (sprint?.card ?: survival?.card)?.let { passed = it.wordFull; passedTick++ }
         when (mode) {
             PlayMode.SPRINT -> { sprint?.skip(elapsedMs); gain = null }
             PlayMode.SURVIVAL -> { survival?.skip(); lifeLostTick++ }
