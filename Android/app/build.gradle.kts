@@ -18,7 +18,8 @@ android {
         applicationId = "com.poupoutch.cnsnn"
         minSdk = 26
         targetSdk = 36
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1)
+        // Google Play builds pass their own number (google-play.yml), always above the CI builds.
+        versionCode = (System.getenv("CNSNN_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The instrumented tests talk to the Firebase emulators instead of production.

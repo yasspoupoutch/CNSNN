@@ -434,7 +434,7 @@ jobs:
             git rm -rf --quiet .
           fi
           # La branche ne contient que les captures.
-          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name ios -exec rm -rf {} +
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name ios ! -name android -exec rm -rf {} +
           rm -rf "ios/$APPEARANCE"
           mkdir -p "ios/$APPEARANCE"
           cp "$RUNNER_TEMP/screenshots/"*.png "ios/$APPEARANCE/"
