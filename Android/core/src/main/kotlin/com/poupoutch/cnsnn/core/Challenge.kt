@@ -228,6 +228,23 @@ object ChallengeInvite {
         "Je te défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne ! Rejoins mon défi avec le code $code : ${link(code)}"
 }
 
+/**
+ * Friend links: https://…/a/CODE (or cnsnn://a/CODE from the web page) opens the app and adds the
+ * player whose friend code it is. Same alphabet and length as the friend codes. Same as Challenge.swift.
+ */
+object FriendInvite {
+    fun link(code: String) = "https://${ChallengeInvite.HOST}/a/$code"
+    /** The friend code in an opened URL; null when it is not a friend link. */
+    fun code(url: String): String? {
+        val slash = url.lastIndexOf("/a/")
+        if (slash < 0) return null
+        val letters = url.substring(slash + 3).uppercase().takeWhile { it != '?' && it != '#' && it != '/' }.filter { it.isLetterOrDigit() }
+        return letters.takeIf { it.length == 6 && it.all { c -> c in ChallengeInvite.ALPHABET } }
+    }
+    fun shareText(code: String) =
+        "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! Mon code ami : $code. ${link(code)}"
+}
+
 data class ChallengeTally(val wins: Int = 0, val losses: Int = 0, val draws: Int = 0) {
     /** "2 victoires · 1 défaite", or null before the first finished challenge. */
     val label: String?

@@ -135,6 +135,12 @@ fun RootScreen(state: AppViewModel) {
         AlertDialog(onDismissRequest = { state.error = null }, confirmButton = { TextButton({ state.error = null }) { Text("Compris") } },
             title = { Text("CNSNN") }, text = { Text(message) })
     }
+    // A friend link: added once there is an account, then said in a dialog.
+    LaunchedEffect(state.friendInviteCode, state.uid) { state.acceptFriendInvite() }
+    state.friendInviteResult?.let { message ->
+        AlertDialog(onDismissRequest = { state.friendInviteResult = null }, confirmButton = { TextButton({ state.friendInviteResult = null }) { Text("OK") } },
+            title = { Text("Ami") }, text = { Text(message) })
+    }
 }
 
 @Composable

@@ -37,6 +37,7 @@ ol, ul { padding-left: 22px; } li { margin: 6px 0; }
   font-family: inherit; font-size: 17px; font-weight: 600; line-height: 1; text-decoration: none; cursor: pointer;
   background: linear-gradient(#ffd673, #f6b84d); color: #1a1406;
 }
+[hidden] { display: none !important; }
 .button.ghost { background: var(--glass); color: var(--fg); border: 1px solid var(--border); }
 button:disabled { opacity: .45; cursor: default; }
 label { display: block; font-size: 15px; color: var(--fg2); margin: 14px 0 6px; }

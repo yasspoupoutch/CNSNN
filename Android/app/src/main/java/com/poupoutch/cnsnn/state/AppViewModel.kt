@@ -70,6 +70,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var challengeRequest by mutableStateOf(0)
     /** The code of a challenge link the app was opened with, waiting for the challenge sheet to join it. */
     var inviteCode by mutableStateOf<String?>(null)
+    /** The friend code of a friend link (…/a/CODE) the app was opened with, added once signed in. */
+    var friendInviteCode by mutableStateOf<String?>(null)
+    /** What came of that friend link, shown once. */
+    var friendInviteResult by mutableStateOf<String?>(null)
     /** Asks the shell to show the leaderboard (from the home page). */
     var leaderboardRequest by mutableStateOf(0)
     /** Shows the first-launch tutorial again (Profil). */
@@ -514,6 +518,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
     /** A new friend: the friends ranking is read again next time it shows. */
+    /** A friend link: adds that player as soon as there is an account (a new player picks a pseudo first). */
+    suspend fun acceptFriendInvite() {
+        val code = friendInviteCode ?: return
+        val user = uid ?: return
+        friendInviteCode = null
+        friendInviteResult = try {
+            val name = cloud.addFriendByCode(code, user, progress.username.ifEmpty { "Joueur" })
+            ChallengeWatch.setActive(getApplication(), true)
+            forgetFriendsRanking()
+            "$name fait partie de vos amis."
+        } catch (e: Exception) { CloudError.message(e) }
+    }
     fun forgetFriendsRanking() { rankings = rankings.copy(readAt = rankings.readAt.filterKeys { !it.startsWith("friends-") }) }
 
     private var challengesReadAt = 0L

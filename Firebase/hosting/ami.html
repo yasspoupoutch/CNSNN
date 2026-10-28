@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Un ami vous invite · CNSNN</title>
+<meta name="description" content="Un ami vous invite sur CNSNN, le jeu de mots sans voyelles.">
+<meta property="og:title" content="Un ami vous invite sur CNSNN">
+<meta property="og:description" content="Le jeu de mots sans voyelles : ajoutez-vous en amis pour vous défier et comparer vos temps.">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:image" content="https://cnsnn-9ctosy.web.app/partage.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="apple-itunes-app" content="app-id=6823569042">
+<meta name="theme-color" content="#06070c">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .code { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 6px 0 0; }
+  .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
+</style>
+</head>
+<body>
+<main>
+<nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a></nav>
+<h1>Un ami vous invite !</h1>
+<p class="lead">Ajoutez-vous en amis sur CNSNN pour vous défier et comparer vos temps au mot du jour.</p>
+<section class="card" id="invite">
+  <div class="small">Code ami</div>
+  <div class="code" id="code" aria-live="polite">······</div>
+  <p class="muted" id="hint">Avec l’application, ce lien vous ajoute en amis directement.</p>
+  <div class="buttons">
+    <a class="button" id="open" href="/">Ouvrir dans CNSNN</a>
+    <button class="button ghost" id="copy" type="button">Copier le code</button>
+  </div>
+  <p class="status" id="status" role="status"></p>
+</section>
+<h2>Vous n’avez pas encore l’application ?</h2>
+<ol>
+  <li>Installez CNSNN depuis l’App Store.</li>
+  <li>Ouvrez-la une fois et choisissez un pseudo.</li>
+  <li>Revenez dans la conversation et touchez de nouveau le lien : CNSNN s’ouvre et vous ajoute en amis.</li>
+</ol>
+<!--STORES-->
+<section class="card">
+  <p class="muted" style="margin:0">Sur iPhone, CNSNN est gratuit sur l’App Store.</p>
+  <div class="buttons"><a class="button" href="https://apps.apple.com/app/id6823569042">Télécharger sur l’App Store</a></div>
+  <p class="muted" style="margin:14px 0 0">Sur Android, CNSNN arrive bientôt sur Google Play.</p>
+</section>
+<!--/STORES-->
+<footer>CNSNN, une application créée par Poupoutch. Contact : <a href="mailto:jeucnsnn@gmail.com">jeucnsnn@gmail.com</a></footer>
+</main>
+<script>
+  // The friend code is the end of the address: /a/ABC234. Same alphabet as the apps (no 0/O, no 1/I).
+  const raw = decodeURIComponent(location.pathname.split('/a/')[1] || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = /^[A-HJ-NP-Z2-9]{6}$/.test(raw) ? raw : null;
+  const status = document.getElementById('status');
+  if (code) {
+    document.getElementById('code').textContent = code;
+    document.getElementById('open').href = 'cnsnn://a/' + code;
+    document.title = 'Ami ' + code + ' · CNSNN';
+  } else {
+    document.getElementById('code').textContent = '?';
+    document.getElementById('hint').textContent = 'Ce lien est incomplet. Demandez son code ami de 6 caractères à la personne qui vous invite.';
+    document.getElementById('open').hidden = true;
+    document.getElementById('copy').hidden = true;
+  }
+  document.getElementById('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
+    catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }
+  });
+</script>
+</body>
+</html>

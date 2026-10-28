@@ -15,13 +15,12 @@ import CNSNNCore
                 // Above this size the glass cards stop fitting on a phone screen.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .tint(CNSNNTheme.accent).task { await state.connectIfConfigured() }
-                // A challenge link (https://…/d/CODE as a universal link, or cnsnn://d/CODE from the web page):
-                // join it from the challenge sheet. Both handlers set the same code, so one firing twice is harmless.
-                .onOpenURL { url in
-                    if let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
-                }
+                // A challenge link (https://…/d/CODE as a universal link, or cnsnn://d/CODE from the web page) is
+                // joined from the challenge sheet; a friend link (…/a/CODE) adds that friend. Both handlers set the
+                // same code, so one firing twice is harmless.
+                .onOpenURL { open($0) }
                 .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-                    if let url = activity.webpageURL, let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
+                    if let url = activity.webpageURL { open(url) }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -34,5 +33,9 @@ import CNSNNCore
         }
         // Friend challenges: a short check when iOS grants a background refresh (see ChallengeWatch).
         .backgroundTask(.appRefresh(ChallengeWatch.identifier)) { await ChallengeWatch.run() }
+    }
+    private func open(_ url: URL) {
+        if let code = FriendInvite.code(in: url.absoluteString) { state.friendInviteCode = code }
+        else if let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
     }
 }

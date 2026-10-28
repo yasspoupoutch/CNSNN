@@ -237,6 +237,22 @@ public enum ChallengeInvite {
     }
 }
 
+/// Friend links: https://…/a/CODE (or cnsnn://a/CODE from the web page) opens the app and adds the
+/// player whose friend code it is. Same alphabet and length as the friend codes.
+public enum FriendInvite {
+    public static func link(_ code: String) -> String { "https://\(ChallengeInvite.host)/a/\(code)" }
+    /// The friend code in an opened URL; nil when it is not a friend link.
+    public static func code(in url: String) -> String? {
+        guard let range = url.range(of: "/a/", options: .backwards) else { return nil }
+        let letters = url[range.upperBound...].uppercased().prefix { $0 != "?" && $0 != "#" && $0 != "/" }.filter { $0.isLetter || $0.isNumber }
+        guard letters.count == 6, letters.allSatisfy({ ChallengeInvite.alphabet.contains($0) }) else { return nil }
+        return String(letters)
+    }
+    public static func shareText(code: String) -> String {
+        "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! Mon code ami : \(code). \(link(code))"
+    }
+}
+
 public enum ChallengeFormat {
     /// 1:58, or 12:04 past ten minutes; the hour is folded into minutes.
     public static func time(_ ms: Int) -> String {

@@ -158,6 +158,18 @@ class ChallengeTest {
         assertTrue(ChallengeRules.shouldCheck(evening, evening - 20 * 60_000, paris))
     }
 
+    @Test fun friendLinks() {
+        assertEquals("https://cnsnn-9ctosy.web.app/a/ABC234", FriendInvite.link("ABC234"))
+        assertEquals("ABC234", FriendInvite.code("https://cnsnn-9ctosy.web.app/a/ABC234"))
+        assertEquals("ABC234", FriendInvite.code("cnsnn://a/abc234?x=1"))
+        assertEquals("XYZ789", FriendInvite.code(FriendInvite.shareText("XYZ789")))
+        assertNull(FriendInvite.code("https://cnsnn-9ctosy.web.app/d/ABC234"))
+        assertNull(FriendInvite.code("https://cnsnn-9ctosy.web.app/a/ABO234"))
+        // A friend link is not a challenge link.
+        assertNull(ChallengeInvite.code("https://cnsnn-9ctosy.web.app/a/ABC234"))
+        assertNull(ChallengeInvite.code("cnsnn://a/ABC234"))
+    }
+
     @Test fun inviteCodesFromTextsAndLinks() {
         assertEquals("ABC234", ChallengeInvite.code("abc234"))
         assertEquals("ABC234", ChallengeInvite.code(" ABC 234 "))

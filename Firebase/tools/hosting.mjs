@@ -56,7 +56,7 @@ const root = new URL('../hosting/', import.meta.url);
 const fonts = new URL('../../App/Resources/Fonts/', import.meta.url);
 const apk = process.argv[2];
 const files = new Map();
-// Android App Links: a challenge link (/d/CODE) opens the app directly once Android has checked this
+// Android App Links: a challenge link (/d/CODE) or a friend link (/a/CODE) opens the app directly once Android has checked this
 // file, which names the app and the certificate it is signed with. The release key lives in the
 // repository only encrypted (Android/signing); its fingerprint is read here. When Google Play signs
 // the app (Play App Signing), add the fingerprint it shows in the Play Console to this list.
@@ -90,7 +90,7 @@ const assetLinks = [{
 // entitlement (App/CNSNN.entitlements). Apple reads this file when the app is installed. The team
 // id comes from the APPLE_TEAM_ID secret; without it the link keeps opening the web page.
 const teamId = (process.env.APPLE_TEAM_ID || '').trim();
-const appSiteAssociation = { applinks: { details: [{ appIDs: [`${teamId}.com.poupoutch.cnsnn`], components: [{ '/': '/d/*' }] }] } };
+const appSiteAssociation = { applinks: { details: [{ appIDs: [`${teamId}.com.poupoutch.cnsnn`], components: [{ '/': '/d/*' }, { '/': '/a/*' }] }] } };
 if (!teamId) console.log('::warning::APPLE_TEAM_ID absent : sur iPhone, les liens de défi ouvriront la page web au lieu de l’app.');
 
 for (const name of await readdir(root)) {
@@ -109,8 +109,8 @@ const version = await call('POST', `${api}/sites/${site}/versions`, {
   config: {
     cleanUrls: true,
     trailingSlashBehavior: 'REMOVE',
-    // Challenge links: one page reads the code from the address.
-    rewrites: [{ glob: '/d/**', path: '/defi.html' }],
+    // Challenge and friend links: one page each reads the code from the address.
+    rewrites: [{ glob: '/d/**', path: '/defi.html' }, { glob: '/a/**', path: '/ami.html' }],
     headers: [
       { glob: '**', headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY' } },
       { glob: '/cnsnn.apk', headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Cache-Control': 'no-cache' } },

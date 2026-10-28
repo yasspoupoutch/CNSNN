@@ -169,6 +169,18 @@ final class ChallengeTests: XCTestCase {
         XCTAssertTrue(ChallengeRules.shouldCheck(at: evening, lastReadMs: ms - 20 * 60_000, calendar: calendar))
     }
 
+    func testFriendLinks() {
+        XCTAssertEqual(FriendInvite.link("ABC234"), "https://cnsnn-9ctosy.web.app/a/ABC234")
+        XCTAssertEqual(FriendInvite.code(in: "https://cnsnn-9ctosy.web.app/a/ABC234"), "ABC234")
+        XCTAssertEqual(FriendInvite.code(in: "cnsnn://a/abc234?x=1"), "ABC234")
+        XCTAssertEqual(FriendInvite.code(in: FriendInvite.shareText(code: "XYZ789")), "XYZ789")
+        XCTAssertNil(FriendInvite.code(in: "https://cnsnn-9ctosy.web.app/d/ABC234"))
+        XCTAssertNil(FriendInvite.code(in: "https://cnsnn-9ctosy.web.app/a/ABO234"))
+        // A friend link is not a challenge link.
+        XCTAssertNil(ChallengeInvite.code(in: "https://cnsnn-9ctosy.web.app/a/ABC234"))
+        XCTAssertNil(ChallengeInvite.code(in: "cnsnn://a/ABC234"))
+    }
+
     func testInviteCodesFromTextsAndLinks() {
         XCTAssertEqual(ChallengeInvite.code(in: "abc234"), "ABC234")
         XCTAssertEqual(ChallengeInvite.code(in: " ABC 234 "), "ABC234")

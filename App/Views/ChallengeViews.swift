@@ -324,8 +324,9 @@ struct ChallengeSheet: View {
     }
 
     private var invite: some View {
-        let text = "Je te défie sur CNSNN : 5 mots sans leurs voyelles, le plus rapide gagne !"
-            + (code.map { " Ajoute-moi avec mon code ami " + $0 + "." } ?? "") + " " + Site.appStore.absoluteString
+        // A friend invite, not a challenge: its friend link adds me (challenges go by their own link).
+        let text = code.map { FriendInvite.shareText(code: $0) }
+            ?? "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! " + Site.appStore.absoluteString
         return ShareLink(item: text) {
             Label("Inviter par message", systemImage: "square.and.arrow.up").scaledFont(15, .semibold)
         }.buttonStyle(GlassPillStyle(height: 50)).padding(.top, 6)

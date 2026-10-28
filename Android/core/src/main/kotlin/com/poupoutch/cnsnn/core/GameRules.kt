@@ -148,7 +148,7 @@ object Site {
     const val URL = "https://cnsnn-9ctosy.web.app"
     const val RULES = "$URL/regles"
     const val PRIVACY = "$URL/confidentialite"
-    fun friendInvite(code: String) = "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est $code. $URL"
+    fun friendInvite(code: String) = FriendInvite.shareText(code)
 }
 
 /** The community rules every player accepts (same text and version as the iPhone app and the site). */
