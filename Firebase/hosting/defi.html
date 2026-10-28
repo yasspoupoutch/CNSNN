@@ -30,17 +30,16 @@
   <div class="code" id="code" aria-live="polite">······</div>
   <p class="muted" id="hint">Vous avez 48 h pour le relever. Le premier qui utilise ce code prend la place.</p>
   <div class="buttons">
-    <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
-    <a class="button ghost" id="open" href="/">J’ai déjà l’application</a>
+    <a class="button" id="open" href="/">Ouvrir dans CNSNN</a>
     <button class="button ghost" id="copy" type="button">Copier le code</button>
   </div>
   <p class="status" id="status" role="status"></p>
 </section>
 <h2>Vous n’avez pas encore l’application ?</h2>
 <ol>
-  <li>Installez CNSNN depuis l’App Store.</li>
-  <li>Ouvrez-la une fois et choisissez un pseudo.</li>
-  <li>Revenez dans la conversation et touchez de nouveau le lien du défi : CNSNN s’ouvre directement sur le défi.</li>
+  <li>Installez CNSNN sur votre téléphone.</li>
+  <li>Ouvrez-la, choisissez un pseudo, puis touchez « Défier un ami » sur l’accueil.</li>
+  <li>Tapez le code ci-dessus dans « Code d’un défi reçu », puis « Rejoindre ».</li>
 </ol>
 <!--STORES-->
 <section class="card">
@@ -66,13 +65,6 @@
     document.getElementById('open').hidden = true;
     document.getElementById('copy').hidden = true;
   }
-  // Android: no store yet (the page says Google Play is coming), so no install button there.
-  if (/android/i.test(navigator.userAgent)) document.getElementById('install').hidden = true;
-  // On an iPhone with CNSNN installed, iOS opens the app for this link (universal link) and this page
-  // never shows. So reaching it on an iPhone means the app is missing: go straight to the App Store.
-  // Once installed, the player taps the same link again and the app opens on the challenge.
-  const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (code && iPhone) location.replace(document.getElementById('install').href);
   document.getElementById('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
     catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }
