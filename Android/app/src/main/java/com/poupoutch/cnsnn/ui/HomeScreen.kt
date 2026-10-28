@@ -48,14 +48,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Leaderboard
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -439,22 +434,12 @@ private fun ClassicCard(state: AppViewModel, play: (Category?, Difficulty?) -> U
             Text("$left mot${if (left > 1) "s" else ""} avant le niveau ${level + 1}", style = MaterialTheme.typography.bodySmall, color = Palette.secondary)
         }
         LevelBar(into / ClassicLevel.WORDS_PER_LEVEL.toFloat(), Modifier.padding(top = 8.dp))
-        Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterMenu(category?.label ?: "Toutes catégories", listOf<Category?>(null) + Category.entries, { it?.label ?: "Toutes catégories" }) { category = it }
-            FilterMenu(difficulty?.label ?: "Toutes difficultés", listOf<Difficulty?>(null) + Difficulty.entries, { it?.label ?: "Toutes difficultés" }) { difficulty = it }
-        }
+        // Every choice is shown at once, so players see they can pick a theme or a level.
+        Kicker("Catégorie", color = Palette.secondary, modifier = Modifier.padding(top = 22.dp, bottom = 4.dp))
+        ChipRow(listOf<Category?>(null) + Category.entries, category, { it?.label ?: "Toutes" }) { category = it }
+        Kicker("Difficulté", color = Palette.secondary, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+        ChipRow(listOf<Difficulty?>(null) + Difficulty.entries, difficulty, { it?.label ?: "Toutes" }) { difficulty = it }
         PrimaryButton("Lancer une partie", Modifier.padding(top = 20.dp)) { play(category, difficulty) }
     }
 }
 
-@Composable
-private fun <T> FilterMenu(title: String, items: List<T>, label: (T) -> String, select: (T) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        AssistChip({ open = true }, { Text(title, maxLines = 1) }, trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
-            shape = RoundedCornerShape(50), colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
-        DropdownMenu(open, { open = false }) {
-            items.forEach { item -> DropdownMenuItem({ Text(label(item)) }, { select(item); open = false }) }
-        }
-    }
-}

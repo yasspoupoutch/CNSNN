@@ -165,6 +165,7 @@ struct MainShell: View {
     private func turnOnReminder() async {
         Reminders.minutes = Reminders.defaultMinutes
         guard await Reminders.enable() else { return }
+        state.remindersVersion += 1
         state.refreshGlance(force: true)
     }
     /// Apple's rating prompt, back on the home page after a found daily word, never during a game.

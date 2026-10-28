@@ -1,6 +1,6 @@
 {
   "locale": "fr-FR",
-  "version": "1.2",
+  "version": "1.3",
   "name": "CNSNN : Jeu de mots du jour",
   "subtitle": "Défi quotidien sans voyelles",
   "privacyPolicyUrl": "https://cnsnn-9ctosy.web.app/confidentialite",
@@ -48,5 +48,5 @@
       "subtitle": "Avec un code, sans réseau social"
     }
   },
-  "whatsNew": "• Un tutoriel au premier lancement pour comprendre le jeu en quelques secondes.\n• Votre semaine en un coup d'œil sur l'accueil. Un mot du jour manqué depuis lundi se rattrape et compte au classement de la semaine, avec 5 minutes en plus.\n• Un rappel à 12h pour ne pas oublier le mot du jour (proposé une fois, réglable dans Profil).\n• Le rang du jour compte maintenant les mêmes joueurs que le classement."
+  "whatsNew": "Corrections de bugs et améliorations."
 }

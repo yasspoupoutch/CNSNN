@@ -585,9 +585,10 @@ struct Shake: GeometryEffect {
     }
 }
 
-/// Wraps children onto several centred lines.
+/// Wraps children onto several lines, centred or from the leading edge.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
+    var centred = true
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
         let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
@@ -596,7 +597,7 @@ struct FlowLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var y = bounds.minY
         for row in arrange(width: bounds.width, subviews: subviews) {
-            var x = bounds.midX - row.width / 2
+            var x = centred ? bounds.midX - row.width / 2 : bounds.minX
             for index in row.indices {
                 let size = subviews[index].sizeThatFits(.unspecified)
                 subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))

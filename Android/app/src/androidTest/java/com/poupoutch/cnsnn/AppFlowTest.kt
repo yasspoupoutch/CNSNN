@@ -2,6 +2,8 @@ package com.poupoutch.cnsnn
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -38,6 +40,12 @@ class AppFlowTest {
         // Classique opens its filters in a sheet.
         rule.onNodeWithText("Classique").performScrollTo().performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Lancer une partie")).fetchSemanticsNodes().isNotEmpty() }
+        // Every category and difficulty is a visible chip; the one tapped is selected.
+        listOf("Général", "Cinéma", "Animaux", "Moyen", "Difficile").forEach { rule.onNodeWithText(it).assertIsDisplayed() }
+        rule.onAllNodes(hasText("Toutes"))[1].assertIsSelected()
+        rule.onNodeWithText("Facile").performClick()
+        rule.onNodeWithText("Facile").assertIsSelected()
+        rule.onAllNodes(hasText("Toutes"))[1].assertIsNotSelected()
         rule.onNodeWithText("Lancer une partie").performClick()
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("votre réponse")).fetchSemanticsNodes().isNotEmpty() }
         // A wrong answer stays in the game and is shown crossed out.
