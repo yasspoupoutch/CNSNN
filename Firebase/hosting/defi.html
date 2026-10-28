@@ -30,7 +30,7 @@
   <div class="code" id="code" aria-live="polite">······</div>
   <p class="muted" id="hint">Vous avez 48 h pour le relever. Le premier qui utilise ce code prend la place.</p>
   <div class="buttons">
-    <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer et rejoindre</a>
+    <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
     <a class="button ghost" id="open" href="/">J’ai déjà l’application</a>
     <button class="button ghost" id="copy" type="button">Copier le code</button>
   </div>
@@ -38,9 +38,9 @@
 </section>
 <h2>Vous n’avez pas encore l’application ?</h2>
 <ol>
-  <li>Touchez « Installer et rejoindre » : le code est copié et l’App Store s’ouvre.</li>
-  <li>Ouvrez CNSNN, choisissez un pseudo, puis touchez « Défier un ami » sur l’accueil.</li>
-  <li>Touchez « Coller » à côté de « Code d’un défi reçu » : vous rejoignez le défi. Vous pouvez aussi taper le code.</li>
+  <li>Installez CNSNN depuis l’App Store.</li>
+  <li>Ouvrez-la une fois et choisissez un pseudo.</li>
+  <li>Revenez dans la conversation et touchez de nouveau le lien du défi : CNSNN s’ouvre directement sur le défi.</li>
 </ol>
 <!--STORES-->
 <section class="card">
@@ -68,14 +68,11 @@
   }
   // Android: no store yet (the page says Google Play is coming), so no install button there.
   if (/android/i.test(navigator.userAgent)) document.getElementById('install').hidden = true;
-  // Installing loses the link, so the code goes to the clipboard first: the app pastes it in one tap.
-  document.getElementById('install').addEventListener('click', async (event) => {
-    if (!code) return;
-    event.preventDefault();
-    const store = event.currentTarget.href;
-    try { await navigator.clipboard.writeText(code); } catch {}
-    location.href = store;
-  });
+  // On an iPhone with CNSNN installed, iOS opens the app for this link (universal link) and this page
+  // never shows. So reaching it on an iPhone means the app is missing: go straight to the App Store.
+  // Once installed, the player taps the same link again and the app opens on the challenge.
+  const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (code && iPhone) location.replace(document.getElementById('install').href);
   document.getElementById('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
     catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }
