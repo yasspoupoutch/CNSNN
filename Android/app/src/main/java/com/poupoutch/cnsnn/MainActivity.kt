@@ -42,5 +42,12 @@ class MainActivity : ComponentActivity() {
         state.refreshGlance(force = true)
         // Progress saved while offline, or played on another device, is synced again.
         state.onForeground()
+        // Anonymous attendance: counted on return, sent on leaving.
+        state.noteOpen()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        state.sendUsage()
     }
 }

@@ -219,6 +219,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshChallenges()
         isAdmin = runCatching { cloud.isAdmin() }.getOrDefault(false)
         uid?.let { user -> isSuspended = runCatching { cloud.isSuspended(user) }.getOrDefault(isSuspended) }
+        sendUsage()
     }
     fun refreshModeration() = viewModelScope.launch {
         isAdmin = runCatching { cloud.isAdmin() }.getOrDefault(isAdmin)
@@ -411,6 +412,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         update { p ->
             p.copy(attempts = p.attempts + attempt, recentCards = (p.recentCards.filter { it != attempt.cardID } + attempt.cardID).takeLast(20))
         }
+        notePlayed(if (attempt.mode == GameMode.DAILY) "daily" else "classic")
     }
     /** The server's result replaces this phone's measurement for that day. */
     fun recordOfficial(attempt: Attempt) {
@@ -427,6 +429,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun recordMode(mode: PlayMode, best: Map<String, Int>, add: Map<String, Int>): Set<String> {
         val (next, beaten) = progress.recordingMode(mode, best, add, local.deviceID)
         progress = next; persist()
+        notePlayed(mode.key)
         return beaten
     }
     /** A Sprint whose app was closed during play is over: it counts as it stood (its clock never stops). */
@@ -435,6 +438,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         local.clearRun(PlayMode.SPRINT)
         game.stop()
         recordMode(PlayMode.SPRINT, game.best, game.add)
+    }
+
+    // ---- Attendance
+
+    /** The app is on screen (launch, or back from the background): counted once a day, anonymously. */
+    fun noteOpen() {
+        local.usage = local.usage.open(DailySchedule.key(), "Android", returning = progress.username.isNotEmpty() || progress.attempts.isNotEmpty())
+    }
+    private fun notePlayed(mode: String) { local.usage = local.usage.play(mode, DailySchedule.key()) }
+    /** Sends what is waiting: once signed in, and when the app leaves the screen (one write a day or so). While the free quota is used up, the counts wait on the phone. */
+    fun sendUsage() {
+        if (isServerFull) return
+        val (counts, left) = local.usage.take(DailySchedule.shift(DailySchedule.key(), -3), signedIn = uid != null)
+        if (counts.isEmpty()) return
+        runCatching { cloud.addUsage(counts) }.onSuccess { local.usage = left }
     }
 
     // ---- Community
@@ -609,6 +627,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .exceptionOrNull()?.let { CloudError.code(it) == CloudError.Code.PERMISSION_DENIED } ?: false
         val fresh = runCatching { cloud.challenge(challenge.id) }.getOrNull() ?: return challenge to ChallengeSend.PENDING
         replace(fresh)
+        if (fresh.mine(user).finished && !challenge.mine(user).finished) notePlayed("challenge")
         return fresh to when {
             fresh.mine(user).finished -> ChallengeSend.CONFIRMED
             refused && System.currentTimeMillis() >= fresh.finishDeadlineMs -> ChallengeSend.EXPIRED

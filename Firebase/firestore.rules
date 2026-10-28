@@ -497,6 +497,33 @@ service cloud.firestore {
     && request.time >= old[side + 'StartedAt'] + duration.value((5 - c[side + 'Skips']) * 2, 's');
   }
 
+  // ---- Anonymous attendance (Core/Usage.swift): one document per day of counters, no name, no id.
+  // Each phone only adds to them, a little at a time; only the admins read them. A phone without a
+  // pseudo yet (no account) can only count itself as opened.
+  match /stats/{day} {
+   allow read: if admin();
+   allow create: if countsUsage(day, {}, request.resource.data);
+   allow update: if countsUsage(day, resource.data, request.resource.data);
+   allow delete: if false;
+  }
+  function usageOpenKeys() { return ['opensIos','opensAndroid','newIos','newAndroid']; }
+  function usagePlayKeys() { return ['players','newPlayers','daily','classic','sprint','survival','duo','challenge']; }
+  function grows(old, d, k, most) {
+   return !(k in d) || (d[k] is int && d[k] >= old.get(k, 0) && d[k] <= old.get(k, 0) + most);
+  }
+  // The day on the phone's calendar, sent at most 3 days late (a phone that stayed offline). Nothing
+  // removed, nothing but the known counters, each one growing by a few at most.
+  function countsUsage(day, old, d) {
+   let changed = d.diff(old).affectedKeys();
+   return validDayKey(day) && request.time >= dayDate(day) - duration.value(14, 'h')
+    && request.time < dayDate(day) + duration.value(108, 'h')
+    && d.keys().hasAll(old.keys()) && changed.size() > 0 && changed.hasOnly(signedIn() ? usageOpenKeys().concat(usagePlayKeys()) : usageOpenKeys())
+    && grows(old, d, 'opensIos', 1) && grows(old, d, 'opensAndroid', 1) && grows(old, d, 'newIos', 1) && grows(old, d, 'newAndroid', 1)
+    && grows(old, d, 'players', 1) && grows(old, d, 'newPlayers', 1)
+    && grows(old, d, 'daily', 10) && grows(old, d, 'classic', 500) && grows(old, d, 'sprint', 100)
+    && grows(old, d, 'survival', 100) && grows(old, d, 'duo', 100) && grows(old, d, 'challenge', 50);
+  }
+
   match /{document=**} { allow read, write: if false; }
  }
 }

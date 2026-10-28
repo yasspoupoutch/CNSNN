@@ -10,6 +10,7 @@ import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ProgressJson
 import com.poupoutch.cnsnn.core.SprintGame
 import com.poupoutch.cnsnn.core.SurvivalGame
+import com.poupoutch.cnsnn.core.UsageTally
 import com.poupoutch.cnsnn.reminders.Reminders
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,6 +37,11 @@ class LocalStore(context: Context) {
     var activeScope: String?
         get() = prefs.getString("activeScope", null)
         set(value) { prefs.edit().putString("activeScope", value).apply() }
+
+    /** Anonymous attendance counts waiting to be sent (core Usage.kt), whatever the account. */
+    var usage: UsageTally
+        get() = UsageTally.fromJson(prefs.getString("usage.tally", null))
+        set(value) { prefs.edit().putString("usage.tally", value.toJson()).apply() }
 
     var avatar: Int
         get() = prefs.getInt("avatar", 0)

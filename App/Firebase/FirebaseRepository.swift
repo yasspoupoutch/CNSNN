@@ -10,6 +10,8 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
 struct PlayerReport: Identifiable { let id: String; let playerID: String; let username: String; let reason: String }
 /// A player a moderator suspended.
 struct SuspendedPlayer: Identifiable { let id: String; let username: String; let reason: String }
+/// One day of anonymous attendance (`stats/{day}`): counter name to value.
+struct DayUsage: Identifiable { var id: String { day }; let day: String; let counts: [String: Int] }
 
 /// Official totals of one player (`leaderboard/{uid}`), only ever moved by the security rules' checks.
 struct LeaderboardEntry: Identifiable, Equatable {
@@ -518,6 +520,23 @@ enum DailyGuesses {
         return Array(docs.filter(Self.visible).compactMap(Self.rank).prefix(limit))
     }
     /// Moderation: today's wins under 5 s, too fast to be read and typed by hand.
+    // MARK: Attendance
+
+    /// Adds this phone's anonymous counts to the days' totals (`stats/{day}`, see Core/Usage.swift).
+    /// Firestore keeps the write on the phone until it reaches the server: nothing is lost offline.
+    func addUsage(_ counts: [String: [String: Int]]) {
+        for (day, fields) in counts {
+            db.collection("stats").document(day).setData(fields.mapValues { FieldValue.increment(Int64($0)) }, merge: true)
+        }
+    }
+    /// The counts of the days from `day` on, most recent first (admins only: one read per day).
+    func usage(since day: String) async throws -> [DayUsage] {
+        let docs = try await db.collection("stats").whereField(FieldPath.documentID(), isGreaterThanOrEqualTo: day)
+            .getDocuments(source: .server).documents
+        return docs.map { doc in DayUsage(day: doc.documentID, counts: doc.data().compactMapValues { ($0 as? NSNumber)?.intValue }) }
+            .sorted { $0.day > $1.day }
+    }
+
     func suspiciousResults(day: String) async throws -> [DailyRank] {
         guard let fast = dayResults(day, to: 4999) else { return [] }
         let docs = try await fast.order(by: "rank").limit(to: 20).getDocuments(source: .server).documents

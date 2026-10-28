@@ -122,6 +122,7 @@ import CNSNNCore
     }
     func connectIfConfigured() async {
         defer { isRestoring = false }
+        noteOpen()
         guard !RuntimeFlags.isTesting, FirebaseRepository.isConfigured else { return }
         guard !isBusy else { return }
         isBusy = true
@@ -151,6 +152,7 @@ import CNSNNCore
         await refreshChallenges()
         isAdmin = (try? await cloud?.isAdmin()) ?? false
         if let cloud, let uid { isSuspended = (try? await cloud.isSuspended(uid: uid)) ?? isSuspended }
+        sendUsage()
     }
     static let refusedName = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
     static let suspendedText = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
@@ -402,6 +404,7 @@ import CNSNNCore
         progress.recentCards.append(attempt.cardID)
         progress.recentCards = Array(progress.recentCards.suffix(20))
         persist()
+        notePlayed(attempt.mode == .daily ? "daily" : "classic")
     }
     /// This week's daily words, Monday to Sunday: found, lost, to catch up, today, coming.
     func dailyWeek(now: Date = Date()) -> [CatchUp.Day] {
@@ -436,6 +439,7 @@ import CNSNNCore
     @discardableResult func recordMode(_ mode: PlayMode, best: [String: Int], add: [String: Int]) -> Set<String> {
         let beaten = progress.recordMode(mode, best: best, add: add, device: ModeRunStore.deviceID)
         persist()
+        notePlayed(mode.rawValue)
         return beaten
     }
     /// A Sprint whose app was closed during play is over: it counts as it stood (its clock never stops).
@@ -557,7 +561,10 @@ import CNSNNCore
         catch { refused = CloudError.code(error) == .permissionDenied }
         guard let fresh = try? await cloud.challenge(id: challenge.id) else { return (challenge, .pending) }
         replace(fresh)
-        if fresh.mine(uid).finished { return (fresh, .confirmed) }
+        if fresh.mine(uid).finished {
+            if !challenge.mine(uid).finished { notePlayed("challenge") }
+            return (fresh, .confirmed)
+        }
         if refused && Int(Date().timeIntervalSince1970 * 1000) >= fresh.finishDeadlineMs() { return (fresh, .expired) }
         return (fresh, .pending)
     }
@@ -572,6 +579,35 @@ import CNSNNCore
     private func replace(_ challenge: Challenge) {
         if let index = challenges.firstIndex(where: { $0.id == challenge.id }) { challenges[index] = challenge } else { challenges.insert(challenge, at: 0) }
     }
+
+    // MARK: Attendance
+
+    /// Anonymous counts for the admins' attendance page (Core/Usage.swift): kept on this iPhone, never
+    /// tied to the account, and sent as a few increments at a time.
+    private static let usageKey = "usage.tally"
+    @ObservationIgnored private var usage = UserDefaults.standard.data(forKey: AppState.usageKey).flatMap { try? JSONDecoder().decode(UsageTally.self, from: $0) } ?? UsageTally()
+    private var countsUsage: Bool { !RuntimeFlags.isTesting }
+    /// The app is on screen (launch, or back from the background): counted once a day.
+    func noteOpen() {
+        guard countsUsage else { return }
+        usage.open(day: DailySchedule.key(), platform: "Ios", returning: !progress.username.isEmpty || !progress.attempts.isEmpty)
+        saveUsage()
+    }
+    private func notePlayed(_ mode: String) {
+        guard countsUsage else { return }
+        usage.play(mode, day: DailySchedule.key())
+        saveUsage()
+    }
+    /// Sends what is waiting: once signed in, and when the app leaves the screen (one write a day or so).
+    /// While the free quota is used up, the counts wait on the phone.
+    func sendUsage() {
+        guard countsUsage, let cloud, !isServerFull else { return }
+        let counts = usage.take(oldest: DailySchedule.key(Date().addingTimeInterval(-3 * 86_400)), signedIn: uid != nil)
+        guard !counts.isEmpty else { return }
+        cloud.addUsage(counts)
+        saveUsage()
+    }
+    private func saveUsage() { UserDefaults.standard.set(try? JSONEncoder().encode(usage), forKey: Self.usageKey) }
 
     // MARK: Community
 
