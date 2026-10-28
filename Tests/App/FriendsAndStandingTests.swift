@@ -2,6 +2,18 @@ import XCTest
 import CNSNNCore
 @testable import CNSNN
 final class FriendsAndStandingTests: XCTestCase {
+    /// The free Firestore quota starts again at midnight in California, whatever the phone's time zone.
+    func testServerFullUntilCaliforniaMidnight() throws {
+        let iso = ISO8601DateFormatter()
+        // 23:30 in Paris on 27 October 2026 (22:30 UTC): California is still on summer time (UTC-7).
+        let reset = CloudError.quotaReset(after: try XCTUnwrap(iso.date(from: "2026-10-27T22:30:00Z")))
+        XCTAssertEqual(reset, iso.date(from: "2026-10-28T07:00:00Z"))
+        // After the US clock change: midnight is 08:00 UTC, 9 h in Paris.
+        XCTAssertEqual(CloudError.quotaReset(after: try XCTUnwrap(iso.date(from: "2026-11-10T12:00:00Z"))), iso.date(from: "2026-11-11T08:00:00Z"))
+        XCTAssertEqual(CloudError.code(CloudError.serverFull), .serverFull)
+        XCTAssertEqual(CloudError.code(NSError(domain: "FIRFirestoreErrorDomain", code: 8)), .serverFull)
+        XCTAssertTrue(CloudError.message(NSError(domain: "FIRFirestoreErrorDomain", code: 8)).hasPrefix("Beaucoup de joueurs aujourd’hui"))
+    }
     func testTopPercentBadges() {
         func top(_ rank: Int, of players: Int) -> Int? { DailyStanding(rank: rank, players: players, beatenPercent: nil).topPercent }
         XCTAssertNil(top(1, of: 200))      // Shown as "numéro 1".

@@ -33,6 +33,12 @@ struct HomeView: View {
         ScrollView {
             VStack(spacing: 16) {
                 header
+                // The free Firestore quota is used up for today: one calm line instead of errors everywhere.
+                if state.isServerFull {
+                    Label(CloudError.serverFull.errorDescription ?? "", systemImage: "hourglass")
+                        .scaledFont(14).foregroundStyle(Palette.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                        .glassPanel(radius: 24, padding: 16).accessibilityIdentifier("home.serverFull")
+                }
                 dailyCard
                 modes
                 Label(syncLabel, systemImage: state.uid == nil ? "iphone" : "checkmark.icloud")
@@ -343,7 +349,7 @@ struct HomeView: View {
     }
 
     private var syncLabel: String {
-        if state.uid == nil { return state.cloud == nil ? "Progression enregistrée sur cet iPhone" : "Hors connexion · progression gardée sur cet iPhone" }
+        if state.uid == nil { return state.cloud == nil ? "Progression enregistrée sur cet iPhone" : (state.isServerFull ? "Serveur plein" : "Hors connexion") + " · progression gardée sur cet iPhone" }
         if state.isAnonymous { return "Sauvegardé en ligne · compte invité" }
         return "Sauvegardé en ligne · " + (state.email ?? "compte permanent")
     }

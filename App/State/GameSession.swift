@@ -43,7 +43,7 @@ import CNSNNCore
                 ranked = true; phase = .loading
                 Task {
                     if state.uid == nil { await state.connectIfConfigured() }
-                    guard let cloud = state.cloud, let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
+                    guard let cloud = state.cloud, let uid = state.uid else { phase = .failed((state.isServerFull ? CloudError.serverFull : CloudError.offline).errorDescription ?? ""); return }
                     if state.isSuspended, (try? await cloud.dailySession(uid: uid, day: key)) == nil { phase = .failed(AppState.suspendedText); return }
                     await loadRankedDaily(key: key, catchUp: catchUp != nil, cloud: cloud, uid: uid, state: state)
                 }
@@ -137,6 +137,7 @@ import CNSNNCore
             }
             phase = card == nil ? .failed("Cette carte n’existe pas dans cette version. Mettez l’application à jour.") : .playing
         } catch {
+            state.note(error)
             phase = .failed(CloudError.message(error))
         }
     }
@@ -207,7 +208,7 @@ import CNSNNCore
             notice = "Patientez une seconde avant de réessayer."; return
         } catch {
             if (error as? CloudError) == .noGuessesLeft { notice = CloudError.noGuessesLeft.errorDescription; await giveUp(cloud: cloud, uid: uid, day: dailyKey, state: state) }
-            else { notice = CloudError.message(error) }
+            else { state.note(error); notice = CloudError.message(error) }
             return
         }
         do {

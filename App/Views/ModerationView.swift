@@ -136,7 +136,7 @@ struct ModerationView: View {
                 try await work()
                 Haptics.success()
                 await refresh()
-                await state.refreshCards()
+                await state.refreshCards(force: true)
                 await state.refreshSubmissions()
             } catch { message = CloudError.message(error) }
         }
