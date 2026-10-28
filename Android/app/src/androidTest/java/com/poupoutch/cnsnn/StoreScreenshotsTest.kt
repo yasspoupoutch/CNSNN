@@ -80,6 +80,8 @@ class StoreScreenshotsTest {
         rule.waitUntil(20_000) { !has("Validation du temps officiel…") }
         shot("03-resultat")
         rule.onNodeWithText("Terminer").performClick()
+        waitFor("Classement")
+        rule.onNodeWithText("Classement").performClick()
         waitFor("Lina")
         shot("04-classement")
 
