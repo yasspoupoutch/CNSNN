@@ -34,12 +34,19 @@ async function token() {
 const auth = { Authorization: `Bearer ${await token()}` };
 
 async function call(method, url, body, type = 'application/json') {
-  const res = await fetch(url, {
-    method,
-    headers: { ...auth, ...(body === undefined ? {} : { 'Content-Type': type }) },
-    body: body === undefined ? undefined : type === 'application/json' ? JSON.stringify(body) : body,
-  });
-  const text = await res.text();
+  let res, text;
+  // Google Play answers 503 now and then: try again a few times before giving up.
+  for (let attempt = 1; ; attempt++) {
+    res = await fetch(url, {
+      method,
+      headers: { ...auth, ...(body === undefined ? {} : { 'Content-Type': type }) },
+      body: body === undefined ? undefined : type === 'application/json' ? JSON.stringify(body) : body,
+    });
+    text = await res.text();
+    if (res.status < 500 || attempt === 4) break;
+    console.log(`${method} : ${res.status}, nouvel essai dans ${attempt * 10} s`);
+    await new Promise((r) => setTimeout(r, attempt * 10_000));
+  }
   if (!res.ok) throw Object.assign(new Error(`${method} ${url.replace(/^.*applications\//, '')} : ${res.status} ${text.slice(0, 600)}`), { status: res.status, text });
   return text ? JSON.parse(text) : {};
 }
