@@ -92,6 +92,7 @@ jobs:
           codesign --force --sign - --timestamp=none --entitlements Widget/CNSNNWidget.entitlements "$app/PlugIns/CNSNNWidget.appex"
           codesign --force --sign - --timestamp=none --entitlements App/CNSNN.entitlements "$app"
           codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'group.com.poupoutch.cnsnn'
+          codesign -d --entitlements - "$app" 2>/dev/null | grep -q 'applinks:cnsnn-9ctosy.web.app'
 
       - name: Preparer le certificat et les profils
         if: ${{ !inputs.diagnostic_only }}
@@ -115,6 +116,11 @@ jobs:
               exit 1
             fi
           done
+          # The app also carries Associated Domains (challenge links open the app).
+          if ! grep "^PROFILE com.poupoutch.cnsnn " "$TF_ROOT/logs/signing.log" | grep -q "domains=yes"; then
+            echo "::error::Le profil de com.poupoutch.cnsnn n'autorise pas Associated Domains : cocher Associated Domains sur l'identifiant com.poupoutch.cnsnn (developer.apple.com)."
+            exit 1
+          fi
           # Temporary keychain holding only the distribution certificate.
           kc="$TF_ROOT/key/ci.keychain-db"; pass="$(uuidgen)"
           security create-keychain -p "$pass" "$kc"

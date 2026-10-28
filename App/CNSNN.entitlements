@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Shares the widget's data (Core/Glance.swift) between the app and its widget. -->
+<!-- Shares the widget's data (Core/Glance.swift) between the app and its widget.
+     Associated Domains: a challenge link https://cnsnn-9ctosy.web.app/d/CODE opens the app directly
+     (universal link, checked against /.well-known/apple-app-site-association, see Firebase/tools/hosting.mjs). -->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array><string>group.com.poupoutch.cnsnn</string></array>
+	<key>com.apple.developer.associated-domains</key>
+	<array><string>applinks:cnsnn-9ctosy.web.app</string></array>
 </dict>
 </plist>

@@ -15,9 +15,13 @@ import CNSNNCore
                 // Above this size the glass cards stop fitting on a phone screen.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .tint(CNSNNTheme.accent).task { await state.connectIfConfigured() }
-                // A challenge link (cnsnn://d/CODE, opened from the web page): join it from the challenge sheet.
+                // A challenge link (https://…/d/CODE as a universal link, or cnsnn://d/CODE from the web page):
+                // join it from the challenge sheet. Both handlers set the same code, so one firing twice is harmless.
                 .onOpenURL { url in
                     if let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL, let code = ChallengeInvite.code(in: url.absoluteString) { state.inviteCode = code }
                 }
         }
         .onChange(of: scenePhase) { _, phase in

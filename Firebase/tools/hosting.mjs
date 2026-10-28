@@ -86,6 +86,12 @@ const assetLinks = [{
   relation: ['delegate_permission/common.handle_all_urls'],
   target: { namespace: 'android_app', package_name: 'com.poupoutch.cnsnn', sha256_cert_fingerprints: fingerprints },
 }];
+// iOS universal links: same idea for the iPhone app, which lists this site in its Associated Domains
+// entitlement (App/CNSNN.entitlements). Apple reads this file when the app is installed. The team
+// id comes from the APPLE_TEAM_ID secret; without it the link keeps opening the web page.
+const teamId = (process.env.APPLE_TEAM_ID || '').trim();
+const appSiteAssociation = { applinks: { details: [{ appIDs: [`${teamId}.com.poupoutch.cnsnn`], components: [{ '/': '/d/*' }] }] } };
+if (!teamId) console.log('::warning::APPLE_TEAM_ID absent : sur iPhone, les liens de défi ouvriront la page web au lieu de l’app.');
 
 for (const name of await readdir(root)) {
   let content = await readFile(new URL(name, root));
@@ -95,6 +101,7 @@ for (const name of await readdir(root)) {
 for (const name of ['Fraunces-Black.ttf', 'InstrumentSerif-Italic.ttf']) files.set('/fonts/' + name, await readFile(new URL(name, fonts)));
 if (apk) files.set('/cnsnn.apk', await readFile(apk));
 if (fingerprints.length) files.set('/.well-known/assetlinks.json', Buffer.from(JSON.stringify(assetLinks, null, 1) + '\n'));
+if (teamId) files.set('/.well-known/apple-app-site-association', Buffer.from(JSON.stringify(appSiteAssociation, null, 1) + '\n'));
 
 await ensureWebApp();
 await ensureSite();
@@ -109,6 +116,7 @@ const version = await call('POST', `${api}/sites/${site}/versions`, {
       { glob: '/cnsnn.apk', headers: { 'Content-Type': 'application/vnd.android.package-archive', 'Cache-Control': 'no-cache' } },
       { glob: '/fonts/**', headers: { 'Cache-Control': 'public, max-age=31536000' } },
       { glob: '/.well-known/assetlinks.json', headers: { 'Content-Type': 'application/json' } },
+      { glob: '/.well-known/apple-app-site-association', headers: { 'Content-Type': 'application/json' } },
     ],
   },
 });
