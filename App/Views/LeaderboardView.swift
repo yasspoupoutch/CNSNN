@@ -6,7 +6,7 @@ import CNSNNCore
 struct LeaderboardView: View {
     @Environment(AppState.self) private var state
     enum Board: String, CaseIterable, Identifiable {
-        case today = "Aujourd’hui", friends = "Amis", week = "Semaine", fastest = "Records"
+        case today = "Aujourd’hui", friends = "Amis", week = "Semaine", fastest = "Records", sprint = "Sprint"
         var id: String { rawValue }
     }
     /// Bumped by the Stats page's pull to refresh.
@@ -48,6 +48,7 @@ struct LeaderboardView: View {
                     if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
                     Text(caption).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
                     list
+                    if board == .sprint { sprintPlace }
                     if !hidden.isEmpty {
                         Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
                             .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.horizontal, 4)
@@ -107,6 +108,10 @@ struct LeaderboardView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 6) {
                             Text(row.name).scaledFont(15, mine ? .bold : .medium).lineLimit(1)
+                            // The Sprint record holder.
+                            if row.crown {
+                                Image(systemName: "crown.fill").scaledFont(12).foregroundStyle(Palette.accent).accessibilityLabel("détient le record")
+                            }
                             if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
                         }
                         if let detail = row.detail {
@@ -135,6 +140,21 @@ struct LeaderboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).glassPanel(radius: 24, padding: 0)
     }
 
+    /// The player's own Sprint record and place, when the top 10 does not show it.
+    @ViewBuilder private var sprintPlace: some View {
+        if let mine = state.rankings.sprintMine, !rows.contains(where: { $0.id == mine.record.uid }) {
+            HStack(spacing: 12) {
+                Text(Format.ordinal(mine.rank)).scaledFont(14, .bold).monospacedDigit().foregroundStyle(Palette.tertiary).frame(minWidth: 34, alignment: .leading)
+                Text("Votre record").scaledFont(15, .bold)
+                Spacer(minLength: 8)
+                Text(Self.words(mine.record.best)).scaledFont(15, .semibold).monospacedDigit()
+            }
+            .padding(.horizontal, 16).frame(minHeight: 52).glassPanel(radius: 24, padding: 0)
+            .accessibilityElement(children: .combine)
+        }
+    }
+    static func words(_ count: Int) -> String { count == 1 ? "1 mot" : "\(count) mots" }
+
     private var refreshKey: String { (state.uid ?? "") + "-" + String(refreshToken) + "-" + String(state.rankingsVersion) }
 
     /// The rankings show only their first lines: says how many, so nobody looks for a missing name.
@@ -143,6 +163,7 @@ struct LeaderboardView: View {
         case .today: "Top 25 des plus rapides du jour"
         case .week: "Top 50 de la semaine"
         case .fastest, .friends: "Top 25 des meilleurs temps"
+        case .sprint: "Top 10 du Sprint : le plus de mots en 90 secondes"
         }
     }
 
@@ -151,6 +172,7 @@ struct LeaderboardView: View {
         case .today: "Personne n’a encore trouvé le mot du jour."
         case .week: "Personne n’a encore joué cette semaine."
         case .fastest, .friends: "Aucun résultat pour le moment."
+        case .sprint: "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."
         }
     }
 
@@ -159,6 +181,7 @@ struct LeaderboardView: View {
         let name: String
         let value: String
         var detail: String? = nil
+        var crown = false
         /// Stable across launches, unlike hashValue.
         var color: Int { id.unicodeScalars.reduce(0) { $0 + Int($1.value) } }
     }
@@ -175,6 +198,9 @@ struct LeaderboardView: View {
             return Row(id: p.uid, name: p.username, value: Format.clock(week.timeMs), detail: Format.weekDays(week) + " trouvés")
         }
         case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
+        case .sprint: state.rankings.sprint.enumerated().map { index, record in
+            Row(id: record.uid, name: record.username, value: Self.words(record.best), crown: index == 0)
+        }
         case .friends: []
         }
     }
@@ -199,13 +225,16 @@ struct LeaderboardView: View {
         guard let cloud = state.cloud, state.uid != nil else { return }
         if state.isServerFull { failed = true; return }
         guard board != .friends else { return }
-        let force = force || refreshToken != seenToken || arrival != seenArrival
+        let pulled = refreshToken != seenToken
+        let force = force || pulled || arrival != seenArrival
         seenToken = refreshToken; seenArrival = arrival
         let day = DailySchedule.key()
         // Today's and the week's rankings change with the day.
-        let key = board == .today || board == .week ? board.rawValue + "-" + day : board.rawValue
+        let key = board == .today || board == .week ? board.rawValue + "-" + day : board == .sprint ? "sprint" : board.rawValue
+        // The Sprint ranking keeps its own 5 minutes (see AppState.sprintRankingIsStale).
+        let stale = { board == .sprint ? state.sprintRankingIsStale(pulled: pulled) : state.rankingIsStale(key, force: force) }
         let summary = state.rankingIsStale("summary", force: force)
-        guard summary || state.rankingIsStale(key, force: force) else { return }
+        guard summary || stale() else { return }
         loading = true; failed = false
         defer { loading = false }
         do {
@@ -214,11 +243,18 @@ struct LeaderboardView: View {
                 if let entry = state.official { state.rankings.myRank = try await cloud.weekRank(entry, day: day) }
                 state.rankings.readAt["summary"] = Date()
             }
-            guard state.rankingIsStale(key, force: force) else { return }
+            guard stale() else { return }
             switch board {
             case .today: state.rankings.today = try await cloud.dailyRanking(day: day)
             case .week: state.rankings.players = try await cloud.weekPlayers(day: day)
             case .fastest: state.rankings.fastest = try await cloud.fastestPlayers()
+            case .sprint:
+                let top = try await cloud.sprintTop()
+                state.rankings.sprint = top
+                // My own line only when the top 10 does not hold it (one read and one count).
+                if let uid = state.uid, !top.contains(where: { $0.uid == uid }) {
+                    state.rankings.sprintMine = try await cloud.sprintPlace(uid: uid)
+                } else { state.rankings.sprintMine = nil }
             case .friends: return
             }
             state.rankings.readAt[key] = Date()

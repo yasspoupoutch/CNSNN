@@ -181,6 +181,32 @@ import CNSNNCore
         XCTAssertEqual(alone.map(\.uid), [alice.uid])
     }
 
+    /// The Sprint ranking: a game timed by the server goes on it once, only when it beats the line.
+    func testSprintRankingTakesCheckedGames() async throws {
+        let alice = try await repo.bootstrap(username: "Alice")
+        repo.startSprint(uid: alice.uid)
+        // At least a second per word: two words after 2.5 s.
+        try await Task.sleep(nanoseconds: 2_500_000_000)
+        let tooMany = try? await repo.publishSprint(uid: alice.uid, username: "Alice", found: 9)
+        XCTAssertNotEqual(tooMany, true)
+        let published = try await repo.publishSprint(uid: alice.uid, username: "Alice", found: 2)
+        XCTAssertTrue(published)
+        let again = try await repo.publishSprint(uid: alice.uid, username: "Alice", found: 2)
+        XCTAssertFalse(again)
+        try repo.signOut()
+        let bob = try await repo.bootstrap(username: "Bob")
+        repo.startSprint(uid: bob.uid)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        let bobPublished = try await repo.publishSprint(uid: bob.uid, username: "Bob", found: 1)
+        XCTAssertTrue(bobPublished)
+        let top = try await repo.sprintTop()
+        XCTAssertEqual(top.map(\.username), ["Alice", "Bob"])
+        XCTAssertEqual(top.map(\.best), [2, 1])
+        let place = try await repo.sprintPlace(uid: bob.uid)
+        XCTAssertEqual(place?.rank, 2)
+        XCTAssertEqual(place?.record.best, 1)
+    }
+
     /// A friend challenge from end to end: sent to a friend only, both clocks kept by the server,
     /// the same winner on both sides, and gone with either account.
     func testFriendChallengeFlow() async throws {

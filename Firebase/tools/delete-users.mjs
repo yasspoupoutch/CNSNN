@@ -35,7 +35,7 @@ for (const name of names) {
   if (!doDelete) continue;
   if ((await db.doc(`admins/${uid}`).get()).exists) { console.error(`  refusé : « ${name} » est administrateur.`); process.exitCode = 1; continue; }
 
-  const refs = [db.doc(`users/${uid}/private/progress`), db.doc(`leaderboard/${uid}`), db.doc(`banned/${uid}`), ...friends.map((d) => d.ref), ...results.map((d) => d.ref)];
+  const refs = [db.doc(`users/${uid}/private/progress`), db.doc(`leaderboard/${uid}`), db.doc(`sprintRecords/${uid}`), db.doc(`sprintRuns/${uid}`), db.doc(`banned/${uid}`), ...friends.map((d) => d.ref), ...results.map((d) => d.ref)];
   // Friends lists of other players pointing at this account.
   refs.push(...friends.map((d) => db.doc(`users/${d.id}/friends/${uid}`)));
   for (const [collection, field] of [['friendCodes', 'uid'], ['usernames', 'uid'], ['challengeInvites', 'from'], ['dailySessions', 'userId'],

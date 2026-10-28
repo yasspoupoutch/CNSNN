@@ -5,7 +5,8 @@
 import { readFile } from 'node:fs/promises';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getSecurityRules } from 'firebase-admin/security-rules';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { importSprintRecords } from './sprint.mjs';
 
 const projectId = 'cnsnn-9ctosy';
 const credential = applicationDefault();
@@ -98,6 +99,10 @@ for (const friend of (await db.collectionGroup('friends').get()).docs) {
   mutual++;
 }
 console.log(`Amitiés rendues réciproques : ${mutual}`);
+
+// Sprint ranking (iOS 1.3.1): the best Sprints played until now, imported once (see tools/sprint.mjs).
+const sprint = await importSprintRecords(db, Timestamp, FieldValue);
+console.log(sprint.skipped ? 'Records Sprint : déjà importés' : `Records Sprint importés : ${sprint.imported}`);
 
 const source = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 const ruleset = await getSecurityRules().releaseFirestoreRulesetFromSource(source);

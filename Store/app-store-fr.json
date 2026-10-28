@@ -1,6 +1,6 @@
 {
   "locale": "fr-FR",
-  "version": "1.3",
+  "version": "1.3.1",
   "name": "CNSNN : Jeu de mots du jour",
   "subtitle": "Défi quotidien sans voyelles",
   "privacyPolicyUrl": "https://cnsnn-9ctosy.web.app/confidentialite",
@@ -48,5 +48,5 @@
       "subtitle": "Avec un code, sans réseau social"
     }
   },
-  "whatsNew": "Corrections de bugs et améliorations."
+  "whatsNew": "Nouveau : le classement du Sprint, avec le top 10 et le détenteur du record.\nCorrections de bugs et améliorations."
 }

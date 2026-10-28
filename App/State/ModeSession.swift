@@ -61,6 +61,7 @@ import CNSNNCore
         survival = mode == .survival ? SurvivalGame(seed: seed, recent: recent) : nil
         duo = mode == .duo ? DuoGame(seed: seed, recent: recent) : nil
         baseMs = 0; start = .now
+        if mode == .sprint { state.startSprintRun() }
         save()
     }
 
@@ -170,6 +171,7 @@ import CNSNNCore
             guard let sprint else { return }
             beaten = state.recordMode(.sprint, best: sprint.records.best, add: sprint.records.add)
             ModeRunStore.remember(sprint.used, mode: .sprint)
+            state.publishSprint(found: sprint.found)
         case .survival:
             guard let survival else { return }
             beaten = state.recordMode(.survival, best: survival.records.best, add: survival.records.add)

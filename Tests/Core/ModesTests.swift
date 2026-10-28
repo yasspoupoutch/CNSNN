@@ -115,6 +115,14 @@ final class SprintTests: XCTestCase {
         XCTAssertEqual(game.records.best, [ModeStat.words: 12, ModeStat.combo: 12])
     }
 
+    /// Same numbers as Firebase/tests/sprint.test.mjs: more words first, then the earlier game.
+    func testSprintRankingSortsWordsThenTheEarlierGame() {
+        XCTAssertEqual(SprintRecords.rank(best: 17, startedAtMs: 1000), 179_999_999_998_999)
+        XCTAssertGreaterThan(SprintRecords.rank(best: 18, startedAtMs: 5000), SprintRecords.rank(best: 17, startedAtMs: 1000))
+        XCTAssertGreaterThan(SprintRecords.rank(best: 17, startedAtMs: 1000), SprintRecords.rank(best: 17, startedAtMs: 5000))
+        XCTAssertGreaterThan(SprintRecords.rank(best: 60, startedAtMs: 1_900_000_000_000), 0)
+    }
+
     func testPassingCostsFiveSecondsAndTheCombo() {
         var game = SprintGame(seed: 5)
         right(&game, 1000); right(&game, 2000)

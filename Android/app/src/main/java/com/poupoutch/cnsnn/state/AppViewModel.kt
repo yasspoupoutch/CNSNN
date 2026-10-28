@@ -443,6 +443,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         game.stop()
         recordMode(PlayMode.SPRINT, game.best, game.add)
     }
+    /** A Sprint starts: the server notes the time, so the score can go on the Sprint ranking at the end. */
+    fun startSprintRun() {
+        val user = uid ?: return
+        if (isSuspended || isServerFull) return
+        cloud.startSprint(user)
+    }
+    /**
+     * A Sprint ended on time: a new best goes on the Sprint ranking (the rules check the game).
+     * Best effort: offline, or a game that started offline, simply stays a personal record.
+     */
+    fun publishSprint(found: Int) {
+        val user = uid ?: return
+        if (isSuspended || isServerFull || found <= 0) return
+        val name = progress.username.ifEmpty { "Joueur" }
+        viewModelScope.launch {
+            if (runCatching { cloud.publishSprint(user, name, found) }.getOrDefault(false)) {
+                rankings = rankings.copy(readAt = rankings.readAt - "sprint")
+            }
+        }
+    }
 
     // ---- Attendance
 
@@ -485,6 +505,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val today: List<com.poupoutch.cnsnn.data.DailyRank> = emptyList(),
         val players: List<LeaderboardEntry> = emptyList(),
         val fastest: List<LeaderboardEntry> = emptyList(),
+        /** The Sprint top 10, and the player's own line and place when it is not in it. */
+        val sprint: List<com.poupoutch.cnsnn.data.SprintRecord> = emptyList(),
+        val sprintMine: Pair<com.poupoutch.cnsnn.data.SprintRecord, Int>? = null,
         val myRank: Pair<Int, Int>? = null,
         val friends: List<com.poupoutch.cnsnn.core.FriendStanding> = emptyList(),
         val friendCode: String? = null,
@@ -514,6 +537,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (isServerFull) return false
         val at = rankings.readAt[key] ?: return true
         return System.currentTimeMillis() - at > if (force) RANKING_REFRESH_MS else RANKING_KEEP_MS
+    }
+    /**
+     * The Sprint ranking moves little: kept 5 minutes, even when arriving on the page. A pull to refresh
+     * reads it again after 30 s, and a new record of the player's own at once.
+     */
+    fun sprintRankingIsStale(pulled: Boolean): Boolean {
+        if (isServerFull) return false
+        val at = rankings.readAt["sprint"] ?: return true
+        return System.currentTimeMillis() - at > if (pulled) RANKING_REFRESH_MS else SPRINT_KEEP_MS
     }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
@@ -670,6 +702,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val RANKING_KEEP_MS = 180_000L
         const val RANKING_REFRESH_MS = 30_000L
+        const val SPRINT_KEEP_MS = 300_000L
         const val REFUSED_NAME = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
         const val SUSPENDED_TEXT = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
     }

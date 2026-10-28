@@ -24,6 +24,8 @@ test('web deletion: every document, 120 live cards anonymized, reports and suspe
   await seed('friendCodes/ABC234', { uid: 'alice', username: 'Alice', createdAt: now });
   await seed('usernames/alice', { uid: 'alice', createdAt: now });
   await seed('leaderboard/alice', { uid: 'alice', username: 'Alice', played: 1 });
+  await seed('sprintRecords/alice', { uid: 'alice', username: 'Alice', best: 12 });
+  await seed('sprintRuns/alice', { startedAt: now });
   await seed(`dailySessions/alice_${day}`, { userId: 'alice', day, cardId: 'x', startedAt: now, hintUsed: false });
   await seed(`dailyResults/alice_${day}`, { userId: 'alice', username: 'Alice', day, correct: true, timeMs: 9000, scoreMs: 9000 });
   await seed('reports/alice_CHOCOLAT', { userId: 'alice', cardId: 'CHOCOLAT', reason: 'Indice faux.', status: 'pending' });
@@ -36,7 +38,7 @@ test('web deletion: every document, 120 live cards anonymized, reports and suspe
 
   const result = await deleteAccountData(env.authenticatedContext('alice').firestore(), 'alice', fs);
   assert.equal(result.anonymizedCards, 120);
-  for (const name of ['users', 'usernames', 'leaderboard', 'friendCodes', 'dailySessions', 'dailyResults', 'reports', 'playerReports', 'banned']) {
+  for (const name of ['users', 'usernames', 'leaderboard', 'sprintRecords', 'sprintRuns', 'friendCodes', 'dailySessions', 'dailyResults', 'reports', 'playerReports', 'banned']) {
     assert.deepEqual((await all(name)).filter((d) => JSON.stringify(d).includes('alice') || JSON.stringify(d).includes('Alice')), [], name);
   }
   const cards = await all('cards');

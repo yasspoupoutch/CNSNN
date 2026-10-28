@@ -141,6 +141,14 @@ class SprintGame private constructor(
     }
 }
 
+/** The public Sprint ranking (`sprintRecords`), same formula as the security rules' sprintRank. */
+object SprintRecords {
+    /** The rules refuse more: 90 seconds at no less than a second per word, with margin. */
+    const val MAX_WORDS = 60
+    /** One number sorts the ranking: the words, then the earliest game first. */
+    fun rank(best: Int, startedAtMs: Long): Long = best * 10_000_000_000_000L + (9_999_999_999_999L - startedAtMs)
+}
+
 // ---- Survie
 
 /**

@@ -14,7 +14,8 @@ async function commit(db, fs, writes) {
 export async function deleteAccountData(db, uid, fs) {
   const { doc, collection, query, where, getDocs } = fs;
   const owned = async (name, field = 'userId') => (await getDocs(query(collection(db, name), where(field, '==', uid)))).docs;
-  const refs = [doc(db, 'users', uid), doc(db, 'users', uid, 'private', 'progress'), doc(db, 'leaderboard', uid)];
+  const refs = [doc(db, 'users', uid), doc(db, 'users', uid, 'private', 'progress'), doc(db, 'leaderboard', uid),
+    doc(db, 'sprintRecords', uid), doc(db, 'sprintRuns', uid)];
   refs.push(...(await getDocs(collection(db, 'users', uid, 'friends'))).docs.map((d) => d.ref));
   refs.push(...(await owned('friendCodes', 'uid')).map((d) => d.ref));
   refs.push(...(await owned('usernames', 'uid')).map((d) => d.ref));
