@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Shared steps of the iOS workflow (.github/workflows/ios-simulator.yml), so that its parallel
-# jobs build and test with exactly the same xcodebuild settings. Needs CI_ROOT (and SIMULATOR_ID
-# for the simulator steps).
+# Steps of the iOS workflow (.github/workflows/ios-simulator.yml), so that every test target
+# runs with exactly the same xcodebuild settings. Needs CI_ROOT (and SIMULATOR_ID for the
+# simulator steps).
 #   setup                 check Xcode 27 and the project, create CI_ROOT
 #   resolve               fetch the Swift packages (Firebase) into CI_ROOT/SourcePackages
 #   simulator             pick an iPhone simulator matching the SDK and start booting it

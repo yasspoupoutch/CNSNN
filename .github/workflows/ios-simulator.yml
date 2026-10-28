@@ -1,10 +1,10 @@
 name: CNSNN - iOS Simulator
 
 # Manual only: no builds on pushes, no deployment, no Apple signing secrets.
-# Three jobs run side by side: unit, widget and Firebase tests; the UI tests (when asked, once
-# before merging); the Release build. Each test target runs on one Debug build
-# (build-for-testing); npm and the Firebase emulators come from the cache. The Swift packages
-# are not cached: restoring them took 4 min, longer than downloading them.
+# One Debug build (build-for-testing) serves the widget check, the unit tests and the UI tests
+# (when asked, once before merging); npm and the Firebase emulators come from the cache.
+# One job on purpose: parallel macOS jobs slowed each other down (22 min instead of ~12), and
+# the Swift packages are not cached (restoring them took longer than downloading them).
 on:
   workflow_dispatch:
     inputs:
@@ -79,6 +79,10 @@ jobs:
       - name: Exécuter les tests unitaires du moteur et de l'application
         run: Scripts/ci_ios.sh test unit-tests CNSNNCoreTests CNSNNAppTests
 
+      - name: Exécuter les tests UI
+        if: ${{ inputs.run_ui_tests }}
+        run: Scripts/ci_ios.sh test ui-tests CNSNNUITests/CNSNNUITests
+
       - name: Installer Java et Node pour les émulateurs Firebase
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
@@ -97,12 +101,15 @@ jobs:
           key: cnsnn-firebase-emulators-${{ hashFiles('Firebase/package-lock.json') }}
 
       # Signed ad hoc (keychain for Firebase Auth): only the signature changes, the code compiled
-      # above is reused.
+      # above is reused. After the UI tests, which must run on the unsigned build.
       - name: Tester Firebase de bout en bout (émulateurs et vraies règles)
         timeout-minutes: 15
         run: |
           set -euo pipefail
           Scripts/ci_integration_tests.sh 2>&1 | tee "$CI_ROOT/logs/integration-tests.log"
+
+      - name: Compiler aussi en Release pour iPhone (comme l'IPA)
+        run: Scripts/ci_ios.sh release
 
       - name: Afficher les rapports de plantage de l'app
         if: failure()
@@ -119,99 +126,5 @@ jobs:
           path: |
             ${{ runner.temp }}/cnsnn-ci/logs/
             ${{ runner.temp }}/cnsnn-ci/*.xcresult
-          if-no-files-found: warn
-          retention-days: 1
-
-  ui-tests:
-    name: Tests UI
-    if: ${{ inputs.run_ui_tests }}
-    runs-on: xcode-27
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-      CI: 'true'
-      NSUnbufferedIO: 'YES'
-
-    steps:
-      - name: Récupérer le dépôt
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-
-      - name: Vérifier Xcode 27 et la structure du projet
-        run: |
-          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
-          CI_ROOT="$RUNNER_TEMP/cnsnn-ci" Scripts/ci_ios.sh setup
-
-      - name: Choisir un simulateur iPhone et le démarrer pendant la compilation
-        run: Scripts/ci_ios.sh simulator
-
-      - name: Télécharger les dépendances Firebase avec Swift Package Manager
-        timeout-minutes: 15
-        run: Scripts/ci_ios.sh resolve
-
-      - name: Compiler l'application et les tests (sans signature Apple)
-        run: Scripts/ci_ios.sh build-for-testing
-
-      - name: Exécuter les tests UI
-        run: Scripts/ci_ios.sh test ui-tests CNSNNUITests/CNSNNUITests
-
-      - name: Afficher les rapports de plantage de l'app
-        if: failure()
-        run: |
-          for f in $(ls -t ~/Library/Logs/DiagnosticReports/CNSNN*.ips 2>/dev/null | head -2); do
-            echo "== $f"; head -c 12000 "$f"; echo
-          done
-
-      - name: Conserver les journaux et résultats de diagnostic pendant un jour
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: cnsnn-ui-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/cnsnn-ci/logs/
-            ${{ runner.temp }}/cnsnn-ci/*.xcresult
-          if-no-files-found: warn
-          retention-days: 1
-
-  release-build:
-    name: Compiler en Release pour iPhone (comme l'IPA)
-    runs-on: xcode-27
-    timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-      CI: 'true'
-      NSUnbufferedIO: 'YES'
-
-    steps:
-      - name: Récupérer le dépôt
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-
-      - name: Vérifier Xcode 27 et la structure du projet
-        run: |
-          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
-          CI_ROOT="$RUNNER_TEMP/cnsnn-ci" Scripts/ci_ios.sh setup
-
-      - name: Télécharger les dépendances Firebase avec Swift Package Manager
-        timeout-minutes: 15
-        run: Scripts/ci_ios.sh resolve
-
-      - name: Compiler en Release pour iPhone
-        run: Scripts/ci_ios.sh release
-
-      - name: Conserver le journal pendant un jour
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: cnsnn-release-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/cnsnn-ci/logs/
           if-no-files-found: warn
           retention-days: 1
