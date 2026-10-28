@@ -3,7 +3,8 @@ name: CNSNN - iOS Simulator
 # Manual only: no builds on pushes, no deployment, no Apple signing secrets.
 # Three jobs run side by side: unit, widget and Firebase tests; the UI tests (when asked, once
 # before merging); the Release build. Each test target runs on one Debug build
-# (build-for-testing), and the Swift packages and Firebase emulators come from the cache.
+# (build-for-testing); npm and the Firebase emulators come from the cache. The Swift packages
+# are not cached: restoring them took 4 min, longer than downloading them.
 on:
   workflow_dispatch:
     inputs:
@@ -48,24 +49,9 @@ jobs:
       - name: Choisir un simulateur iPhone et le démarrer pendant la compilation
         run: Scripts/ci_ios.sh simulator
 
-      - name: Reprendre les dépendances Firebase du cache
-        id: spm-cache
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ runner.temp }}/cnsnn-ci/SourcePackages
-          key: cnsnn-spm-${{ hashFiles('CNSNN.xcodeproj/project.pbxproj') }}
-          restore-keys: cnsnn-spm-
-
       - name: Télécharger les dépendances Firebase avec Swift Package Manager
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: Scripts/ci_ios.sh resolve
-
-      - name: Mettre les dépendances Firebase en cache
-        if: steps.spm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ runner.temp }}/cnsnn-ci/SourcePackages
-          key: cnsnn-spm-${{ hashFiles('CNSNN.xcodeproj/project.pbxproj') }}
 
       - name: Compiler l'application et tous les tests une seule fois (sans signature Apple)
         run: Scripts/ci_ios.sh build-for-testing
@@ -163,15 +149,8 @@ jobs:
       - name: Choisir un simulateur iPhone et le démarrer pendant la compilation
         run: Scripts/ci_ios.sh simulator
 
-      - name: Reprendre les dépendances Firebase du cache
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ runner.temp }}/cnsnn-ci/SourcePackages
-          key: cnsnn-spm-${{ hashFiles('CNSNN.xcodeproj/project.pbxproj') }}
-          restore-keys: cnsnn-spm-
-
       - name: Télécharger les dépendances Firebase avec Swift Package Manager
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: Scripts/ci_ios.sh resolve
 
       - name: Compiler l'application et les tests (sans signature Apple)
@@ -221,15 +200,8 @@ jobs:
           printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
           CI_ROOT="$RUNNER_TEMP/cnsnn-ci" Scripts/ci_ios.sh setup
 
-      - name: Reprendre les dépendances Firebase du cache
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ runner.temp }}/cnsnn-ci/SourcePackages
-          key: cnsnn-spm-${{ hashFiles('CNSNN.xcodeproj/project.pbxproj') }}
-          restore-keys: cnsnn-spm-
-
       - name: Télécharger les dépendances Firebase avec Swift Package Manager
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: Scripts/ci_ios.sh resolve
 
       - name: Compiler en Release pour iPhone
