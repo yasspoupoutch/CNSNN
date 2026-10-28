@@ -1,0 +1,229 @@
+name: CNSNN - Google Play
+
+# Envoi vers Google Play avec le compte de service du projet (secret FIREBASE_SERVICE_ACCOUNT), qui doit
+# être invité dans Play Console > Utilisateurs et autorisations, l'API Google Play Android Developer
+# activée sur le projet Google Cloud. Store/google-play/play.mjs fait les appels.
+#   - verifier : l'accès au compte et à l'appli (toujours lancé).
+#   - fiche : textes, icône, bannière et captures de la fiche fr-FR. Les captures sont prises dans la
+#     vraie app sur un émulateur (émulateurs Firebase, joueurs inventés, jamais un mot du jour secret)
+#     et publiées aussi sur la branche store-screenshots, dossier android/.
+#   - test_ferme : l'AAB signé en version brouillon du test fermé ; Yasin l'envoie en examen depuis la
+#     Play Console.
+# Un push sur une branche claude/** qui touche ces fichiers ne fait que verifier et les captures.
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/google-play.yml', 'Store/google-play/**', 'Android/tools/store-screenshots.sh', 'Android/app/src/androidTest/java/com/poupoutch/cnsnn/StoreScreenshotsTest.kt']
+  workflow_dispatch:
+    inputs:
+      fiche:
+        description: Envoyer la fiche (textes, images, captures)
+        type: boolean
+        default: true
+      test_ferme:
+        description: Envoyer l'appli dans le test fermé (brouillon)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-google-play-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    name: Vérifier l'accès à Google Play
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier le compte, l'API et l'appli
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          trap 'rm -f "$RUNNER_TEMP/sa.json"' EXIT
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs verifier
+
+  captures:
+    name: Prendre les captures Google Play (émulateur)
+    if: github.event_name == 'push' || inputs.fiche
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Libérer de la place sur le disque
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/share/swift /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Démarrer les émulateurs Firebase
+        working-directory: Firebase
+        run: |
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          nohup npx firebase emulators:start --only auth,firestore --project demo-cnsnn > "$RUNNER_TEMP/emulators.log" 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null http://127.0.0.1:8080 && curl -s -o /dev/null http://127.0.0.1:9099; then echo "Émulateurs prêts"; exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/emulators.log"; exit 1
+      - name: Compiler l'app de test
+        working-directory: Android
+        env:
+          CNSNN_EMULATOR_HOST: 10.0.2.2
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      # Pixel 2 : 1080 x 1920, le format 9:16 que Google Play affiche sans bandes.
+      - name: Captures dans l'app
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          CNSNN_EMULATOR_HOST: 10.0.2.2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          working-directory: Android
+          script: ./tools/store-screenshots.sh ${{ runner.temp }}/shots
+      - name: Détail en cas d'échec
+        if: failure()
+        run: tail -50 "$RUNNER_TEMP/emulators.log" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cnsnn-screenshots-android
+          path: ${{ runner.temp }}/shots/*.png
+          retention-days: 7
+
+  publier-captures:
+    name: Publier les captures sur la branche store-screenshots
+    needs: captures
+    # Aussi après un échec : la capture zz-echec.png montre où le parcours s'est arrêté.
+    if: always() && needs.captures.result != 'skipped' && needs.captures.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cnsnn-screenshots-android
+          path: ${{ runner.temp }}/shots
+      - name: Pousser les captures sur store-screenshots
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch --depth=1 origin store-screenshots; then
+            git checkout -B store-screenshots FETCH_HEAD
+          else
+            git checkout --orphan store-screenshots
+            git rm -rf --quiet .
+          fi
+          # Seuls les dossiers de captures restent sur cette branche.
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name ios ! -name android -exec rm -rf {} +
+          rm -rf android && mkdir -p android
+          cp "$RUNNER_TEMP/shots/"*.png android/
+          git add -A .
+          if git diff --cached --quiet; then echo 'Captures identiques : rien à publier.'; exit 0; fi
+          git commit -m "Captures Google Play depuis ${GITHUB_SHA::7}"
+          git push --force origin HEAD:refs/heads/store-screenshots
+
+  fiche:
+    name: Envoyer la fiche Google Play
+    needs: [verifier, captures]
+    if: github.event_name == 'workflow_dispatch' && inputs.fiche
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cnsnn-screenshots-android
+          path: ${{ runner.temp }}/shots
+      - name: Textes, icône, bannière et captures
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          trap 'rm -f "$RUNNER_TEMP/sa.json"' EXIT
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs fiche "$RUNNER_TEMP/shots"
+
+  test-ferme:
+    name: Envoyer l'appli dans le test fermé
+    needs: [verifier, fiche]
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.test_ferme && needs.verifier.result == 'success' && needs.fiche.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: Android
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Ouvrir la clé de signature
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Android/signing/signing.mjs decrypt
+          rm -f "$RUNNER_TEMP/sa.json"
+      # Toujours au-dessus des numéros des APK du workflow Android.
+      - name: Compiler l'AAB signé
+        run: |
+          set -euo pipefail
+          export CNSNN_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))
+          ./gradlew --no-daemon :core:test :app:bundleRelease
+          rm -f "$RUNNER_TEMP/release.p12"
+      - name: Envoyer l'AAB dans le test fermé (brouillon)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          trap 'rm -f "$RUNNER_TEMP/sa.json"' EXIT
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs test-ferme Android/app/build/outputs/bundle/release/app-release.aab
