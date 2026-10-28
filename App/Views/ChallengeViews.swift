@@ -267,6 +267,16 @@ struct ChallengeSheet: View {
                     if cleaned != text { joinCode = cleaned }
                 }
                 .accessibilityIdentifier("joinCode")
+            // The challenge web page copies the code before sending a new player to the App Store:
+            // one tap pastes it and joins (a system paste button, so iOS asks nothing).
+            if joinCode.isEmpty {
+                PasteButton(payloadType: String.self) { texts in
+                    guard let code = texts.lazy.compactMap({ ChallengeInvite.code(in: $0) }).first else { return }
+                    Task { @MainActor in joinCode = code; join() }
+                }
+                .labelStyle(.titleOnly).buttonBorderShape(.capsule).tint(Palette.duelText)
+                .disabled(sending != nil).accessibilityIdentifier("pasteCode")
+            }
             Button { join() } label: {
                 if sending == "join" { ProgressView().tint(Palette.duelText) } else { Text("Rejoindre") }
             }
