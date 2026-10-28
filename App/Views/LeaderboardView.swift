@@ -362,7 +362,7 @@ struct FriendCodeCards: View {
             }
             Spacer(minLength: 8)
             if let code {
-                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.home.absoluteString) {
+                ShareLink(item: "Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est " + code + ". " + Site.appStore.absoluteString) {
                     Label("Partager", systemImage: "square.and.arrow.up").scaledFont(14, .semibold)
                 }.buttonStyle(GlassPillStyle(height: 44)).frame(width: 132)
             }

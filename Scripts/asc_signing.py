@@ -4,11 +4,12 @@
 Xcode's automatic (cloud) signing refuses the API key on CI, so the TestFlight workflow signs
 manually, with the Apple Distribution certificate of KEY_PEM (the CI's own private key, kept
 encrypted in Scripts/ios-signing). Nothing is ever revoked or deleted:
-  - App Groups is enabled on the app and widget identifiers if needed;
+  - App Groups is enabled on the app and widget identifiers if needed, and Associated Domains
+    (challenge links as universal links) on the app identifier, the first BUNDLE_ID;
   - the certificate matching KEY_PEM is reused, or created once from a CSR;
   - an App Store profile per identifier is reused while active with the App Group, or created.
 Writes into OUT_DIR: dist-cert.der and <bundle id>.mobileprovision, and prints one line per
-profile: PROFILE <bundle id> <uuid> <name> groups=<App Groups it allows>.
+profile: PROFILE <bundle id> <uuid> groups=<App Groups it allows> domains=<yes|no> name=<name>.
 
 Usage: asc_signing.py KEY_ID ISSUER_ID API_KEY_PATH KEY_PEM OUT_DIR BUNDLE_ID [BUNDLE_ID...]
 """
@@ -78,6 +79,11 @@ for bundle in bundles:
             'attributes': {'capabilityType': 'APP_GROUPS'},
             'relationships': {'bundleId': {'data': {'type': 'bundleIds', 'id': ids[bundle]}}}}}, ok=(409,))
         print(f'App Groups activé sur {bundle}')
+    if bundle == bundles[0] and not any(c['attributes'].get('capabilityType') == 'ASSOCIATED_DOMAINS' for c in caps['data']):
+        api('POST', '/v1/bundleIdCapabilities', {'data': {'type': 'bundleIdCapabilities',
+            'attributes': {'capabilityType': 'ASSOCIATED_DOMAINS'},
+            'relationships': {'bundleId': {'data': {'type': 'bundleIds', 'id': ids[bundle]}}}}}, ok=(409,))
+        print(f'Associated Domains activé sur {bundle}')
 
 # Distribution certificate: the one whose public key is ours, else a new one.
 dist_key = serialization.load_pem_private_key(open(dist_key_path, 'rb').read(), password=None)
@@ -104,13 +110,15 @@ else:
 (out / 'dist-cert.der').write_bytes(cert_der)
 
 # App Store profiles tied to that certificate (its id is in the name). A profile is reused only
-# while active and allowing REQUIRED_GROUP; otherwise a new one is made (Apple keeps the old one).
+# while active and allowing REQUIRED_GROUP (and, for the app, Associated Domains); otherwise a new
+# one is made (Apple keeps the old one).
 REQUIRED_GROUP = 'group.com.poupoutch.cnsnn'
 
 
 def parse(content):
     plist = plistlib.loads(re.search(rb'<\?xml.*</plist>', content, re.S).group(0))
-    return plist, plist.get('Entitlements', {}).get('com.apple.security.application-groups', [])
+    entitlements = plist.get('Entitlements', {})
+    return plist, entitlements.get('com.apple.security.application-groups', []), 'com.apple.developer.associated-domains' in entitlements
 
 
 _, res = api('GET', '/v1/profiles?filter[profileType]=IOS_APP_STORE&limit=200')
@@ -121,7 +129,8 @@ for bundle in bundles:
     for profile in active:
         if profile['attributes']['name'].startswith(name):
             candidate = base64.b64decode(profile['attributes']['profileContent'])
-            if REQUIRED_GROUP in parse(candidate)[1]:
+            _, groups, domains = parse(candidate)
+            if REQUIRED_GROUP in groups and (domains or bundle != bundles[0]):
                 content = candidate
     if content is None:
         _, res = api('POST', '/v1/profiles', {'data': {'type': 'profiles',
@@ -131,5 +140,5 @@ for bundle in bundles:
                 'certificates': {'data': [{'type': 'certificates', 'id': cert_id}]}}}})
         content = base64.b64decode(res['data']['attributes']['profileContent'])
     (out / f'{bundle}.mobileprovision').write_bytes(content)
-    plist, groups = parse(content)
-    print(f'PROFILE {bundle} {plist["UUID"]} groups={",".join(groups) or "-"} name={name}')
+    plist, groups, domains = parse(content)
+    print(f'PROFILE {bundle} {plist["UUID"]} groups={",".join(groups) or "-"} domains={"yes" if domains else "no"} name={name}')

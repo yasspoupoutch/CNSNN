@@ -471,7 +471,7 @@ enum ShareText {
         return "CNSNN · Classique : \(outcome)" + (card.map { "\n" + $0.wordNoVowels } ?? "") + invitation
     }
     /// Every share says where to get the game.
-    static let invitation = "\nJouez aussi : " + Site.home.absoluteString
+    static let invitation = "\nJouez aussi : " + Site.appStore.absoluteString
 }
 
 /// Picture shared after a game: only the consonants (no spoiler), the result and the wordmark.
