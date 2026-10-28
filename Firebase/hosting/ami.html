@@ -30,7 +30,8 @@
   <div class="code" id="code" aria-live="polite">······</div>
   <p class="muted" id="hint">Avec l’application, ce lien vous ajoute en amis directement.</p>
   <div class="buttons">
-    <a class="button" id="open" href="/">Ouvrir dans CNSNN</a>
+    <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
+    <a class="button ghost" id="open" href="/">J’ai déjà l’application</a>
     <button class="button ghost" id="copy" type="button">Copier le code</button>
   </div>
   <p class="status" id="status" role="status"></p>
@@ -65,6 +66,12 @@
     document.getElementById('open').hidden = true;
     document.getElementById('copy').hidden = true;
   }
+  // Android: no store yet (the page says Google Play is coming), so no install button there.
+  if (/android/i.test(navigator.userAgent)) document.getElementById('install').hidden = true;
+  // Same as defi.html: on an iPhone with CNSNN, iOS opens the app for this link, so reaching this page
+  // on an iPhone means the app is missing. Straight to the App Store; the player re-taps the link after.
+  const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (code && iPhone) location.replace(document.getElementById('install').href);
   document.getElementById('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
     catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }
