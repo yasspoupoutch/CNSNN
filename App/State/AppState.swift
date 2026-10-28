@@ -32,6 +32,10 @@ import CNSNNCore
     var tutorialRequest = 0
     /// The code of a challenge link the app was opened with, waiting for the challenge sheet to join it.
     var inviteCode: String?
+    /// The friend code of a friend link (…/a/CODE) the app was opened with, added once signed in.
+    var friendInviteCode: String?
+    /// What came of that friend link, shown once.
+    var friendInviteResult: String?
     /// Asks the shell to show the leaderboard (from the home page).
     var leaderboardRequest = 0
     /// Rattrapage on this iPhone, day: found. Outside every ranking, never sent to the server.
@@ -373,6 +377,18 @@ import CNSNNCore
     /// Bumped when the server confirms a daily result, so an open ranking reads again at once.
     var rankingsVersion = 0
     /// A new friend: the friends ranking is read again next time it shows.
+    /// A friend link: adds that player as soon as there is an account (a new player picks a pseudo first).
+    func acceptFriendInvite() async {
+        guard let code = friendInviteCode, let cloud, let uid else { return }
+        friendInviteCode = nil
+        let me = progress.username.isEmpty ? "Joueur" : progress.username
+        do {
+            let name = try await cloud.addFriend(code: code, uid: uid, username: me)
+            ChallengeWatch.setActive(true)
+            forgetFriendsRanking()
+            friendInviteResult = name + " fait partie de vos amis."
+        } catch { friendInviteResult = CloudError.message(error) }
+    }
     func forgetFriendsRanking() { rankings.readAt = rankings.readAt.filter { !$0.key.hasPrefix("friends-") } }
     /// Current pseudos, by player: the totals (leaderboard) are renamed with the profile, whereas a
     /// day's result, a challenge or a friend keeps the pseudo of when it was saved.

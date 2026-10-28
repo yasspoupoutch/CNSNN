@@ -85,6 +85,7 @@ import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeFormat
 import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
+import com.poupoutch.cnsnn.core.FriendInvite
 import com.poupoutch.cnsnn.core.Mistakes
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
@@ -316,7 +317,8 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.red) }
         OutlinedButton({
-            Share.plain(context, "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps !" + (code?.let { " Mon code ami : $it." } ?: "") + " " + Site.URL)
+            // A friend invite, not a challenge: its friend link adds me (challenges go by their own link).
+            Share.plain(context, code?.let { FriendInvite.shareText(it) } ?: "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! ${Site.URL}")
         }, Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(25.dp)) {
             Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Inviter par message", Modifier.padding(start = 8.dp), fontWeight = FontWeight.SemiBold)
         }

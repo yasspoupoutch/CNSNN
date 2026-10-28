@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.poupoutch.cnsnn.core.ChallengeInvite
+import com.poupoutch.cnsnn.core.FriendInvite
 import com.poupoutch.cnsnn.state.AppViewModel
 import com.poupoutch.cnsnn.ui.CnsnnTheme
 import com.poupoutch.cnsnn.ui.RootScreen
@@ -30,9 +31,10 @@ class MainActivity : ComponentActivity() {
         openInvite(intent)
     }
 
-    /** A challenge link: the challenge sheet joins it as soon as the player is connected. */
+    /** A challenge link: the challenge sheet joins it as soon as the player is connected. A friend link adds that friend. */
     private fun openInvite(intent: Intent?) {
         val link = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
+        FriendInvite.code(link)?.let { state.friendInviteCode = it; return }
         ChallengeInvite.code(link)?.let { state.inviteCode = it }
     }
 

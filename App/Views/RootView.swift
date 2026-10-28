@@ -115,6 +115,12 @@ struct MainShell: View {
         // Pages stay alive, so "Mes propositions" reloads its statuses each time it is shown.
         .onChange(of: tab) { _, page in if page == .propose { Task { await state.refreshSubmissions() } } }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
+        // A friend link: added once there is an account, then said in an alert.
+        .task(id: (state.friendInviteCode ?? "") + "|" + (state.uid ?? "")) { await state.acceptFriendInvite() }
+        .alert(state.friendInviteResult ?? "", isPresented: Binding(
+            get: { state.friendInviteResult != nil }, set: { if !$0 { state.friendInviteResult = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
         .fullScreenCover(item: $game, onDismiss: afterGame) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let play = route.play { ModeGameView(mode: play) }

@@ -25,18 +25,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- Challenge links: https://cnsnn-9ctosy.web.app/d/CODE opens the app directly (App Link,
-                 checked against /.well-known/assetlinks.json), and cnsnn://d/CODE from the web page. -->
+                 checked against /.well-known/assetlinks.json), and cnsnn://d/CODE from the web page.
+                 Friend links work the same way with /a/CODE and cnsnn://a/CODE. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="cnsnn-9ctosy.web.app" android:pathPrefix="/d/" />
+                <data android:pathPrefix="/a/" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="cnsnn" android:host="d" />
+                <data android:host="a" />
             </intent-filter>
         </activity>
 

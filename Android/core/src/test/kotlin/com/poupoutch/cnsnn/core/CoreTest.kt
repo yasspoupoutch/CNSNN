@@ -126,7 +126,7 @@ class GameRulesTest {
         assertEquals("Plus que 5 essais", Guesses.remainingText(15))
         assertEquals("Plus qu’un essai", Guesses.remainingText(19))
         assertNull(Guesses.remainingText(20))
-        assertEquals("Ajoute-moi sur CNSNN pour comparer nos temps au mot du jour : mon code ami est ABC234. https://cnsnn-9ctosy.web.app", Site.friendInvite("ABC234"))
+        assertEquals("Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! Mon code ami : ABC234. https://cnsnn-9ctosy.web.app/a/ABC234", Site.friendInvite("ABC234"))
         assertEquals(5, CommunityRules.items.size)
     }
     @Test fun seedCardsMatchTheIphone() {
