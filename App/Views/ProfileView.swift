@@ -143,12 +143,11 @@ struct ReminderSettings: View {
         }
         .glassPanel(radius: 24, padding: 0)
         // The Profil tab stays alive: the reminder may have been turned on elsewhere since (the offer
-        // after the first daily word), so read it again each time the page shows.
-        .onAppear {
-            if enabled != Reminders.isEnabled { enabled = Reminders.isEnabled }
-            time = ReminderSettings.date(minutes: Reminders.minutes)
-        }
+        // after the first daily word), so read it again when that happens.
+        .onAppear(perform: sync)
+        .onChange(of: state.remindersVersion) { _, _ in sync() }
         .onChange(of: enabled) { _, on in
+            guard on != Reminders.isEnabled else { return }
             Task {
                 if on {
                     let allowed = await Reminders.enable()
@@ -165,6 +164,10 @@ struct ReminderSettings: View {
             Reminders.minutes = (parts.hour ?? 12) * 60 + (parts.minute ?? 0)
             state.refreshGlance(force: true)
         }
+    }
+    private func sync() {
+        if enabled != Reminders.isEnabled { enabled = Reminders.isEnabled }
+        time = ReminderSettings.date(minutes: Reminders.minutes)
     }
     private static func date(minutes: Int) -> Date {
         Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date()
