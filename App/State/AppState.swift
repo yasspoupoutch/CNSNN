@@ -366,6 +366,11 @@ import CNSNNCore
         var today: [DailyRank] = []
         var players: [LeaderboardEntry] = []
         var fastest: [LeaderboardEntry] = []
+        /// The Sprint top 10, and the player's own line and place when it is not in it.
+        var sprint: [SprintRecord] = []
+        var sprintMine: (record: SprintRecord, rank: Int)?
+        /// The Sprint record holder alone, for the home page when the ranking was not read.
+        var sprintLeader: SprintRecord?
         var myRank: (rank: Int, players: Int)?
         var friends: [FriendStanding] = []
         var friendCode: String?
@@ -411,6 +416,28 @@ import CNSNNCore
         return Date().timeIntervalSince(at) > (force ? Self.rankingRefreshSeconds : Self.rankingKeepSeconds)
     }
     static let rankingKeepSeconds: TimeInterval = 180
+    /// The Sprint ranking moves little: kept 5 minutes, even when arriving on the page. A pull to refresh
+    /// reads it again after 30 s, and a new record of the player's own at once.
+    func sprintRankingIsStale(pulled: Bool) -> Bool {
+        guard !isServerFull else { return false }
+        guard let at = rankings.readAt["sprint"] else { return true }
+        return Date().timeIntervalSince(at) > (pulled ? Self.rankingRefreshSeconds : Self.sprintKeepSeconds)
+    }
+    static let sprintKeepSeconds: TimeInterval = 300
+    /// The Sprint record holder, shown with a crown on the home page's Sprint card.
+    var sprintLeader: SprintRecord? {
+        let ranking = rankings.readAt["sprint"] ?? .distantPast, leader = rankings.readAt["sprintLeader"] ?? .distantPast
+        return ranking >= leader ? rankings.sprint.first : rankings.sprintLeader
+    }
+    /// Reads the record holder for the home page: 2 reads at most every 15 minutes, none when the
+    /// Sprint ranking was read in the last 5 minutes (its first line is the holder).
+    func refreshSprintLeader() async {
+        guard let cloud, uid != nil, sprintRankingIsStale(pulled: false) else { return }
+        if let at = rankings.readAt["sprintLeader"], Date().timeIntervalSince(at) < 900 { return }
+        guard let top = try? await cloud.sprintTop(limit: 1) else { return }
+        rankings.sprintLeader = top.first
+        rankings.readAt["sprintLeader"] = Date()
+    }
     static let rankingRefreshSeconds: TimeInterval = 30
 
     // MARK: Results
@@ -467,6 +494,22 @@ import CNSNNCore
         ModeRunStore.clear(.sprint)
         game.stop()
         recordMode(.sprint, best: game.records.best, add: game.records.add)
+    }
+    /// A Sprint starts: the server notes the time, so the score can go on the Sprint ranking at the end.
+    func startSprintRun() {
+        guard let cloud, let uid, !isSuspended, !isServerFull else { return }
+        cloud.startSprint(uid: uid)
+    }
+    /// A Sprint ended on time: a new best goes on the Sprint ranking (the rules check the game).
+    /// Best effort: offline, or a game that started offline, simply stays a personal record.
+    func publishSprint(found: Int) {
+        guard let cloud, let uid, !isSuspended, !isServerFull, found > 0 else { return }
+        let name = progress.username.isEmpty ? "Joueur" : progress.username
+        Task {
+            guard (try? await cloud.publishSprint(uid: uid, username: name, found: found)) == true else { return }
+            rankings.readAt["sprint"] = nil; rankings.readAt["sprintLeader"] = nil
+            await refreshSprintLeader()
+        }
     }
 
     // MARK: Friend challenges

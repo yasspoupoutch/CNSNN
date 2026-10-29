@@ -107,6 +107,13 @@ class SprintTest {
         assertEquals(mapOf(ModeStat.WORDS to 12, ModeStat.COMBO to 12), game.best)
     }
 
+    /** Same numbers as Firebase/tests/sprint.test.mjs: more words first, then the earlier game. */
+    @Test fun sprintRankingSortsWordsThenTheEarlierGame() {
+        assertEquals(179_999_999_998_999L, SprintRecords.rank(17, 1000))
+        assertTrue(SprintRecords.rank(18, 5000) > SprintRecords.rank(17, 1000))
+        assertTrue(SprintRecords.rank(17, 1000) > SprintRecords.rank(17, 5000))
+    }
+
     @Test fun passingCostsFiveSecondsAndTheCombo() {
         val game = SprintGame(5uL)
         right(game, 1000); right(game, 2000)

@@ -107,7 +107,7 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
     LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
     LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) challenges = true }
-    LaunchedEffect(state.uid) { state.refreshChallenges() }
+    LaunchedEffect(state.uid) { state.refreshChallenges(); state.refreshSprintLeader() }
     // The day on screen, moved on at midnight and whenever the app comes back (a notification tap
     // the next morning), so yesterday's found word never stays up.
     var today by remember { mutableStateOf(DailySchedule.key()) }
@@ -118,7 +118,7 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     androidx.compose.runtime.DisposableEffect(lifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon() }
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon(); state.refreshSprintLeaderSoon() }
         }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
@@ -168,21 +168,26 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
 @Composable
 private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit, openChallenges: () -> Unit, playChallenge: (com.poupoutch.cnsnn.core.Challenge) -> Unit) {
     val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
-    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
-        PlayMode.entries.map { mode -> Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs) { playMode(mode) } }
+    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, open = openClassic)) +
+        PlayMode.entries.map { mode ->
+            // The player holds the Sprint record: a gold crown on the card.
+            val crowned = mode == PlayMode.SPRINT && state.uid != null && state.sprintLeader?.uid == state.uid
+            Tile(mode.icon, mode.tint, mode.title, mode.tagline, recordLine(state, mode), mode in runs, crowned) { playMode(mode) }
+        }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Kicker("Jouer aussi", Palette.tertiary, Modifier.padding(start = 4.dp, top = 4.dp))
         ChallengeTile(state, openChallenges, playChallenge)
         val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
         tiles.chunked(columns).forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { t -> ModeTile(t.icon, t.tint, t.title, t.tagline, t.detail, t.inProgress, Modifier.weight(1f).fillMaxHeight(), t.open) }
+                row.forEach { t -> ModeTile(t.icon, t.tint, t.title, t.tagline, t.detail, t.inProgress, Modifier.weight(1f).fillMaxHeight(), t.crowned, t.open) }
             }
         }
     }
 }
 
-private class Tile(val icon: ImageVector, val tint: Color, val title: String, val tagline: String, val detail: String, val inProgress: Boolean, val open: () -> Unit)
+private class Tile(val icon: ImageVector, val tint: Color, val title: String, val tagline: String, val detail: String, val inProgress: Boolean,
+                   val crowned: Boolean = false, val open: () -> Unit)
 
 private fun recordLine(state: AppViewModel, mode: PlayMode): String {
     val records = state.progress.records(mode)
@@ -208,18 +213,20 @@ val PlayMode.tagline: String get() = when (this) {
 }
 
 @Composable
-private fun ModeTile(icon: ImageVector, tint: Color, title: String, tagline: String, detail: String, inProgress: Boolean, modifier: Modifier, open: () -> Unit) {
+private fun ModeTile(icon: ImageVector, tint: Color, title: String, tagline: String, detail: String, inProgress: Boolean, modifier: Modifier,
+                     crowned: Boolean, open: () -> Unit) {
     val haptics = rememberHaptics()
     Surface({ haptics.selection(); open() }, modifier.heightIn(min = 112.dp), shape = RoundedCornerShape(22.dp), color = Palette.surface.copy(alpha = 0.82f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Palette.border, Palette.line)))) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp).semantics(mergeDescendants = true) {
-            contentDescription = "$title. $tagline $detail" + if (inProgress) ". Partie en cours" else ""
+            contentDescription = "$title. $tagline $detail" + (if (crowned) ". Vous détenez le record" else "") + if (inProgress) ". Partie en cours" else ""
         }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(30.dp).background(tint.copy(alpha = 0.12f), CircleShape).border(1.dp, tint.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
                     Icon(icon, null, Modifier.size(16.dp), tint = tint)
                 }
                 Spacer(Modifier.weight(1f))
+                if (crowned) Icon(CrownIcon, null, Modifier.size(18.dp), tint = Palette.accent)
                 if (inProgress) Text("En cours", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.mint,
                     modifier = Modifier.background(Palette.mint.copy(alpha = 0.12f), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 3.dp))
             }

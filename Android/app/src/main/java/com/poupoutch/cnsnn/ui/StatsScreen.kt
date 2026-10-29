@@ -219,11 +219,12 @@ private fun ModeRecordsCard(state: AppViewModel) {
     }
 }
 
-private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), MONTH("Mois"), FASTEST("Records") }
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), MONTH("Mois"), FASTEST("Records"), SPRINT("Sprint") }
 
 /** "12 jours joués" this month. */
 private fun monthDetail(entry: LeaderboardEntry): String = if (entry.monthPlayed > 1) "${entry.monthPlayed} jours joués" else "1 jour joué"
-private data class Line(val id: String, val name: String, val value: String, val detail: String? = null)
+private data class Line(val id: String, val name: String, val value: String, val detail: String? = null, val crown: Boolean = false)
+private fun words(count: Int): String = if (count == 1) "1 mot" else "$count mots"
 
 @Composable
 private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
@@ -250,12 +251,15 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         if (board == Board.FRIENDS) return
         if (state.isServerFull) { failed = true; return }
         // Kept 3 minutes; arriving on the page or a pull to refresh reads again after 30 s (see rankingIsStale).
-        val force = !arrived || refreshToken != seenToken
+        val pulled = refreshToken != seenToken
+        val force = !arrived || pulled
         seenToken = refreshToken; arrived = true
         val day = DailySchedule.key()
-        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); else -> board.name }
+        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); Board.SPRINT -> "sprint"; else -> board.name }
+        // The Sprint ranking keeps its own 5 minutes (see AppViewModel.sprintRankingIsStale).
+        val stale = { if (board == Board.SPRINT) state.sprintRankingIsStale(pulled) else state.rankingIsStale(key, force) }
         val summary = state.rankingIsStale("summary", force)
-        if (!summary && !state.rankingIsStale(key, force)) return
+        if (!summary && !stale()) return
         loading = true; failed = false
         try {
             if (summary) {
@@ -263,11 +267,17 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                 state.rankings = state.rankings.copy(myRank = state.official?.let { state.cloud.monthlyRank(it, day) })
                 state.rankingRead("summary")
             }
-            if (state.rankingIsStale(key, force)) {
+            if (stale()) {
                 state.rankings = when (board) {
                     Board.TODAY -> state.rankings.copy(today = state.cloud.dailyRanking(day))
                     Board.MONTH -> state.rankings.copy(players = state.cloud.monthlyPlayers(day))
                     Board.FASTEST -> state.rankings.copy(fastest = state.cloud.fastestPlayers())
+                    Board.SPRINT -> {
+                        val top = state.cloud.sprintTop()
+                        // My own line only when the top 10 does not hold it (one read and one count).
+                        val me = state.uid
+                        state.rankings.copy(sprint = top, sprintMine = if (me != null && top.none { it.uid == me }) state.cloud.sprintPlace(me) else null)
+                    }
                     Board.FRIENDS -> state.rankings
                 }
                 state.rankingRead(key)
@@ -294,7 +304,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     if (board == Board.FRIENDS) { FriendsBoard(state, refreshToken); return }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
     // The rankings show only their first lines: says how many, so nobody looks for a missing name.
-    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; else -> "Top 25 des meilleurs temps" },
+    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes"; else -> "Top 25 des meilleurs temps" },
         fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     val hidden = state.hiddenPlayers
     val rows = when (board) {
@@ -304,17 +314,19 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         // The month total: 10 min for every day not found or not played, so the lowest wins.
         Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
+        Board.SPRINT -> state.rankings.sprint.mapIndexed { index, it -> Line(it.uid, it.username, words(it.best), crown = index == 0) }
         Board.FRIENDS -> emptyList()
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
         if (rows.isEmpty()) EmptyLine(loading, if (failed) unavailable(state) else
-            when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.MONTH -> "Personne n’a encore joué ce mois-ci."; else -> "Aucun résultat pour le moment." })
+            when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.MONTH -> "Personne n’a encore joué ce mois-ci."
+                Board.SPRINT -> "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."; else -> "Aucun résultat pour le moment." })
         rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
             val mine = row.id == state.uid
             var menu by remember(row.id) { mutableStateOf(false) }
             Box {
-                RankRow(index, row.name, row.id, mine, row.detail, row.value, onLongPress = { if (!mine) { haptics.selection(); menu = true } })
+                RankRow(index, row.name, row.id, mine, row.detail, row.value, crown = row.crown, onLongPress = { if (!mine) { haptics.selection(); menu = true } })
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem({ Text("Signaler ce pseudo") }, {
                         menu = false
@@ -327,6 +339,16 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                     if (state.isAdmin) DropdownMenuItem({ Text("Suspendre ce joueur", color = Palette.red) }, { menu = false; suspending = row })
                 }
             }
+        }
+    }
+    // The player's own Sprint record and place, when the top 10 does not show it.
+    val sprintMine = state.rankings.sprintMine
+    if (board == Board.SPRINT && sprintMine != null && rows.none { it.id == sprintMine.first.uid }) SectionCard(padding = 0.dp, radius = 24.dp) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(Format.ordinal(sprintMine.second), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Palette.tertiary, modifier = Modifier.width(36.dp))
+            Text("Votre record", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(words(sprintMine.first.best), fontWeight = FontWeight.SemiBold)
         }
     }
     if (hidden.isNotEmpty()) TextButton(state::showAllPlayers) {
@@ -357,7 +379,7 @@ private fun EmptyLine(loading: Boolean, text: String) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail: String?, value: String, valueColor: androidx.compose.ui.graphics.Color = Palette.foreground,
-                    extra: String? = null, onLongPress: () -> Unit) {
+                    extra: String? = null, crown: Boolean = false, onLongPress: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(if (mine) Palette.fill1 else androidx.compose.ui.graphics.Color.Transparent)
         .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Options").heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -366,6 +388,8 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(name, fontWeight = if (mine) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                // The Sprint record holder.
+                if (crown) Icon(CrownIcon, "détient le record", tint = Palette.accent, modifier = Modifier.padding(start = 6.dp).size(15.dp))
                 if (mine) Text("vous", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
             }
             if (!detail.isNullOrEmpty()) Text(detail, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)

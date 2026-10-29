@@ -130,6 +130,14 @@ public struct SprintGame: Codable, Sendable {
     }
 }
 
+/// The public Sprint ranking (`sprintRecords`), same formula as the security rules' sprintRank.
+public enum SprintRecords {
+    /// The rules refuse more: 90 seconds at no less than a second per word, with margin.
+    public static let maxWords = 60
+    /// One number sorts the ranking: the words, then the earliest game first.
+    public static func rank(best: Int, startedAtMs: Int) -> Int { best * 10_000_000_000_000 + (9_999_999_999_999 - startedAtMs) }
+}
+
 // MARK: - Survie
 
 /// Three lives. A wrong answer or a pass costs one; every tenth word found gives one back (three at

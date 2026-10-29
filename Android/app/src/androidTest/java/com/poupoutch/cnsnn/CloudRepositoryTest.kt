@@ -212,6 +212,30 @@ class CloudRepositoryTest {
         assertEquals(setOf("Alice", "Bob"), repo.friendsBoard(alice.uid, "Alice", DailySchedule.key()).map { it.username }.toSet())
     }
 
+    /** The Sprint ranking: a game timed by the server goes on it once, only when it beats the line. */
+    @Test fun sprintRankingTakesCheckedGames() = runBlocking<Unit> {
+        val alice = repo.bootstrap("Alice")
+        repo.startSprint(alice.uid)
+        // At least a second per word: two words after 2.5 s.
+        kotlinx.coroutines.delay(2500)
+        assertFalse(runCatching { repo.publishSprint(alice.uid, "Alice", 9) }.getOrDefault(false))
+        assertTrue(repo.publishSprint(alice.uid, "Alice", 2))
+        assertFalse(repo.publishSprint(alice.uid, "Alice", 2))
+        auth.signOut()
+        val bob = repo.bootstrap("Bob")
+        repo.startSprint(bob.uid)
+        kotlinx.coroutines.delay(1500)
+        assertTrue(repo.publishSprint(bob.uid, "Bob", 1))
+        val top = repo.sprintTop()
+        assertEquals(listOf("Alice", "Bob"), top.map { it.username })
+        assertEquals(listOf(2, 1), top.map { it.best })
+        // The home page's crown reads the record holder alone.
+        assertEquals(listOf(alice.uid), repo.sprintTop(1).map { it.uid })
+        val place = repo.sprintPlace(bob.uid)
+        assertEquals(2, place?.second)
+        assertEquals(1, place?.first?.best)
+    }
+
     /** A friend challenge from end to end, on the same documents as the iPhone app. */
     @Test fun friendChallengeFlow() = runBlocking<Unit> {
         repo.bootstrap("Alice")

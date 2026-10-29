@@ -33,6 +33,7 @@ import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
 import com.poupoutch.cnsnn.core.SecretDaily
+import com.poupoutch.cnsnn.core.SprintRecords
 import com.poupoutch.cnsnn.core.Submission
 import com.poupoutch.cnsnn.core.WordEngine
 import kotlinx.coroutines.tasks.await
@@ -47,6 +48,8 @@ data class CardReport(val id: String, val cardId: String, val reason: String, va
 data class PlayerReport(val id: String, val playerId: String, val username: String, val reason: String)
 /** A player a moderator suspended. */
 data class SuspendedPlayer(val id: String, val username: String, val reason: String)
+/** A player's best Sprint (`sprintRecords/{uid}`): words found in 90 s, checked by the server since 1.3.1. */
+data class SprintRecord(val uid: String, val username: String, val best: Int)
 /** One day of anonymous attendance (`stats/{day}`): counter name to value. */
 data class DayUsage(val day: String, val counts: Map<String, Int>)
 /** One line of the day's ranking. `scoreMs` is the official time: the hint minute included, 10 min for a lost day. */
@@ -122,6 +125,8 @@ class CloudRepository(
         // Today's result too, if played (the ranking of the day shows it). Best effort, no read:
         // without a result today the write is simply refused.
         resultRef(uid, DailySchedule.key()).update("username", username)
+        // The Sprint ranking too, if the player has a line there (refused otherwise).
+        db.collection("sprintRecords").document(uid).update("username", username)
     }
 
     // ---- Unique pseudos: usernames/{pseudo in lower case} names the player holding it, whatever the case.
@@ -165,7 +170,8 @@ class CloudRepository(
         val email = user.email
         if (password != null && email != null) user.reauthenticate(EmailAuthProvider.getCredential(email, password)).await()
         val users = db.collection("users").document(uid)
-        val refs = mutableListOf<DocumentReference>(users.collection("private").document("progress"), db.collection("leaderboard").document(uid))
+        val refs = mutableListOf<DocumentReference>(users.collection("private").document("progress"), db.collection("leaderboard").document(uid),
+            db.collection("sprintRecords").document(uid), db.collection("sprintRuns").document(uid))
         refs += users.collection("friends").get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("usernames").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
@@ -361,6 +367,42 @@ class CloudRepository(
     }
     suspend fun fastestPlayers(limit: Int = 25): List<LeaderboardEntry> =
         visible(db.collection("leaderboard").whereGreaterThan("bestTimeMs", 0).orderBy("bestTimeMs"), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    // ---- Sprint ranking
+
+    /** The server notes when a Sprint starts (one write per game), so its score can be checked at the end. */
+    fun startSprint(uid: String) {
+        db.collection("sprintRuns").document(uid).set(mapOf("startedAt" to FieldValue.serverTimestamp()))
+    }
+    /**
+     * Puts the game just played on the Sprint ranking when it beats the player's line. Two reads, and a
+     * write only for a new record; the rules check the game's start, its length and the score's pace.
+     */
+    suspend fun publishSprint(uid: String, username: String, found: Int): Boolean {
+        if (found !in 1..SprintRecords.MAX_WORDS) return false
+        val startedAt = db.collection("sprintRuns").document(uid).get(Source.SERVER).await().getTimestamp("startedAt") ?: return false
+        val ref = db.collection("sprintRecords").document(uid)
+        val old = ref.get(Source.SERVER).await()
+        if (found <= (old.getLong("best") ?: 0L) || old.getTimestamp("startedAt") == startedAt) return false
+        ref.set(mapOf("uid" to uid, "username" to username, "best" to found, "rank" to SprintRecords.rank(found, millis(startedAt)),
+            "startedAt" to startedAt, "at" to FieldValue.serverTimestamp())).await()
+        return true
+    }
+    /** The best Sprints, a few more than shown so suspended players can be left out (2 reads for the leader alone). */
+    suspend fun sprintTop(limit: Int = 10): List<SprintRecord> =
+        db.collection("sprintRecords").orderBy("rank", Query.Direction.DESCENDING).limit(limit + maxOf(1, limit / 2).toLong()).get().await().documents
+            .filter { it.getBoolean("suspended") != true }.take(limit).mapNotNull { sprintRecord(it) }
+    /** The player's own line and place, for when they are not in the top (one read and one count). */
+    suspend fun sprintPlace(uid: String): Pair<SprintRecord, Int>? {
+        val doc = db.collection("sprintRecords").document(uid).get().await()
+        val record = sprintRecord(doc) ?: return null
+        val rank = doc.getLong("rank") ?: return null
+        return record to count(db.collection("sprintRecords").whereGreaterThan("rank", rank)) + 1
+    }
+    private fun sprintRecord(d: DocumentSnapshot): SprintRecord? {
+        val best = d.getLong("best")?.toInt() ?: return null
+        return SprintRecord(d.id, d.getString("username") ?: "Joueur", best)
+    }
+
     /** A few more than needed, so the list stays full once suspended players are left out. */
     private suspend fun visible(query: Query, limit: Int): List<DocumentSnapshot> =
         query.limit(limit + 10L).get().await().documents.filter { it.getBoolean("suspended") != true }.take(limit)
@@ -703,6 +745,8 @@ class CloudRepository(
         val refs = mutableListOf<DocumentReference>()
         val board = db.collection("leaderboard").document(player)
         if (board.get(Source.SERVER).await().exists()) refs += board
+        val sprint = db.collection("sprintRecords").document(player)
+        if (sprint.get(Source.SERVER).await().exists()) refs += sprint
         refs += db.collection("dailyResults").whereEqualTo("userId", player).get(Source.SERVER).await().documents.map { it.reference }
         return refs.map { ref -> updating(ref, value) }
     }

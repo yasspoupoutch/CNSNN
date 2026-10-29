@@ -10,6 +10,8 @@ struct CardReport: Identifiable { let id: String; let cardID: String; let reason
 struct PlayerReport: Identifiable { let id: String; let playerID: String; let username: String; let reason: String }
 /// A player a moderator suspended.
 struct SuspendedPlayer: Identifiable { let id: String; let username: String; let reason: String }
+/// A player's best Sprint (`sprintRecords/{uid}`): words found in 90 s, checked by the server since 1.3.1.
+struct SprintRecord: Identifiable, Equatable { var id: String { uid }; let uid: String; let username: String; let best: Int }
 /// One day of anonymous attendance (`stats/{day}`): counter name to value.
 struct DayUsage: Identifiable { var id: String { day }; let day: String; let counts: [String: Int] }
 
@@ -201,6 +203,8 @@ enum DailyGuesses {
         // Today's result too, if played (the ranking of the day shows it). Best effort, no read:
         // without a result today the write is simply refused.
         resultRef(uid, DailySchedule.key()).updateData(["username": username], completion: nil)
+        // The Sprint ranking too, if the player has a line there (refused otherwise).
+        db.collection("sprintRecords").document(uid).updateData(["username": username], completion: nil)
     }
 
     // MARK: Unique pseudos
@@ -264,6 +268,8 @@ enum DailyGuesses {
             db.collection("users").document(uid),
             db.collection("users").document(uid).collection("private").document("progress"),
             db.collection("leaderboard").document(uid),
+            db.collection("sprintRecords").document(uid),
+            db.collection("sprintRuns").document(uid),
         ]
         refs += try await db.collection("users").document(uid).collection("friends").getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
@@ -503,6 +509,42 @@ enum DailyGuesses {
     }
     /// A suspended player's totals and results stay stored but are hidden from everyone else.
     private static func visible(_ doc: QueryDocumentSnapshot) -> Bool { doc.data()["suspended"] as? Bool != true }
+
+    // MARK: Sprint ranking
+
+    /// The server notes when a Sprint starts (one write per game), so its score can be checked at the end.
+    func startSprint(uid: String) {
+        db.collection("sprintRuns").document(uid).setData(["startedAt": FieldValue.serverTimestamp()], completion: nil)
+    }
+    /// Puts the game just played on the Sprint ranking when it beats the player's line. Two reads, and a
+    /// write only for a new record; the rules check the game's start, its length and the score's pace.
+    func publishSprint(uid: String, username: String, found: Int) async throws -> Bool {
+        guard (1...SprintRecords.maxWords).contains(found) else { return false }
+        let run = try await db.collection("sprintRuns").document(uid).getDocument(source: .server)
+        guard let startedAt = run.data()?["startedAt"] as? Timestamp else { return false }
+        let ref = db.collection("sprintRecords").document(uid)
+        let old = try await ref.getDocument(source: .server).data()
+        guard found > (old?["best"] as? Int ?? 0), (old?["startedAt"] as? Timestamp) != startedAt else { return false }
+        try await ref.setData(["uid": uid, "username": username, "best": found, "rank": SprintRecords.rank(best: found, startedAtMs: Self.millis(startedAt)),
+                               "startedAt": startedAt, "at": FieldValue.serverTimestamp()])
+        return true
+    }
+    /// The best Sprints, a few more than shown so suspended players can be left out (2 reads for the leader alone).
+    func sprintTop(limit: Int = 10) async throws -> [SprintRecord] {
+        let docs = try await db.collection("sprintRecords").order(by: "rank", descending: true).limit(to: limit + max(1, limit / 2)).getDocuments().documents
+        return Array(docs.filter(Self.visible).compactMap(Self.sprintRecord).prefix(limit))
+    }
+    /// The player's own line and place, for when they are not in the top (one read and one count).
+    func sprintPlace(uid: String) async throws -> (record: SprintRecord, rank: Int)? {
+        let doc = try await db.collection("sprintRecords").document(uid).getDocument()
+        guard let data = doc.data(), let record = Self.sprintRecord(uid: uid, data), let rank = data["rank"] as? Int else { return nil }
+        return (record, try await Self.count(db.collection("sprintRecords").whereField("rank", isGreaterThan: rank)) + 1)
+    }
+    private static func sprintRecord(_ doc: QueryDocumentSnapshot) -> SprintRecord? { sprintRecord(uid: doc.documentID, doc.data()) }
+    private static func sprintRecord(uid: String, _ d: [String: Any]) -> SprintRecord? {
+        guard let best = d["best"] as? Int else { return nil }
+        return SprintRecord(uid: uid, username: d["username"] as? String ?? "Joueur", best: best)
+    }
     /// Rank in the week's ranking among the players of the week, nil without a game this week.
     func weekRank(_ entry: LeaderboardEntry, day: String) async throws -> (rank: Int, players: Int)? {
         guard let week = entry.thisWeek(on: day), let board = weekBoard(day) else { return nil }
@@ -878,6 +920,8 @@ enum DailyGuesses {
         var refs = try await db.collection("dailyResults").whereField("userId", isEqualTo: player).getDocuments(source: .server).documents.map(\.reference)
         let board = db.collection("leaderboard").document(player)
         if try await board.getDocument(source: .server).exists { refs.append(board) }
+        let sprint = db.collection("sprintRecords").document(player)
+        if try await sprint.getDocument(source: .server).exists { refs.append(sprint) }
         return refs.map { BatchWrite.update(flag, $0) }
     }
     func suspendedPlayers() async throws -> [SuspendedPlayer] {

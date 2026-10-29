@@ -81,6 +81,7 @@ class ModeViewModel : ViewModel() {
         survival = if (mode == PlayMode.SURVIVAL) SurvivalGame(seed, recent) else null
         duo = if (mode == PlayMode.DUO) DuoGame(seed, recent) else null
         baseMs = 0; start = SystemClock.elapsedRealtime()
+        if (mode == PlayMode.SPRINT) state.startSprintRun()
         version++
         save(state)
     }
@@ -175,7 +176,10 @@ class ModeViewModel : ViewModel() {
         state.local.clearRun(mode)
         val now = elapsedMs
         when (mode) {
-            PlayMode.SPRINT -> sprint?.let { beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode) }
+            PlayMode.SPRINT -> sprint?.let {
+                beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode)
+                state.publishSprint(it.found)
+            }
             PlayMode.SURVIVAL -> survival?.let { beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode) }
             PlayMode.DUO -> duo?.let { beaten = state.recordMode(mode, it.best(now), it.add); state.local.remember(it.duos.map { d -> d.id }, mode) }
         }
