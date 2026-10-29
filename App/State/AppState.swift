@@ -369,6 +369,8 @@ import CNSNNCore
         /// The Sprint top 10, and the player's own line and place when it is not in it.
         var sprint: [SprintRecord] = []
         var sprintMine: (record: SprintRecord, rank: Int)?
+        /// The Sprint record holder alone, for the home page when the ranking was not read.
+        var sprintLeader: SprintRecord?
         var myRank: (rank: Int, players: Int)?
         var friends: [FriendStanding] = []
         var friendCode: String?
@@ -422,6 +424,20 @@ import CNSNNCore
         return Date().timeIntervalSince(at) > (pulled ? Self.rankingRefreshSeconds : Self.sprintKeepSeconds)
     }
     static let sprintKeepSeconds: TimeInterval = 300
+    /// The Sprint record holder, shown with a crown on the home page's Sprint card.
+    var sprintLeader: SprintRecord? {
+        let ranking = rankings.readAt["sprint"] ?? .distantPast, leader = rankings.readAt["sprintLeader"] ?? .distantPast
+        return ranking >= leader ? rankings.sprint.first : rankings.sprintLeader
+    }
+    /// Reads the record holder for the home page: 2 reads at most every 15 minutes, none when the
+    /// Sprint ranking was read in the last 5 minutes (its first line is the holder).
+    func refreshSprintLeader() async {
+        guard let cloud, uid != nil, sprintRankingIsStale(pulled: false) else { return }
+        if let at = rankings.readAt["sprintLeader"], Date().timeIntervalSince(at) < 900 { return }
+        guard let top = try? await cloud.sprintTop(limit: 1) else { return }
+        rankings.sprintLeader = top.first
+        rankings.readAt["sprintLeader"] = Date()
+    }
     static let rankingRefreshSeconds: TimeInterval = 30
 
     // MARK: Results
@@ -491,7 +507,8 @@ import CNSNNCore
         let name = progress.username.isEmpty ? "Joueur" : progress.username
         Task {
             guard (try? await cloud.publishSprint(uid: uid, username: name, found: found)) == true else { return }
-            rankings.readAt["sprint"] = nil
+            rankings.readAt["sprint"] = nil; rankings.readAt["sprintLeader"] = nil
+            await refreshSprintLeader()
         }
     }
 

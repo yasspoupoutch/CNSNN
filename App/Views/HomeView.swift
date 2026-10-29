@@ -86,11 +86,12 @@ struct HomeView: View {
         .task(id: state.uid) {
             if state.inviteCode != nil { showChallenges = true }
             await state.refreshChallenges()
+            await state.refreshSprintLeader()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             todayKey = DailySchedule.key()
-            Task { await state.refreshChallenges() }
+            Task { await state.refreshChallenges(); await state.refreshSprintLeader() }
         }
         .task(id: todayKey) {
             // Wakes up just after midnight to show the new word, then waits for the next day.
@@ -299,7 +300,8 @@ struct HomeView: View {
                 }
                 ForEach(PlayMode.allCases) { mode in
                     ModeTile(symbol: mode.symbol, tint: mode.tint, title: mode.title, tagline: mode.tagline,
-                             detail: recordLine(mode), inProgress: savedRuns.contains(mode)) {
+                             detail: recordLine(mode), inProgress: savedRuns.contains(mode),
+                             crowned: mode == .sprint && state.uid != nil && state.sprintLeader?.uid == state.uid) {
                         play(GameRoute(mode: .classic, play: mode))
                     }
                 }
@@ -377,6 +379,8 @@ struct ModeTile: View {
     var tagline: String
     var detail: String
     var inProgress: Bool
+    /// The player holds the Sprint record: a gold crown on the card.
+    var crowned = false
     var action: () -> Void
     var body: some View {
         Button { Haptics.selection(); action() } label: {
@@ -387,6 +391,10 @@ struct ModeTile: View {
                         .background(Circle().fill(tint.opacity(0.12)))
                         .overlay(Circle().strokeBorder(tint.opacity(0.25), lineWidth: 1))
                     Spacer(minLength: 4)
+                    if crowned {
+                        Image(systemName: "crown.fill").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.accent)
+                            .accessibilityLabel("Vous détenez le record")
+                    }
                     if inProgress {
                         Text("En cours").scaledFont(11, .semibold).foregroundStyle(Palette.mint)
                             .padding(.horizontal, 8).frame(minHeight: 22)
@@ -405,7 +413,7 @@ struct ModeTile: View {
         }
         .buttonStyle(PressStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(tagline) \(detail)" + (inProgress ? ". Partie en cours" : ""))
+        .accessibilityLabel("\(title). \(tagline) \(detail)" + (crowned ? ". Vous détenez le record" : "") + (inProgress ? ". Partie en cours" : ""))
         .accessibilityAddTraits(.isButton)
     }
 }

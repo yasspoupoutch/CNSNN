@@ -183,3 +183,11 @@ fun ScreenTitle(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun Divider() { Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.line)) }
+
+/** The Sprint record holder's crown, the same shape as the iPhone's. */
+val CrownIcon: androidx.compose.ui.graphics.vector.ImageVector by lazy {
+    androidx.compose.ui.graphics.vector.ImageVector.Builder("Crown", 24.dp, 24.dp, 24f, 24f).addPath(
+        androidx.compose.ui.graphics.vector.PathParser().parsePathString("M3,16L5,6.5L9.5,11L12,4.5L14.5,11L19,6.5L21,16Z M3,18H21V20.5H3Z").toNodes(),
+        fill = androidx.compose.ui.graphics.SolidColor(Color.Black),
+    ).build()
+}

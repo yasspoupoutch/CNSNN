@@ -529,9 +529,9 @@ enum DailyGuesses {
                                "startedAt": startedAt, "at": FieldValue.serverTimestamp()])
         return true
     }
-    /// The best Sprints, a few more than shown so suspended players can be left out.
+    /// The best Sprints, a few more than shown so suspended players can be left out (2 reads for the leader alone).
     func sprintTop(limit: Int = 10) async throws -> [SprintRecord] {
-        let docs = try await db.collection("sprintRecords").order(by: "rank", descending: true).limit(to: limit + 5).getDocuments().documents
+        let docs = try await db.collection("sprintRecords").order(by: "rank", descending: true).limit(to: limit + max(1, limit / 2)).getDocuments().documents
         return Array(docs.filter(Self.visible).compactMap(Self.sprintRecord).prefix(limit))
     }
     /// The player's own line and place, for when they are not in the top (one read and one count).

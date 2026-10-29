@@ -387,9 +387,10 @@ class CloudRepository(
             "startedAt" to startedAt, "at" to FieldValue.serverTimestamp())).await()
         return true
     }
-    /** The best Sprints, suspended players left out. */
+    /** The best Sprints, a few more than shown so suspended players can be left out (2 reads for the leader alone). */
     suspend fun sprintTop(limit: Int = 10): List<SprintRecord> =
-        visible(db.collection("sprintRecords").orderBy("rank", Query.Direction.DESCENDING), limit).mapNotNull { sprintRecord(it) }
+        db.collection("sprintRecords").orderBy("rank", Query.Direction.DESCENDING).limit(limit + maxOf(1, limit / 2).toLong()).get().await().documents
+            .filter { it.getBoolean("suspended") != true }.take(limit).mapNotNull { sprintRecord(it) }
     /** The player's own line and place, for when they are not in the top (one read and one count). */
     suspend fun sprintPlace(uid: String): Pair<SprintRecord, Int>? {
         val doc = db.collection("sprintRecords").document(uid).get().await()

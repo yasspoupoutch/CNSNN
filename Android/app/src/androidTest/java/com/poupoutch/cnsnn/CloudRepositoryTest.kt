@@ -229,6 +229,8 @@ class CloudRepositoryTest {
         val top = repo.sprintTop()
         assertEquals(listOf("Alice", "Bob"), top.map { it.username })
         assertEquals(listOf(2, 1), top.map { it.best })
+        // The home page's crown reads the record holder alone.
+        assertEquals(listOf(alice.uid), repo.sprintTop(1).map { it.uid })
         val place = repo.sprintPlace(bob.uid)
         assertEquals(2, place?.second)
         assertEquals(1, place?.first?.best)

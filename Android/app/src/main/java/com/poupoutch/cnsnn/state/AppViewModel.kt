@@ -459,7 +459,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val name = progress.username.ifEmpty { "Joueur" }
         viewModelScope.launch {
             if (runCatching { cloud.publishSprint(user, name, found) }.getOrDefault(false)) {
-                rankings = rankings.copy(readAt = rankings.readAt - "sprint")
+                rankings = rankings.copy(readAt = rankings.readAt - "sprint" - "sprintLeader")
+                refreshSprintLeader()
             }
         }
     }
@@ -508,6 +509,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         /** The Sprint top 10, and the player's own line and place when it is not in it. */
         val sprint: List<com.poupoutch.cnsnn.data.SprintRecord> = emptyList(),
         val sprintMine: Pair<com.poupoutch.cnsnn.data.SprintRecord, Int>? = null,
+        /** The Sprint record holder alone, for the home page when the ranking was not read. */
+        val sprintLeader: com.poupoutch.cnsnn.data.SprintRecord? = null,
         val myRank: Pair<Int, Int>? = null,
         val friends: List<com.poupoutch.cnsnn.core.FriendStanding> = emptyList(),
         val friendCode: String? = null,
@@ -547,6 +550,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val at = rankings.readAt["sprint"] ?: return true
         return System.currentTimeMillis() - at > if (pulled) RANKING_REFRESH_MS else SPRINT_KEEP_MS
     }
+    /** The Sprint record holder, shown as a crown on the home page's Sprint card when it is the player. */
+    val sprintLeader: com.poupoutch.cnsnn.data.SprintRecord? get() =
+        if ((rankings.readAt["sprint"] ?: 0L) >= (rankings.readAt["sprintLeader"] ?: 0L)) rankings.sprint.firstOrNull() else rankings.sprintLeader
+    /**
+     * Reads the record holder for the home page: 2 reads at most every 15 minutes, none when the
+     * Sprint ranking was read in the last 5 minutes (its first line is the holder).
+     */
+    suspend fun refreshSprintLeader() {
+        if (uid == null || !sprintRankingIsStale(false)) return
+        val at = rankings.readAt["sprintLeader"]
+        if (at != null && System.currentTimeMillis() - at < SPRINT_LEADER_KEEP_MS) return
+        val top = runCatching { cloud.sprintTop(1) }.getOrNull() ?: return
+        rankings = rankings.copy(sprintLeader = top.firstOrNull(), readAt = rankings.readAt + ("sprintLeader" to System.currentTimeMillis()))
+    }
+    fun refreshSprintLeaderSoon() { viewModelScope.launch { refreshSprintLeader() } }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
     /** A new friend: the friends ranking is read again next time it shows. */
@@ -703,6 +721,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val RANKING_KEEP_MS = 180_000L
         const val RANKING_REFRESH_MS = 30_000L
         const val SPRINT_KEEP_MS = 300_000L
+        const val SPRINT_LEADER_KEEP_MS = 900_000L
         const val REFUSED_NAME = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
         const val SUSPENDED_TEXT = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
     }

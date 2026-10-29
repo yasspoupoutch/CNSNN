@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -390,7 +389,7 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(name, fontWeight = if (mine) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 // The Sprint record holder.
-                if (crown) Icon(Icons.Filled.EmojiEvents, "détient le record", tint = Palette.accent, modifier = Modifier.padding(start = 6.dp).size(15.dp))
+                if (crown) Icon(CrownIcon, "détient le record", tint = Palette.accent, modifier = Modifier.padding(start = 6.dp).size(15.dp))
                 if (mine) Text("vous", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
             }
             if (!detail.isNullOrEmpty()) Text(detail, fontSize = 12.sp, color = Palette.tertiary, maxLines = 1)

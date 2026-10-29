@@ -202,6 +202,9 @@ import CNSNNCore
         let top = try await repo.sprintTop()
         XCTAssertEqual(top.map(\.username), ["Alice", "Bob"])
         XCTAssertEqual(top.map(\.best), [2, 1])
+        // The home page's crown reads the record holder alone.
+        let leader = try await repo.sprintTop(limit: 1)
+        XCTAssertEqual(leader.map(\.uid), [alice.uid])
         let place = try await repo.sprintPlace(uid: bob.uid)
         XCTAssertEqual(place?.rank, 2)
         XCTAssertEqual(place?.record.best, 1)
