@@ -168,7 +168,7 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
 @Composable
 private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayMode) -> Unit, openChallenges: () -> Unit, playChallenge: (com.poupoutch.cnsnn.core.Challenge) -> Unit) {
     val runs = remember(state.progress) { PlayMode.entries.filter { it != PlayMode.SPRINT && state.local.loadRun(it)?.finished == false }.toSet() }
-    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, openClassic)) +
+    val tiles = listOf(Tile(Icons.Filled.AllInclusive, Palette.foreground, "Classique", "Jouez sans limite.", "${state.progress.correctAnswers} mots trouvés", false, open = openClassic)) +
         PlayMode.entries.map { mode ->
             // The player holds the Sprint record: a gold crown on the card.
             val crowned = mode == PlayMode.SPRINT && state.uid != null && state.sprintLeader?.uid == state.uid
