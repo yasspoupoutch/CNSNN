@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
+import com.poupoutch.cnsnn.core.CardPicker
 import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeGame
 import com.poupoutch.cnsnn.core.ChallengeRules
@@ -416,7 +417,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (attempt.dailyKey != null && progress.attempts.any { it.dailyKey == attempt.dailyKey }) return
         if (attempt.dailyKey != null) forgetRankings()
         update { p ->
-            p.copy(attempts = p.attempts + attempt, recentCards = (p.recentCards.filter { it != attempt.cardID } + attempt.cardID).takeLast(20))
+            p.copy(attempts = p.attempts + attempt, recentCards = (p.recentCards.filter { it != attempt.cardID } + attempt.cardID).takeLast(CardPicker.MEMORY))
         }
         notePlayed(if (attempt.mode == GameMode.DAILY) "daily" else "classic")
     }

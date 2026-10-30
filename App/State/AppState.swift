@@ -450,7 +450,7 @@ import CNSNNCore
         progress.attempts.append(attempt)
         progress.recentCards.removeAll { $0 == attempt.cardID }
         progress.recentCards.append(attempt.cardID)
-        progress.recentCards = Array(progress.recentCards.suffix(20))
+        progress.recentCards = Array(progress.recentCards.suffix(CardPicker.memory))
         persist()
         notePlayed(attempt.mode == .daily ? "daily" : "classic")
     }
