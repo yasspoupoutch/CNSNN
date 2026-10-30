@@ -265,19 +265,22 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         try {
             if (summary) {
                 state.refreshOfficial()
-                state.rankings = state.rankings.copy(myRank = state.official?.let { state.cloud.monthlyRank(it, day) })
+                // Read first, then copy: the rankings may change while the server answers (the friend code).
+                val rank = state.official?.let { state.cloud.monthlyRank(it, day) }
+                state.rankings = state.rankings.copy(myRank = rank)
                 state.rankingRead("summary")
             }
             if (stale()) {
-                state.rankings = when (board) {
-                    Board.TODAY -> state.rankings.copy(today = state.cloud.dailyRanking(day))
-                    Board.MONTH -> state.rankings.copy(players = state.cloud.monthlyPlayers(day))
-                    Board.FASTEST -> state.rankings.copy(fastest = state.cloud.fastestPlayers())
+                when (board) {
+                    Board.TODAY -> { val rows = state.cloud.dailyRanking(day); state.rankings = state.rankings.copy(today = rows) }
+                    Board.MONTH -> { val rows = state.cloud.monthlyPlayers(day); state.rankings = state.rankings.copy(players = rows) }
+                    Board.FASTEST -> { val rows = state.cloud.fastestPlayers(); state.rankings = state.rankings.copy(fastest = rows) }
                     Board.SPRINT -> {
                         val top = state.cloud.sprintTop()
                         // My own line only when the top 10 does not hold it (one read and one count).
                         val me = state.uid
-                        state.rankings.copy(sprint = top, sprintMine = if (me != null && top.none { it.uid == me }) state.cloud.sprintPlace(me) else null)
+                        val mine = if (me != null && top.none { it.uid == me }) state.cloud.sprintPlace(me) else null
+                        state.rankings = state.rankings.copy(sprint = top, sprintMine = mine)
                     }
                 }
                 state.rankingRead(key)
@@ -453,8 +456,10 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
         }
         loading = true; failed = false
         try {
-            state.rankings = state.rankings.copy(friends = state.cloud.friendsBoard(uid, name, DailySchedule.key()))
-            state.rankings = state.rankings.copy(friendCount = runCatching { state.cloud.friendCount(uid) }.getOrNull())
+            // Read first, then copy: the friend code may arrive while the server answers.
+            val friends = state.cloud.friendsBoard(uid, name, DailySchedule.key())
+            val count = runCatching { state.cloud.friendCount(uid) }.getOrNull()
+            state.rankings = state.rankings.copy(friends = friends, friendCount = count)
             state.rankingRead(key)
             state.refreshChallenges(force)
         } catch (e: Exception) { failed = true; state.note(e) } finally { loading = false }
