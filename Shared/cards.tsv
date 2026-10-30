@@ -290,44 +290,27 @@ D	Cinéma	La Nuit américaine	Truffaut filme le tournage d’un film.
 D	Cinéma	Les Quatre Cents Coups	Antoine Doinel fugue, chez Truffaut.
 D	Cinéma	Jour de fête	Un facteur de village veut distribuer le courrier à l’américaine.
 
-# Cartes ajoutées en version 1.3.1 (2 669 mots, aucun sur le football) : de quoi tenir des mois sans revoir les mêmes.
+# Cartes ajoutées en version 1.3.1 (2 445 mots, aucun sur le football) : de quoi tenir des mois sans revoir les mêmes.
 F	Animaux	Chat	Il miaule et ronronne.
-F	Animaux	Chien	Le meilleur ami de l’homme, il aboie.
-F	Animaux	Vache	Elle donne du lait et fait meuh.
-F	Animaux	Cochon	Il est rose et se roule dans la boue.
-F	Animaux	Poule	Elle pond des œufs et caquette.
-F	Animaux	Canard	Il fait coin-coin sur la mare.
 F	Animaux	Chèvre	Elle donne un lait dont on fait du fromage, et a une barbichette.
-F	Animaux	Lion	Le roi de la savane, avec sa crinière.
-F	Animaux	Tigre	Un grand félin orange rayé de noir.
-F	Animaux	Zèbre	Un cheval rayé noir et blanc.
-F	Animaux	Ours	Il hiberne tout l’hiver et adore le miel.
 F	Animaux	Loup	Il hurle à la lune et vit en meute.
-F	Animaux	Renard	Un animal roux et rusé à la queue touffue.
 F	Animaux	Singe	Il grimpe aux arbres et mange des bananes.
-F	Animaux	Souris	Un petit rongeur gris que le chat poursuit.
 F	Animaux	Serpent	Un reptile sans pattes qui siffle.
-F	Animaux	Hibou	Un oiseau de nuit avec des aigrettes sur la tête.
 F	Animaux	Aigle	Un grand rapace au regard perçant.
 F	Animaux	Pigeon	Un oiseau gris très présent sur les places des villes.
 F	Animaux	Moineau	Un petit oiseau brun très commun.
 F	Animaux	Corbeau	Un grand oiseau noir qui croasse.
 F	Animaux	Cygne	Un grand oiseau blanc au long cou sur l’étang.
-F	Animaux	Poisson	Il nage et respire avec des branchies.
-F	Animaux	Crabe	Il marche de côté avec ses pinces.
-F	Animaux	Moustique	Il pique la nuit et laisse un bouton.
 F	Animaux	Papillon de nuit	Un insecte ailé attiré par les lampes le soir.
 F	Animaux	Ver	Un petit animal tout mou et sans pattes.
 F	Animaux	Lapin nain	Une petite race de lapin de compagnie.
 F	Animaux	Cheval de course	On parie sur lui à l’hippodrome.
 F	Animaux	Mouton noir	On le dit de celui qui se démarque du groupe.
-F	Animaux	Chaton	Le petit du chat.
 F	Animaux	Chiot	Le petit du chien.
 F	Animaux	Veau	Le petit de la vache.
 F	Animaux	Ourson	Le petit de l’ours.
 F	Animaux	Lionceau	Le petit du lion.
 F	Animaux	Hippopotame nain	Une petite cousine de l’hippopotame, qui vit en Afrique de l’Ouest.
-F	Animaux	Écrevisse	Un petit crustacé d’eau douce.
 F	Animaux	Tortue de terre	Elle avance très lentement avec sa carapace.
 F	Animaux	Perroquet gris	Un oiseau d’Afrique très doué pour imiter la voix.
 F	Animaux	Dinde	On la mange farcie à Noël.
@@ -336,43 +319,23 @@ F	Animaux	Escargot de Bourgogne	On le mange avec du beurre persillé.
 F	Animaux	Poisson-clown	Un poisson orange et blanc qui vit dans une anémone.
 F	Animaux	Requin blanc	Le grand prédateur des mers des Dents de la mer.
 F	Animaux	Orque	Une baleine tueuse noire et blanche.
-F	Animaux	Morse	Un gros animal marin avec deux longues défenses.
 F	Animaux	Ours polaire	Un ours tout blanc qui vit sur la banquise.
 F	Animaux	Renne	Il tire le traîneau du Père Noël.
 F	Animaux	Cerf	Il porte de grands bois sur la tête.
-F	Animaux	Castor	Il construit des barrages avec ses dents.
-F	Animaux	Raton laveur	Il a un masque noir autour des yeux et lave sa nourriture.
-F	Animaux	Panthère	Un grand félin tacheté, parfois tout noir.
 F	Animaux	Léopard	Un félin tacheté qui grimpe aux arbres.
-F	Animaux	Jaguar	Le grand félin d’Amérique du Sud.
-F	Animaux	Puma	Un grand félin d’Amérique, aussi appelé couguar.
-F	Animaux	Lynx	Un félin aux oreilles pointues terminées par des pinceaux.
 F	Animaux	Chameau de Bactriane	Un chameau à deux bosses d’Asie centrale.
 F	Animaux	Mammouth	Un éléphant poilu disparu depuis la préhistoire.
 F	Animaux	Tyrannosaure	Le dinosaure carnivore le plus célèbre.
 F	Cinéma	La Petite Sirène	Ariel rêve de vivre sur la terre ferme.
-F	Cinéma	Blanche-Neige	Une princesse et sept nains.
 F	Cinéma	La Belle au bois dormant	Aurore s’endort en se piquant à un fuseau.
-F	Cinéma	Peter Pan	Le garçon qui ne voulait pas grandir.
-F	Cinéma	Dumbo	Un éléphanteau qui vole grâce à ses grandes oreilles.
-F	Cinéma	Le Livre de la jungle	Mowgli, Baloo et Bagheera.
 F	Cinéma	Les 101 Dalmatiens	Cruella veut leurs fourrures tachetées.
-F	Cinéma	Hercule	Un demi-dieu grec devient un héros chez Disney.
-F	Cinéma	Raiponce	Une princesse aux cheveux immenses enfermée dans une tour.
-F	Cinéma	Vaiana	Une jeune navigatrice polynésienne et le demi-dieu Maui.
-F	Cinéma	Zootopie	Une lapine policière dans une ville d’animaux.
 F	Cinéma	Vice-versa	Les émotions de Riley vivent dans sa tête.
 F	Cinéma	Monstres et Cie	Sulli et Bob font peur aux enfants pour l’énergie.
 F	Cinéma	Le Monde de Nemo	Marin cherche son fils dans l’océan.
-F	Cinéma	Cars	Flash McQueen, une voiture de course.
 F	Cinéma	Là-haut	Une maison s’envole avec des ballons.
-F	Cinéma	Wall-E	Un petit robot nettoie la Terre abandonnée.
 F	Cinéma	Kung Fu Panda	Po, un panda maladroit, devient guerrier dragon.
 F	Cinéma	Dragons	Harold et son dragon Krokmou.
-F	Cinéma	Le Petit Prince	« Dessine-moi un mouton. »
 F	Cinéma	Astérix et Obélix	Deux Gaulois contre les Romains.
-F	Cinéma	Les Schtroumpfs	Des petits êtres bleus chez Gargamel.
-F	Cinéma	Tintin	Un reporter à houppe et son chien Milou.
 F	Cinéma	Spirou	Un groom aventurier de la BD belge.
 F	Cinéma	Lucky Luke	L’homme qui tire plus vite que son ombre.
 F	Cinéma	Garfield	Un chat orange qui adore les lasagnes.
@@ -384,10 +347,8 @@ F	Cinéma	Paddington	Un ourson péruvien à Londres qui adore la marmelade.
 F	Cinéma	Babe	Un petit cochon qui veut garder les moutons.
 F	Cinéma	Beethoven	Un énorme saint-bernard dans une famille.
 F	Cinéma	Free Willy	Un garçon libère une orque.
-F	Cinéma	Superman	Il vient de la planète Krypton.
 F	Cinéma	Wonder Woman	Une princesse amazone super-héroïne.
 F	Cinéma	Iron Man	Tony Stark dans son armure.
-F	Cinéma	Hulk	Un géant vert très en colère.
 F	Cinéma	Thor	Le dieu du tonnerre et son marteau.
 F	Cinéma	Black Panther	Le roi du Wakanda.
 F	Cinéma	Captain America	Le super-soldat au bouclier étoilé.
@@ -397,10 +358,6 @@ F	Cinéma	X-Men	Des mutants dirigés par le professeur Xavier.
 F	Cinéma	Hunger Games	Katniss participe à un jeu mortel.
 F	Cinéma	Twilight	Une histoire d’amour avec un vampire.
 F	Cinéma	James Bond	L’agent 007.
-F	Cinéma	Les Dents de la mer	Un requin terrorise une plage.
-F	Cinéma	King Kong	Un gorille géant sur l’Empire State Building.
-F	Cinéma	Godzilla	Un monstre géant qui détruit Tokyo.
-F	Cinéma	Mary Poppins	Une nounou magique au parapluie.
 F	Cinéma	Charlie et la chocolaterie	Willy Wonka ouvre son usine de friandises.
 F	Cinéma	Maman, j’ai raté l’avion	Un enfant oublié seul à la maison à Noël.
 F	Général	Ananas	Un fruit tropical avec une couronne de feuilles piquantes.
@@ -425,7 +382,6 @@ F	Général	Chou-fleur	Un légume blanc en forme de bouquet.
 F	Général	Potiron	Une grosse courge orange d’Halloween.
 F	Général	Épinard	Le légume préféré de Popeye.
 F	Général	Beurre	On l’étale sur une tartine le matin.
-F	Général	Confiture	Des fruits cuits avec beaucoup de sucre, en pot.
 F	Général	Miel	Les abeilles le fabriquent dans la ruche.
 F	Général	Céréales	On les verse dans un bol de lait au petit-déjeuner.
 F	Général	Jambon	Une tranche rose dans le sandwich parisien.
@@ -438,9 +394,7 @@ F	Général	Ketchup	Une sauce rouge à la tomate pour les frites.
 F	Général	Pâtes	Spaghettis, coquillettes ou penne, par exemple.
 F	Général	Riz	Des petits grains blancs, base des sushis.
 F	Général	Soupe	Un plat chaud et liquide servi dans un bol.
-F	Général	Gâteau	On souffle ses bougies dessus le jour de sa fête.
 F	Général	Tarte aux pommes	Un dessert de pâte et de fruits en lamelles.
-F	Général	Bonbon	Une petite sucrerie que les enfants adorent.
 F	Général	Sucette	Un bonbon au bout d’un bâton.
 F	Général	Chewing-gum	On le mâche longtemps sans l’avaler.
 F	Général	Limonade	Une boisson pétillante au citron.
@@ -456,7 +410,6 @@ F	Général	Poivre	Une épice noire qu’on moud au-dessus de l’assiette.
 F	Général	Été	La saison des grandes vacances.
 F	Général	Soir	Le moment de la journée où le soleil se couche.
 F	Général	Nuit	Le moment où il fait noir et où l’on dort.
-F	Général	Dimanche	Le dernier jour de la semaine.
 F	Général	Lundi	Le premier jour de la semaine.
 F	Général	Janvier	Le premier mois de l’année.
 F	Général	Décembre	Le mois de Noël.
@@ -465,30 +418,18 @@ F	Général	Halloween	La fête des citrouilles et des costumes qui font peur.
 F	Général	Pâques	La fête où l’on cherche des œufs en chocolat.
 F	Général	Week-end	Samedi et dimanche réunis.
 F	Général	Pluie	De l’eau qui tombe des nuages.
-F	Général	Neige	Des flocons blancs qui tombent en hiver.
 F	Général	Vent	De l’air qui souffle fort.
 F	Général	Arc	Une arme qui lance des flèches.
 F	Général	Étoile	Elle brille dans le ciel la nuit.
 F	Général	Lune	Elle éclaire la nuit et change de forme chaque soir.
-F	Général	Plage	On y étale sa serviette sur le sable.
-F	Général	Forêt	Un grand espace couvert d’arbres.
-F	Général	Rivière	Un cours d’eau qui se jette dans un fleuve.
-F	Général	Château	Une grande demeure de roi, avec des tours.
 F	Général	Maison	Le bâtiment où l’on habite.
-F	Général	Cuisine	La pièce où l’on prépare les repas.
 F	Général	Chambre	La pièce où l’on dort.
 F	Général	Salle de bain	La pièce avec la douche et le lavabo.
 F	Général	Garage	On y range la voiture.
-F	Général	Grenier	La pièce tout en haut de la maison, sous le toit.
 F	Général	Cave	La pièce sous la maison, souvent fraîche et sombre.
 F	Général	Balcon	Une petite terrasse accrochée à la façade.
 F	Général	Piscine	Un bassin où l’on nage.
-F	Général	Cinéma	Une salle avec un grand écran pour voir des films.
-F	Général	Musée	On y admire des tableaux et des sculptures.
-F	Général	Pompier	Il éteint les incendies avec sa lance.
 F	Général	Médecin	On va le voir quand on est malade.
-F	Général	Dentiste	Il soigne les caries.
-F	Général	Facteur	Il distribue le courrier.
 F	Général	Policier	Il fait respecter la loi et règle la circulation.
 F	Général	Maîtresse	Elle fait la classe aux petits.
 F	Général	Coiffeur	Il coupe et coiffe les cheveux.
@@ -523,7 +464,6 @@ F	Général	Mariage	La cérémonie où deux personnes se disent oui.
 F	Général	Fête	On danse et on s’amuse pour célébrer quelque chose.
 F	Général	Voyage	On part loin de chez soi pour découvrir un autre endroit.
 F	Général	Rêve	Ce qu’on voit en dormant.
-F	Général	Cauchemar	Un mauvais rêve qui fait peur.
 F	Général	Larme	Une goutte qui coule de l’œil quand on pleure.
 F	Général	Ballon de baudruche	On le gonfle avec la bouche pour décorer une fête.
 F	Général	Chanson	Des paroles et une mélodie qu’on fredonne.
@@ -540,9 +480,7 @@ F	Général	Calcul	Additions, soustractions et multiplications.
 F	Général	Alphabet	De A à Z.
 F	Général	Mathématiques	La matière des nombres et des figures.
 F	Général	Géographie	La matière des cartes, des pays et des fleuves.
-F	Général	Docteur	Un autre nom du médecin.
 F	Général	Infirmière	Elle fait les piqûres et les pansements.
-F	Général	Pharmacie	On y achète des médicaments.
 F	Général	Médicament	Un comprimé ou un sirop pour guérir.
 F	Général	Rhume	On éternue et on a le nez qui coule.
 F	Général	Fièvre	Quand le corps est trop chaud parce qu’on est malade.
@@ -559,7 +497,6 @@ F	Général	Doigt	On en a dix aux mains.
 F	Général	Cerveau	L’organe qui pense, dans la tête.
 F	Général	Supermarché	Un grand magasin où l’on pousse un chariot.
 F	Général	Marché	On y achète fruits et légumes en plein air.
-F	Général	Restaurant	On y mange un repas servi par un serveur.
 F	Général	Boucherie	Le magasin où l’on achète la viande.
 F	Général	Poste	On y envoie des lettres et des colis.
 F	Général	Banque	On y garde son argent.
@@ -569,7 +506,6 @@ F	Général	Prison	On y enferme les voleurs.
 F	Général	Parc	Un jardin public avec des bancs et des pelouses.
 F	Général	Zoo	On y voit des lions et des girafes.
 F	Général	Ferme	On y trouve des vaches, des poules et des cochons.
-F	Général	Aéroport	On y prend l’avion.
 F	Général	Autoroute	Une route rapide avec des péages.
 F	Général	Village	Une toute petite commune à la campagne.
 F	Général	Ville	Beaucoup de rues, d’immeubles et d’habitants.
@@ -577,8 +513,6 @@ F	Général	Campagne	Des champs, des prés et des fermes, loin de la ville.
 F	Général	Île	Une terre entourée d’eau de tous côtés.
 F	Général	Lac	Une grande étendue d’eau douce.
 F	Général	Mer	Une grande étendue d’eau salée.
-F	Général	Cascade	Une chute d’eau.
-F	Général	Désert	Un endroit très sec plein de sable.
 F	Général	Grotte	Une cavité creusée dans la roche.
 F	Général	Colline	Une petite montagne arrondie.
 F	Général	Vague	Elle se forme sur la mer et se brise sur la plage.
@@ -588,7 +522,6 @@ F	Général	Fleur	Elle a des pétales et sent bon.
 F	Général	Rose	Une fleur à épines, symbole de l’amour.
 F	Général	Tulipe	Une fleur en forme de coupe, célèbre aux Pays-Bas.
 F	Général	Marguerite	Une fleur blanche au cœur jaune qu’on effeuille.
-F	Général	Tournesol	Une grande fleur jaune qui suit le soleil.
 F	Général	Sapin	L’arbre qu’on décore à Noël.
 F	Général	Chêne	Un grand arbre qui donne des glands.
 F	Général	Palmier	Un arbre des pays chauds qui porte des noix de coco.
@@ -619,14 +552,12 @@ F	Général	Batterie	Un instrument à baguettes avec caisses et cymbales.
 F	Général	Flûte	Un instrument à vent qu’on apprend souvent à l’école.
 F	Général	Trompette	Un instrument en cuivre à trois pistons.
 F	Général	Chanteur	Il monte sur scène pour chanter.
-F	Général	Concert	Un spectacle de musique en direct.
 F	Général	Théâtre	Des acteurs jouent une pièce sur scène.
 F	Général	Spectacle	Une représentation devant un public.
 F	Général	Plongée	On explore le fond de la mer avec un masque et des bouteilles.
 F	Général	Camping	On dort sous une tente pendant les vacances.
 F	Général	Randonnée	Une longue marche dans la nature.
 F	Général	Cache-cache	Un jeu où l’un compte pendant que les autres se cachent.
-F	Général	Marelle	Un jeu où l’on saute à cloche-pied sur des cases dessinées.
 F	Général	Poupée	Un jouet qui ressemble à un petit enfant.
 F	Général	Peluche	Un jouet tout doux en forme d’animal.
 F	Général	Jeu vidéo	On y joue avec une manette sur un écran.
@@ -639,27 +570,18 @@ F	Général	Toupie	Un jouet qui tourne sur sa pointe.
 F	Général	Bulle de savon	On la souffle et elle éclate.
 F	Général	Château de sable	On le construit sur la plage avec une pelle et un seau.
 F	Général	Robot ménager	Un appareil qui hache et mixe en cuisine.
-F	Objets	Chaise	On s’assoit dessus à table.
-F	Objets	Table	On y mange et on y pose les assiettes.
 F	Objets	Lit	On dort dedans.
 F	Objets	Armoire	Un grand meuble où l’on range les vêtements.
 F	Objets	Canapé	Un siège moelleux pour plusieurs personnes dans le salon.
 F	Objets	Fauteuil	Un siège confortable avec des accoudoirs.
-F	Objets	Lampe	Elle éclaire la pièce quand on l’allume.
-F	Objets	Miroir	On s’y regarde pour se coiffer.
-F	Objets	Fenêtre	On l’ouvre pour aérer la pièce.
-F	Objets	Clé	Elle ouvre la serrure de la porte.
-F	Objets	Téléphone	On l’utilise pour appeler quelqu’un.
 F	Objets	Ordinateur portable	Un ordinateur qu’on peut emporter partout.
 F	Objets	Tablette	Un écran tactile plus grand qu’un téléphone.
 F	Objets	Clavier	On tape dessus pour écrire sur l’ordinateur.
 F	Objets	Écran	On regarde les images dessus.
 F	Objets	Radio	On l’allume pour écouter de la musique ou les infos.
 F	Objets	Appareil photo	On l’utilise pour prendre des photos.
-F	Objets	Montre	On la porte au poignet pour lire l’heure.
 F	Objets	Réveil-matin	Il sonne pour nous sortir du lit.
 F	Objets	Lunettes de soleil	On les porte l’été pour protéger ses yeux.
-F	Objets	Chapeau	On le porte sur la tête.
 F	Objets	Casquette	Un chapeau avec une visière.
 F	Objets	Bonnet	Un chapeau de laine pour l’hiver.
 F	Objets	Gant de toilette	On le mouille pour se laver.
@@ -669,7 +591,6 @@ F	Objets	Robe	Un vêtement d’une seule pièce pour les filles.
 F	Objets	Chemise	Un vêtement à boutons et à col.
 F	Objets	Pull	Un vêtement chaud en laine.
 F	Objets	Veste	Un vêtement qu’on enfile par-dessus le reste.
-F	Objets	Pyjama	On le met pour dormir.
 F	Objets	Short	Un pantalon court pour l’été.
 F	Objets	Maillot de bain	On le porte pour nager.
 F	Objets	Chaussure	On la met au pied pour marcher dehors.
@@ -677,45 +598,34 @@ F	Objets	Botte	Une chaussure haute pour la pluie.
 F	Objets	Sandale	Une chaussure ouverte pour l’été.
 F	Objets	Pantoufle	Une chaussure douce pour la maison.
 F	Objets	Sac à main	On y met ses affaires quand on sort.
-F	Objets	Brosse à dents	On l’utilise avec du dentifrice.
 F	Objets	Dentifrice	On le met sur la brosse à dents.
 F	Objets	Shampoing	On se lave les cheveux avec.
 F	Objets	Serviette	On s’essuie avec en sortant de la douche.
 F	Objets	Mouchoir	On se mouche dedans.
-F	Objets	Couteau	On coupe la viande avec.
-F	Objets	Cuillère	On mange la soupe avec.
 F	Objets	Verre	On boit dedans.
 F	Objets	Tasse	On boit le café dedans.
-F	Objets	Bouteille	On y met de l’eau ou du vin.
 F	Objets	Poêle	On y fait cuire les crêpes.
 F	Objets	Marmite	Une grande casserole pour cuire la soupe.
 F	Objets	Four	On y cuit les gâteaux.
 F	Objets	Micro-ondes	Il réchauffe les plats en quelques minutes.
 F	Objets	Frigo	Il garde les aliments au frais.
-F	Objets	Lave-vaisselle	Il nettoie les assiettes tout seul.
-F	Objets	Machine à laver	Elle lave le linge.
 F	Objets	Aspirateur robot	Il fait le ménage tout seul en roulant.
 F	Objets	Balai-brosse	On frotte le sol avec.
 F	Objets	Seau	On le remplit d’eau pour le ménage.
 F	Objets	Éponge	On fait la vaisselle avec.
-F	Objets	Marteau	On tape sur les clous avec.
 F	Objets	Clou	On l’enfonce avec un marteau.
 F	Objets	Vis	Une petite tige filetée qu’on tourne pour fixer deux pièces.
 F	Objets	Scie	On coupe le bois avec.
 F	Objets	Pelle	On creuse la terre avec.
-F	Objets	Râteau	On ramasse les feuilles mortes avec.
 F	Objets	Échelle	On grimpe dessus pour atteindre le haut.
 F	Objets	Corde	On fait des nœuds avec.
 F	Objets	Crayon de couleur	On colorie avec.
 F	Objets	Règle	On trace des traits droits avec.
 F	Objets	Cahier	On écrit dedans à l’école.
-F	Objets	Trousse	On y range ses stylos.
 F	Objets	Colle	Un tube ou un bâton pour fixer du papier sur du carton.
 F	Objets	Craie	On écrit au tableau avec.
-F	Objets	Pinceau	On peint avec.
 F	Objets	Enveloppe	On y glisse une lettre.
 F	Objets	Timbre	On le colle sur l’enveloppe.
-F	Objets	Voiture	Un véhicule à quatre roues.
 F	Objets	Camion	Un gros véhicule qui transporte des marchandises.
 F	Objets	Bus	On le prend à l’arrêt pour aller en ville.
 F	Objets	Moto	Un deux-roues à moteur.
@@ -728,7 +638,6 @@ F	Objets	Métro	Un train qui roule sous la ville.
 F	Objets	Tram	Un train qui roule dans les rues de la ville.
 F	Objets	Skateboard	Une planche à roulettes.
 F	Objets	Patins à roulettes	Des chaussures à roues.
-F	Objets	Ballon	On le gonfle et on joue avec.
 F	Objets	Billes	De petites boules de verre avec lesquelles on joue dans la cour.
 F	Objets	Corde à sauter	On saute par-dessus en la faisant tourner.
 F	Objets	Raquette de ping-pong	On frappe une petite balle blanche avec.
@@ -737,7 +646,6 @@ F	Objets	Tente	On dort dedans en camping.
 F	Objets	Sac de couchage	On s’y glisse pour dormir en camping.
 F	Objets	Lampe de poche	Une petite lampe à piles.
 F	Objets	Pile	Elle fait marcher la télécommande.
-F	Objets	Ampoule	Elle s’allume au plafond.
 F	Objets	Prise	On y branche les appareils électriques.
 F	Objets	Coussin	On le pose sur le canapé pour plus de confort.
 F	Objets	Couverture	Elle tient chaud dans le lit.
@@ -747,7 +655,6 @@ F	Objets	Vase	On y met des fleurs.
 F	Objets	Cadre	On y met une photo pour l’accrocher au mur.
 F	Objets	Horloge murale	Elle donne l’heure accrochée au mur.
 F	Objets	Sonnette	On appuie dessus en arrivant chez quelqu’un.
-F	Objets	Boîte aux lettres	Le facteur y dépose le courrier.
 F	Objets	Panier	On y met les courses.
 F	Objets	Chariot	On le pousse au supermarché.
 F	Objets	Billet	De l’argent en papier.
@@ -762,21 +669,14 @@ F	Objets	Bouclier	Le chevalier se protège avec.
 F	Objets	Flèche	On la tire avec un arc.
 F	Objets	Baguette magique	L’outil des fées et des sorciers.
 F	Objets	Cloche	Elle sonne en haut de l’église.
-F	Objets	Loupe	Elle grossit ce qu’on regarde.
-F	Objets	Cadenas	Il ferme un casier ou un vélo.
 F	Objets	Coffre-fort	On y cache ses objets précieux.
 F	Objets	Masque de plongée	Il permet de voir sous l’eau.
 F	Objets	Bouée	Elle aide à flotter.
 F	Objets	Palmes	On les met aux pieds pour nager plus vite.
-M	Animaux	Belette	Un petit carnivore au corps allongé, cousin du furet.
-M	Animaux	Blaireau	Un animal noir et blanc qui creuse des terriers.
-M	Animaux	Taupe	Elle creuse des galeries et laisse des petits monticules.
 M	Animaux	Mulot	Un petit rongeur des champs.
 M	Animaux	Campagnol	Un petit rongeur qui ressemble à une souris à queue courte.
-M	Animaux	Musaraigne	Un tout petit mammifère au museau pointu.
 M	Animaux	Lièvre	Plus grand que le lapin, il court très vite dans les champs.
 M	Animaux	Cobaye	Un autre nom du cochon d’Inde.
-M	Animaux	Chinchilla	Un petit rongeur à la fourrure très douce, venu des Andes.
 M	Animaux	Gerbille	Un petit rongeur du désert qu’on garde en cage.
 M	Animaux	Hermine	Une belette qui devient blanche en hiver.
 M	Animaux	Vison	Un petit animal à fourrure précieuse.
@@ -786,7 +686,6 @@ M	Animaux	Écureuil roux	Le rongeur des parcs français à la queue en panache.
 M	Animaux	Marcassin	Le petit du sanglier, avec des rayures.
 M	Animaux	Faon	Le petit de la biche.
 M	Animaux	Chevreuil	Un petit cervidé des forêts françaises.
-M	Animaux	Bouquetin	Une chèvre sauvage des Alpes aux grandes cornes.
 M	Animaux	Mouflon	Un mouton sauvage aux cornes enroulées.
 M	Animaux	Élan	Le plus grand des cervidés, aux bois très larges.
 M	Animaux	Caribou	Le renne d’Amérique du Nord.
@@ -794,24 +693,18 @@ M	Animaux	Yak	Un bœuf à longs poils de l’Himalaya.
 M	Animaux	Buffle	Un gros bovin aux cornes larges.
 M	Animaux	Antilope	Un herbivore rapide aux cornes fines.
 M	Animaux	Gazelle	Une petite antilope gracieuse de la savane.
-M	Animaux	Okapi	Un cousin de la girafe aux pattes rayées.
-M	Animaux	Suricate	Il se tient debout pour surveiller les alentours.
-M	Animaux	Hyène	Un carnivore de la savane qui semble rire.
 M	Animaux	Chacal	Un canidé d’Afrique proche du coyote.
-M	Animaux	Fennec	Un petit renard du désert aux très grandes oreilles.
 M	Animaux	Babouin	Un singe d’Afrique aux fesses rouges.
 M	Animaux	Macaque	Un singe très répandu en Asie.
 M	Animaux	Gibbon	Un singe aux très longs bras qui se balance de branche en branche.
 M	Animaux	Mandrill	Un singe au museau rouge et bleu.
 M	Animaux	Bonobo	Un grand singe très proche du chimpanzé.
 M	Animaux	Panda roux	Un petit animal roux de l’Himalaya.
-M	Animaux	Tatou	Un animal d’Amérique protégé par une carapace.
 M	Animaux	Opossum	Un marsupial d’Amérique qui fait le mort.
 M	Animaux	Wombat	Un marsupial australien trapu qui creuse des terriers.
 M	Animaux	Wallaby	Un petit cousin du kangourou.
 M	Animaux	Dingo	Le chien sauvage d’Australie.
 M	Animaux	Émeu	Un grand oiseau coureur d’Australie.
-M	Animaux	Toucan	Un oiseau tropical au bec énorme et coloré.
 M	Animaux	Ara	Un grand perroquet très coloré d’Amérique du Sud.
 M	Animaux	Cacatoès	Un perroquet blanc à crête jaune.
 M	Animaux	Perruche	Un petit perroquet qu’on garde en cage.
@@ -828,9 +721,7 @@ M	Animaux	Condor	Le grand vautour des Andes.
 M	Animaux	Buse	Un rapace brun qu’on voit sur les poteaux au bord des routes.
 M	Animaux	Chouette effraie	Un rapace nocturne au visage blanc en forme de cœur.
 M	Animaux	Grand-duc	Le plus grand hibou d’Europe.
-M	Animaux	Cigogne	Un grand oiseau blanc qui fait son nid sur les cheminées d’Alsace.
 M	Animaux	Grue	Un grand échassier, et aussi une machine de chantier.
-M	Animaux	Flamant rose	Il tient sur une patte dans les étangs de Camargue.
 M	Animaux	Héron cendré	Un grand échassier gris qui pêche immobile.
 M	Animaux	Pélican brun	Un oiseau à poche sous le bec des côtes américaines.
 M	Animaux	Goéland	Un grand oiseau marin, plus gros que la mouette.
@@ -866,10 +757,8 @@ M	Animaux	Langouste	Un crustacé sans grosses pinces, cousin du homard.
 M	Animaux	Oursin	Une boule de piquants au fond de la mer.
 M	Animaux	Corail	Il forme des récifs dans les mers chaudes.
 M	Animaux	Dauphin rose	Un dauphin d’eau douce de l’Amazone.
-M	Animaux	Narval	Un cétacé avec une longue dent en spirale.
 M	Animaux	Lamantin	Un gros mammifère marin herbivore, surnommé vache de mer.
 M	Animaux	Loutre de mer	Elle flotte sur le dos et casse les coquillages sur son ventre.
-M	Animaux	Iguane	Un grand lézard vert d’Amérique.
 M	Animaux	Gecko	Un petit lézard qui grimpe aux murs.
 M	Animaux	Varan	Un grand lézard, dont le dragon de Komodo.
 M	Animaux	Alligator	Un cousin du crocodile au museau large, en Floride.
@@ -879,15 +768,10 @@ M	Animaux	Vipère	Un serpent venimeux de France.
 M	Animaux	Couleuvre	Un serpent non venimeux de nos campagnes.
 M	Animaux	Python	Un très grand serpent constricteur.
 M	Animaux	Triton	Un petit amphibien à queue des mares.
-M	Animaux	Axolotl	Un amphibien mexicain qui garde ses branchies toute sa vie.
 M	Animaux	Têtard	Le bébé de la grenouille.
-M	Animaux	Chenille	Elle deviendra papillon.
-M	Animaux	Sauterelle	Un insecte vert qui saute très haut.
 M	Animaux	Grillon	Un insecte qui chante la nuit en frottant ses ailes.
 M	Animaux	Cigale	Elle chante en été dans le Sud.
 M	Animaux	Criquet	Un insecte sauteur qui voyage parfois en nuées.
-M	Animaux	Mante religieuse	Un insecte qui semble prier.
-M	Animaux	Scarabée	Un insecte à carapace dure, sacré en Égypte.
 M	Animaux	Hanneton	Un gros coléoptère brun qui vole en mai.
 M	Animaux	Luciole	Un insecte qui brille la nuit.
 M	Animaux	Termite	Un insecte qui mange le bois.
@@ -898,9 +782,6 @@ M	Animaux	Pou	Un petit insecte qui vit dans les cheveux.
 M	Animaux	Tique	Un acarien qui s’accroche à la peau.
 M	Animaux	Limace	Un escargot sans coquille.
 M	Animaux	Sangsue	Un ver qui suce le sang.
-M	Animaux	Mygale	Une grosse araignée poilue.
-M	Cinéma	Bienvenue chez les Ch’tis	Un directeur de poste muté dans le Nord.
-M	Cinéma	La Grande Vadrouille	Bourvil et de Funès en pleine guerre.
 M	Cinéma	Le Gendarme de Saint-Tropez	Louis de Funès en uniforme sur la Côte d’Azur.
 M	Cinéma	Les Aventures de Rabbi Jacob	De Funès déguisé en rabbin.
 M	Cinéma	OSS 117	Un espion français très maladroit joué par Jean Dujardin.
@@ -912,7 +793,6 @@ M	Cinéma	Le Père Noël est une ordure	La permanence de SOS Détresse Amitié u
 M	Cinéma	Les Bronzés font du ski	La bande du Club Med à la montagne.
 M	Cinéma	Brice de Nice	Un surfeur sans vagues.
 M	Cinéma	Léon	Un tueur à gages et une petite fille, par Luc Besson.
-M	Cinéma	Le Cinquième Élément	Leeloo et Korben Dallas dans un futur coloré.
 M	Cinéma	Nikita	Une jeune délinquante devient tueuse d’État.
 M	Cinéma	Le Dîner	Un titre incomplet.
 M	Cinéma	Le Bossu	Lagardère et sa botte de Nevers.
@@ -926,23 +806,17 @@ M	Cinéma	Le Château de ma mère	La suite des souvenirs de Pagnol.
 M	Cinéma	La Môme	La vie d’Édith Piaf.
 M	Cinéma	Le Pacte des loups	La bête du Gévaudan.
 M	Cinéma	Les Tuche	Une famille de Bouzolles gagne au loto.
-M	Cinéma	Forrest Gump	« Cours, Forrest, cours ! »
 M	Cinéma	Le Hobbit	Bilbon part à l’aventure avec des nains.
 M	Cinéma	Jurassic World	Un parc de dinosaures rouvre.
 M	Cinéma	Les Goonies	Des enfants cherchent le trésor d’un pirate.
 M	Cinéma	Gremlins	De petites créatures à ne jamais mouiller.
-M	Cinéma	Terminator	« I’ll be back. »
-M	Cinéma	Rambo	Un ancien soldat seul contre tous.
-M	Cinéma	Top Gun	Des pilotes de chasse américains.
 M	Cinéma	Dirty Dancing	Baby apprend à danser avec Johnny.
 M	Cinéma	Grease	Danny et Sandy chantent dans un lycée des années 50.
 M	Cinéma	La La Land	Une actrice et un pianiste à Los Angeles.
 M	Cinéma	Mamma Mia	Une comédie musicale sur des chansons d’ABBA.
 M	Cinéma	Le Magicien d’Oz	Dorothy suit la route de briques jaunes.
 M	Cinéma	Les Oiseaux	Des volatiles attaquent une ville chez Hitchcock.
-M	Cinéma	Le Silence des agneaux	Hannibal Lecter.
 M	Cinéma	Seven	Deux policiers traquent un tueur des sept péchés.
-M	Cinéma	Shining	Jack Nicholson devient fou dans un hôtel isolé.
 M	Cinéma	Le Prestige	Deux magiciens rivaux.
 M	Cinéma	Le Loup de Wall Street	Leonardo DiCaprio en trader déchaîné.
 M	Cinéma	Arrête-moi si tu peux	Un jeune faussaire poursuivi par le FBI.
@@ -950,7 +824,6 @@ M	Cinéma	Le Terminal	Un homme coincé dans un aéroport.
 M	Cinéma	Seul au monde	Tom Hanks échoué sur une île avec un ballon.
 M	Cinéma	Il faut sauver le soldat Ryan	Une mission pendant le Débarquement.
 M	Cinéma	La Ligne verte	Un condamné aux pouvoirs étranges.
-M	Cinéma	Les Évadés	Une évasion de la prison de Shawshank.
 M	Cinéma	Rain Man	Deux frères, dont un autiste génial en calcul.
 M	Cinéma	Ghost	Un fantôme et une scène de poterie.
 M	Cinéma	Pretty Woman	Julia Roberts et Richard Gere.
@@ -961,19 +834,15 @@ M	Cinéma	Armageddon	Des foreurs envoyés détruire un astéroïde.
 M	Cinéma	Matrix Reloaded	La suite des aventures de Neo.
 M	Cinéma	Kill Bill	La mariée en jaune se venge.
 M	Cinéma	Braveheart	William Wallace se bat pour l’Écosse.
-M	Cinéma	Le Voyage de Chihiro	Une fillette dans le monde des esprits.
 M	Cinéma	Princesse Mononoké	Une jeune fille élevée par des loups.
 M	Cinéma	Kiki la petite sorcière	Une apprentie sorcière fait des livraisons sur son balai.
 M	Cinéma	Le Château ambulant	Une maison qui marche, chez Miyazaki.
 M	Cinéma	Akira	Un anime culte dans un Tokyo futuriste.
-M	Cinéma	Kirikou	Un tout petit garçon africain courageux.
 M	Cinéma	Ernest et Célestine	Un ours et une souris amis.
 M	Cinéma	Ma vie de Courgette	Un garçon en foyer, en pâte à modeler.
-M	Cinéma	Wallace et Gromit	Un inventeur anglais et son chien en pâte à modeler.
 M	Cinéma	Chicken Run	Des poules s’évadent de leur ferme.
 M	Cinéma	Les Noces funèbres	Un marié épouse par erreur une morte.
 M	Cinéma	L’Étrange Noël de monsieur Jack	Le roi d’Halloween découvre Noël.
-M	Cinéma	Edward aux mains d’argent	Un jeune homme aux ciseaux à la place des doigts.
 M	Cinéma	Beetlejuice	Un fantôme farceur qu’on appelle trois fois.
 M	Cinéma	SOS Fantômes	« Who you gonna call ? »
 M	Cinéma	Hook	Peter Pan devenu adulte.
@@ -992,7 +861,6 @@ M	Cinéma	Jason Bourne	Un agent amnésique.
 M	Cinéma	Fast and Furious	Des courses de voitures et Vin Diesel.
 M	Cinéma	Ocean’s Eleven	Onze voleurs braquent un casino.
 M	Cinéma	Sherlock Holmes	Le détective de Baker Street.
-M	Cinéma	Le Bon, la Brute et le Truand	Un western spaghetti de Sergio Leone.
 M	Cinéma	Il était une fois dans l’Ouest	Un western avec un harmonica.
 M	Cinéma	Danse avec les loups	Un soldat vit parmi les Sioux.
 M	Cinéma	Django	Un esclave libéré devient chasseur de primes.
@@ -1081,7 +949,6 @@ M	Général	Soupe à l’oignon	Une soupe gratinée de Paris.
 M	Général	Velouté	Une soupe très lisse et crémeuse.
 M	Général	Frites	Des bâtonnets de pommes de terre dorés dans l’huile.
 M	Général	Chips	De fines tranches de pomme de terre croustillantes en sachet.
-M	Général	Pop-corn	Du maïs éclaté qu’on mange au cinéma.
 M	Général	Crème chantilly	De la crème fouettée sucrée.
 M	Général	Mousse au chocolat	Un dessert aérien au cacao.
 M	Général	Tiramisu	Un dessert italien au café et au mascarpone.
@@ -1164,7 +1031,6 @@ M	Général	Couturière	Elle coud des vêtements.
 M	Général	Styliste	Il dessine des vêtements de mode.
 M	Général	Mannequin	Il défile pour présenter des vêtements.
 M	Général	Acteur	Il joue un rôle dans un film.
-M	Général	Réalisateur	Il dirige le tournage d’un film.
 M	Général	Écrivain	Il écrit des romans.
 M	Général	Poète	Il écrit des vers.
 M	Général	Sculpteur	Il taille le marbre ou modèle l’argile.
@@ -1173,10 +1039,7 @@ M	Général	Chef d’orchestre	Il dirige les musiciens avec une baguette.
 M	Général	Danseuse étoile	La plus haute distinction du ballet.
 M	Général	Jongleur	Il lance et rattrape plusieurs balles à la fois.
 M	Général	Acrobate	Il fait des sauts périlleux au cirque.
-M	Général	Funambule	Il marche sur un fil tendu.
 M	Général	Dompteur	Il fait obéir les fauves au cirque.
-M	Général	Ventriloque	Il parle sans bouger les lèvres avec sa marionnette.
-M	Général	Marionnette	Une poupée qu’on anime avec la main ou des fils.
 M	Général	Guignol	Le héros lyonnais du théâtre de marionnettes.
 M	Général	Scientifique	Il fait des expériences au laboratoire.
 M	Général	Chimiste	Il mélange des produits dans des éprouvettes.
@@ -1310,7 +1173,6 @@ M	Général	Triathlon	Natation, vélo et course à pied enchaînés.
 M	Général	Tour de France	La grande course cycliste de juillet.
 M	Général	Maillot jaune	Le leader du Tour le porte.
 M	Général	Tir à l’arc	Un sport où l’on vise une cible avec des flèches.
-M	Général	Parachute	On saute d’un avion avec.
 M	Général	Deltaplane	Une grande aile pour planer depuis une montagne.
 M	Général	Sudoku	Une grille de chiffres de 1 à 9 à remplir.
 M	Général	Mots croisés	Une grille de lettres avec des définitions.
@@ -1328,8 +1190,6 @@ M	Général	Colin-maillard	Un jeu où l’on cherche les autres les yeux bandés
 M	Général	Chat perché	Un jeu de poursuite où l’on est à l’abri en hauteur.
 M	Général	Pierre-feuille-ciseaux	On joue avec la main : le papier bat le caillou.
 M	Général	Karaoké	On chante sur la musique en lisant les paroles.
-M	Général	Déguisement	On le met pour le carnaval.
-M	Général	Feu d’artifice	Il éclate dans le ciel le 14 Juillet.
 M	Général	Défilé	Une marche en rang dans la rue.
 M	Général	Brocante	On y chine de vieux objets.
 M	Général	Vide-grenier	On y vend ses vieilles affaires le dimanche.
@@ -1340,15 +1200,12 @@ M	Général	Montagnes russes	Un manège qui fait des loopings.
 M	Général	Auto-tamponneuse	Une petite voiture de fête foraine qu’on cogne.
 M	Général	Train fantôme	Un manège qui fait peur dans le noir.
 M	Général	Parc d’attractions	Un grand lieu plein de manèges.
-M	Général	Aquarium	On y regarde des poissons derrière des vitres.
 M	Général	Planétarium	On y voit les étoiles projetées sur un dôme.
 M	Général	Médiathèque	Une bibliothèque avec aussi des films et de la musique.
 M	Général	Librairie	Le magasin où l’on achète des livres.
 M	Général	Papeterie	On y achète cahiers et stylos.
-M	Général	Quincaillerie	On y achète des clous et des vis.
 M	Général	Droguerie	Un magasin de produits d’entretien.
 M	Général	Laverie	On y lave son linge dans des machines à pièces.
-M	Général	Pressing	On y fait nettoyer ses costumes.
 M	Général	Bureau de tabac	On y achète des timbres et des journaux.
 M	Général	Kiosque	Une petite boutique de journaux dans la rue.
 M	Général	Station-service	On y fait le plein d’essence.
@@ -1357,12 +1214,10 @@ M	Général	Péage	On y paie pour prendre l’autoroute.
 M	Général	Rond-point	Un carrefour où l’on tourne en rond.
 M	Général	Feu rouge	Il oblige à s’arrêter.
 M	Général	Passage piéton	Des bandes blanches pour traverser.
-M	Général	Trottoir	Le chemin des piétons au bord de la rue.
 M	Général	Gare routière	On y prend les cars.
 M	Général	Port	On y amarre les bateaux.
 M	Général	Phare	Une tour lumineuse qui guide les bateaux.
 M	Général	Moulin à vent	Il tourne ses ailes pour moudre le grain.
-M	Général	Cathédrale	Une très grande église, comme Notre-Dame.
 M	Général	Abbaye	Un monastère dirigé par un abbé.
 M	Général	Chapelle	Une petite église.
 M	Général	Synagogue	Le lieu de prière des juifs.
@@ -1407,8 +1262,6 @@ M	Général	Acropole	La colline des temples d’Athènes.
 M	Général	Stonehenge	Un cercle de pierres dressées en Angleterre.
 M	Général	Louvre	Le musée de la Joconde.
 M	Général	Joconde	Le tableau au sourire mystérieux.
-M	Géographie	Lille	La grande ville du Nord, célèbre pour sa braderie.
-M	Géographie	Montpellier	Une grande ville étudiante de l’Hérault.
 M	Géographie	Dijon	La capitale de la moutarde.
 M	Géographie	Reims	La ville des sacres des rois et du champagne.
 M	Géographie	Rouen	La ville où Jeanne d’Arc fut brûlée.
@@ -1448,7 +1301,6 @@ M	Géographie	Vichy	Une ville thermale de l’Allier aux pastilles célèbres.
 M	Géographie	Deauville	Une station chic de la côte normande.
 M	Géographie	Étretat	Ses falaises blanches et son aiguille sont célèbres.
 M	Géographie	Lascaux	Une grotte aux peintures préhistoriques.
-M	Géographie	Alsace	La région des cigognes et des maisons à colombages.
 M	Géographie	Lorraine	La région de la quiche et de la mirabelle.
 M	Géographie	Auvergne	La région des volcans endormis.
 M	Géographie	Savoie	La région de la tartiflette et des pistes de ski.
@@ -1470,14 +1322,11 @@ M	Géographie	Vendée	Un département au bord de l’Atlantique, avec le Puy du 
 M	Géographie	Finistère	Le bout de la terre, à l’ouest de la Bretagne.
 M	Géographie	Côte d’Azur	Le littoral de Nice à Saint-Tropez.
 M	Géographie	Saint-Tropez	Un petit port chic du Var.
-M	Géographie	Martinique	Une île française des Antilles, île aux fleurs.
 M	Géographie	Réunion	Une île française de l’océan Indien avec un volcan actif.
 M	Géographie	Guyane	Un territoire français d’Amérique du Sud avec une base spatiale.
 M	Géographie	Tahiti	La plus grande île de la Polynésie française.
 M	Géographie	Nouvelle-Calédonie	Un territoire français du Pacifique.
 M	Géographie	Mayotte	Une île française de l’archipel des Comores.
-M	Géographie	Rome	La capitale de l’Italie.
-M	Géographie	Lisbonne	La capitale du Portugal.
 M	Géographie	Athènes	La capitale de la Grèce.
 M	Géographie	Vienne	La capitale de l’Autriche.
 M	Géographie	Prague	La capitale de la Tchéquie.
@@ -1492,7 +1341,6 @@ M	Géographie	Pékin	La capitale de la Chine.
 M	Géographie	Séoul	La capitale de la Corée du Sud.
 M	Géographie	Bangkok	La capitale de la Thaïlande.
 M	Géographie	New Delhi	La capitale de l’Inde.
-M	Géographie	Le Caire	La capitale de l’Égypte.
 M	Géographie	Dakar	La capitale du Sénégal.
 M	Géographie	Alger	Une capitale d’Afrique du Nord surnommée la Blanche.
 M	Géographie	Tunis	Une capitale d’Afrique du Nord, près des ruines de Carthage.
@@ -1516,10 +1364,8 @@ M	Géographie	Sydney	La ville australienne à l’opéra en forme de voiles.
 M	Géographie	Hong Kong	Une ville de gratte-ciel au sud de la Chine.
 M	Géographie	Singapour	Une cité-État d’Asie du Sud-Est.
 M	Géographie	Dubaï	La ville de la plus haute tour du monde.
-M	Géographie	Istanbul	Une ville à cheval sur l’Europe et l’Asie.
 M	Géographie	Jérusalem	Une ville sainte pour trois religions.
 M	Géographie	La Mecque	La ville sainte de l’islam.
-M	Géographie	Barcelone	La ville de Gaudí.
 M	Géographie	Séville	Une ville andalouse du flamenco.
 M	Géographie	Florence	La ville de la Renaissance en Toscane.
 M	Géographie	Naples	La ville de la pizza au pied du Vésuve.
@@ -1528,19 +1374,13 @@ M	Géographie	Munich	La ville de la fête de la bière.
 M	Géographie	Hambourg	Un grand port allemand.
 M	Géographie	Manchester	Une ville industrielle anglaise.
 M	Géographie	Liverpool	La ville des Beatles.
-M	Géographie	Allemagne	Le pays de Berlin et de Munich.
 M	Géographie	Angleterre	Le pays de Londres.
-M	Géographie	Écosse	Le pays des kilts et du monstre du Loch Ness.
-M	Géographie	Irlande	L’île verte du trèfle.
 M	Géographie	Pays-Bas	Le pays des tulipes et des moulins.
 M	Géographie	Luxembourg	Un petit pays entre la France, la Belgique et l’Allemagne.
 M	Géographie	Autriche	Le pays de Mozart.
-M	Géographie	Grèce	Le pays de l’Acropole.
 M	Géographie	Croatie	Un pays de l’Adriatique aux nombreuses îles.
 M	Géographie	Roumanie	Le pays de Dracula.
 M	Géographie	Ukraine	Un grand pays d’Europe de l’Est, capitale Kiev.
-M	Géographie	Finlande	Le pays du Père Noël, dit-on.
-M	Géographie	Chine	Le pays le plus peuplé avec l’Inde.
 M	Géographie	Corée	Une péninsule d’Asie coupée en deux.
 M	Géographie	Thaïlande	Le pays de Bangkok.
 M	Géographie	Indonésie	Un pays de milliers d’îles, dont Bali.
@@ -1548,7 +1388,6 @@ M	Géographie	Philippines	Un archipel d’Asie, capitale Manille.
 M	Géographie	Iran	L’ancienne Perse.
 M	Géographie	Israël	Un pays du Proche-Orient avec Tel-Aviv au bord de la mer.
 M	Géographie	Liban	Le pays du cèdre.
-M	Géographie	Maroc	Le pays de Marrakech.
 M	Géographie	Algérie	Le plus grand pays d’Afrique.
 M	Géographie	Tunisie	Le pays de Carthage.
 M	Géographie	Côte d’Ivoire	Le pays d’Abidjan.
@@ -1558,13 +1397,9 @@ M	Géographie	Nigeria	Le pays le plus peuplé d’Afrique.
 M	Géographie	Kenya	Un pays d’Afrique de l’Est célèbre pour ses safaris.
 M	Géographie	Afrique du Sud	Le pays de Nelson Mandela.
 M	Géographie	États-Unis	Le pays de l’Oncle Sam.
-M	Géographie	Pérou	Le pays du Machu Picchu.
-M	Géographie	Chili	Un pays très long et très étroit d’Amérique du Sud.
-M	Géographie	Colombie	Un pays d’Amérique du Sud célèbre pour son café.
 M	Géographie	Cuba	Une île des Caraïbes célèbre pour ses cigares.
 M	Géographie	Jamaïque	L’île du reggae.
 M	Géographie	Haïti	Un pays francophone des Caraïbes.
-M	Géographie	Afrique	Le continent du Sahara et de la savane.
 M	Géographie	Asie	Le plus grand continent.
 M	Géographie	Amérique	Le continent découvert par Christophe Colomb.
 M	Géographie	Océanie	Le continent de l’Australie.
@@ -1575,16 +1410,13 @@ M	Géographie	Mer du Nord	La mer froide entre la Grande-Bretagne et la Scandinav
 M	Géographie	Mer Rouge	La mer entre l’Afrique et l’Arabie.
 M	Géographie	Mer Morte	Une mer si salée qu’on y flotte sans effort.
 M	Géographie	Caraïbes	Une mer bordée d’îles paradisiaques.
-M	Géographie	Danube	Un grand fleuve qui traverse Vienne et Budapest.
 M	Géographie	Tamise	Le fleuve de Londres.
 M	Géographie	Gange	Le fleuve sacré de l’Inde.
 M	Géographie	Niagara	Des chutes célèbres entre les États-Unis et le Canada.
-M	Géographie	Andes	La grande chaîne de montagnes d’Amérique du Sud.
 M	Géographie	Rocheuses	Les grandes montagnes de l’ouest de l’Amérique du Nord.
 M	Géographie	Vésuve	Le volcan qui a détruit Pompéi.
 M	Géographie	Etna	Le grand volcan de Sicile.
 M	Géographie	Fuji	Le volcan sacré du Japon.
-M	Géographie	Sicile	La plus grande île de la Méditerranée.
 M	Géographie	Sardaigne	Une grande île italienne au sud de la Corse.
 M	Géographie	Baléares	Un archipel espagnol avec Majorque et Ibiza.
 M	Géographie	Canaries	Un archipel espagnol au large de l’Afrique.
@@ -1604,12 +1436,8 @@ M	Géographie	Savane	Une grande prairie d’Afrique avec des acacias.
 M	Géographie	Toundra	Une plaine glacée sans arbres du Grand Nord.
 M	Géographie	Jungle	Une forêt tropicale très dense.
 M	Géographie	Banquise	La mer gelée des pôles.
-M	Géographie	Glacier	Une rivière de glace qui descend de la montagne.
-M	Géographie	Fjord	Une longue baie entre de hautes falaises en Norvège.
 M	Géographie	Delta	L’embouchure d’un fleuve qui se divise en bras.
 M	Géographie	Estuaire	L’embouchure large d’un fleuve sur la mer.
-M	Géographie	Péninsule	Une terre entourée d’eau sauf d’un côté.
-M	Géographie	Presqu’île	Une petite péninsule.
 M	Géographie	Atoll	Une île en anneau de corail.
 M	Géographie	Lagon	Une étendue d’eau calme protégée par un récif.
 M	Géographie	Oasis	Un coin vert avec de l’eau au milieu du désert.
@@ -1620,7 +1448,6 @@ M	Géographie	Falaise	Une paroi rocheuse au-dessus de la mer.
 M	Géographie	Dune du Pilat	La plus haute dune d’Europe, près d’Arcachon.
 M	Géographie	Équateur	La ligne qui coupe la Terre en deux hémisphères.
 M	Géographie	Tropique	Une ligne imaginaire à 23 degrés de l’équateur.
-M	Géographie	Hémisphère	Une moitié de la Terre.
 M	Géographie	Méridien	Une ligne imaginaire du pôle Nord au pôle Sud.
 M	Géographie	Latitude	La distance d’un lieu à l’équateur, en degrés.
 M	Géographie	Longitude	La distance d’un lieu au méridien de Greenwich.
@@ -1641,7 +1468,6 @@ M	Objets	Équerre	Elle sert à tracer des angles droits.
 M	Objets	Correcteur	Il efface l’encre en blanc.
 M	Objets	Post-it	Un petit papier jaune autocollant.
 M	Objets	Calepin	Un petit carnet de notes.
-M	Objets	Agenda	On y note ses rendez-vous.
 M	Objets	Globe	Une boule qui représente la Terre.
 M	Objets	Imprimante	Elle sort les documents de l’ordinateur sur papier.
 M	Objets	Clé USB	Une petite mémoire qu’on branche à l’ordinateur.
@@ -1665,8 +1491,6 @@ M	Objets	Polaroid	Un appareil photo qui imprime la photo tout de suite.
 M	Objets	Machine à écrire	On tapait les lettres dessus avant l’ordinateur.
 M	Objets	Minitel	L’ancêtre français d’internet.
 M	Objets	Cabine téléphonique	On y téléphonait dans la rue.
-M	Objets	Bouilloire	Elle chauffe l’eau pour le thé.
-M	Objets	Grille-pain	Il fait sauter les tartines dorées.
 M	Objets	Mixeur	Il réduit la soupe en purée.
 M	Objets	Batteur	Il fouette les blancs en neige.
 M	Objets	Fouet	On bat les œufs avec.
@@ -1676,7 +1500,6 @@ M	Objets	Écumoire	Une grande cuillère percée de trous.
 M	Objets	Râpe	On l’utilise pour le fromage.
 M	Objets	Économe	Un couteau pour éplucher les légumes.
 M	Objets	Ouvre-boîte	On l’utilise pour les conserves.
-M	Objets	Tire-bouchon	Il sert à ouvrir une bouteille de vin.
 M	Objets	Décapsuleur	Il ouvre les bouteilles à capsule.
 M	Objets	Saladier	Un grand bol pour servir la salade.
 M	Objets	Carafe	On y met l’eau sur la table.
@@ -1706,7 +1529,6 @@ M	Objets	Baignoire	On s’y allonge pour prendre un bain.
 M	Objets	Douche	On s’y lave debout.
 M	Objets	Pommeau	La tête percée de trous de la douche.
 M	Objets	Rasoir	On l’utilise pour se raser.
-M	Objets	Sèche-cheveux	Il souffle de l’air chaud sur les cheveux mouillés.
 M	Objets	Fer à lisser	Il rend les cheveux bien raides.
 M	Objets	Brosse à cheveux	On démêle avec.
 M	Objets	Élastique	On s’attache les cheveux avec.
@@ -1725,7 +1547,6 @@ M	Objets	Tapis de bain	On pose les pieds dessus en sortant de la douche.
 M	Objets	Rideau de douche	Il empêche l’eau d’éclabousser.
 M	Objets	Chasse d’eau	On la tire après être allé aux toilettes.
 M	Objets	Papier toilette	Un rouleau indispensable aux toilettes.
-M	Objets	Ventilateur	Ses pales tournent pour rafraîchir.
 M	Objets	Climatiseur	Il refroidit la pièce l’été.
 M	Objets	Radiateur	Il chauffe la pièce l’hiver.
 M	Objets	Chaudière	Elle produit l’eau chaude de la maison.
@@ -1734,7 +1555,6 @@ M	Objets	Allumette	On la frotte pour faire du feu.
 M	Objets	Briquet	Il fait une flamme d’une pression du pouce.
 M	Objets	Bougeoir	Il tient la bougie.
 M	Objets	Lustre	Un grand luminaire qui pend du plafond.
-M	Objets	Abat-jour	Il couvre l’ampoule de la lampe.
 M	Objets	Veilleuse	Une petite lumière pour la nuit des enfants.
 M	Objets	Volet	On le ferme devant la fenêtre la nuit.
 M	Objets	Store	Il descend devant la fenêtre pour faire de l’ombre.
@@ -1745,12 +1565,10 @@ M	Objets	Judas	Le petit trou de la porte pour voir qui sonne.
 M	Objets	Interphone	On y parle pour ouvrir la porte de l’immeuble.
 M	Objets	Digicode	On tape un code pour entrer dans l’immeuble.
 M	Objets	Porte-manteau	On y accroche sa veste en entrant.
-M	Objets	Cintre	On y suspend les vêtements dans l’armoire.
 M	Objets	Commode	Un meuble à tiroirs pour le linge.
 M	Objets	Tiroir	On le tire pour ranger des affaires.
 M	Objets	Étagère	Une planche fixée au mur pour poser des livres.
 M	Objets	Buffet	Un meuble de salle à manger pour la vaisselle.
-M	Objets	Tabouret	Un siège sans dossier.
 M	Objets	Pouf	Un siège bas et mou.
 M	Objets	Transat	Une chaise longue de plage.
 M	Objets	Berceau	Le petit lit du bébé.
@@ -1883,7 +1701,6 @@ D	Animaux	Nasique	Un singe de Bornéo au très long nez.
 D	Animaux	Tarsier	Un petit primate aux yeux immenses.
 D	Animaux	Loris	Un petit primate lent aux grands yeux ronds.
 D	Animaux	Fossa	Le plus grand carnivore de Madagascar.
-D	Animaux	Capybara	Le plus gros rongeur du monde.
 D	Animaux	Porc-épic	Un rongeur couvert de longs piquants.
 D	Animaux	Ragondin	Un gros rongeur aquatique à dents orange.
 D	Animaux	Desman	Une petite taupe aquatique des Pyrénées.
@@ -1916,7 +1733,6 @@ D	Animaux	Huppe	Un oiseau à crête en éventail.
 D	Animaux	Guêpier	Un oiseau très coloré qui mange des abeilles.
 D	Animaux	Loriot	Un oiseau jaune vif au chant flûté.
 D	Animaux	Bouvreuil	Un petit oiseau au ventre rose-rouge.
-D	Animaux	Bergeronnette	Un petit oiseau qui hoche sans cesse la queue.
 D	Animaux	Roitelet	Le plus petit oiseau d’Europe.
 D	Animaux	Troglodyte	Un minuscule oiseau brun à queue dressée.
 D	Animaux	Engoulevent	Un oiseau de nuit au bec très large.
@@ -1973,7 +1789,6 @@ D	Animaux	Éphémère	Un insecte qui ne vit qu’une journée adulte.
 D	Animaux	Tipule	Un insecte aux très longues pattes, comme un gros moustique.
 D	Animaux	Taon	Une grosse mouche qui pique le bétail.
 D	Animaux	Cloporte	Un petit crustacé terrestre qui se roule en boule.
-D	Animaux	Tardigrade	Un animal microscopique presque indestructible.
 D	Animaux	Ammonite	Un mollusque fossile à coquille enroulée.
 D	Animaux	Tricératops	Un dinosaure à trois cornes.
 D	Animaux	Stégosaure	Un dinosaure à plaques sur le dos.
@@ -2009,7 +1824,6 @@ D	Général	Baccalauréat	L’examen de fin de lycée.
 D	Général	Balbutiement	Une parole hésitante, qui bafouille.
 D	Général	Ballerine	Une danseuse classique, ou une chaussure plate.
 D	Général	Banquet	Un grand repas de fête.
-D	Général	Baromètre	Il mesure la pression de l’air et prévoit le temps.
 D	Général	Barricade	Un amas d’objets pour bloquer une rue.
 D	Général	Bestiaire	Un livre sur les animaux réels ou imaginaires.
 D	Général	Bivouac	Un campement léger pour une nuit en montagne.
@@ -2017,7 +1831,6 @@ D	Général	Blockbuster	Un film à très gros budget.
 D	Général	Bouquiniste	Il vend des livres d’occasion sur les quais de la Seine.
 D	Général	Brouhaha	Un bruit confus de voix.
 D	Général	Cacophonie	Un mélange de sons désagréables.
-D	Général	Calligraphie	L’art de la belle écriture.
 D	Général	Camouflage	L’art de se fondre dans le décor.
 D	Général	Capharnaüm	Un endroit très en désordre.
 D	Général	Caricature	Un dessin qui exagère les traits.
@@ -2025,7 +1838,6 @@ D	Général	Carillon	Un ensemble de cloches qui jouent un air.
 D	Général	Cartographe	Il dessine les cartes.
 D	Général	Catastrophe	Un malheur soudain et grave.
 D	Général	Cérémonie	Une célébration solennelle.
-D	Général	Chorégraphie	L’enchaînement des pas d’une danse.
 D	Général	Chronomètre	Il mesure le temps d’une course.
 D	Général	Cinéphile	Un passionné de films.
 D	Général	Circonférence	Le tour d’un cercle.
@@ -2044,13 +1856,11 @@ D	Général	Coquetterie	Le souci de plaire par son apparence.
 D	Général	Corsaire	Un pirate autorisé par le roi.
 D	Général	Crépuscule	La lumière du soir quand le soleil se couche.
 D	Général	Croisière	Un voyage de vacances en paquebot.
-D	Général	Cryptogramme	Un message codé.
 D	Général	Dactylographie	L’art de taper à la machine.
 D	Général	Déambulation	Une promenade sans but précis.
 D	Général	Décathlon	Une épreuve d’athlétisme en dix disciplines.
 D	Général	Dégustation	On y goûte des vins ou des fromages.
 D	Général	Démangeaison	Une envie de se gratter.
-D	Général	Déménagement	On change de logement avec des cartons.
 D	Général	Dénouement	La fin d’une histoire.
 D	Général	Dépaysement	Le changement d’habitudes en voyage.
 D	Général	Dérision	La moquerie de soi ou des autres.
@@ -2059,15 +1869,12 @@ D	Général	Diaporama	Une suite d’images projetées.
 D	Général	Diplomatie	L’art de négocier entre pays.
 D	Général	Dirigeable	Un ballon allongé à moteur.
 D	Général	Discothèque	On y danse la nuit.
-D	Général	Documentaire	Un film qui montre la réalité.
 D	Général	Dramaturge	Il écrit des pièces de théâtre.
 D	Général	Ébéniste	Il fabrique de beaux meubles en bois.
-D	Général	Éblouissement	Une lumière si forte qu’on ne voit plus.
 D	Général	Échafaudage	Une structure de tubes pour travailler sur une façade.
 D	Général	Éclipse	La Lune cache le Soleil.
 D	Général	Écosystème	Un milieu naturel et tous ses êtres vivants.
 D	Général	Effervescence	Des bulles qui montent, ou une grande agitation.
-D	Général	Électroménager	Les appareils de la maison comme le frigo et le four.
 D	Général	Éloquence	L’art de bien parler.
 D	Général	Embarcadère	On y monte à bord du bateau.
 D	Général	Embuscade	Une attaque surprise.
@@ -2127,7 +1934,6 @@ D	Général	Itinéraire	Le chemin à suivre pour aller quelque part.
 D	Général	Jardinière	Un bac à fleurs, ou des légumes en mélange.
 D	Général	Jubilation	Une joie débordante.
 D	Général	Kilomètre	Mille mètres.
-D	Général	Laboratoire	La salle des expériences scientifiques.
 D	Général	Lampadaire	Il éclaire la rue la nuit.
 D	Général	Légende	Un récit merveilleux transmis de génération en génération.
 D	Général	Lexique	Une liste de mots expliqués.
@@ -2160,11 +1966,9 @@ D	Général	Nomade	Il se déplace sans cesse, sans maison fixe.
 D	Général	Nonchalance	Une manière lente et insouciante d’agir.
 D	Général	Observatoire	Un bâtiment pour regarder les étoiles.
 D	Général	Odyssée	Un long voyage plein d’aventures, comme celui d’Ulysse.
-D	Général	Onomatopée	Un mot qui imite un bruit, comme « boum ».
 D	Général	Opéra	Un spectacle chanté avec orchestre.
 D	Général	Orfèvre	Il travaille l’or et l’argent.
 D	Général	Origami	L’art japonais du pliage de papier.
-D	Général	Palindrome	Un mot qui se lit dans les deux sens, comme « kayak ».
 D	Général	Panorama	Une vue très large depuis un sommet.
 D	Général	Pantomime	Un spectacle sans paroles, seulement des gestes.
 D	Général	Paparazzi	Un photographe qui traque les stars.
@@ -2176,17 +1980,13 @@ D	Général	Patrimoine	Les monuments et traditions hérités du passé.
 D	Général	Pèlerinage	Un voyage vers un lieu saint.
 D	Général	Pendule	Une horloge à balancier.
 D	Général	Péripétie	Un rebondissement dans une histoire.
-D	Général	Périscope	Le tube pour voir au-dessus de l’eau depuis un sous-marin.
 D	Général	Philatélie	La collection de timbres.
 D	Général	Philosophie	L’amour de la sagesse, en terminale.
 D	Général	Photosynthèse	Les plantes fabriquent leur nourriture grâce à la lumière.
 D	Général	Planisphère	Une carte du monde à plat.
-D	Général	Pléonasme	Une répétition inutile, comme « monter en haut ».
 D	Général	Polyglotte	Il parle plusieurs langues.
 D	Général	Ponctuation	Les points, virgules et points d’exclamation.
 D	Général	Porcelaine	Une céramique fine et blanche.
-D	Général	Prestidigitateur	Un magicien très habile de ses mains.
-D	Général	Procrastination	Remettre toujours à plus tard.
 D	Général	Prophétie	Une prédiction de l’avenir.
 D	Général	Proverbe	Une phrase de sagesse populaire.
 D	Général	Pseudonyme	Un faux nom d’artiste.
@@ -2201,14 +2001,12 @@ D	Général	Réincarnation	Renaître dans un autre corps.
 D	Général	Rendez-vous	Une rencontre prévue à une heure précise.
 D	Général	Répertoire	Un carnet d’adresses ou la liste des œuvres d’un artiste.
 D	Général	Rhétorique	L’art de convaincre par la parole.
-D	Général	Rocambolesque	Plein de rebondissements incroyables.
 D	Général	Rodéo	Un cow-boy tente de rester sur un cheval sauvage.
 D	Général	Sarcasme	Une ironie mordante.
 D	Général	Scaphandre	La combinaison du plongeur ou de l’astronaute.
 D	Général	Scénario	Le texte d’un film.
 D	Général	Sérénade	Une chanson chantée sous la fenêtre de sa belle.
 D	Général	Silhouette	La forme sombre d’une personne à contre-jour.
-D	Général	Sismographe	Il enregistre les tremblements de terre.
 D	Général	Solitude	L’état de celui qui est seul.
 D	Général	Somnifère	Un médicament pour dormir.
 D	Général	Spéléologue	Il explore les grottes.
@@ -2219,7 +2017,6 @@ D	Général	Tapisserie	Un tissu décoratif tissé, comme celle de Bayeux.
 D	Général	Taxidermiste	Il empaille les animaux.
 D	Général	Télépathie	Communiquer par la pensée.
 D	Général	Témoignage	Ce que raconte celui qui a vu.
-D	Général	Tintamarre	Un grand vacarme.
 D	Général	Tragédie	Une pièce de théâtre qui finit mal.
 D	Général	Tremblement de terre	Le sol se met à trembler.
 D	Général	Tribunal	On y juge les accusés.
@@ -2237,7 +2034,6 @@ D	Général	Vocabulaire	L’ensemble des mots qu’on connaît.
 D	Général	Voltige	Des acrobaties à cheval ou en avion.
 D	Général	Zénith	Le point le plus haut du ciel.
 D	Général	Zodiaque	Les douze signes astrologiques.
-D	Géographie	Oulan-Bator	La capitale de la Mongolie.
 D	Géographie	Katmandou	La capitale du Népal.
 D	Géographie	Hanoï	La capitale du Vietnam.
 D	Géographie	Phnom Penh	La capitale du Cambodge.
@@ -2265,7 +2061,6 @@ D	Géographie	La Valette	La capitale de Malte.
 D	Géographie	Tirana	La capitale de l’Albanie.
 D	Géographie	Belgrade	La capitale de la Serbie.
 D	Géographie	Zagreb	La capitale de la Croatie.
-D	Géographie	Ljubljana	La capitale de la Slovénie.
 D	Géographie	Sarajevo	La capitale de la Bosnie-Herzégovine.
 D	Géographie	Sofia	La capitale de la Bulgarie.
 D	Géographie	Bucarest	La capitale de la Roumanie.
@@ -2275,7 +2070,6 @@ D	Géographie	Minsk	La capitale de la Biélorussie.
 D	Géographie	Vilnius	La capitale de la Lituanie.
 D	Géographie	Riga	La capitale de la Lettonie.
 D	Géographie	Tallinn	La capitale de l’Estonie.
-D	Géographie	Reykjavik	La capitale de l’Islande.
 D	Géographie	Berne	La capitale de la Suisse.
 D	Géographie	Vaduz	La capitale du Liechtenstein.
 D	Géographie	Andorre-la-Vieille	La capitale de l’Andorre.
@@ -2329,7 +2123,6 @@ D	Géographie	Malaisie	Un pays d’Asie avec Kuala Lumpur.
 D	Géographie	Sri Lanka	Une île en forme de larme au sud de l’Inde.
 D	Géographie	Pakistan	Un pays voisin de l’Inde, capitale Islamabad.
 D	Géographie	Afghanistan	Un pays montagneux d’Asie centrale, capitale Kaboul.
-D	Géographie	Ouzbékistan	Le pays de Samarcande.
 D	Géographie	Arménie	Un pays du Caucase au pied du mont Ararat.
 D	Géographie	Géorgie	Un pays du Caucase, ou un État américain.
 D	Géographie	Jordanie	Le pays de Pétra.
@@ -2350,7 +2143,6 @@ D	Géographie	Lettonie	Un pays balte, capitale Riga.
 D	Géographie	Estonie	Le plus au nord des pays baltes.
 D	Géographie	Biélorussie	Un pays d’Europe de l’Est, capitale Minsk.
 D	Géographie	Slovaquie	Un pays d’Europe centrale, capitale Bratislava.
-D	Géographie	Hongrie	Le pays de Budapest et du goulash.
 D	Géographie	Andorre	Une petite principauté dans les Pyrénées.
 D	Géographie	Éthiopie	Un pays de la Corne de l’Afrique au café réputé.
 D	Géographie	Somalie	Un pays de la Corne de l’Afrique.
@@ -2365,7 +2157,6 @@ D	Géographie	Congo	Un grand fleuve et deux pays d’Afrique centrale.
 D	Géographie	Rwanda	Le pays des mille collines.
 D	Géographie	Ouganda	Un pays d’Afrique de l’Est au bord du lac Victoria.
 D	Géographie	Tanzanie	Le pays du Kilimandjaro et de Zanzibar.
-D	Géographie	Mozambique	Un pays d’Afrique australe au bord de l’océan Indien.
 D	Géographie	Zimbabwe	Le pays des chutes Victoria, avec la Zambie.
 D	Géographie	Namibie	Un pays d’Afrique australe aux dunes rouges.
 D	Géographie	Botswana	Un pays d’Afrique australe avec le delta de l’Okavango.
@@ -2378,7 +2169,6 @@ D	Géographie	Libye	Un pays d’Afrique du Nord, capitale Tripoli.
 D	Géographie	Comores	Un archipel de l’océan Indien près de Mayotte.
 D	Géographie	Uruguay	Un petit pays entre l’Argentine et le Brésil.
 D	Géographie	Paraguay	Un pays d’Amérique du Sud sans accès à la mer.
-D	Géographie	Bolivie	Un pays des Andes avec le lac Titicaca.
 D	Géographie	Venezuela	Un pays d’Amérique du Sud aux plus hautes chutes du monde.
 D	Géographie	Guatemala	Un pays d’Amérique centrale aux temples mayas.
 D	Géographie	Honduras	Un pays d’Amérique centrale.
@@ -2388,7 +2178,6 @@ D	Géographie	Bahamas	Un archipel au large de la Floride.
 D	Géographie	Fidji	Un archipel du Pacifique Sud.
 D	Géographie	Samoa	Un archipel de Polynésie.
 D	Géographie	Vanuatu	Un archipel du Pacifique, ancien condominium franco-britannique.
-D	Géographie	Titicaca	Un grand lac entre le Pérou et la Bolivie.
 D	Géographie	Léman	Le grand lac de Genève.
 D	Géographie	Baïkal	Le lac le plus profond du monde, en Sibérie.
 D	Géographie	Okavango	Un delta au milieu du désert du Kalahari.
@@ -2511,9 +2300,7 @@ D	Géographie	La Nouvelle-Orléans	La ville du jazz en Louisiane.
 D	Géographie	Louisiane	Un État américain au nom français.
 D	Géographie	Alaska	Le plus grand État américain, au nord-ouest.
 D	Géographie	Floride	Un État américain en forme de péninsule.
-D	Géographie	Californie	L’État d’Hollywood et de la Silicon Valley.
 D	Géographie	Texas	Un grand État américain de cow-boys.
-D	Géographie	Tasmanie	Une île au sud de l’Australie.
 D	Géographie	Bornéo	Une grande île partagée par trois pays.
 D	Géographie	Sumatra	Une grande île indonésienne aux orangs-outans.
 D	Géographie	Java	L’île la plus peuplée d’Indonésie.
@@ -2528,13 +2315,9 @@ D	Géographie	Guernesey	L’île où Victor Hugo s’est exilé.
 D	Géographie	Açores	Un archipel portugais en plein Atlantique.
 D	Géographie	Madère	Une île portugaise au large du Maroc.
 D	Géographie	Cap-Vert	Un archipel au large du Sénégal.
-D	Géographie	Saint-Pierre-et-Miquelon	Un archipel français près du Canada.
-D	Géographie	Wallis-et-Futuna	Un archipel français du Pacifique.
 D	Géographie	Kerguelen	Des îles françaises australes et glacées.
 D	Géographie	Clipperton	Un atoll français isolé du Pacifique.
-D	Objets	Abaque	Un boulier pour compter.
 D	Objets	Boulier	Un cadre à petites boules pour compter.
-D	Objets	Astrolabe	Un ancien instrument pour lire la position des étoiles.
 D	Objets	Baldaquin	Un toit de tissu au-dessus d’un lit.
 D	Objets	Bandoulière	Une sangle qu’on porte en travers de la poitrine.
 D	Objets	Bilboquet	Une boule percée à rattraper sur une pointe.
@@ -2551,7 +2334,6 @@ D	Objets	Castagnettes	Deux coquilles en bois qu’on claque en dansant le flamen
 D	Objets	Chevalet	Le support du tableau du peintre.
 D	Objets	Chope	Une grande tasse à bière avec anse.
 D	Objets	Clarinette	Un instrument à vent en bois à anche.
-D	Objets	Clepsydre	Une horloge à eau de l’Antiquité.
 D	Objets	Coupe-papier	Un petit couteau pour ouvrir le courrier.
 D	Objets	Crécelle	Un jouet en bois qui fait un bruit de crépitement.
 D	Objets	Cymbale	Un disque de cuivre qu’on frappe.
@@ -2559,15 +2341,12 @@ D	Objets	Didgeridoo	Un long instrument à vent des Aborigènes.
 D	Objets	Dynamo	Elle produit du courant pour la lumière du vélo.
 D	Objets	Éolienne	Elle tourne au vent pour produire de l’électricité.
 D	Objets	Éprouvette	Un tube de verre du laboratoire.
-D	Objets	Escarpin	Une chaussure élégante à talon.
-D	Objets	Éventail	On l’agite pour se rafraîchir.
 D	Objets	Fanion	Un petit drapeau triangulaire.
 D	Objets	Fléau	Une arme médiévale à boule et chaîne.
 D	Objets	Fronde	Un lance-pierre.
 D	Objets	Gibecière	Le sac du chasseur.
 D	Objets	Gong	Un grand disque de métal qui résonne.
 D	Objets	Gourdin	Un gros bâton.
-D	Objets	Gramophone	L’ancêtre du tourne-disque à pavillon.
 D	Objets	Guéridon	Une petite table ronde à un pied.
 D	Objets	Hallebarde	Une arme à longue hampe des gardes suisses.
 D	Objets	Harpe	Un grand instrument à cordes pincées.
@@ -2644,7 +2423,6 @@ D	Objets	Poncho	Une couverture avec un trou pour la tête.
 D	Objets	Kimono	Une longue robe japonaise à larges manches.
 D	Objets	Sari	Une longue étoffe drapée des femmes indiennes.
 D	Objets	Kilt	La jupe à carreaux des Écossais.
-D	Objets	Sombrero	Un grand chapeau mexicain.
 D	Objets	Béret	Le chapeau rond et plat du Basque.
 D	Objets	Haut-de-forme	Le chapeau cylindrique des magiciens.
 D	Objets	Canotier	Un chapeau de paille plat.
@@ -2697,7 +2475,6 @@ D	Objets	Saucière	Un petit récipient pour servir la sauce.
 D	Objets	Ménagère	Un coffret complet de couverts en argent.
 D	Objets	Chinois	Une passoire conique.
 D	Objets	Presse-ail	Il écrase les gousses.
-D	Objets	Presse-agrumes	On l’utilise pour faire du jus.
 D	Objets	Casse-noix	Il ouvre les coques dures.
 D	Objets	Pince à sucre	Elle attrape les morceaux de sucre.
 D	Objets	Rince-doigts	Un petit bol d’eau citronnée sur la table.
@@ -2847,7 +2624,6 @@ M	Animaux	Requin-tigre	Un requin rayé très vorace.
 M	Animaux	Raie manta	Une raie géante qui plane dans l’océan.
 M	Animaux	Poulpe	Un autre nom de la pieuvre.
 M	Animaux	Calamar géant	Un mollusque des abysses aux yeux énormes.
-M	Animaux	Bernard-l’ermite	Un crabe qui vit dans une coquille vide.
 M	Animaux	Langoustine	Un petit crustacé rose à pinces fines.
 M	Animaux	Crevette grise	Une petite crevette de la mer du Nord.
 M	Animaux	Coque	Un petit coquillage rond des plages.
