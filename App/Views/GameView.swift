@@ -377,6 +377,10 @@ private struct ResultSheet: View {
             } else {
                 Text(pending ? "Votre partie est gardée sur cet iPhone et sera validée au retour du réseau." : "Votre défi du jour est enregistré. À demain !")
                     .scaledFont(13).foregroundStyle(Palette.tertiary).multilineTextAlignment(.center).padding(.top, 14)
+                // The form lives in Profil: this keeps it in sight once a day.
+                Button("Une idée de mot ? Proposez-la") { Haptics.selection(); state.proposeRequest += 1; close() }
+                    .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.top, 6)
+                    .accessibilityIdentifier("result.propose")
             }
         }
         .padding(.horizontal, 22).padding(.vertical, 26)

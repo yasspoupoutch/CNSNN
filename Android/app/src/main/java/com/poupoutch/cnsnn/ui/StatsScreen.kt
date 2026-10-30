@@ -37,6 +37,8 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
@@ -219,7 +221,7 @@ private fun ModeRecordsCard(state: AppViewModel) {
     }
 }
 
-private enum class Board(val label: String) { TODAY("Aujourd’hui"), FRIENDS("Amis"), MONTH("Mois"), FASTEST("Records"), SPRINT("Sprint") }
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), MONTH("Mois"), FASTEST("Records"), SPRINT("Sprint") }
 
 /** "12 jours joués" this month. */
 private fun monthDetail(entry: LeaderboardEntry): String = if (entry.monthPlayed > 1) "${entry.monthPlayed} jours joués" else "1 jour joué"
@@ -248,14 +250,13 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     val haptics = rememberHaptics()
     /** Reads only the ranking on screen, and only when the kept copy is old (see AppViewModel.rankings). */
     suspend fun refresh() {
-        if (board == Board.FRIENDS) return
         if (state.isServerFull) { failed = true; return }
         // Kept 3 minutes; arriving on the page or a pull to refresh reads again after 30 s (see rankingIsStale).
         val pulled = refreshToken != seenToken
         val force = !arrived || pulled
         seenToken = refreshToken; arrived = true
         val day = DailySchedule.key()
-        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); Board.SPRINT -> "sprint"; else -> board.name }
+        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); Board.SPRINT -> "sprint"; Board.FASTEST -> board.name }
         // The Sprint ranking keeps its own 5 minutes (see AppViewModel.sprintRankingIsStale).
         val stale = { if (board == Board.SPRINT) state.sprintRankingIsStale(pulled) else state.rankingIsStale(key, force) }
         val summary = state.rankingIsStale("summary", force)
@@ -278,7 +279,6 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                         val me = state.uid
                         state.rankings.copy(sprint = top, sprintMine = if (me != null && top.none { it.uid == me }) state.cloud.sprintPlace(me) else null)
                     }
-                    Board.FRIENDS -> state.rankings
                 }
                 state.rankingRead(key)
             }
@@ -301,7 +301,6 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         }
     }
     if (state.isServerFull) Text(CloudError.serverFull(), fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
-    if (board == Board.FRIENDS) { FriendsBoard(state, refreshToken); return }
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
     // The rankings show only their first lines: says how many, so nobody looks for a missing name.
     Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes"; else -> "Top 25 des meilleurs temps" },
@@ -315,7 +314,6 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
         Board.SPRINT -> state.rankings.sprint.mapIndexed { index, it -> Line(it.uid, it.username, words(it.best), crown = index == 0) }
-        Board.FRIENDS -> emptyList()
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
         if (rows.isEmpty()) EmptyLine(loading, if (failed) unavailable(state) else
@@ -399,6 +397,36 @@ private fun RankRow(index: Int, name: String, id: String, mine: Boolean, detail:
     }
 }
 
+/** The Amis tab: challenges, the friend code, and the friends ranked on today's Mot du jour. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FriendsScreen(state: AppViewModel, playChallenge: (String) -> Unit) {
+    var refreshToken by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
+    var challenges by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    PullToRefreshBox(refreshing, { scope.launch { refreshing = true; refreshToken++; refreshing = false } }, Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ScreenTitle("Amis", Modifier.padding(top = 8.dp))
+            if (state.uid == null) SectionCard(Modifier.testTag("friends.offline")) { Text("Connectez-vous à Internet pour ajouter vos amis et les défier.", color = Palette.secondary) }
+            else {
+                ChallengeTile(state, { challenges = true }) { playChallenge(it.id) }
+                FriendsBoard(state, refreshToken)
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+    if (challenges) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet({ challenges = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
+            ChallengeSheet(state) { c ->
+                scope.launch { sheet.hide() }.invokeOnCompletion { challenges = false; playChallenge(c.id) }
+            }
+        }
+    }
+}
+
 /** The player and the friends added with a 6-character code, ranked on today's Mot du jour. */
 @Composable
 private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
@@ -465,7 +493,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
     }
 }
 
-/** The player's friend code to share, and the field to type a friend's: in Stats > Amis and in Profil. */
+/** The player's friend code to share, and the field to type a friend's: in the Amis tab. */
 @Composable
 fun FriendCodeCards(state: AppViewModel, added: () -> Unit = {}) {
     val code = state.rankings.friendCode

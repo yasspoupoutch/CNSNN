@@ -87,7 +87,7 @@ class StoreScreenshotsTest {
 
         // A Classique card from the home page.
         rule.onNodeWithText("Profil").performClick()
-        waitFor("Ajouter un ami")
+        waitFor("Proposer un mot")
         shot("06-profil")
         rule.onNode(hasText("Jouer") and isSelectable()).performClick()
         rule.onNodeWithText("Classique").performScrollTo().performClick()

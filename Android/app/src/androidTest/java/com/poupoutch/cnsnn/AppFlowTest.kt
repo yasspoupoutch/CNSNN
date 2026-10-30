@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -62,9 +63,14 @@ class AppFlowTest {
         rule.onNodeWithText("Mot suivant").assertIsDisplayed()
         rule.onNodeWithText("Retour à l’accueil").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("1 mots trouvés")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("0 mots trouvés")).fetchSemanticsNodes().isNotEmpty() }
-        // Profil > Ajouter un ami: the player's own code shows up, ready to share, with the field for a friend's.
+        // Profil > Proposer un mot opens the form full screen.
         rule.onNodeWithText("Profil").performClick()
-        rule.onNodeWithText("Ajouter un ami").performScrollTo().performClick()
+        rule.onNodeWithTag("profile.propose").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Les mots validés par l’équipe rejoignent le jeu.")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithContentDescription("Fermer").performClick()
+        // The Amis tab: the player's own code shows up, ready to share, with the field for a friend's.
+        rule.onNodeWithText("Amis").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Votre code ami")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Votre code ami").assertIsDisplayed()
         rule.onNodeWithText("Code d’un ami").assertIsDisplayed()
         rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Partager mon code")).fetchSemanticsNodes().isNotEmpty() }

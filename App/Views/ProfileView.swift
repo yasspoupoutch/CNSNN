@@ -7,7 +7,7 @@ struct ProfileView: View {
     @State private var editingName = false
     @State private var name = ""
     @State private var account = false
-    @State private var addFriend = false
+    @State private var propose = false
     @State private var moderation = false
     @State private var attendance = false
     @State private var privacy = false
@@ -40,8 +40,8 @@ struct ProfileView: View {
                 VStack(spacing: 0) {
                     Button { account = true } label: { row(state.isAnonymous ? "Sauvegarder mon compte" : "Mon compte", symbol: "person.crop.circle.badge.checkmark") }
                     Rectangle().fill(Palette.line).frame(height: 1)
-                    Button { addFriend = true } label: { row("Ajouter un ami", symbol: "person.badge.plus") }
-                        .accessibilityIdentifier("profile.addFriend")
+                    Button { propose = true } label: { row("Proposer un mot", symbol: "plus.bubble") }
+                        .accessibilityIdentifier("profile.propose")
                     if state.isAdmin {
                         Rectangle().fill(Palette.line).frame(height: 1)
                         Button { moderation = true } label: { row("Modération", symbol: "checkmark.shield") }
@@ -69,9 +69,14 @@ struct ProfileView: View {
             }.padding(.horizontal, 20).padding(.top, 8)
         }.tabBarInset().scrollIndicators(.hidden)
             .sheet(isPresented: $account) { AccountView() }
-            .sheet(isPresented: $addFriend) {
-                AddFriendView().presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+            .sheet(isPresented: $propose) {
+                ProposeView().padding(.top, 12).environment(\.colorScheme, .dark)
+                    .presentationDetents([.large]).presentationDragIndicator(.visible)
                     .presentationBackground(.ultraThinMaterial)
+            }
+            // "Proposer un mot" on the daily result: opens once the game has closed.
+            .onChange(of: state.proposeRequest) { _, _ in
+                Task { try? await Task.sleep(for: .seconds(0.7)); propose = true }
             }
             .sheet(isPresented: $moderation) { NavigationStack { ModerationView() } }
             .sheet(isPresented: $attendance) { NavigationStack { AttendanceView() } }
@@ -96,26 +101,6 @@ struct ProfileView: View {
         }.padding(.horizontal, 18).frame(minHeight: 58).contentShape(Rectangle())
     }
 }
-/// Profil > Ajouter un ami: the player's code to share and the field for a friend's, as in Stats > Amis.
-struct AddFriendView: View {
-    @Environment(AppState.self) private var state
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Ajouter un ami").scaledFont(24, .bold).tracking(-0.4).padding(.top, 8).accessibilityAddTraits(.isHeader)
-                Text("Donnez votre code à un ami ou entrez le sien : vous apparaissez aussitôt dans les amis l’un de l’autre, pour comparer vos temps et vous défier.")
-                    .scaledFont(14).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
-                if state.uid == nil {
-                    Text("Connectez-vous à Internet pour ajouter vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
-                } else {
-                    FriendCodeCards()
-                }
-            }.padding(.horizontal, 22).padding(.vertical, 20)
-        }.scrollIndicators(.hidden)
-        .environment(\.colorScheme, .dark)
-    }
-}
-
 /// Daily Mot du jour reminder: a local notification at the chosen time, nothing sent by a server.
 struct ReminderSettings: View {
     @Environment(AppState.self) private var state

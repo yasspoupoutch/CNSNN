@@ -83,6 +83,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -462,8 +463,12 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
                 },
                 style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
             else if (mode == GameMode.CLASSIC) TextButton(close, Modifier.padding(top = 6.dp)) { Text("Retour à l’accueil", color = Palette.secondary) }
-            else Text(if (pending) "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau." else "Votre défi du jour est enregistré. À demain !",
-                style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+            else {
+                Text(if (pending) "Votre partie est gardée sur ce téléphone et sera validée au retour du réseau." else "Votre défi du jour est enregistré. À demain !",
+                    style = MaterialTheme.typography.bodySmall, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+                // The form lives in Profil: this keeps it in sight once a day.
+                TextButton({ state.proposeRequest++; close() }, Modifier.testTag("result.propose")) { Text("Une idée de mot ? Proposez-la", color = Palette.secondary, fontWeight = FontWeight.SemiBold) }
+            }
         }
     }
 }

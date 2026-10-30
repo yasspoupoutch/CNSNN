@@ -1,7 +1,7 @@
 import SwiftUI
 import CNSNNCore
 
-/// "Proposer un mot" tab: card proposal form and the player's submissions.
+/// "Proposer un mot", opened from Profil: card proposal form and the player's submissions.
 struct ProposeView: View {
     @Environment(AppState.self) private var state
     @State private var word = ""

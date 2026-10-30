@@ -34,13 +34,13 @@ struct RootView: View {
 }
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case play = "Jouer", stats = "Stats", propose = "Proposer", profile = "Profil"
+    case play = "Jouer", stats = "Stats", friends = "Amis", profile = "Profil"
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .play: "suit.diamond.fill"
         case .stats: "chart.bar.fill"
-        case .propose: "plus"
+        case .friends: "person.2.fill"
         case .profile: "person.fill"
         }
     }
@@ -112,8 +112,8 @@ struct MainShell: View {
         } message: {
             Text("Chaque jour à midi : « N’oubliez pas le mot du jour », sauf si vous l’avez déjà joué. Vous pourrez changer l’heure dans Profil.")
         }
-        // Pages stay alive, so "Mes propositions" reloads its statuses each time it is shown.
-        .onChange(of: tab) { _, page in if page == .propose { Task { await state.refreshSubmissions() } } }
+        // "Proposer un mot" on the daily result: the form lives in Profil.
+        .onChange(of: state.proposeRequest) { _, _ in tab = .profile }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
         // A friend link: added once there is an account, then said in an alert.
         .task(id: (state.friendInviteCode ?? "") + "|" + (state.uid ?? "")) { await state.acceptFriendInvite() }
@@ -137,7 +137,7 @@ struct MainShell: View {
             switch page {
             case .play: HomeView { game = $0 }
             case .stats: StatsView()
-            case .propose: ProposeView()
+            case .friends: FriendsView { game = $0 }
             case .profile: ProfileView()
             }
         }.readableWidth()

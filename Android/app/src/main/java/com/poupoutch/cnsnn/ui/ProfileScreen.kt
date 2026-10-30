@@ -35,7 +35,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.filled.Close
@@ -67,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -92,7 +93,10 @@ const val SUPPORT_EMAIL = "jeucnsnn@gmail.com"
 fun ProfileScreen(state: AppViewModel) {
     var editingName by remember { mutableStateOf(false) }
     var account by rememberSaveable { mutableStateOf(false) }
-    var addFriend by rememberSaveable { mutableStateOf(false) }
+    var propose by rememberSaveable { mutableStateOf(false) }
+    // "Proposer un mot" on the daily result.
+    var seenPropose by rememberSaveable { mutableStateOf(state.proposeRequest) }
+    LaunchedEffect(state.proposeRequest) { if (state.proposeRequest != seenPropose) { seenPropose = state.proposeRequest; propose = true } }
     var moderation by rememberSaveable { mutableStateOf(false) }
     var attendance by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
@@ -115,7 +119,7 @@ fun ProfileScreen(state: AppViewModel) {
         SectionCard(padding = 0.dp, radius = 24.dp) {
             NavRow(if (state.isAnonymous) "Sauvegarder mon compte" else "Mon compte", Icons.Outlined.AccountCircle) { account = true }
             Divider()
-            NavRow("Ajouter un ami", Icons.Outlined.PersonAdd) { addFriend = true }
+            NavRow("Proposer un mot", Icons.Outlined.AddComment, Modifier.testTag("profile.propose")) { propose = true }
             if (state.isAdmin) {
                 Divider(); NavRow("Modération", Icons.Outlined.Shield) { moderation = true }
                 Divider(); NavRow("Fréquentation", Icons.Outlined.BarChart) { attendance = true }
@@ -148,7 +152,7 @@ fun ProfileScreen(state: AppViewModel) {
 
     if (editingName) RenameDialog(state.progress.username, { editingName = false }) { state.rename(it); editingName = false }
     if (account) FullScreen("Votre compte", { account = false }) { AccountContent(state) { account = false } }
-    if (addFriend) FullScreen("Ajouter un ami", { addFriend = false }) { AddFriendContent(state) }
+    if (propose) FullScreen("Proposer un mot", { propose = false }) { ProposeScreen(state, inSheet = true) }
     if (moderation) FullScreen("Modération", { moderation = false }) { ModerationContent(state) }
     if (attendance) FullScreen("Fréquentation", { attendance = false }) { AttendanceContent(state) }
     if (privacy) FullScreen("Confidentialité", { privacy = false }) { PrivacyContent() }
@@ -160,21 +164,9 @@ fun ProfileScreen(state: AppViewModel) {
     }
 }
 
-/** Profil > Ajouter un ami: the player's code to share and the field for a friend's, as in Stats > Amis. */
 @Composable
-private fun AddFriendContent(state: AppViewModel) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Donnez votre code à un ami ou entrez le sien : vous apparaissez aussitôt dans les amis l’un de l’autre, pour comparer vos temps et vous défier.",
-            fontSize = 14.sp, color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
-        if (state.uid == null) SectionCard(radius = 22.dp) { Text("Connectez-vous à Internet pour ajouter vos amis.", color = Palette.secondary) }
-        else FriendCodeCards(state)
-        Spacer(Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun NavRow(title: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 58.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun NavRow(title: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 58.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = Palette.secondary)
         Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 14.dp))
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Palette.tertiary)

@@ -66,6 +66,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var hiddenPlayers by mutableStateOf(local.hiddenPlayers); private set
     /** Friend challenges sent and received (see core Challenge.kt). */
     var challenges by mutableStateOf<List<Challenge>>(emptyList()); private set
+    /** Asks Profil to open "Proposer un mot" (from the daily result). */
+    var proposeRequest by mutableStateOf(0)
     /** Asks the home page to open the challenge sheet (from the daily result). */
     var challengeRequest by mutableStateOf(0)
     /** The code of a challenge link the app was opened with, waiting for the challenge sheet to join it. */
