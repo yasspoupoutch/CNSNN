@@ -38,11 +38,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SportsEsports
-import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SportsEsports
@@ -200,7 +200,7 @@ private fun AppNavigation(state: AppViewModel) {
 private enum class Tab(val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
     PLAY("Jouer", Icons.Outlined.SportsEsports, Icons.Filled.SportsEsports),
     STATS("Stats", Icons.Outlined.BarChart, Icons.Filled.BarChart),
-    PROPOSE("Proposer", Icons.Outlined.AddCircleOutline, Icons.Filled.AddCircle),
+    FRIENDS("Amis", Icons.Outlined.Group, Icons.Filled.Group),
     PROFILE("Profil", Icons.Outlined.Person, Icons.Filled.Person),
 }
 
@@ -211,6 +211,9 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
     // "Classement" on the home page.
     var seenRequest by rememberSaveable { mutableStateOf(state.leaderboardRequest) }
     LaunchedEffect(state.leaderboardRequest) { if (state.leaderboardRequest != seenRequest) { seenRequest = state.leaderboardRequest; tab = Tab.STATS } }
+    // "Proposer un mot" on the daily result: the form lives in Profil.
+    var seenPropose by rememberSaveable { mutableStateOf(state.proposeRequest) }
+    LaunchedEffect(state.proposeRequest) { if (state.proposeRequest != seenPropose) { seenPropose = state.proposeRequest; tab = Tab.PROFILE } }
     // A challenge link opened the app: back to the home page, whose sheet joins it.
     LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) tab = Tab.PLAY }
     val holder = rememberSaveableStateHolder()
@@ -242,7 +245,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
                         when (page) {
                             Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge, playCatchUp)
                             Tab.STATS -> StatsScreen(state)
-                            Tab.PROPOSE -> ProposeScreen(state)
+                            Tab.FRIENDS -> FriendsScreen(state, playChallenge)
                             Tab.PROFILE -> ProfileScreen(state)
                         }
                     }

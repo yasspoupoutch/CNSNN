@@ -19,11 +19,14 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Statistiques"].waitForExistence(timeout:5))
         app.buttons["Profil"].tap()
         XCTAssertTrue(app.staticTexts["Camille"].waitForExistence(timeout:5))
-        // Profil > Ajouter un ami opens the friend code sheet (no server in UI tests: the offline line).
-        app.buttons["profile.addFriend"].tap()
-        XCTAssertTrue(app.staticTexts["Connectez-vous à Internet pour ajouter vos amis."].waitForExistence(timeout:5))
+        // Profil > Proposer un mot opens the form in a sheet.
+        app.buttons["profile.propose"].tap()
+        XCTAssertTrue(app.staticTexts["Mes propositions"].waitForExistence(timeout:5))
         app.swipeDown(velocity: .fast)
-        XCTAssertTrue(app.buttons["profile.addFriend"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["profile.propose"].waitForExistence(timeout:5))
+        // The Amis tab (no server in UI tests: the offline line).
+        app.buttons["Amis"].tap()
+        XCTAssertTrue(app.staticTexts["friends.offline"].waitForExistence(timeout:5))
         app.buttons["Jouer"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout:5))
     }

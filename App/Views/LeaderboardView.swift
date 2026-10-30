@@ -6,7 +6,7 @@ import CNSNNCore
 struct LeaderboardView: View {
     @Environment(AppState.self) private var state
     enum Board: String, CaseIterable, Identifiable {
-        case today = "Aujourd’hui", friends = "Amis", week = "Semaine", fastest = "Records", sprint = "Sprint"
+        case today = "Aujourd’hui", week = "Semaine", fastest = "Records", sprint = "Sprint"
         var id: String { rawValue }
     }
     /// Bumped by the Stats page's pull to refresh.
@@ -44,15 +44,13 @@ struct LeaderboardView: View {
                         ForEach(Board.allCases) { item in Chip(title: item.rawValue, selected: board == item) { board = item } }
                     }
                 }.scrollIndicators(.hidden)
-                if board == .friends { FriendsBoard(refreshToken: refreshToken) } else {
-                    if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
-                    Text(caption).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
-                    list
-                    if board == .sprint { sprintPlace }
-                    if !hidden.isEmpty {
-                        Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
-                            .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.horizontal, 4)
-                    }
+                if let message { Text(message).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4) }
+                Text(caption).scaledFont(13).foregroundStyle(Palette.secondary).padding(.horizontal, 4)
+                list
+                if board == .sprint { sprintPlace }
+                if !hidden.isEmpty {
+                    Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
+                        .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.horizontal, 4)
                 }
             }
         }
@@ -162,7 +160,7 @@ struct LeaderboardView: View {
         switch board {
         case .today: "Top 25 des plus rapides du jour"
         case .week: "Top 50 de la semaine"
-        case .fastest, .friends: "Top 25 des meilleurs temps"
+        case .fastest: "Top 25 des meilleurs temps"
         case .sprint: "Top 10 du Sprint : le plus de mots en 90 secondes"
         }
     }
@@ -171,7 +169,7 @@ struct LeaderboardView: View {
         switch board {
         case .today: "Personne n’a encore trouvé le mot du jour."
         case .week: "Personne n’a encore joué cette semaine."
-        case .fastest, .friends: "Aucun résultat pour le moment."
+        case .fastest: "Aucun résultat pour le moment."
         case .sprint: "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."
         }
     }
@@ -201,7 +199,6 @@ struct LeaderboardView: View {
         case .sprint: state.rankings.sprint.enumerated().map { index, record in
             Row(id: record.uid, name: record.username, value: Self.words(record.best), crown: index == 0)
         }
-        case .friends: []
         }
     }
 
@@ -224,7 +221,6 @@ struct LeaderboardView: View {
     private func refresh(force: Bool = false) async {
         guard let cloud = state.cloud, state.uid != nil else { return }
         if state.isServerFull { failed = true; return }
-        guard board != .friends else { return }
         let pulled = refreshToken != seenToken
         let force = force || pulled || arrival != seenArrival
         seenToken = refreshToken; seenArrival = arrival
@@ -255,10 +251,42 @@ struct LeaderboardView: View {
                 if let uid = state.uid, !top.contains(where: { $0.uid == uid }) {
                     state.rankings.sprintMine = try await cloud.sprintPlace(uid: uid)
                 } else { state.rankings.sprintMine = nil }
-            case .friends: return
             }
             state.rankings.readAt[key] = Date()
         } catch { failed = true; state.note(error) }
+    }
+}
+
+/// The Amis tab: challenges, the friend code, and the friends ranked on today's Mot du jour.
+struct FriendsView: View {
+    @Environment(AppState.self) private var state
+    var play: (GameRoute) -> Void
+    @State private var refreshToken = 0
+    @State private var showChallenges = false
+    @State private var pending: GameRoute?
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Amis").scaledFont(34, .bold).tracking(-0.6)
+                    .padding(.horizontal, 2).padding(.top, 6).padding(.bottom, 4).accessibilityAddTraits(.isHeader)
+                if state.uid == nil {
+                    Text(state.cloud == nil ? "Les amis apparaîtront quand le serveur sera configuré." : "Connectez-vous à Internet pour ajouter vos amis et les défier.")
+                        .scaledFont(15).foregroundStyle(Palette.secondary).frame(maxWidth: .infinity, alignment: .leading).glassPanel(radius: 24, padding: 18)
+                        .accessibilityIdentifier("friends.offline")
+                } else {
+                    ChallengeTile(open: { showChallenges = true }, play: { play(GameRoute(mode: .classic, challenge: $0)) })
+                    FriendsBoard(refreshToken: refreshToken)
+                }
+            }.padding(.horizontal, 20).padding(.top, 8)
+        }.tabBarInset().scrollIndicators(.hidden)
+            .refreshable { refreshToken += 1 }
+            .sheet(isPresented: $showChallenges, onDismiss: {
+                if let route = pending { pending = nil; play(route) }
+            }) {
+                ChallengeSheet { pending = GameRoute(mode: .classic, challenge: $0) }
+                    .presentationDetents([.large]).presentationDragIndicator(.visible)
+                    .presentationBackground(.ultraThinMaterial)
+            }
     }
 }
 
@@ -370,7 +398,7 @@ struct FriendsBoard: View {
     }
 }
 
-/// The player's friend code to share, and the field to type a friend's: in Stats > Amis and in Profil.
+/// The player's friend code to share, and the field to type a friend's: in the Amis tab.
 struct FriendCodeCards: View {
     @Environment(AppState.self) private var state
     /// After a friend was added (the friends ranking is already marked to read again).

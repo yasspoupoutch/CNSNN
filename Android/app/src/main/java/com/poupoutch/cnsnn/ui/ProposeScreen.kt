@@ -50,7 +50,7 @@ import java.util.UUID
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ProposeScreen(state: AppViewModel) {
+fun ProposeScreen(state: AppViewModel, inSheet: Boolean = false) {
     var word by rememberSaveable { mutableStateOf("") }
     var hint by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf(Category.entries.first()) }
@@ -64,9 +64,10 @@ fun ProposeScreen(state: AppViewModel) {
     val haptics = rememberHaptics()
     LaunchedEffect(Unit) { state.refreshSubmissions() }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(horizontal = 20.dp),
+    // Opened from Profil, under the full-screen title bar.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).then(if (inSheet) Modifier else Modifier.statusBarsPadding().imePadding()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScreenTitle("Proposer un mot", Modifier.padding(top = 8.dp))
+        if (!inSheet) ScreenTitle("Proposer un mot", Modifier.padding(top = 8.dp))
         Text("Les mots validés par l’équipe rejoignent le jeu.", color = Palette.secondary)
         SectionCard(radius = 30.dp) {
             Kicker("Aperçu en jeu")
