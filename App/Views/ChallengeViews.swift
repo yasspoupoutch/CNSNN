@@ -526,7 +526,7 @@ struct ChallengeGameView: View {
                 .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
         }
         .buttonStyle(PressStyle()).accessibilityLabel("Passer ce mot, 20 secondes de pénalité").padding(.vertical, 10)
-        LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, submit: { session.submit(state: state) })
     }
 
     private func clue(_ card: Card, number: Int) -> some View {
@@ -553,7 +553,7 @@ struct ChallengeGameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong) }
             Caret()
         }
         .lineLimit(1).minimumScaleFactor(0.4)

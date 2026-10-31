@@ -17,6 +17,8 @@ import CNSNNCore
     var survival: SurvivalGame?
     var duo: DuoGame?
     var answer = ""
+    /// The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all.
+    var answerWrong = false
     /// Bumped on each event, so the screen can shake, glow or animate a heart.
     var mistakeTick = 0
     var successTick = 0
@@ -47,7 +49,7 @@ import CNSNNCore
 
     /// Picks up the saved game of this mode, or starts a new one.
     func begin(state: AppState) {
-        answer = ""; gain = nil; passed = nil; over = false; beaten = []; recorded = false
+        answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false
         previous = state.progress.records(mode)
         if mode != .sprint, let run = ModeRunStore.load(mode), !run.finished {
             sprint = nil; survival = run.survival; duo = run.duo
@@ -75,9 +77,11 @@ import CNSNNCore
     func press(_ letter: String) {
         guard !finished, answer.count < 40 else { return }
         if letter == " ", answer.isEmpty || answer.hasSuffix(" ") { return }
-        answer += letter
+        answer += letter; answerWrong = false
     }
-    func delete() { if !answer.isEmpty { answer.removeLast() } }
+    func delete() { if !answer.isEmpty { answer.removeLast() }; answerWrong = false }
+    /// Long press on ⌫.
+    func clear() { answer = ""; answerWrong = false }
 
     func submit(state: AppState) {
         guard !finished, !WordEngine.normalize(answer).isEmpty else { mistakeTick += 1; return }
@@ -86,22 +90,22 @@ import CNSNNCore
         case .sprint:
             switch sprint?.answer(text, elapsed: now) {
             case .right?:
-                answer = ""; successTick += 1; gain = "+1"; Haptics.success()
+                answer = ""; answerWrong = false; successTick += 1; gain = "+1"; Haptics.success()
             case .wrong?: wrong()
             default: break
             }
         case .survival:
             switch survival?.answer(text) {
             case .right(let gained)?:
-                answer = ""; successTick += 1; Haptics.success()
+                answer = ""; answerWrong = false; successTick += 1; Haptics.success()
                 if gained { lifeGainedTick += 1 }
             case .wrong?: wrong(); lifeLostTick += 1; Haptics.failure()
             default: break
             }
         case .duo:
             switch duo?.answer(text, elapsed: now) {
-            case .first?, .second?: answer = ""; successTick += 1; Haptics.success()
-            case .already?: answer = ""
+            case .first?, .second?: answer = ""; answerWrong = false; successTick += 1; Haptics.success()
+            case .already?: answer = ""; answerWrong = false
             case .wrong?: wrong()
             default: break
             }
@@ -109,13 +113,13 @@ import CNSNNCore
         afterMove(state: state)
     }
     private func wrong() {
-        answer = ""; mistakeTick += 1; Haptics.retry()
+        answerWrong = true; mistakeTick += 1; Haptics.retry()
     }
 
     /// Sprint: next word for 5 seconds. Survie: next word for one life. Double sens: gives up the round.
     func skip(state: AppState) {
         guard !finished else { return }
-        answer = ""
+        answer = ""; answerWrong = false
         if let word = sprint?.card?.wordFull ?? survival?.card?.wordFull { passed = word; passedTick += 1 }
         switch mode {
         case .sprint: sprint?.skip(elapsed: elapsedMs); gain = nil

@@ -4,12 +4,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.poupoutch.cnsnn.core.DuoGame
@@ -95,9 +97,10 @@ class ModesFlowTest {
         type(expected.card!!.wordFull)
         waitForDescription("Mots : 2")
         waitFor("×2")
-        // A wrong answer keeps the word and resets the combo.
+        // A wrong answer keeps the word and resets the combo; the answer stays, in red, to fix a typo.
         type("XQ")
         waitFor("×1")
+        waitForDescription("Votre réponse : XQ")
         rule.onNodeWithText("Passer · −5 s").performClick()
         // Stopping counts the game with its words.
         rule.onNodeWithContentDescription("Quitter").performClick()
@@ -157,6 +160,10 @@ class ModesFlowTest {
         // Each answer fills the clue it matches, whatever the order.
         type(duo.second.word)
         type("XQ")
+        // The wrong answer stays on screen; a long press on ⌫ erases it all.
+        waitForDescription("Votre réponse : XQ")
+        rule.onNodeWithContentDescription("Effacer").performTouchInput { longClick() }
+        waitForDescription("Votre réponse : vide")
         type(duo.first.word)
         waitFor("Manche suivante")
         rule.onNodeWithText("Manche suivante").performClick()

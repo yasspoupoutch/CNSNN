@@ -455,7 +455,11 @@ private struct ResultSheet: View {
 struct LetterKeyboard: View {
     var press: (String) -> Void
     var delete: () -> Void
+    /// A long press on ⌫ erases the whole answer, when the screen offers it.
+    var clear: (() -> Void)? = nil
     var submit: () -> Void
+    /// Valider, in key widths: narrow enough that a thumb aiming at the space bar does not send the answer.
+    static let submitUnits: CGFloat = 2.2
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
     static let rowHeight: CGFloat = 57.5
@@ -471,17 +475,17 @@ struct LetterKeyboard: View {
                     Color.clear.frame(width: unit * 1.6)
                     letterRow(rows[2], unit)
                     Spacer(minLength: 0)
-                    KeyCap(label: "⌫", width: unit * 1.35, action: delete)
+                    KeyCap(label: "⌫", width: unit * 1.35, action: delete, longPress: clear)
                         .accessibilityLabel("Effacer")
                 }
                 HStack(spacing: 0) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    KeyCap(label: "espace", width: geo.size.width - unit * 3) { press(" ") }
+                    KeyCap(label: "espace", width: geo.size.width - unit * Self.submitUnits) { press(" ") }
                         .accessibilityLabel("Espace")
                     Button("Valider") { Haptics.selection(); submit() }
                         .buttonStyle(PrimaryPillStyle(height: Self.rowHeight - 10))
                         .padding(.horizontal, 3)
-                        .frame(width: unit * 3, height: Self.rowHeight)
+                        .frame(width: unit * Self.submitUnits, height: Self.rowHeight)
                 }
             }
         }
@@ -509,6 +513,7 @@ private struct KeyCap: View {
     var vowel = false
     var width: CGFloat
     var action: () -> Void
+    var longPress: (() -> Void)? = nil
     var body: some View {
         Button { Haptics.key(); action() } label: {
             Group {
@@ -519,6 +524,10 @@ private struct KeyCap: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .buttonStyle(KeyStyle(vowel: vowel, popup: label.count == 1 && label != "⌫" ? label : nil))
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            guard let longPress else { return }
+            Haptics.retry(); longPress()
+        }, including: longPress == nil ? .subviews : .all)
         .frame(width: max(width, 0), height: LetterKeyboard.rowHeight)
     }
 }
@@ -562,10 +571,12 @@ private struct KeyStyle: ButtonStyle {
 /// shrinks by the same amount (separate texts each shrank on their own, wide letters like M more).
 struct AnswerLetters: View {
     let answer: String
+    /// A wrong answer kept on screen: all in red until the next key.
+    var wrong = false
     var body: some View {
         Text(answer.reduce(into: AttributedString()) { line, character in
             var letter = AttributedString(String(character))
-            letter.foregroundColor = Vowels.contains(character) ? Palette.accent : Palette.foreground
+            letter.foregroundColor = wrong ? Palette.red : Vowels.contains(character) ? Palette.accent : Palette.foreground
             line += letter
         })
         .tracking(4.4).scaledFont(30, .medium)

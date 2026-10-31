@@ -34,6 +34,8 @@ class ModeViewModel : ViewModel() {
     var survival: SurvivalGame? = null; private set
     var duo: DuoGame? = null; private set
     var answer by mutableStateOf("")
+    /** The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all. */
+    var answerWrong by mutableStateOf(false); private set
     /** The core games are plain objects: this counter tells the screen they changed. */
     var version by mutableIntStateOf(0); private set
     var mistakeTick by mutableIntStateOf(0); private set
@@ -65,7 +67,7 @@ class ModeViewModel : ViewModel() {
 
     /** Picks up the saved game of this mode, or starts a new one. */
     fun begin(state: AppViewModel) {
-        answer = ""; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false
+        answer = ""; answerWrong = false; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false
         previous = state.progress.records(mode)
         val run = if (mode != PlayMode.SPRINT) state.local.loadRun(mode) else null
         if (run != null && !run.finished) {
@@ -91,9 +93,11 @@ class ModeViewModel : ViewModel() {
     fun press(letter: String) {
         if (finished || answer.length >= 40) return
         if (letter == " " && (answer.isEmpty() || answer.endsWith(" "))) return
-        answer += letter
+        answer += letter; answerWrong = false
     }
-    fun delete() { answer = answer.dropLast(1) }
+    fun delete() { answer = answer.dropLast(1); answerWrong = false }
+    /** Long press on ⌫. */
+    fun clear() { answer = ""; answerWrong = false }
 
     fun submit(state: AppViewModel) {
         if (finished) return
@@ -101,30 +105,30 @@ class ModeViewModel : ViewModel() {
         val text = answer; val now = elapsedMs
         when (mode) {
             PlayMode.SPRINT -> when (val outcome = sprint?.answer(text, now)) {
-                is SprintGame.Outcome.Right -> { answer = ""; successTick++; gain = "+1" }
+                is SprintGame.Outcome.Right -> { answer = ""; answerWrong = false; successTick++; gain = "+1" }
                 SprintGame.Outcome.Wrong -> wrong()
                 else -> Unit
             }
             PlayMode.SURVIVAL -> when (val outcome = survival?.answer(text)) {
-                is SurvivalGame.Outcome.Right -> { answer = ""; successTick++; if (outcome.lifeGained) lifeGainedTick++ }
+                is SurvivalGame.Outcome.Right -> { answer = ""; answerWrong = false; successTick++; if (outcome.lifeGained) lifeGainedTick++ }
                 is SurvivalGame.Outcome.Wrong -> { wrong(); lifeLostTick++ }
                 else -> Unit
             }
             PlayMode.DUO -> when (duo?.answer(text, now)) {
-                DuoGame.Outcome.FIRST, DuoGame.Outcome.SECOND -> { answer = ""; successTick++ }
-                DuoGame.Outcome.ALREADY -> answer = ""
+                DuoGame.Outcome.FIRST, DuoGame.Outcome.SECOND -> { answer = ""; answerWrong = false; successTick++ }
+                DuoGame.Outcome.ALREADY -> { answer = ""; answerWrong = false }
                 DuoGame.Outcome.WRONG -> wrong()
                 else -> Unit
             }
         }
         afterMove(state)
     }
-    private fun wrong() { answer = ""; mistakeTick++ }
+    private fun wrong() { answerWrong = true; mistakeTick++ }
 
     /** Sprint: next word for 5 seconds. Survie: next word for one life. Double sens: gives up the round. */
     fun skip(state: AppViewModel) {
         if (finished) return
-        answer = ""
+        answer = ""; answerWrong = false
         (sprint?.card ?: survival?.card)?.let { passed = it.wordFull; passedTick++ }
         when (mode) {
             PlayMode.SPRINT -> { sprint?.skip(elapsedMs); gain = null }

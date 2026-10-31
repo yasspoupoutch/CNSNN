@@ -17,7 +17,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -306,9 +307,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
 @Composable
 private fun AnswerLine(game: GameViewModel) = AnswerLine(game.answer, game.mistakeTick, game.result == null)
 
-/** The typed answer, gold vowels, a caret, and a shake on each wrong guess. */
+/** The typed answer, gold vowels, a caret, and a shake on each wrong guess; `wrong` keeps a wrong answer in red. */
 @Composable
-fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean) {
+fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean, wrong: Boolean = false) {
     val shake = remember { Animatable(0f) }
     LaunchedEffect(mistakeTick) {
         if (mistakeTick > 0) { shake.snapTo(0f); shake.animateTo(1f, tween(420)) }
@@ -319,7 +320,7 @@ fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean) {
         .semantics { contentDescription = "Votre réponse : " + answer.ifEmpty { "vide" } },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         if (answer.isEmpty()) Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary)
-        else Text(highlighted(answer), fontSize = if (answer.length > 14) 22.sp else 30.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
+        else Text(if (wrong) highlighted(answer, Palette.red, Palette.red) else highlighted(answer), fontSize = if (answer.length > 14) 22.sp else 30.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
         if (active) Caret()
     }
 }
@@ -337,7 +338,7 @@ private fun Caret() {
  * touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
  */
 @Composable
-fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean) {
+fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean, clear: (() -> Unit)? = null) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
     val rowHeight = 56.dp
@@ -356,11 +357,13 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
                     Spacer(Modifier.width(unit * 1.6f))
                     rows[2].forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
                     Spacer(Modifier.weight(1f))
-                    Key("⌫", false, unit * 1.35f, rowHeight, enabled, label = "Effacer") { haptics.key(); delete() }
+                    Key("⌫", false, unit * 1.35f, rowHeight, enabled, label = "Effacer",
+                        longPress = clear?.let { { haptics.retry(); it() } }) { haptics.key(); delete() }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    Key("espace", false, unit * 7, rowHeight, enabled, label = "Espace") { haptics.key(); press(" ") }
+                    // Valider takes the last 2.2 keys: narrow enough that a thumb aiming at the space bar does not send the answer.
+                    Key("espace", false, unit * 7.8f, rowHeight, enabled, label = "Espace") { haptics.key(); press(" ") }
                     androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).padding(horizontal = 3.dp).height(rowHeight - 10.dp),
                         enabled = enabled, shape = RoundedCornerShape(24.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1) }
@@ -378,8 +381,9 @@ private fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
 }
 
 /** One key: the whole cell takes the touch, the cap sits inside it with the phone's gaps around. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, action: () -> Unit) {
+private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, longPress: (() -> Unit)? = null, action: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(8.dp)
@@ -387,7 +391,7 @@ private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Bo
     val face: Modifier = if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
         else Modifier.background(if (pressed && !letter) Palette.fill2 else Palette.fill1, shape).border(1.dp, Palette.border, shape)
     Box(Modifier.width(width).height(height)
-        .clickable(interaction, indication = null, enabled = enabled, onClickLabel = label ?: text, onClick = action)
+        .combinedClickable(interaction, indication = null, enabled = enabled, onClickLabel = label ?: text, onLongClick = longPress, onClick = action)
         .semantics { contentDescription = label ?: text }) {
         Box(Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 5.dp).then(face), contentAlignment = Alignment.Center) {
             if (text == "⌫") Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(20.dp), tint = Palette.foreground)

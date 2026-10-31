@@ -33,6 +33,8 @@ class ChallengeViewModel : ViewModel() {
     var game: ChallengeGame? = null; private set
     var phase by mutableStateOf<Phase>(Phase.Starting); private set
     var answer by mutableStateOf("")
+    /** The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all. */
+    var answerWrong by mutableStateOf(false); private set
     /** The core game is a plain object: this counter tells the screen it changed. */
     var version by mutableIntStateOf(0); private set
     var mistakeTick by mutableIntStateOf(0); private set
@@ -83,16 +85,18 @@ class ChallengeViewModel : ViewModel() {
     fun press(letter: String) {
         if (phase != Phase.Playing || answer.length >= 40) return
         if (letter == " " && (answer.isEmpty() || answer.endsWith(" "))) return
-        answer += letter
+        answer += letter; answerWrong = false
     }
-    fun delete() { if (answer.isNotEmpty()) answer = answer.dropLast(1) }
+    fun delete() { if (answer.isNotEmpty()) answer = answer.dropLast(1); answerWrong = false }
+    /** Long press on ⌫. */
+    fun clear() { answer = ""; answerWrong = false }
 
     fun submit(state: AppViewModel) {
         val current = game
         if (phase != Phase.Playing || current == null || WordEngine.normalize(answer).isEmpty()) { mistakeTick++; return }
         when (current.answer(answer)) {
-            ChallengeGame.Outcome.RIGHT -> { answer = ""; successTick++ }
-            ChallengeGame.Outcome.WRONG -> { answer = ""; mistakeTick++ }
+            ChallengeGame.Outcome.RIGHT -> { answer = ""; answerWrong = false; successTick++ }
+            ChallengeGame.Outcome.WRONG -> { answerWrong = true; mistakeTick++ }
             ChallengeGame.Outcome.OVER -> {}
         }
         afterMove(state)
@@ -102,7 +106,7 @@ class ChallengeViewModel : ViewModel() {
     fun skip(state: AppViewModel) {
         val current = game ?: return
         if (phase != Phase.Playing) return
-        answer = ""
+        answer = ""; answerWrong = false
         current.card?.let { passed = it.wordFull; passedTick++ }
         current.skip()
         afterMove(state)

@@ -12,6 +12,8 @@ import CNSNNCore
     var game: ChallengeGame?
     var phase: Phase = .starting
     var answer = ""
+    /// The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all.
+    var answerWrong = false
     var mistakeTick = 0
     var successTick = 0
     /// The answer of the word just passed, shown for a moment.
@@ -54,15 +56,17 @@ import CNSNNCore
     func press(_ letter: String) {
         guard phase == .playing, answer.count < 40 else { return }
         if letter == " ", answer.isEmpty || answer.hasSuffix(" ") { return }
-        answer += letter
+        answer += letter; answerWrong = false
     }
-    func delete() { if !answer.isEmpty { answer.removeLast() } }
+    func delete() { if !answer.isEmpty { answer.removeLast() }; answerWrong = false }
+    /// Long press on ⌫.
+    func clear() { answer = ""; answerWrong = false }
 
     func submit(state: AppState) {
         guard phase == .playing, var game, !WordEngine.normalize(answer).isEmpty else { mistakeTick += 1; return }
         switch game.answer(answer) {
-        case .right: answer = ""; successTick += 1; Haptics.success()
-        case .wrong: answer = ""; mistakeTick += 1; Haptics.retry()
+        case .right: answer = ""; answerWrong = false; successTick += 1; Haptics.success()
+        case .wrong: answerWrong = true; mistakeTick += 1; Haptics.retry()
         case .over: break
         }
         self.game = game
@@ -72,7 +76,7 @@ import CNSNNCore
     /// Next word, for 20 seconds.
     func skip(state: AppState) {
         guard phase == .playing, var game else { return }
-        answer = ""
+        answer = ""; answerWrong = false
         if let word = game.card?.wordFull { passed = word; passedTick += 1 }
         game.skip()
         self.game = game
