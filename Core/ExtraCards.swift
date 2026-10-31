@@ -375,7 +375,6 @@ public enum ExtraCards {
         Card(id: "seed-chataigne", wordFull: "Châtaigne", hint: "On la grille en automne, cachée dans sa bogue piquante.", category: .general, difficulty: .easy),
         Card(id: "seed-pommedeterre", wordFull: "Pomme de terre", hint: "On en fait des frites et de la purée.", category: .general, difficulty: .easy),
         Card(id: "seed-haricot", wordFull: "Haricot", hint: "Un légume vert et fin, ou une graine blanche en sauce.", category: .general, difficulty: .easy),
-        Card(id: "seed-petitpois", wordFull: "Petit pois", hint: "Une petite bille verte qui sort d’une cosse.", category: .general, difficulty: .easy),
         Card(id: "seed-concombre", wordFull: "Concombre", hint: "Un long légume vert et frais qu’on mange en salade.", category: .general, difficulty: .easy),
         Card(id: "seed-oignon", wordFull: "Oignon", hint: "Un légume qui fait pleurer quand on le coupe.", category: .general, difficulty: .easy),
         Card(id: "seed-champignon", wordFull: "Champignon", hint: "Il pousse dans les bois après la pluie.", category: .general, difficulty: .easy),
@@ -386,15 +385,12 @@ public enum ExtraCards {
         Card(id: "seed-epinard", wordFull: "Épinard", hint: "Le légume préféré de Popeye.", category: .general, difficulty: .easy),
         Card(id: "seed-beurre", wordFull: "Beurre", hint: "On l’étale sur une tartine le matin.", category: .general, difficulty: .easy),
         Card(id: "seed-miel", wordFull: "Miel", hint: "Les abeilles le fabriquent dans la ruche.", category: .general, difficulty: .easy),
-        Card(id: "seed-cereales", wordFull: "Céréales", hint: "On les verse dans un bol de lait au petit-déjeuner.", category: .general, difficulty: .easy),
         Card(id: "seed-jambon", wordFull: "Jambon", hint: "Une tranche rose dans le sandwich parisien.", category: .general, difficulty: .easy),
         Card(id: "seed-saucisson", wordFull: "Saucisson", hint: "Une charcuterie sèche qu’on coupe en rondelles à l’apéro.", category: .general, difficulty: .easy),
         Card(id: "seed-poulet", wordFull: "Poulet", hint: "La volaille rôtie du dimanche.", category: .general, difficulty: .easy),
         Card(id: "seed-steak", wordFull: "Steak", hint: "Une tranche de viande de bœuf cuite à la poêle.", category: .general, difficulty: .easy),
-        Card(id: "seed-lasagnes", wordFull: "Lasagnes", hint: "Des couches de pâtes, de viande et de béchamel.", category: .general, difficulty: .easy),
         Card(id: "seed-hamburger", wordFull: "Hamburger", hint: "Un pain rond, un steak haché et du ketchup.", category: .general, difficulty: .easy),
         Card(id: "seed-ketchup", wordFull: "Ketchup", hint: "Une sauce rouge à la tomate pour les frites.", category: .general, difficulty: .easy),
-        Card(id: "seed-pates", wordFull: "Pâtes", hint: "Spaghettis, coquillettes ou penne, par exemple.", category: .general, difficulty: .easy),
         Card(id: "seed-riz", wordFull: "Riz", hint: "Des petits grains blancs, base des sushis.", category: .general, difficulty: .easy),
         Card(id: "seed-soupe", wordFull: "Soupe", hint: "Un plat chaud et liquide servi dans un bol.", category: .general, difficulty: .easy),
         Card(id: "seed-tarteauxpommes", wordFull: "Tarte aux pommes", hint: "Un dessert de pâte et de fruits en lamelles.", category: .general, difficulty: .easy),
@@ -407,13 +403,13 @@ public enum ExtraCards {
         Card(id: "seed-the", wordFull: "Thé", hint: "Une boisson chaude faite avec des feuilles infusées.", category: .general, difficulty: .easy),
         Card(id: "seed-cafe", wordFull: "Café", hint: "Une boisson noire qui réveille le matin.", category: .general, difficulty: .easy),
         Card(id: "seed-pain", wordFull: "Pain", hint: "On l’achète chez le boulanger tous les jours.", category: .general, difficulty: .easy),
-    ]
-
-    private static let part1: [Card] = [
         Card(id: "seed-oeuf", wordFull: "Œuf", hint: "La poule le pond, on peut le faire à la coque.", category: .general, difficulty: .easy),
         Card(id: "seed-sucre", wordFull: "Sucre", hint: "Une poudre blanche et douce.", category: .general, difficulty: .easy),
         Card(id: "seed-poivre", wordFull: "Poivre", hint: "Une épice noire qu’on moud au-dessus de l’assiette.", category: .general, difficulty: .easy),
         Card(id: "seed-ete", wordFull: "Été", hint: "La saison des grandes vacances.", category: .general, difficulty: .easy),
+    ]
+
+    private static let part1: [Card] = [
         Card(id: "seed-soir", wordFull: "Soir", hint: "Le moment de la journée où le soleil se couche.", category: .general, difficulty: .easy),
         Card(id: "seed-nuit", wordFull: "Nuit", hint: "Le moment où il fait noir et où l’on dort.", category: .general, difficulty: .easy),
         Card(id: "seed-lundi", wordFull: "Lundi", hint: "Le premier jour de la semaine.", category: .general, difficulty: .easy),
@@ -478,13 +474,11 @@ public enum ExtraCards {
         Card(id: "seed-histoire", wordFull: "Histoire", hint: "On la lit aux enfants avant de dormir.", category: .general, difficulty: .easy),
         Card(id: "seed-journal", wordFull: "Journal", hint: "On le lit pour connaître les nouvelles du jour.", category: .general, difficulty: .easy),
         Card(id: "seed-lettre", wordFull: "Lettre", hint: "On l’écrit, on la met dans une enveloppe et on la poste.", category: .general, difficulty: .easy),
-        Card(id: "seed-devoirs", wordFull: "Devoirs", hint: "Le travail de l’école qu’on fait à la maison.", category: .general, difficulty: .easy),
         Card(id: "seed-professeur", wordFull: "Professeur", hint: "Il enseigne une matière au collège.", category: .general, difficulty: .easy),
         Card(id: "seed-tableaunoir", wordFull: "Tableau noir", hint: "On y écrit à la craie en classe.", category: .general, difficulty: .easy),
         Card(id: "seed-dictee", wordFull: "Dictée", hint: "Un exercice où l’on écrit ce que la maîtresse lit.", category: .general, difficulty: .easy),
         Card(id: "seed-calcul", wordFull: "Calcul", hint: "Additions, soustractions et multiplications.", category: .general, difficulty: .easy),
         Card(id: "seed-alphabet", wordFull: "Alphabet", hint: "De A à Z.", category: .general, difficulty: .easy),
-        Card(id: "seed-mathematiques", wordFull: "Mathématiques", hint: "La matière des nombres et des figures.", category: .general, difficulty: .easy),
         Card(id: "seed-geographie", wordFull: "Géographie", hint: "La matière des cartes, des pays et des fleuves.", category: .general, difficulty: .easy),
         Card(id: "seed-infirmiere", wordFull: "Infirmière", hint: "Elle fait les piqûres et les pansements.", category: .general, difficulty: .easy),
         Card(id: "seed-medicament", wordFull: "Médicament", hint: "Un comprimé ou un sirop pour guérir.", category: .general, difficulty: .easy),
@@ -567,9 +561,6 @@ public enum ExtraCards {
         Card(id: "seed-poupee", wordFull: "Poupée", hint: "Un jouet qui ressemble à un petit enfant.", category: .general, difficulty: .easy),
         Card(id: "seed-peluche", wordFull: "Peluche", hint: "Un jouet tout doux en forme d’animal.", category: .general, difficulty: .easy),
         Card(id: "seed-jeuvideo", wordFull: "Jeu vidéo", hint: "On y joue avec une manette sur un écran.", category: .general, difficulty: .easy),
-        Card(id: "seed-echecs", wordFull: "Échecs", hint: "Un jeu avec des rois, des reines, des fous et des tours.", category: .general, difficulty: .easy),
-        Card(id: "seed-dames", wordFull: "Dames", hint: "Un jeu de pions noirs et blancs sur un damier.", category: .general, difficulty: .easy),
-        Card(id: "seed-cartesajouer", wordFull: "Cartes à jouer", hint: "Cœur, carreau, trèfle et pique.", category: .general, difficulty: .easy),
         Card(id: "seed-domino", wordFull: "Domino", hint: "Un jeu de petites pièces à points qu’on aligne.", category: .general, difficulty: .easy),
         Card(id: "seed-lego", wordFull: "Lego", hint: "Des petites briques en plastique à emboîter.", category: .general, difficulty: .easy),
         Card(id: "seed-toupie", wordFull: "Toupie", hint: "Un jouet qui tourne sur sa pointe.", category: .general, difficulty: .easy),
@@ -587,7 +578,6 @@ public enum ExtraCards {
         Card(id: "seed-radio", wordFull: "Radio", hint: "On l’allume pour écouter de la musique ou les infos.", category: .objects, difficulty: .easy),
         Card(id: "seed-appareilphoto", wordFull: "Appareil photo", hint: "On l’utilise pour prendre des photos.", category: .objects, difficulty: .easy),
         Card(id: "seed-reveilmatin", wordFull: "Réveil-matin", hint: "Il sonne pour nous sortir du lit.", category: .objects, difficulty: .easy),
-        Card(id: "seed-lunettesdesoleil", wordFull: "Lunettes de soleil", hint: "On les porte l’été pour protéger ses yeux.", category: .objects, difficulty: .easy),
         Card(id: "seed-casquette", wordFull: "Casquette", hint: "Un chapeau avec une visière.", category: .objects, difficulty: .easy),
         Card(id: "seed-bonnet", wordFull: "Bonnet", hint: "Un chapeau de laine pour l’hiver.", category: .objects, difficulty: .easy),
         Card(id: "seed-gantdetoilette", wordFull: "Gant de toilette", hint: "On le mouille pour se laver.", category: .objects, difficulty: .easy),
@@ -643,8 +633,6 @@ public enum ExtraCards {
         Card(id: "seed-metro", wordFull: "Métro", hint: "Un train qui roule sous la ville.", category: .objects, difficulty: .easy),
         Card(id: "seed-tram", wordFull: "Tram", hint: "Un train qui roule dans les rues de la ville.", category: .objects, difficulty: .easy),
         Card(id: "seed-skateboard", wordFull: "Skateboard", hint: "Une planche à roulettes.", category: .objects, difficulty: .easy),
-        Card(id: "seed-patinsaroulettes", wordFull: "Patins à roulettes", hint: "Des chaussures à roues.", category: .objects, difficulty: .easy),
-        Card(id: "seed-billes", wordFull: "Billes", hint: "De petites boules de verre avec lesquelles on joue dans la cour.", category: .objects, difficulty: .easy),
         Card(id: "seed-cordeasauter", wordFull: "Corde à sauter", hint: "On saute par-dessus en la faisant tourner.", category: .objects, difficulty: .easy),
         Card(id: "seed-raquettedepingpong", wordFull: "Raquette de ping-pong", hint: "On frappe une petite balle blanche avec.", category: .objects, difficulty: .easy),
         Card(id: "seed-balancoireabascule", wordFull: "Balançoire à bascule", hint: "Deux enfants s’assoient aux deux bouts et montent à tour de rôle.", category: .objects, difficulty: .easy),
@@ -678,7 +666,6 @@ public enum ExtraCards {
         Card(id: "seed-coffrefort", wordFull: "Coffre-fort", hint: "On y cache ses objets précieux.", category: .objects, difficulty: .easy),
         Card(id: "seed-masquedeplongee", wordFull: "Masque de plongée", hint: "Il permet de voir sous l’eau.", category: .objects, difficulty: .easy),
         Card(id: "seed-bouee", wordFull: "Bouée", hint: "Elle aide à flotter.", category: .objects, difficulty: .easy),
-        Card(id: "seed-palmes", wordFull: "Palmes", hint: "On les met aux pieds pour nager plus vite.", category: .objects, difficulty: .easy),
         Card(id: "seed-mulot", wordFull: "Mulot", hint: "Un petit rongeur des champs.", category: .animals, difficulty: .medium),
         Card(id: "seed-campagnol", wordFull: "Campagnol", hint: "Un petit rongeur qui ressemble à une souris à queue courte.", category: .animals, difficulty: .medium),
         Card(id: "seed-lievre", wordFull: "Lièvre", hint: "Plus grand que le lapin, il court très vite dans les champs.", category: .animals, difficulty: .medium),
@@ -810,9 +797,6 @@ public enum ExtraCards {
         Card(id: "seed-lagloiredemonpere", wordFull: "La Gloire de mon père", hint: "Le petit Marcel en Provence.", category: .cinema, difficulty: .medium),
         Card(id: "seed-lechateaudemamere", wordFull: "Le Château de ma mère", hint: "La suite des souvenirs de Pagnol.", category: .cinema, difficulty: .medium),
         Card(id: "seed-lamome", wordFull: "La Môme", hint: "La vie d’Édith Piaf.", category: .cinema, difficulty: .medium),
-    ]
-
-    private static let part2: [Card] = [
         Card(id: "seed-lepactedesloups", wordFull: "Le Pacte des loups", hint: "La bête du Gévaudan.", category: .cinema, difficulty: .medium),
         Card(id: "seed-lestuche", wordFull: "Les Tuche", hint: "Une famille de Bouzolles gagne au loto.", category: .cinema, difficulty: .medium),
         Card(id: "seed-lehobbit", wordFull: "Le Hobbit", hint: "Bilbon part à l’aventure avec des nains.", category: .cinema, difficulty: .medium),
@@ -826,6 +810,9 @@ public enum ExtraCards {
         Card(id: "seed-lemagiciendoz", wordFull: "Le Magicien d’Oz", hint: "Dorothy suit la route de briques jaunes.", category: .cinema, difficulty: .medium),
         Card(id: "seed-lesoiseaux", wordFull: "Les Oiseaux", hint: "Des volatiles attaquent une ville chez Hitchcock.", category: .cinema, difficulty: .medium),
         Card(id: "seed-seven", wordFull: "Seven", hint: "Deux policiers traquent un tueur des sept péchés.", category: .cinema, difficulty: .medium),
+    ]
+
+    private static let part2: [Card] = [
         Card(id: "seed-leprestige", wordFull: "Le Prestige", hint: "Deux magiciens rivaux.", category: .cinema, difficulty: .medium),
         Card(id: "seed-leloupdewallstreet", wordFull: "Le Loup de Wall Street", hint: "Leonardo DiCaprio en trader déchaîné.", category: .cinema, difficulty: .medium),
         Card(id: "seed-arretemoisitupeux", wordFull: "Arrête-moi si tu peux", hint: "Un jeune faussaire poursuivi par le FBI.", category: .cinema, difficulty: .medium),
@@ -956,8 +943,6 @@ public enum ExtraCards {
         Card(id: "seed-hachisparmentier", wordFull: "Hachis parmentier", hint: "Viande hachée recouverte de purée.", category: .general, difficulty: .medium),
         Card(id: "seed-soupealoignon", wordFull: "Soupe à l’oignon", hint: "Une soupe gratinée de Paris.", category: .general, difficulty: .medium),
         Card(id: "seed-veloute", wordFull: "Velouté", hint: "Une soupe très lisse et crémeuse.", category: .general, difficulty: .medium),
-        Card(id: "seed-frites", wordFull: "Frites", hint: "Des bâtonnets de pommes de terre dorés dans l’huile.", category: .general, difficulty: .medium),
-        Card(id: "seed-chips", wordFull: "Chips", hint: "De fines tranches de pomme de terre croustillantes en sachet.", category: .general, difficulty: .medium),
         Card(id: "seed-cremechantilly", wordFull: "Crème chantilly", hint: "De la crème fouettée sucrée.", category: .general, difficulty: .medium),
         Card(id: "seed-mousseauchocolat", wordFull: "Mousse au chocolat", hint: "Un dessert aérien au cacao.", category: .general, difficulty: .medium),
         Card(id: "seed-tiramisu", wordFull: "Tiramisu", hint: "Un dessert italien au café et au mascarpone.", category: .general, difficulty: .medium),
@@ -971,7 +956,6 @@ public enum ExtraCards {
         Card(id: "seed-religieuse", wordFull: "Religieuse", hint: "Un chou sur un autre chou, au chocolat ou au café.", category: .general, difficulty: .medium),
         Card(id: "seed-chouquette", wordFull: "Chouquette", hint: "Un petit chou parsemé de grains de sucre.", category: .general, difficulty: .medium),
         Card(id: "seed-beignet", wordFull: "Beignet", hint: "Une pâte frite, parfois fourrée de confiture.", category: .general, difficulty: .medium),
-        Card(id: "seed-churros", wordFull: "Churros", hint: "Des bâtonnets de pâte frite sucrés.", category: .general, difficulty: .medium),
         Card(id: "seed-cookie", wordFull: "Cookie", hint: "Un biscuit aux pépites de chocolat.", category: .general, difficulty: .medium),
         Card(id: "seed-muffin", wordFull: "Muffin", hint: "Un petit gâteau rond en caissette.", category: .general, difficulty: .medium),
         Card(id: "seed-brownie", wordFull: "Brownie", hint: "Un gâteau carré très chocolaté.", category: .general, difficulty: .medium),
@@ -1005,7 +989,6 @@ public enum ExtraCards {
         Card(id: "seed-reblochon", wordFull: "Reblochon", hint: "Le fromage de la tartiflette.", category: .general, difficulty: .medium),
         Card(id: "seed-saumonfume", wordFull: "Saumon fumé", hint: "Un poisson rose servi à Noël sur des blinis.", category: .general, difficulty: .medium),
         Card(id: "seed-foiegras", wordFull: "Foie gras", hint: "Un mets de fête du Sud-Ouest.", category: .general, difficulty: .medium),
-        Card(id: "seed-huitres", wordFull: "Huîtres", hint: "Des coquillages qu’on gobe au réveillon.", category: .general, difficulty: .medium),
         Card(id: "seed-boucheealareine", wordFull: "Bouchée à la reine", hint: "Une pâte feuilletée garnie de ragoût en sauce.", category: .general, difficulty: .medium),
         Card(id: "seed-volauvent", wordFull: "Vol-au-vent", hint: "Une pâte feuilletée garnie, autre nom de la bouchée à la reine.", category: .general, difficulty: .medium),
         Card(id: "seed-carbonara", wordFull: "Carbonara", hint: "Des pâtes aux lardons et au jaune d’œuf.", category: .general, difficulty: .medium),
@@ -1158,7 +1141,6 @@ public enum ExtraCards {
         Card(id: "seed-medaille", wordFull: "Médaille", hint: "On la gagne aux Jeux olympiques.", category: .general, difficulty: .medium),
         Card(id: "seed-trophee", wordFull: "Trophée", hint: "Une coupe remise au vainqueur.", category: .general, difficulty: .medium),
         Card(id: "seed-podium", wordFull: "Podium", hint: "Les trois marches des vainqueurs.", category: .general, difficulty: .medium),
-        Card(id: "seed-jeuxolympiques", wordFull: "Jeux olympiques", hint: "La plus grande compétition sportive, tous les quatre ans.", category: .general, difficulty: .medium),
         Card(id: "seed-athletisme", wordFull: "Athlétisme", hint: "Le sport des courses, des sauts et des lancers.", category: .general, difficulty: .medium),
         Card(id: "seed-gymnastique", wordFull: "Gymnastique", hint: "Le sport des barres, de la poutre et du sol.", category: .general, difficulty: .medium),
         Card(id: "seed-escalade", wordFull: "Escalade", hint: "On grimpe sur un mur avec des prises.", category: .general, difficulty: .medium),
@@ -1184,7 +1166,6 @@ public enum ExtraCards {
         Card(id: "seed-tiralarc", wordFull: "Tir à l’arc", hint: "Un sport où l’on vise une cible avec des flèches.", category: .general, difficulty: .medium),
         Card(id: "seed-deltaplane", wordFull: "Deltaplane", hint: "Une grande aile pour planer depuis une montagne.", category: .general, difficulty: .medium),
         Card(id: "seed-sudoku", wordFull: "Sudoku", hint: "Une grille de chiffres de 1 à 9 à remplir.", category: .general, difficulty: .medium),
-        Card(id: "seed-motscroises", wordFull: "Mots croisés", hint: "Une grille de lettres avec des définitions.", category: .general, difficulty: .medium),
         Card(id: "seed-devinette", wordFull: "Devinette", hint: "Une question amusante dont il faut trouver la réponse.", category: .general, difficulty: .medium),
         Card(id: "seed-charade", wordFull: "Charade", hint: "Mon premier, mon second, mon tout.", category: .general, difficulty: .medium),
         Card(id: "seed-rebus", wordFull: "Rébus", hint: "Une phrase cachée dans des dessins.", category: .general, difficulty: .medium),
@@ -1197,7 +1178,6 @@ public enum ExtraCards {
         Card(id: "seed-bataillenavale", wordFull: "Bataille navale", hint: "Un jeu où l’on coule les bateaux de l’autre.", category: .general, difficulty: .medium),
         Card(id: "seed-colinmaillard", wordFull: "Colin-maillard", hint: "Un jeu où l’on cherche les autres les yeux bandés.", category: .general, difficulty: .medium),
         Card(id: "seed-chatperche", wordFull: "Chat perché", hint: "Un jeu de poursuite où l’on est à l’abri en hauteur.", category: .general, difficulty: .medium),
-        Card(id: "seed-pierrefeuilleciseaux", wordFull: "Pierre-feuille-ciseaux", hint: "On joue avec la main : le papier bat le caillou.", category: .general, difficulty: .medium),
         Card(id: "seed-karaoke", wordFull: "Karaoké", hint: "On chante sur la musique en lisant les paroles.", category: .general, difficulty: .medium),
         Card(id: "seed-defile", wordFull: "Défilé", hint: "Une marche en rang dans la rue.", category: .general, difficulty: .medium),
         Card(id: "seed-brocante", wordFull: "Brocante", hint: "On y chine de vieux objets.", category: .general, difficulty: .medium),
@@ -1205,7 +1185,6 @@ public enum ExtraCards {
         Card(id: "seed-feteforaine", wordFull: "Fête foraine", hint: "Il y a des manèges et de la barbe à papa.", category: .general, difficulty: .medium),
         Card(id: "seed-manege", wordFull: "Manège", hint: "Il tourne avec des chevaux de bois.", category: .general, difficulty: .medium),
         Card(id: "seed-granderoue", wordFull: "Grande roue", hint: "Un manège qui monte haut dans le ciel.", category: .general, difficulty: .medium),
-        Card(id: "seed-montagnesrusses", wordFull: "Montagnes russes", hint: "Un manège qui fait des loopings.", category: .general, difficulty: .medium),
         Card(id: "seed-autotamponneuse", wordFull: "Auto-tamponneuse", hint: "Une petite voiture de fête foraine qu’on cogne.", category: .general, difficulty: .medium),
         Card(id: "seed-trainfantome", wordFull: "Train fantôme", hint: "Un manège qui fait peur dans le noir.", category: .general, difficulty: .medium),
         Card(id: "seed-parcdattractions", wordFull: "Parc d’attractions", hint: "Un grand lieu plein de manèges.", category: .general, difficulty: .medium),
@@ -1213,9 +1192,6 @@ public enum ExtraCards {
         Card(id: "seed-mediatheque", wordFull: "Médiathèque", hint: "Une bibliothèque avec aussi des films et de la musique.", category: .general, difficulty: .medium),
         Card(id: "seed-librairie", wordFull: "Librairie", hint: "Le magasin où l’on achète des livres.", category: .general, difficulty: .medium),
         Card(id: "seed-papeterie", wordFull: "Papeterie", hint: "On y achète cahiers et stylos.", category: .general, difficulty: .medium),
-    ]
-
-    private static let part3: [Card] = [
         Card(id: "seed-droguerie", wordFull: "Droguerie", hint: "Un magasin de produits d’entretien.", category: .general, difficulty: .medium),
         Card(id: "seed-laverie", wordFull: "Laverie", hint: "On y lave son linge dans des machines à pièces.", category: .general, difficulty: .medium),
         Card(id: "seed-bureaudetabac", wordFull: "Bureau de tabac", hint: "On y achète des timbres et des journaux.", category: .general, difficulty: .medium),
@@ -1237,6 +1213,9 @@ public enum ExtraCards {
         Card(id: "seed-cimetiere", wordFull: "Cimetière", hint: "On y enterre les morts.", category: .general, difficulty: .medium),
         Card(id: "seed-mausolee", wordFull: "Mausolée", hint: "Un grand tombeau, comme le Taj Mahal.", category: .general, difficulty: .medium),
         Card(id: "seed-gratteciel", wordFull: "Gratte-ciel", hint: "Un immeuble très haut.", category: .general, difficulty: .medium),
+    ]
+
+    private static let part3: [Card] = [
         Card(id: "seed-immeuble", wordFull: "Immeuble", hint: "Un bâtiment avec plusieurs étages d’appartements.", category: .general, difficulty: .medium),
         Card(id: "seed-appartement", wordFull: "Appartement", hint: "Un logement dans un immeuble.", category: .general, difficulty: .medium),
         Card(id: "seed-cabane", wordFull: "Cabane", hint: "Une petite maison en bois dans les arbres.", category: .general, difficulty: .medium),
@@ -1248,9 +1227,6 @@ public enum ExtraCards {
         Card(id: "seed-chateaufort", wordFull: "Château fort", hint: "Une forteresse médiévale avec pont-levis.", category: .general, difficulty: .medium),
         Card(id: "seed-donjon", wordFull: "Donjon", hint: "La plus grande tour du château fort.", category: .general, difficulty: .medium),
         Card(id: "seed-pontlevis", wordFull: "Pont-levis", hint: "Il se relève pour fermer le château.", category: .general, difficulty: .medium),
-        Card(id: "seed-douves", wordFull: "Douves", hint: "Un fossé plein d’eau autour du château.", category: .general, difficulty: .medium),
-        Card(id: "seed-remparts", wordFull: "Remparts", hint: "Les murs épais qui protègent une ville.", category: .general, difficulty: .medium),
-        Card(id: "seed-oubliettes", wordFull: "Oubliettes", hint: "Un cachot souterrain où l’on enfermait les prisonniers.", category: .general, difficulty: .medium),
         Card(id: "seed-catapulte", wordFull: "Catapulte", hint: "Une machine de siège qui lance des pierres.", category: .general, difficulty: .medium),
         Card(id: "seed-armure", wordFull: "Armure", hint: "Le vêtement de métal du chevalier.", category: .general, difficulty: .medium),
         Card(id: "seed-tournoi", wordFull: "Tournoi", hint: "Un combat de chevaliers à la lance.", category: .general, difficulty: .medium),
@@ -1463,7 +1439,6 @@ public enum ExtraCards {
         Card(id: "seed-meridien", wordFull: "Méridien", hint: "Une ligne imaginaire du pôle Nord au pôle Sud.", category: .geography, difficulty: .medium),
         Card(id: "seed-latitude", wordFull: "Latitude", hint: "La distance d’un lieu à l’équateur, en degrés.", category: .geography, difficulty: .medium),
         Card(id: "seed-longitude", wordFull: "Longitude", hint: "La distance d’un lieu au méridien de Greenwich.", category: .geography, difficulty: .medium),
-        Card(id: "seed-fuseauhoraire", wordFull: "Fuseau horaire", hint: "Une zone qui a la même heure.", category: .geography, difficulty: .medium),
         Card(id: "seed-capitale", wordFull: "Capitale", hint: "La ville où siège le gouvernement.", category: .geography, difficulty: .medium),
         Card(id: "seed-frontiere", wordFull: "Frontière", hint: "La limite entre deux pays.", category: .geography, difficulty: .medium),
         Card(id: "seed-continent", wordFull: "Continent", hint: "Une très grande étendue de terre, comme l’Afrique.", category: .geography, difficulty: .medium),
@@ -1484,7 +1459,6 @@ public enum ExtraCards {
         Card(id: "seed-imprimante", wordFull: "Imprimante", hint: "Elle sort les documents de l’ordinateur sur papier.", category: .objects, difficulty: .medium),
         Card(id: "seed-cleusb", wordFull: "Clé USB", hint: "Une petite mémoire qu’on branche à l’ordinateur.", category: .objects, difficulty: .medium),
         Card(id: "seed-chargeur", wordFull: "Chargeur", hint: "Il remplit la batterie du téléphone.", category: .objects, difficulty: .medium),
-        Card(id: "seed-ecouteurs", wordFull: "Écouteurs", hint: "On les met dans les oreilles pour écouter de la musique.", category: .objects, difficulty: .medium),
         Card(id: "seed-casqueaudio", wordFull: "Casque audio", hint: "Il se pose sur les deux oreilles pour écouter de la musique.", category: .objects, difficulty: .medium),
         Card(id: "seed-enceinte", wordFull: "Enceinte", hint: "Elle diffuse la musique dans la pièce.", category: .objects, difficulty: .medium),
         Card(id: "seed-micro", wordFull: "Micro", hint: "On parle dedans pour amplifier sa voix.", category: .objects, difficulty: .medium),
@@ -1520,7 +1494,6 @@ public enum ExtraCards {
         Card(id: "seed-saliere", wordFull: "Salière", hint: "On y met le sel sur la table.", category: .objects, difficulty: .medium),
         Card(id: "seed-moulinapoivre", wordFull: "Moulin à poivre", hint: "On le tourne au-dessus de l’assiette.", category: .objects, difficulty: .medium),
         Card(id: "seed-coquetier", wordFull: "Coquetier", hint: "Il tient l’œuf à la coque.", category: .objects, difficulty: .medium),
-        Card(id: "seed-baguetteschinoises", wordFull: "Baguettes chinoises", hint: "On les tient d’une main pour manger des nouilles.", category: .objects, difficulty: .medium),
         Card(id: "seed-nappe", wordFull: "Nappe", hint: "On la pose sur la table avant de mettre le couvert.", category: .objects, difficulty: .medium),
         Card(id: "seed-serviettedetable", wordFull: "Serviette de table", hint: "On la pose sur ses genoux pendant le repas.", category: .objects, difficulty: .medium),
         Card(id: "seed-tablier", wordFull: "Tablier", hint: "On le met pour ne pas se salir en cuisinant.", category: .objects, difficulty: .medium),
@@ -1546,7 +1519,6 @@ public enum ExtraCards {
         Card(id: "seed-elastique", wordFull: "Élastique", hint: "On s’attache les cheveux avec.", category: .objects, difficulty: .medium),
         Card(id: "seed-barrette", wordFull: "Barrette", hint: "Une petite pince pour les cheveux.", category: .objects, difficulty: .medium),
         Card(id: "seed-pinceaepiler", wordFull: "Pince à épiler", hint: "On retire les poils avec.", category: .objects, difficulty: .medium),
-        Card(id: "seed-coupeongles", wordFull: "Coupe-ongles", hint: "On se coupe les ongles avec.", category: .objects, difficulty: .medium),
         Card(id: "seed-limeaongles", wordFull: "Lime à ongles", hint: "On se lime les ongles avec.", category: .objects, difficulty: .medium),
         Card(id: "seed-rougealevres", wordFull: "Rouge à lèvres", hint: "Un bâton de maquillage pour la bouche.", category: .objects, difficulty: .medium),
         Card(id: "seed-mascara", wordFull: "Mascara", hint: "Il allonge les cils.", category: .objects, difficulty: .medium),
@@ -1616,10 +1588,6 @@ public enum ExtraCards {
         Card(id: "seed-funiculaire", wordFull: "Funiculaire", hint: "Un train tiré par un câble sur une pente raide.", category: .objects, difficulty: .medium),
         Card(id: "seed-tgv", wordFull: "TGV", hint: "Le train à grande vitesse français.", category: .objects, difficulty: .medium),
         Card(id: "seed-wagon", wordFull: "Wagon", hint: "Une voiture de train.", category: .objects, difficulty: .medium),
-    ]
-
-    private static let part4: [Card] = [
-        Card(id: "seed-rails", wordFull: "Rails", hint: "Le train roule dessus.", category: .objects, difficulty: .medium),
         Card(id: "seed-draisine", wordFull: "Draisine", hint: "Un petit véhicule sur rails à pédales ou à bras.", category: .objects, difficulty: .medium),
         Card(id: "seed-caleche", wordFull: "Calèche", hint: "Une voiture tirée par des chevaux.", category: .objects, difficulty: .medium),
         Card(id: "seed-carrosse", wordFull: "Carrosse", hint: "La voiture de Cendrillon.", category: .objects, difficulty: .medium),
@@ -1648,6 +1616,9 @@ public enum ExtraCards {
         Card(id: "seed-gps", wordFull: "GPS", hint: "Il indique la route à suivre.", category: .objects, difficulty: .medium),
         Card(id: "seed-giletjaune", wordFull: "Gilet jaune", hint: "On doit l’avoir dans sa voiture en cas de panne.", category: .objects, difficulty: .medium),
         Card(id: "seed-cric", wordFull: "Cric", hint: "On l’utilise pour soulever la voiture et changer une roue.", category: .objects, difficulty: .medium),
+    ]
+
+    private static let part4: [Card] = [
         Card(id: "seed-jerrican", wordFull: "Jerrican", hint: "Un bidon pour l’essence.", category: .objects, difficulty: .medium),
         Card(id: "seed-antivol", wordFull: "Antivol", hint: "Il empêche de voler le vélo.", category: .objects, difficulty: .medium),
         Card(id: "seed-pompeavelo", wordFull: "Pompe à vélo", hint: "On regonfle les pneus avec.", category: .objects, difficulty: .medium),
@@ -1661,11 +1632,9 @@ public enum ExtraCards {
         Card(id: "seed-batondemarche", wordFull: "Bâton de marche", hint: "On s’appuie dessus en randonnée.", category: .objects, difficulty: .medium),
         Card(id: "seed-piolet", wordFull: "Piolet", hint: "La petite pioche des alpinistes.", category: .objects, difficulty: .medium),
         Card(id: "seed-mousqueton", wordFull: "Mousqueton", hint: "Un anneau à ressort des grimpeurs.", category: .objects, difficulty: .medium),
-        Card(id: "seed-raquettesaneige", wordFull: "Raquettes à neige", hint: "On les met aux pieds pour marcher dans la poudreuse.", category: .objects, difficulty: .medium),
         Card(id: "seed-bonnetdebain", wordFull: "Bonnet de bain", hint: "On le met à la piscine.", category: .objects, difficulty: .medium),
         Card(id: "seed-lunettesdepiscine", wordFull: "Lunettes de piscine", hint: "On les met pour voir sous l’eau.", category: .objects, difficulty: .medium),
         Card(id: "seed-friteenmousse", wordFull: "Frite en mousse", hint: "Un long boudin coloré pour flotter.", category: .objects, difficulty: .medium),
-        Card(id: "seed-brassards", wordFull: "Brassards", hint: "On les gonfle autour des bras des enfants.", category: .objects, difficulty: .medium),
         Card(id: "seed-serviettedeplage", wordFull: "Serviette de plage", hint: "On s’allonge dessus sur le sable.", category: .objects, difficulty: .medium),
         Card(id: "seed-cremesolaire", wordFull: "Crème solaire", hint: "On s’en tartine pour ne pas brûler.", category: .objects, difficulty: .medium),
         Card(id: "seed-glaciere", wordFull: "Glacière", hint: "Elle garde les boissons fraîches en pique-nique.", category: .objects, difficulty: .medium),
@@ -1864,7 +1833,6 @@ public enum ExtraCards {
         Card(id: "seed-comediemusicale", wordFull: "Comédie musicale", hint: "Un spectacle où l’on chante et danse.", category: .general, difficulty: .hard),
         Card(id: "seed-competition", wordFull: "Compétition", hint: "Une épreuve où l’on veut gagner.", category: .general, difficulty: .hard),
         Card(id: "seed-complicite", wordFull: "Complicité", hint: "Une entente secrète entre deux personnes.", category: .general, difficulty: .hard),
-        Card(id: "seed-confettis", wordFull: "Confettis", hint: "Des petits ronds de papier qu’on lance aux fêtes.", category: .general, difficulty: .hard),
         Card(id: "seed-conservatoire", wordFull: "Conservatoire", hint: "L’école de musique.", category: .general, difficulty: .hard),
         Card(id: "seed-constitution", wordFull: "Constitution", hint: "Le texte qui fixe les règles d’un État.", category: .general, difficulty: .hard),
         Card(id: "seed-coquetterie", wordFull: "Coquetterie", hint: "Le souci de plaire par son apparence.", category: .general, difficulty: .hard),
@@ -1918,7 +1886,6 @@ public enum ExtraCards {
         Card(id: "seed-fourmiliere", wordFull: "Fourmilière", hint: "La maison des fourmis.", category: .general, difficulty: .hard),
         Card(id: "seed-fresque", wordFull: "Fresque", hint: "Une peinture sur un mur.", category: .general, difficulty: .hard),
         Card(id: "seed-friandise", wordFull: "Friandise", hint: "Une petite douceur sucrée.", category: .general, difficulty: .hard),
-        Card(id: "seed-funerailles", wordFull: "Funérailles", hint: "La cérémonie d’enterrement.", category: .general, difficulty: .hard),
         Card(id: "seed-galimatias", wordFull: "Galimatias", hint: "Un discours confus et incompréhensible.", category: .general, difficulty: .hard),
         Card(id: "seed-gargouille", wordFull: "Gargouille", hint: "Une sculpture de monstre qui crache l’eau des toits.", category: .general, difficulty: .hard),
         Card(id: "seed-gastronome", wordFull: "Gastronome", hint: "Il aime la bonne cuisine.", category: .general, difficulty: .hard),
@@ -2019,9 +1986,6 @@ public enum ExtraCards {
         Card(id: "seed-rodeo", wordFull: "Rodéo", hint: "Un cow-boy tente de rester sur un cheval sauvage.", category: .general, difficulty: .hard),
         Card(id: "seed-sarcasme", wordFull: "Sarcasme", hint: "Une ironie mordante.", category: .general, difficulty: .hard),
         Card(id: "seed-scaphandre", wordFull: "Scaphandre", hint: "La combinaison du plongeur ou de l’astronaute.", category: .general, difficulty: .hard),
-    ]
-
-    private static let part5: [Card] = [
         Card(id: "seed-scenario", wordFull: "Scénario", hint: "Le texte d’un film.", category: .general, difficulty: .hard),
         Card(id: "seed-serenade", wordFull: "Sérénade", hint: "Une chanson chantée sous la fenêtre de sa belle.", category: .general, difficulty: .hard),
         Card(id: "seed-silhouette", wordFull: "Silhouette", hint: "La forme sombre d’une personne à contre-jour.", category: .general, difficulty: .hard),
@@ -2055,6 +2019,9 @@ public enum ExtraCards {
         Card(id: "seed-katmandou", wordFull: "Katmandou", hint: "La capitale du Népal.", category: .geography, difficulty: .hard),
         Card(id: "seed-hanoi", wordFull: "Hanoï", hint: "La capitale du Vietnam.", category: .geography, difficulty: .hard),
         Card(id: "seed-phnompenh", wordFull: "Phnom Penh", hint: "La capitale du Cambodge.", category: .geography, difficulty: .hard),
+    ]
+
+    private static let part5: [Card] = [
         Card(id: "seed-vientiane", wordFull: "Vientiane", hint: "La capitale du Laos.", category: .geography, difficulty: .hard),
         Card(id: "seed-kualalumpur", wordFull: "Kuala Lumpur", hint: "La capitale de la Malaisie, aux tours jumelles.", category: .geography, difficulty: .hard),
         Card(id: "seed-djakarta", wordFull: "Djakarta", hint: "La capitale de l’Indonésie.", category: .geography, difficulty: .hard),
@@ -2341,14 +2308,12 @@ public enum ExtraCards {
         Card(id: "seed-bilboquet", wordFull: "Bilboquet", hint: "Une boule percée à rattraper sur une pointe.", category: .objects, difficulty: .hard),
         Card(id: "seed-bistouri", wordFull: "Bistouri", hint: "Le petit couteau du chirurgien.", category: .objects, difficulty: .hard),
         Card(id: "seed-bobine", wordFull: "Bobine", hint: "On y enroule le fil à coudre.", category: .objects, difficulty: .hard),
-        Card(id: "seed-bretelles", wordFull: "Bretelles", hint: "Elles retiennent le pantalon par les épaules.", category: .objects, difficulty: .hard),
         Card(id: "seed-burin", wordFull: "Burin", hint: "Un outil de sculpteur qu’on frappe au marteau.", category: .objects, difficulty: .hard),
         Card(id: "seed-cafetiereitalienne", wordFull: "Cafetière italienne", hint: "Elle fait monter le café sur le feu.", category: .objects, difficulty: .hard),
         Card(id: "seed-calumet", wordFull: "Calumet", hint: "La pipe de la paix.", category: .objects, difficulty: .hard),
         Card(id: "seed-candelabre", wordFull: "Candélabre", hint: "Un grand chandelier à plusieurs branches.", category: .objects, difficulty: .hard),
         Card(id: "seed-canif", wordFull: "Canif", hint: "Un petit couteau de poche.", category: .objects, difficulty: .hard),
         Card(id: "seed-carafon", wordFull: "Carafon", hint: "Une petite carafe.", category: .objects, difficulty: .hard),
-        Card(id: "seed-castagnettes", wordFull: "Castagnettes", hint: "Deux coquilles en bois qu’on claque en dansant le flamenco.", category: .objects, difficulty: .hard),
         Card(id: "seed-chevalet", wordFull: "Chevalet", hint: "Le support du tableau du peintre.", category: .objects, difficulty: .hard),
         Card(id: "seed-chope", wordFull: "Chope", hint: "Une grande tasse à bière avec anse.", category: .objects, difficulty: .hard),
         Card(id: "seed-clarinette", wordFull: "Clarinette", hint: "Un instrument à vent en bois à anche.", category: .objects, difficulty: .hard),
@@ -2375,7 +2340,6 @@ public enum ExtraCards {
         Card(id: "seed-longuevue", wordFull: "Longue-vue", hint: "Une lunette pour voir loin, celle des marins.", category: .objects, difficulty: .hard),
         Card(id: "seed-luth", wordFull: "Luth", hint: "Un instrument à cordes de la Renaissance.", category: .objects, difficulty: .hard),
         Card(id: "seed-mandoline", wordFull: "Mandoline", hint: "Un instrument à cordes, ou un outil pour trancher les légumes.", category: .objects, difficulty: .hard),
-        Card(id: "seed-maracas", wordFull: "Maracas", hint: "Des instruments qu’on secoue en rythme.", category: .objects, difficulty: .hard),
         Card(id: "seed-marteaupiqueur", wordFull: "Marteau-piqueur", hint: "Il casse le bitume dans un grand vacarme.", category: .objects, difficulty: .hard),
         Card(id: "seed-massue", wordFull: "Massue", hint: "Une grosse arme de bois.", category: .objects, difficulty: .hard),
         Card(id: "seed-megaphone", wordFull: "Mégaphone", hint: "Il amplifie la voix dans la rue.", category: .objects, difficulty: .hard),
@@ -2422,9 +2386,6 @@ public enum ExtraCards {
         Card(id: "seed-glockenspiel", wordFull: "Glockenspiel", hint: "Un petit carillon à lames qu’on frappe.", category: .objects, difficulty: .hard),
         Card(id: "seed-synthetiseur", wordFull: "Synthétiseur", hint: "Un clavier électronique aux mille sons.", category: .objects, difficulty: .hard),
         Card(id: "seed-orguedebarbarie", wordFull: "Orgue de Barbarie", hint: "On tourne une manivelle pour jouer un air.", category: .objects, difficulty: .hard),
-    ]
-
-    private static let part6: [Card] = [
         Card(id: "seed-boiteamusique", wordFull: "Boîte à musique", hint: "On la remonte et une danseuse tourne.", category: .objects, difficulty: .hard),
         Card(id: "seed-kazoo", wordFull: "Kazoo", hint: "Un petit instrument dans lequel on fredonne.", category: .objects, difficulty: .hard),
         Card(id: "seed-banjo", wordFull: "Banjo", hint: "Un instrument à cordes rond de la musique country.", category: .objects, difficulty: .hard),
@@ -2438,8 +2399,6 @@ public enum ExtraCards {
         Card(id: "seed-espadrille", wordFull: "Espadrille", hint: "Une chaussure de toile à semelle de corde.", category: .objects, difficulty: .hard),
         Card(id: "seed-mocassin", wordFull: "Mocassin", hint: "Une chaussure souple sans lacets.", category: .objects, difficulty: .hard),
         Card(id: "seed-babouche", wordFull: "Babouche", hint: "Une pantoufle marocaine.", category: .objects, difficulty: .hard),
-        Card(id: "seed-tongs", wordFull: "Tongs", hint: "Des sandales qui claquent sous le pied.", category: .objects, difficulty: .hard),
-        Card(id: "seed-cuissardes", wordFull: "Cuissardes", hint: "Des bottes qui montent jusqu’aux cuisses.", category: .objects, difficulty: .hard),
         Card(id: "seed-poncho", wordFull: "Poncho", hint: "Une couverture avec un trou pour la tête.", category: .objects, difficulty: .hard),
         Card(id: "seed-kimono", wordFull: "Kimono", hint: "Une longue robe japonaise à larges manches.", category: .objects, difficulty: .hard),
         Card(id: "seed-sari", wordFull: "Sari", hint: "Une longue étoffe drapée des femmes indiennes.", category: .objects, difficulty: .hard),
@@ -2463,9 +2422,10 @@ public enum ExtraCards {
         Card(id: "seed-cardigan", wordFull: "Cardigan", hint: "Un gilet de laine boutonné.", category: .objects, difficulty: .hard),
         Card(id: "seed-jogging", wordFull: "Jogging", hint: "Un pantalon de sport molletonné.", category: .objects, difficulty: .hard),
         Card(id: "seed-bermuda", wordFull: "Bermuda", hint: "Un short qui descend aux genoux.", category: .objects, difficulty: .hard),
+    ]
+
+    private static let part6: [Card] = [
         Card(id: "seed-collant", wordFull: "Collant", hint: "On le porte sous une jupe.", category: .objects, difficulty: .hard),
-        Card(id: "seed-chaussonsdedanse", wordFull: "Chaussons de danse", hint: "Les chaussures souples de la danseuse.", category: .objects, difficulty: .hard),
-        Card(id: "seed-pointes", wordFull: "Pointes", hint: "Les chaussons des danseuses étoiles.", category: .objects, difficulty: .hard),
         Card(id: "seed-tutu", wordFull: "Tutu", hint: "La jupe en tulle des danseuses.", category: .objects, difficulty: .hard),
         Card(id: "seed-diademe", wordFull: "Diadème", hint: "Une petite couronne de princesse.", category: .objects, difficulty: .hard),
         Card(id: "seed-broche", wordFull: "Broche", hint: "Un bijou qu’on épingle sur un vêtement.", category: .objects, difficulty: .hard),
@@ -2498,7 +2458,6 @@ public enum ExtraCards {
         Card(id: "seed-presseail", wordFull: "Presse-ail", hint: "Il écrase les gousses.", category: .objects, difficulty: .hard),
         Card(id: "seed-cassenoix", wordFull: "Casse-noix", hint: "Il ouvre les coques dures.", category: .objects, difficulty: .hard),
         Card(id: "seed-pinceasucre", wordFull: "Pince à sucre", hint: "Elle attrape les morceaux de sucre.", category: .objects, difficulty: .hard),
-        Card(id: "seed-rincedoigts", wordFull: "Rince-doigts", hint: "Un petit bol d’eau citronnée sur la table.", category: .objects, difficulty: .hard),
         Card(id: "seed-dessousdeplat", wordFull: "Dessous-de-plat", hint: "On le pose sous la casserole chaude.", category: .objects, difficulty: .hard),
         Card(id: "seed-portecouteau", wordFull: "Porte-couteau", hint: "On y pose son couteau entre deux plats.", category: .objects, difficulty: .hard),
         Card(id: "seed-cocotteenfonte", wordFull: "Cocotte en fonte", hint: "Une marmite lourde pour les plats mijotés.", category: .objects, difficulty: .hard),

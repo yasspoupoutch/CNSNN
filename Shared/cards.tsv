@@ -290,7 +290,7 @@ D	Cinéma	La Nuit américaine	Truffaut filme le tournage d’un film.
 D	Cinéma	Les Quatre Cents Coups	Antoine Doinel fugue, chez Truffaut.
 D	Cinéma	Jour de fête	Un facteur de village veut distribuer le courrier à l’américaine.
 
-# Cartes ajoutées en version 1.3.1 (2 445 mots, aucun sur le football) : de quoi tenir des mois sans revoir les mêmes.
+# Cartes ajoutées en version 1.3.1 (2 404 mots, réponses au singulier, aucun sur le football) : de quoi tenir des mois sans revoir les mêmes.
 F	Animaux	Chat	Il miaule et ronronne.
 F	Animaux	Chèvre	Elle donne un lait dont on fait du fromage, et a une barbichette.
 F	Animaux	Loup	Il hurle à la lune et vit en meute.
@@ -372,7 +372,6 @@ F	Général	Noix	Un fruit sec dont la coque ressemble à un petit cerveau.
 F	Général	Châtaigne	On la grille en automne, cachée dans sa bogue piquante.
 F	Général	Pomme de terre	On en fait des frites et de la purée.
 F	Général	Haricot	Un légume vert et fin, ou une graine blanche en sauce.
-F	Général	Petit pois	Une petite bille verte qui sort d’une cosse.
 F	Général	Concombre	Un long légume vert et frais qu’on mange en salade.
 F	Général	Oignon	Un légume qui fait pleurer quand on le coupe.
 F	Général	Champignon	Il pousse dans les bois après la pluie.
@@ -383,15 +382,12 @@ F	Général	Potiron	Une grosse courge orange d’Halloween.
 F	Général	Épinard	Le légume préféré de Popeye.
 F	Général	Beurre	On l’étale sur une tartine le matin.
 F	Général	Miel	Les abeilles le fabriquent dans la ruche.
-F	Général	Céréales	On les verse dans un bol de lait au petit-déjeuner.
 F	Général	Jambon	Une tranche rose dans le sandwich parisien.
 F	Général	Saucisson	Une charcuterie sèche qu’on coupe en rondelles à l’apéro.
 F	Général	Poulet	La volaille rôtie du dimanche.
 F	Général	Steak	Une tranche de viande de bœuf cuite à la poêle.
-F	Général	Lasagnes	Des couches de pâtes, de viande et de béchamel.
 F	Général	Hamburger	Un pain rond, un steak haché et du ketchup.
 F	Général	Ketchup	Une sauce rouge à la tomate pour les frites.
-F	Général	Pâtes	Spaghettis, coquillettes ou penne, par exemple.
 F	Général	Riz	Des petits grains blancs, base des sushis.
 F	Général	Soupe	Un plat chaud et liquide servi dans un bol.
 F	Général	Tarte aux pommes	Un dessert de pâte et de fruits en lamelles.
@@ -472,13 +468,11 @@ F	Général	Peinture	On l’étale au pinceau.
 F	Général	Histoire	On la lit aux enfants avant de dormir.
 F	Général	Journal	On le lit pour connaître les nouvelles du jour.
 F	Général	Lettre	On l’écrit, on la met dans une enveloppe et on la poste.
-F	Général	Devoirs	Le travail de l’école qu’on fait à la maison.
 F	Général	Professeur	Il enseigne une matière au collège.
 F	Général	Tableau noir	On y écrit à la craie en classe.
 F	Général	Dictée	Un exercice où l’on écrit ce que la maîtresse lit.
 F	Général	Calcul	Additions, soustractions et multiplications.
 F	Général	Alphabet	De A à Z.
-F	Général	Mathématiques	La matière des nombres et des figures.
 F	Général	Géographie	La matière des cartes, des pays et des fleuves.
 F	Général	Infirmière	Elle fait les piqûres et les pansements.
 F	Général	Médicament	Un comprimé ou un sirop pour guérir.
@@ -561,9 +555,6 @@ F	Général	Cache-cache	Un jeu où l’un compte pendant que les autres se cache
 F	Général	Poupée	Un jouet qui ressemble à un petit enfant.
 F	Général	Peluche	Un jouet tout doux en forme d’animal.
 F	Général	Jeu vidéo	On y joue avec une manette sur un écran.
-F	Général	Échecs	Un jeu avec des rois, des reines, des fous et des tours.
-F	Général	Dames	Un jeu de pions noirs et blancs sur un damier.
-F	Général	Cartes à jouer	Cœur, carreau, trèfle et pique.
 F	Général	Domino	Un jeu de petites pièces à points qu’on aligne.
 F	Général	Lego	Des petites briques en plastique à emboîter.
 F	Général	Toupie	Un jouet qui tourne sur sa pointe.
@@ -581,7 +572,6 @@ F	Objets	Écran	On regarde les images dessus.
 F	Objets	Radio	On l’allume pour écouter de la musique ou les infos.
 F	Objets	Appareil photo	On l’utilise pour prendre des photos.
 F	Objets	Réveil-matin	Il sonne pour nous sortir du lit.
-F	Objets	Lunettes de soleil	On les porte l’été pour protéger ses yeux.
 F	Objets	Casquette	Un chapeau avec une visière.
 F	Objets	Bonnet	Un chapeau de laine pour l’hiver.
 F	Objets	Gant de toilette	On le mouille pour se laver.
@@ -637,8 +627,6 @@ F	Objets	Ambulance	Elle transporte les blessés à l’hôpital.
 F	Objets	Métro	Un train qui roule sous la ville.
 F	Objets	Tram	Un train qui roule dans les rues de la ville.
 F	Objets	Skateboard	Une planche à roulettes.
-F	Objets	Patins à roulettes	Des chaussures à roues.
-F	Objets	Billes	De petites boules de verre avec lesquelles on joue dans la cour.
 F	Objets	Corde à sauter	On saute par-dessus en la faisant tourner.
 F	Objets	Raquette de ping-pong	On frappe une petite balle blanche avec.
 F	Objets	Balançoire à bascule	Deux enfants s’assoient aux deux bouts et montent à tour de rôle.
@@ -672,7 +660,6 @@ F	Objets	Cloche	Elle sonne en haut de l’église.
 F	Objets	Coffre-fort	On y cache ses objets précieux.
 F	Objets	Masque de plongée	Il permet de voir sous l’eau.
 F	Objets	Bouée	Elle aide à flotter.
-F	Objets	Palmes	On les met aux pieds pour nager plus vite.
 M	Animaux	Mulot	Un petit rongeur des champs.
 M	Animaux	Campagnol	Un petit rongeur qui ressemble à une souris à queue courte.
 M	Animaux	Lièvre	Plus grand que le lapin, il court très vite dans les champs.
@@ -947,8 +934,6 @@ M	Général	Gratin dauphinois	Des pommes de terre à la crème cuites au four.
 M	Général	Hachis parmentier	Viande hachée recouverte de purée.
 M	Général	Soupe à l’oignon	Une soupe gratinée de Paris.
 M	Général	Velouté	Une soupe très lisse et crémeuse.
-M	Général	Frites	Des bâtonnets de pommes de terre dorés dans l’huile.
-M	Général	Chips	De fines tranches de pomme de terre croustillantes en sachet.
 M	Général	Crème chantilly	De la crème fouettée sucrée.
 M	Général	Mousse au chocolat	Un dessert aérien au cacao.
 M	Général	Tiramisu	Un dessert italien au café et au mascarpone.
@@ -962,7 +947,6 @@ M	Général	Paris-Brest	Une couronne de pâte à choux à la crème pralinée.
 M	Général	Religieuse	Un chou sur un autre chou, au chocolat ou au café.
 M	Général	Chouquette	Un petit chou parsemé de grains de sucre.
 M	Général	Beignet	Une pâte frite, parfois fourrée de confiture.
-M	Général	Churros	Des bâtonnets de pâte frite sucrés.
 M	Général	Cookie	Un biscuit aux pépites de chocolat.
 M	Général	Muffin	Un petit gâteau rond en caissette.
 M	Général	Brownie	Un gâteau carré très chocolaté.
@@ -996,7 +980,6 @@ M	Général	Parmesan	Un fromage italien dur qu’on râpe.
 M	Général	Reblochon	Le fromage de la tartiflette.
 M	Général	Saumon fumé	Un poisson rose servi à Noël sur des blinis.
 M	Général	Foie gras	Un mets de fête du Sud-Ouest.
-M	Général	Huîtres	Des coquillages qu’on gobe au réveillon.
 M	Général	Bouchée à la reine	Une pâte feuilletée garnie de ragoût en sauce.
 M	Général	Vol-au-vent	Une pâte feuilletée garnie, autre nom de la bouchée à la reine.
 M	Général	Carbonara	Des pâtes aux lardons et au jaune d’œuf.
@@ -1149,7 +1132,6 @@ M	Général	Hymne national	Le chant officiel d’un pays.
 M	Général	Médaille	On la gagne aux Jeux olympiques.
 M	Général	Trophée	Une coupe remise au vainqueur.
 M	Général	Podium	Les trois marches des vainqueurs.
-M	Général	Jeux olympiques	La plus grande compétition sportive, tous les quatre ans.
 M	Général	Athlétisme	Le sport des courses, des sauts et des lancers.
 M	Général	Gymnastique	Le sport des barres, de la poutre et du sol.
 M	Général	Escalade	On grimpe sur un mur avec des prises.
@@ -1175,7 +1157,6 @@ M	Général	Maillot jaune	Le leader du Tour le porte.
 M	Général	Tir à l’arc	Un sport où l’on vise une cible avec des flèches.
 M	Général	Deltaplane	Une grande aile pour planer depuis une montagne.
 M	Général	Sudoku	Une grille de chiffres de 1 à 9 à remplir.
-M	Général	Mots croisés	Une grille de lettres avec des définitions.
 M	Général	Devinette	Une question amusante dont il faut trouver la réponse.
 M	Général	Charade	Mon premier, mon second, mon tout.
 M	Général	Rébus	Une phrase cachée dans des dessins.
@@ -1188,7 +1169,6 @@ M	Général	Mikado	Un jeu de baguettes à retirer sans faire bouger les autres.
 M	Général	Bataille navale	Un jeu où l’on coule les bateaux de l’autre.
 M	Général	Colin-maillard	Un jeu où l’on cherche les autres les yeux bandés.
 M	Général	Chat perché	Un jeu de poursuite où l’on est à l’abri en hauteur.
-M	Général	Pierre-feuille-ciseaux	On joue avec la main : le papier bat le caillou.
 M	Général	Karaoké	On chante sur la musique en lisant les paroles.
 M	Général	Défilé	Une marche en rang dans la rue.
 M	Général	Brocante	On y chine de vieux objets.
@@ -1196,7 +1176,6 @@ M	Général	Vide-grenier	On y vend ses vieilles affaires le dimanche.
 M	Général	Fête foraine	Il y a des manèges et de la barbe à papa.
 M	Général	Manège	Il tourne avec des chevaux de bois.
 M	Général	Grande roue	Un manège qui monte haut dans le ciel.
-M	Général	Montagnes russes	Un manège qui fait des loopings.
 M	Général	Auto-tamponneuse	Une petite voiture de fête foraine qu’on cogne.
 M	Général	Train fantôme	Un manège qui fait peur dans le noir.
 M	Général	Parc d’attractions	Un grand lieu plein de manèges.
@@ -1236,9 +1215,6 @@ M	Général	Caravane	Une petite maison qu’on tire derrière la voiture.
 M	Général	Château fort	Une forteresse médiévale avec pont-levis.
 M	Général	Donjon	La plus grande tour du château fort.
 M	Général	Pont-levis	Il se relève pour fermer le château.
-M	Général	Douves	Un fossé plein d’eau autour du château.
-M	Général	Remparts	Les murs épais qui protègent une ville.
-M	Général	Oubliettes	Un cachot souterrain où l’on enfermait les prisonniers.
 M	Général	Catapulte	Une machine de siège qui lance des pierres.
 M	Général	Armure	Le vêtement de métal du chevalier.
 M	Général	Tournoi	Un combat de chevaliers à la lance.
@@ -1451,7 +1427,6 @@ M	Géographie	Tropique	Une ligne imaginaire à 23 degrés de l’équateur.
 M	Géographie	Méridien	Une ligne imaginaire du pôle Nord au pôle Sud.
 M	Géographie	Latitude	La distance d’un lieu à l’équateur, en degrés.
 M	Géographie	Longitude	La distance d’un lieu au méridien de Greenwich.
-M	Géographie	Fuseau horaire	Une zone qui a la même heure.
 M	Géographie	Capitale	La ville où siège le gouvernement.
 M	Géographie	Frontière	La limite entre deux pays.
 M	Géographie	Continent	Une très grande étendue de terre, comme l’Afrique.
@@ -1472,7 +1447,6 @@ M	Objets	Globe	Une boule qui représente la Terre.
 M	Objets	Imprimante	Elle sort les documents de l’ordinateur sur papier.
 M	Objets	Clé USB	Une petite mémoire qu’on branche à l’ordinateur.
 M	Objets	Chargeur	Il remplit la batterie du téléphone.
-M	Objets	Écouteurs	On les met dans les oreilles pour écouter de la musique.
 M	Objets	Casque audio	Il se pose sur les deux oreilles pour écouter de la musique.
 M	Objets	Enceinte	Elle diffuse la musique dans la pièce.
 M	Objets	Micro	On parle dedans pour amplifier sa voix.
@@ -1508,7 +1482,6 @@ M	Objets	Sucrier	On y met le sucre sur la table.
 M	Objets	Salière	On y met le sel sur la table.
 M	Objets	Moulin à poivre	On le tourne au-dessus de l’assiette.
 M	Objets	Coquetier	Il tient l’œuf à la coque.
-M	Objets	Baguettes chinoises	On les tient d’une main pour manger des nouilles.
 M	Objets	Nappe	On la pose sur la table avant de mettre le couvert.
 M	Objets	Serviette de table	On la pose sur ses genoux pendant le repas.
 M	Objets	Tablier	On le met pour ne pas se salir en cuisinant.
@@ -1534,7 +1507,6 @@ M	Objets	Brosse à cheveux	On démêle avec.
 M	Objets	Élastique	On s’attache les cheveux avec.
 M	Objets	Barrette	Une petite pince pour les cheveux.
 M	Objets	Pince à épiler	On retire les poils avec.
-M	Objets	Coupe-ongles	On se coupe les ongles avec.
 M	Objets	Lime à ongles	On se lime les ongles avec.
 M	Objets	Rouge à lèvres	Un bâton de maquillage pour la bouche.
 M	Objets	Mascara	Il allonge les cils.
@@ -1604,7 +1576,6 @@ M	Objets	Télésiège	Un siège qui remonte les skieurs.
 M	Objets	Funiculaire	Un train tiré par un câble sur une pente raide.
 M	Objets	TGV	Le train à grande vitesse français.
 M	Objets	Wagon	Une voiture de train.
-M	Objets	Rails	Le train roule dessus.
 M	Objets	Draisine	Un petit véhicule sur rails à pédales ou à bras.
 M	Objets	Calèche	Une voiture tirée par des chevaux.
 M	Objets	Carrosse	La voiture de Cendrillon.
@@ -1646,11 +1617,9 @@ M	Objets	Sac de randonnée	On le porte sur le dos pour marcher longtemps.
 M	Objets	Bâton de marche	On s’appuie dessus en randonnée.
 M	Objets	Piolet	La petite pioche des alpinistes.
 M	Objets	Mousqueton	Un anneau à ressort des grimpeurs.
-M	Objets	Raquettes à neige	On les met aux pieds pour marcher dans la poudreuse.
 M	Objets	Bonnet de bain	On le met à la piscine.
 M	Objets	Lunettes de piscine	On les met pour voir sous l’eau.
 M	Objets	Frite en mousse	Un long boudin coloré pour flotter.
-M	Objets	Brassards	On les gonfle autour des bras des enfants.
 M	Objets	Serviette de plage	On s’allonge dessus sur le sable.
 M	Objets	Crème solaire	On s’en tartine pour ne pas brûler.
 M	Objets	Glacière	Elle garde les boissons fraîches en pique-nique.
@@ -1849,7 +1818,6 @@ D	Général	Colombage	Des poutres apparentes sur les façades d’Alsace et de N
 D	Général	Comédie musicale	Un spectacle où l’on chante et danse.
 D	Général	Compétition	Une épreuve où l’on veut gagner.
 D	Général	Complicité	Une entente secrète entre deux personnes.
-D	Général	Confettis	Des petits ronds de papier qu’on lance aux fêtes.
 D	Général	Conservatoire	L’école de musique.
 D	Général	Constitution	Le texte qui fixe les règles d’un État.
 D	Général	Coquetterie	Le souci de plaire par son apparence.
@@ -1903,7 +1871,6 @@ D	Général	Folklore	Les traditions populaires d’un pays.
 D	Général	Fourmilière	La maison des fourmis.
 D	Général	Fresque	Une peinture sur un mur.
 D	Général	Friandise	Une petite douceur sucrée.
-D	Général	Funérailles	La cérémonie d’enterrement.
 D	Général	Galimatias	Un discours confus et incompréhensible.
 D	Général	Gargouille	Une sculpture de monstre qui crache l’eau des toits.
 D	Général	Gastronome	Il aime la bonne cuisine.
@@ -2323,14 +2290,12 @@ D	Objets	Bandoulière	Une sangle qu’on porte en travers de la poitrine.
 D	Objets	Bilboquet	Une boule percée à rattraper sur une pointe.
 D	Objets	Bistouri	Le petit couteau du chirurgien.
 D	Objets	Bobine	On y enroule le fil à coudre.
-D	Objets	Bretelles	Elles retiennent le pantalon par les épaules.
 D	Objets	Burin	Un outil de sculpteur qu’on frappe au marteau.
 D	Objets	Cafetière italienne	Elle fait monter le café sur le feu.
 D	Objets	Calumet	La pipe de la paix.
 D	Objets	Candélabre	Un grand chandelier à plusieurs branches.
 D	Objets	Canif	Un petit couteau de poche.
 D	Objets	Carafon	Une petite carafe.
-D	Objets	Castagnettes	Deux coquilles en bois qu’on claque en dansant le flamenco.
 D	Objets	Chevalet	Le support du tableau du peintre.
 D	Objets	Chope	Une grande tasse à bière avec anse.
 D	Objets	Clarinette	Un instrument à vent en bois à anche.
@@ -2357,7 +2322,6 @@ D	Objets	Lorgnette	Une petite longue-vue.
 D	Objets	Longue-vue	Une lunette pour voir loin, celle des marins.
 D	Objets	Luth	Un instrument à cordes de la Renaissance.
 D	Objets	Mandoline	Un instrument à cordes, ou un outil pour trancher les légumes.
-D	Objets	Maracas	Des instruments qu’on secoue en rythme.
 D	Objets	Marteau-piqueur	Il casse le bitume dans un grand vacarme.
 D	Objets	Massue	Une grosse arme de bois.
 D	Objets	Mégaphone	Il amplifie la voix dans la rue.
@@ -2417,8 +2381,6 @@ D	Objets	Sabot	Une chaussure en bois.
 D	Objets	Espadrille	Une chaussure de toile à semelle de corde.
 D	Objets	Mocassin	Une chaussure souple sans lacets.
 D	Objets	Babouche	Une pantoufle marocaine.
-D	Objets	Tongs	Des sandales qui claquent sous le pied.
-D	Objets	Cuissardes	Des bottes qui montent jusqu’aux cuisses.
 D	Objets	Poncho	Une couverture avec un trou pour la tête.
 D	Objets	Kimono	Une longue robe japonaise à larges manches.
 D	Objets	Sari	Une longue étoffe drapée des femmes indiennes.
@@ -2443,8 +2405,6 @@ D	Objets	Cardigan	Un gilet de laine boutonné.
 D	Objets	Jogging	Un pantalon de sport molletonné.
 D	Objets	Bermuda	Un short qui descend aux genoux.
 D	Objets	Collant	On le porte sous une jupe.
-D	Objets	Chaussons de danse	Les chaussures souples de la danseuse.
-D	Objets	Pointes	Les chaussons des danseuses étoiles.
 D	Objets	Tutu	La jupe en tulle des danseuses.
 D	Objets	Diadème	Une petite couronne de princesse.
 D	Objets	Broche	Un bijou qu’on épingle sur un vêtement.
@@ -2477,7 +2437,6 @@ D	Objets	Chinois	Une passoire conique.
 D	Objets	Presse-ail	Il écrase les gousses.
 D	Objets	Casse-noix	Il ouvre les coques dures.
 D	Objets	Pince à sucre	Elle attrape les morceaux de sucre.
-D	Objets	Rince-doigts	Un petit bol d’eau citronnée sur la table.
 D	Objets	Dessous-de-plat	On le pose sous la casserole chaude.
 D	Objets	Porte-couteau	On y pose son couteau entre deux plats.
 D	Objets	Cocotte en fonte	Une marmite lourde pour les plats mijotés.

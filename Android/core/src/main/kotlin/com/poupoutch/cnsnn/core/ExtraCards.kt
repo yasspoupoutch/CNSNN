@@ -374,7 +374,6 @@ object ExtraCards {
         Card("seed-chataigne", "Châtaigne", "On la grille en automne, cachée dans sa bogue piquante.", Category.GENERAL, Difficulty.EASY),
         Card("seed-pommedeterre", "Pomme de terre", "On en fait des frites et de la purée.", Category.GENERAL, Difficulty.EASY),
         Card("seed-haricot", "Haricot", "Un légume vert et fin, ou une graine blanche en sauce.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-petitpois", "Petit pois", "Une petite bille verte qui sort d’une cosse.", Category.GENERAL, Difficulty.EASY),
         Card("seed-concombre", "Concombre", "Un long légume vert et frais qu’on mange en salade.", Category.GENERAL, Difficulty.EASY),
         Card("seed-oignon", "Oignon", "Un légume qui fait pleurer quand on le coupe.", Category.GENERAL, Difficulty.EASY),
         Card("seed-champignon", "Champignon", "Il pousse dans les bois après la pluie.", Category.GENERAL, Difficulty.EASY),
@@ -385,15 +384,12 @@ object ExtraCards {
         Card("seed-epinard", "Épinard", "Le légume préféré de Popeye.", Category.GENERAL, Difficulty.EASY),
         Card("seed-beurre", "Beurre", "On l’étale sur une tartine le matin.", Category.GENERAL, Difficulty.EASY),
         Card("seed-miel", "Miel", "Les abeilles le fabriquent dans la ruche.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-cereales", "Céréales", "On les verse dans un bol de lait au petit-déjeuner.", Category.GENERAL, Difficulty.EASY),
         Card("seed-jambon", "Jambon", "Une tranche rose dans le sandwich parisien.", Category.GENERAL, Difficulty.EASY),
         Card("seed-saucisson", "Saucisson", "Une charcuterie sèche qu’on coupe en rondelles à l’apéro.", Category.GENERAL, Difficulty.EASY),
         Card("seed-poulet", "Poulet", "La volaille rôtie du dimanche.", Category.GENERAL, Difficulty.EASY),
         Card("seed-steak", "Steak", "Une tranche de viande de bœuf cuite à la poêle.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-lasagnes", "Lasagnes", "Des couches de pâtes, de viande et de béchamel.", Category.GENERAL, Difficulty.EASY),
         Card("seed-hamburger", "Hamburger", "Un pain rond, un steak haché et du ketchup.", Category.GENERAL, Difficulty.EASY),
         Card("seed-ketchup", "Ketchup", "Une sauce rouge à la tomate pour les frites.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-pates", "Pâtes", "Spaghettis, coquillettes ou penne, par exemple.", Category.GENERAL, Difficulty.EASY),
         Card("seed-riz", "Riz", "Des petits grains blancs, base des sushis.", Category.GENERAL, Difficulty.EASY),
         Card("seed-soupe", "Soupe", "Un plat chaud et liquide servi dans un bol.", Category.GENERAL, Difficulty.EASY),
         Card("seed-tarteauxpommes", "Tarte aux pommes", "Un dessert de pâte et de fruits en lamelles.", Category.GENERAL, Difficulty.EASY),
@@ -406,13 +402,13 @@ object ExtraCards {
         Card("seed-the", "Thé", "Une boisson chaude faite avec des feuilles infusées.", Category.GENERAL, Difficulty.EASY),
         Card("seed-cafe", "Café", "Une boisson noire qui réveille le matin.", Category.GENERAL, Difficulty.EASY),
         Card("seed-pain", "Pain", "On l’achète chez le boulanger tous les jours.", Category.GENERAL, Difficulty.EASY),
-    )
-
-    private fun part1(): List<Card> = listOf(
         Card("seed-oeuf", "Œuf", "La poule le pond, on peut le faire à la coque.", Category.GENERAL, Difficulty.EASY),
         Card("seed-sucre", "Sucre", "Une poudre blanche et douce.", Category.GENERAL, Difficulty.EASY),
         Card("seed-poivre", "Poivre", "Une épice noire qu’on moud au-dessus de l’assiette.", Category.GENERAL, Difficulty.EASY),
         Card("seed-ete", "Été", "La saison des grandes vacances.", Category.GENERAL, Difficulty.EASY),
+    )
+
+    private fun part1(): List<Card> = listOf(
         Card("seed-soir", "Soir", "Le moment de la journée où le soleil se couche.", Category.GENERAL, Difficulty.EASY),
         Card("seed-nuit", "Nuit", "Le moment où il fait noir et où l’on dort.", Category.GENERAL, Difficulty.EASY),
         Card("seed-lundi", "Lundi", "Le premier jour de la semaine.", Category.GENERAL, Difficulty.EASY),
@@ -477,13 +473,11 @@ object ExtraCards {
         Card("seed-histoire", "Histoire", "On la lit aux enfants avant de dormir.", Category.GENERAL, Difficulty.EASY),
         Card("seed-journal", "Journal", "On le lit pour connaître les nouvelles du jour.", Category.GENERAL, Difficulty.EASY),
         Card("seed-lettre", "Lettre", "On l’écrit, on la met dans une enveloppe et on la poste.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-devoirs", "Devoirs", "Le travail de l’école qu’on fait à la maison.", Category.GENERAL, Difficulty.EASY),
         Card("seed-professeur", "Professeur", "Il enseigne une matière au collège.", Category.GENERAL, Difficulty.EASY),
         Card("seed-tableaunoir", "Tableau noir", "On y écrit à la craie en classe.", Category.GENERAL, Difficulty.EASY),
         Card("seed-dictee", "Dictée", "Un exercice où l’on écrit ce que la maîtresse lit.", Category.GENERAL, Difficulty.EASY),
         Card("seed-calcul", "Calcul", "Additions, soustractions et multiplications.", Category.GENERAL, Difficulty.EASY),
         Card("seed-alphabet", "Alphabet", "De A à Z.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-mathematiques", "Mathématiques", "La matière des nombres et des figures.", Category.GENERAL, Difficulty.EASY),
         Card("seed-geographie", "Géographie", "La matière des cartes, des pays et des fleuves.", Category.GENERAL, Difficulty.EASY),
         Card("seed-infirmiere", "Infirmière", "Elle fait les piqûres et les pansements.", Category.GENERAL, Difficulty.EASY),
         Card("seed-medicament", "Médicament", "Un comprimé ou un sirop pour guérir.", Category.GENERAL, Difficulty.EASY),
@@ -566,9 +560,6 @@ object ExtraCards {
         Card("seed-poupee", "Poupée", "Un jouet qui ressemble à un petit enfant.", Category.GENERAL, Difficulty.EASY),
         Card("seed-peluche", "Peluche", "Un jouet tout doux en forme d’animal.", Category.GENERAL, Difficulty.EASY),
         Card("seed-jeuvideo", "Jeu vidéo", "On y joue avec une manette sur un écran.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-echecs", "Échecs", "Un jeu avec des rois, des reines, des fous et des tours.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-dames", "Dames", "Un jeu de pions noirs et blancs sur un damier.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-cartesajouer", "Cartes à jouer", "Cœur, carreau, trèfle et pique.", Category.GENERAL, Difficulty.EASY),
         Card("seed-domino", "Domino", "Un jeu de petites pièces à points qu’on aligne.", Category.GENERAL, Difficulty.EASY),
         Card("seed-lego", "Lego", "Des petites briques en plastique à emboîter.", Category.GENERAL, Difficulty.EASY),
         Card("seed-toupie", "Toupie", "Un jouet qui tourne sur sa pointe.", Category.GENERAL, Difficulty.EASY),
@@ -586,7 +577,6 @@ object ExtraCards {
         Card("seed-radio", "Radio", "On l’allume pour écouter de la musique ou les infos.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-appareilphoto", "Appareil photo", "On l’utilise pour prendre des photos.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-reveilmatin", "Réveil-matin", "Il sonne pour nous sortir du lit.", Category.OBJECTS, Difficulty.EASY),
-        Card("seed-lunettesdesoleil", "Lunettes de soleil", "On les porte l’été pour protéger ses yeux.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-casquette", "Casquette", "Un chapeau avec une visière.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-bonnet", "Bonnet", "Un chapeau de laine pour l’hiver.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-gantdetoilette", "Gant de toilette", "On le mouille pour se laver.", Category.OBJECTS, Difficulty.EASY),
@@ -642,8 +632,6 @@ object ExtraCards {
         Card("seed-metro", "Métro", "Un train qui roule sous la ville.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-tram", "Tram", "Un train qui roule dans les rues de la ville.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-skateboard", "Skateboard", "Une planche à roulettes.", Category.OBJECTS, Difficulty.EASY),
-        Card("seed-patinsaroulettes", "Patins à roulettes", "Des chaussures à roues.", Category.OBJECTS, Difficulty.EASY),
-        Card("seed-billes", "Billes", "De petites boules de verre avec lesquelles on joue dans la cour.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-cordeasauter", "Corde à sauter", "On saute par-dessus en la faisant tourner.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-raquettedepingpong", "Raquette de ping-pong", "On frappe une petite balle blanche avec.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-balancoireabascule", "Balançoire à bascule", "Deux enfants s’assoient aux deux bouts et montent à tour de rôle.", Category.OBJECTS, Difficulty.EASY),
@@ -677,7 +665,6 @@ object ExtraCards {
         Card("seed-coffrefort", "Coffre-fort", "On y cache ses objets précieux.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-masquedeplongee", "Masque de plongée", "Il permet de voir sous l’eau.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-bouee", "Bouée", "Elle aide à flotter.", Category.OBJECTS, Difficulty.EASY),
-        Card("seed-palmes", "Palmes", "On les met aux pieds pour nager plus vite.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-mulot", "Mulot", "Un petit rongeur des champs.", Category.ANIMALS, Difficulty.MEDIUM),
         Card("seed-campagnol", "Campagnol", "Un petit rongeur qui ressemble à une souris à queue courte.", Category.ANIMALS, Difficulty.MEDIUM),
         Card("seed-lievre", "Lièvre", "Plus grand que le lapin, il court très vite dans les champs.", Category.ANIMALS, Difficulty.MEDIUM),
@@ -809,9 +796,6 @@ object ExtraCards {
         Card("seed-lagloiredemonpere", "La Gloire de mon père", "Le petit Marcel en Provence.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-lechateaudemamere", "Le Château de ma mère", "La suite des souvenirs de Pagnol.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-lamome", "La Môme", "La vie d’Édith Piaf.", Category.CINEMA, Difficulty.MEDIUM),
-    )
-
-    private fun part2(): List<Card> = listOf(
         Card("seed-lepactedesloups", "Le Pacte des loups", "La bête du Gévaudan.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-lestuche", "Les Tuche", "Une famille de Bouzolles gagne au loto.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-lehobbit", "Le Hobbit", "Bilbon part à l’aventure avec des nains.", Category.CINEMA, Difficulty.MEDIUM),
@@ -825,6 +809,9 @@ object ExtraCards {
         Card("seed-lemagiciendoz", "Le Magicien d’Oz", "Dorothy suit la route de briques jaunes.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-lesoiseaux", "Les Oiseaux", "Des volatiles attaquent une ville chez Hitchcock.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-seven", "Seven", "Deux policiers traquent un tueur des sept péchés.", Category.CINEMA, Difficulty.MEDIUM),
+    )
+
+    private fun part2(): List<Card> = listOf(
         Card("seed-leprestige", "Le Prestige", "Deux magiciens rivaux.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-leloupdewallstreet", "Le Loup de Wall Street", "Leonardo DiCaprio en trader déchaîné.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-arretemoisitupeux", "Arrête-moi si tu peux", "Un jeune faussaire poursuivi par le FBI.", Category.CINEMA, Difficulty.MEDIUM),
@@ -955,8 +942,6 @@ object ExtraCards {
         Card("seed-hachisparmentier", "Hachis parmentier", "Viande hachée recouverte de purée.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-soupealoignon", "Soupe à l’oignon", "Une soupe gratinée de Paris.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-veloute", "Velouté", "Une soupe très lisse et crémeuse.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-frites", "Frites", "Des bâtonnets de pommes de terre dorés dans l’huile.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-chips", "Chips", "De fines tranches de pomme de terre croustillantes en sachet.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-cremechantilly", "Crème chantilly", "De la crème fouettée sucrée.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-mousseauchocolat", "Mousse au chocolat", "Un dessert aérien au cacao.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-tiramisu", "Tiramisu", "Un dessert italien au café et au mascarpone.", Category.GENERAL, Difficulty.MEDIUM),
@@ -970,7 +955,6 @@ object ExtraCards {
         Card("seed-religieuse", "Religieuse", "Un chou sur un autre chou, au chocolat ou au café.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-chouquette", "Chouquette", "Un petit chou parsemé de grains de sucre.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-beignet", "Beignet", "Une pâte frite, parfois fourrée de confiture.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-churros", "Churros", "Des bâtonnets de pâte frite sucrés.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-cookie", "Cookie", "Un biscuit aux pépites de chocolat.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-muffin", "Muffin", "Un petit gâteau rond en caissette.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-brownie", "Brownie", "Un gâteau carré très chocolaté.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1004,7 +988,6 @@ object ExtraCards {
         Card("seed-reblochon", "Reblochon", "Le fromage de la tartiflette.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-saumonfume", "Saumon fumé", "Un poisson rose servi à Noël sur des blinis.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-foiegras", "Foie gras", "Un mets de fête du Sud-Ouest.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-huitres", "Huîtres", "Des coquillages qu’on gobe au réveillon.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-boucheealareine", "Bouchée à la reine", "Une pâte feuilletée garnie de ragoût en sauce.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-volauvent", "Vol-au-vent", "Une pâte feuilletée garnie, autre nom de la bouchée à la reine.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-carbonara", "Carbonara", "Des pâtes aux lardons et au jaune d’œuf.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1157,7 +1140,6 @@ object ExtraCards {
         Card("seed-medaille", "Médaille", "On la gagne aux Jeux olympiques.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-trophee", "Trophée", "Une coupe remise au vainqueur.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-podium", "Podium", "Les trois marches des vainqueurs.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-jeuxolympiques", "Jeux olympiques", "La plus grande compétition sportive, tous les quatre ans.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-athletisme", "Athlétisme", "Le sport des courses, des sauts et des lancers.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-gymnastique", "Gymnastique", "Le sport des barres, de la poutre et du sol.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-escalade", "Escalade", "On grimpe sur un mur avec des prises.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1183,7 +1165,6 @@ object ExtraCards {
         Card("seed-tiralarc", "Tir à l’arc", "Un sport où l’on vise une cible avec des flèches.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-deltaplane", "Deltaplane", "Une grande aile pour planer depuis une montagne.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-sudoku", "Sudoku", "Une grille de chiffres de 1 à 9 à remplir.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-motscroises", "Mots croisés", "Une grille de lettres avec des définitions.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-devinette", "Devinette", "Une question amusante dont il faut trouver la réponse.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-charade", "Charade", "Mon premier, mon second, mon tout.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-rebus", "Rébus", "Une phrase cachée dans des dessins.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1196,7 +1177,6 @@ object ExtraCards {
         Card("seed-bataillenavale", "Bataille navale", "Un jeu où l’on coule les bateaux de l’autre.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-colinmaillard", "Colin-maillard", "Un jeu où l’on cherche les autres les yeux bandés.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-chatperche", "Chat perché", "Un jeu de poursuite où l’on est à l’abri en hauteur.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-pierrefeuilleciseaux", "Pierre-feuille-ciseaux", "On joue avec la main : le papier bat le caillou.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-karaoke", "Karaoké", "On chante sur la musique en lisant les paroles.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-defile", "Défilé", "Une marche en rang dans la rue.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-brocante", "Brocante", "On y chine de vieux objets.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1204,7 +1184,6 @@ object ExtraCards {
         Card("seed-feteforaine", "Fête foraine", "Il y a des manèges et de la barbe à papa.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-manege", "Manège", "Il tourne avec des chevaux de bois.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-granderoue", "Grande roue", "Un manège qui monte haut dans le ciel.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-montagnesrusses", "Montagnes russes", "Un manège qui fait des loopings.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-autotamponneuse", "Auto-tamponneuse", "Une petite voiture de fête foraine qu’on cogne.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-trainfantome", "Train fantôme", "Un manège qui fait peur dans le noir.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-parcdattractions", "Parc d’attractions", "Un grand lieu plein de manèges.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1212,9 +1191,6 @@ object ExtraCards {
         Card("seed-mediatheque", "Médiathèque", "Une bibliothèque avec aussi des films et de la musique.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-librairie", "Librairie", "Le magasin où l’on achète des livres.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-papeterie", "Papeterie", "On y achète cahiers et stylos.", Category.GENERAL, Difficulty.MEDIUM),
-    )
-
-    private fun part3(): List<Card> = listOf(
         Card("seed-droguerie", "Droguerie", "Un magasin de produits d’entretien.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-laverie", "Laverie", "On y lave son linge dans des machines à pièces.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-bureaudetabac", "Bureau de tabac", "On y achète des timbres et des journaux.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1236,6 +1212,9 @@ object ExtraCards {
         Card("seed-cimetiere", "Cimetière", "On y enterre les morts.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-mausolee", "Mausolée", "Un grand tombeau, comme le Taj Mahal.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-gratteciel", "Gratte-ciel", "Un immeuble très haut.", Category.GENERAL, Difficulty.MEDIUM),
+    )
+
+    private fun part3(): List<Card> = listOf(
         Card("seed-immeuble", "Immeuble", "Un bâtiment avec plusieurs étages d’appartements.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-appartement", "Appartement", "Un logement dans un immeuble.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-cabane", "Cabane", "Une petite maison en bois dans les arbres.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1247,9 +1226,6 @@ object ExtraCards {
         Card("seed-chateaufort", "Château fort", "Une forteresse médiévale avec pont-levis.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-donjon", "Donjon", "La plus grande tour du château fort.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-pontlevis", "Pont-levis", "Il se relève pour fermer le château.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-douves", "Douves", "Un fossé plein d’eau autour du château.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-remparts", "Remparts", "Les murs épais qui protègent une ville.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-oubliettes", "Oubliettes", "Un cachot souterrain où l’on enfermait les prisonniers.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-catapulte", "Catapulte", "Une machine de siège qui lance des pierres.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-armure", "Armure", "Le vêtement de métal du chevalier.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-tournoi", "Tournoi", "Un combat de chevaliers à la lance.", Category.GENERAL, Difficulty.MEDIUM),
@@ -1462,7 +1438,6 @@ object ExtraCards {
         Card("seed-meridien", "Méridien", "Une ligne imaginaire du pôle Nord au pôle Sud.", Category.GEOGRAPHY, Difficulty.MEDIUM),
         Card("seed-latitude", "Latitude", "La distance d’un lieu à l’équateur, en degrés.", Category.GEOGRAPHY, Difficulty.MEDIUM),
         Card("seed-longitude", "Longitude", "La distance d’un lieu au méridien de Greenwich.", Category.GEOGRAPHY, Difficulty.MEDIUM),
-        Card("seed-fuseauhoraire", "Fuseau horaire", "Une zone qui a la même heure.", Category.GEOGRAPHY, Difficulty.MEDIUM),
         Card("seed-capitale", "Capitale", "La ville où siège le gouvernement.", Category.GEOGRAPHY, Difficulty.MEDIUM),
         Card("seed-frontiere", "Frontière", "La limite entre deux pays.", Category.GEOGRAPHY, Difficulty.MEDIUM),
         Card("seed-continent", "Continent", "Une très grande étendue de terre, comme l’Afrique.", Category.GEOGRAPHY, Difficulty.MEDIUM),
@@ -1483,7 +1458,6 @@ object ExtraCards {
         Card("seed-imprimante", "Imprimante", "Elle sort les documents de l’ordinateur sur papier.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-cleusb", "Clé USB", "Une petite mémoire qu’on branche à l’ordinateur.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-chargeur", "Chargeur", "Il remplit la batterie du téléphone.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-ecouteurs", "Écouteurs", "On les met dans les oreilles pour écouter de la musique.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-casqueaudio", "Casque audio", "Il se pose sur les deux oreilles pour écouter de la musique.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-enceinte", "Enceinte", "Elle diffuse la musique dans la pièce.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-micro", "Micro", "On parle dedans pour amplifier sa voix.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1519,7 +1493,6 @@ object ExtraCards {
         Card("seed-saliere", "Salière", "On y met le sel sur la table.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-moulinapoivre", "Moulin à poivre", "On le tourne au-dessus de l’assiette.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-coquetier", "Coquetier", "Il tient l’œuf à la coque.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-baguetteschinoises", "Baguettes chinoises", "On les tient d’une main pour manger des nouilles.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-nappe", "Nappe", "On la pose sur la table avant de mettre le couvert.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-serviettedetable", "Serviette de table", "On la pose sur ses genoux pendant le repas.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-tablier", "Tablier", "On le met pour ne pas se salir en cuisinant.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1545,7 +1518,6 @@ object ExtraCards {
         Card("seed-elastique", "Élastique", "On s’attache les cheveux avec.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-barrette", "Barrette", "Une petite pince pour les cheveux.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-pinceaepiler", "Pince à épiler", "On retire les poils avec.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-coupeongles", "Coupe-ongles", "On se coupe les ongles avec.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-limeaongles", "Lime à ongles", "On se lime les ongles avec.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-rougealevres", "Rouge à lèvres", "Un bâton de maquillage pour la bouche.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-mascara", "Mascara", "Il allonge les cils.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1615,10 +1587,6 @@ object ExtraCards {
         Card("seed-funiculaire", "Funiculaire", "Un train tiré par un câble sur une pente raide.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-tgv", "TGV", "Le train à grande vitesse français.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-wagon", "Wagon", "Une voiture de train.", Category.OBJECTS, Difficulty.MEDIUM),
-    )
-
-    private fun part4(): List<Card> = listOf(
-        Card("seed-rails", "Rails", "Le train roule dessus.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-draisine", "Draisine", "Un petit véhicule sur rails à pédales ou à bras.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-caleche", "Calèche", "Une voiture tirée par des chevaux.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-carrosse", "Carrosse", "La voiture de Cendrillon.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1647,6 +1615,9 @@ object ExtraCards {
         Card("seed-gps", "GPS", "Il indique la route à suivre.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-giletjaune", "Gilet jaune", "On doit l’avoir dans sa voiture en cas de panne.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-cric", "Cric", "On l’utilise pour soulever la voiture et changer une roue.", Category.OBJECTS, Difficulty.MEDIUM),
+    )
+
+    private fun part4(): List<Card> = listOf(
         Card("seed-jerrican", "Jerrican", "Un bidon pour l’essence.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-antivol", "Antivol", "Il empêche de voler le vélo.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-pompeavelo", "Pompe à vélo", "On regonfle les pneus avec.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1660,11 +1631,9 @@ object ExtraCards {
         Card("seed-batondemarche", "Bâton de marche", "On s’appuie dessus en randonnée.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-piolet", "Piolet", "La petite pioche des alpinistes.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-mousqueton", "Mousqueton", "Un anneau à ressort des grimpeurs.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-raquettesaneige", "Raquettes à neige", "On les met aux pieds pour marcher dans la poudreuse.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-bonnetdebain", "Bonnet de bain", "On le met à la piscine.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-lunettesdepiscine", "Lunettes de piscine", "On les met pour voir sous l’eau.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-friteenmousse", "Frite en mousse", "Un long boudin coloré pour flotter.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-brassards", "Brassards", "On les gonfle autour des bras des enfants.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-serviettedeplage", "Serviette de plage", "On s’allonge dessus sur le sable.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-cremesolaire", "Crème solaire", "On s’en tartine pour ne pas brûler.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-glaciere", "Glacière", "Elle garde les boissons fraîches en pique-nique.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1863,7 +1832,6 @@ object ExtraCards {
         Card("seed-comediemusicale", "Comédie musicale", "Un spectacle où l’on chante et danse.", Category.GENERAL, Difficulty.HARD),
         Card("seed-competition", "Compétition", "Une épreuve où l’on veut gagner.", Category.GENERAL, Difficulty.HARD),
         Card("seed-complicite", "Complicité", "Une entente secrète entre deux personnes.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-confettis", "Confettis", "Des petits ronds de papier qu’on lance aux fêtes.", Category.GENERAL, Difficulty.HARD),
         Card("seed-conservatoire", "Conservatoire", "L’école de musique.", Category.GENERAL, Difficulty.HARD),
         Card("seed-constitution", "Constitution", "Le texte qui fixe les règles d’un État.", Category.GENERAL, Difficulty.HARD),
         Card("seed-coquetterie", "Coquetterie", "Le souci de plaire par son apparence.", Category.GENERAL, Difficulty.HARD),
@@ -1917,7 +1885,6 @@ object ExtraCards {
         Card("seed-fourmiliere", "Fourmilière", "La maison des fourmis.", Category.GENERAL, Difficulty.HARD),
         Card("seed-fresque", "Fresque", "Une peinture sur un mur.", Category.GENERAL, Difficulty.HARD),
         Card("seed-friandise", "Friandise", "Une petite douceur sucrée.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-funerailles", "Funérailles", "La cérémonie d’enterrement.", Category.GENERAL, Difficulty.HARD),
         Card("seed-galimatias", "Galimatias", "Un discours confus et incompréhensible.", Category.GENERAL, Difficulty.HARD),
         Card("seed-gargouille", "Gargouille", "Une sculpture de monstre qui crache l’eau des toits.", Category.GENERAL, Difficulty.HARD),
         Card("seed-gastronome", "Gastronome", "Il aime la bonne cuisine.", Category.GENERAL, Difficulty.HARD),
@@ -2018,9 +1985,6 @@ object ExtraCards {
         Card("seed-rodeo", "Rodéo", "Un cow-boy tente de rester sur un cheval sauvage.", Category.GENERAL, Difficulty.HARD),
         Card("seed-sarcasme", "Sarcasme", "Une ironie mordante.", Category.GENERAL, Difficulty.HARD),
         Card("seed-scaphandre", "Scaphandre", "La combinaison du plongeur ou de l’astronaute.", Category.GENERAL, Difficulty.HARD),
-    )
-
-    private fun part5(): List<Card> = listOf(
         Card("seed-scenario", "Scénario", "Le texte d’un film.", Category.GENERAL, Difficulty.HARD),
         Card("seed-serenade", "Sérénade", "Une chanson chantée sous la fenêtre de sa belle.", Category.GENERAL, Difficulty.HARD),
         Card("seed-silhouette", "Silhouette", "La forme sombre d’une personne à contre-jour.", Category.GENERAL, Difficulty.HARD),
@@ -2054,6 +2018,9 @@ object ExtraCards {
         Card("seed-katmandou", "Katmandou", "La capitale du Népal.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-hanoi", "Hanoï", "La capitale du Vietnam.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-phnompenh", "Phnom Penh", "La capitale du Cambodge.", Category.GEOGRAPHY, Difficulty.HARD),
+    )
+
+    private fun part5(): List<Card> = listOf(
         Card("seed-vientiane", "Vientiane", "La capitale du Laos.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-kualalumpur", "Kuala Lumpur", "La capitale de la Malaisie, aux tours jumelles.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-djakarta", "Djakarta", "La capitale de l’Indonésie.", Category.GEOGRAPHY, Difficulty.HARD),
@@ -2340,14 +2307,12 @@ object ExtraCards {
         Card("seed-bilboquet", "Bilboquet", "Une boule percée à rattraper sur une pointe.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-bistouri", "Bistouri", "Le petit couteau du chirurgien.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-bobine", "Bobine", "On y enroule le fil à coudre.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-bretelles", "Bretelles", "Elles retiennent le pantalon par les épaules.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-burin", "Burin", "Un outil de sculpteur qu’on frappe au marteau.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-cafetiereitalienne", "Cafetière italienne", "Elle fait monter le café sur le feu.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-calumet", "Calumet", "La pipe de la paix.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-candelabre", "Candélabre", "Un grand chandelier à plusieurs branches.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-canif", "Canif", "Un petit couteau de poche.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-carafon", "Carafon", "Une petite carafe.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-castagnettes", "Castagnettes", "Deux coquilles en bois qu’on claque en dansant le flamenco.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-chevalet", "Chevalet", "Le support du tableau du peintre.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-chope", "Chope", "Une grande tasse à bière avec anse.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-clarinette", "Clarinette", "Un instrument à vent en bois à anche.", Category.OBJECTS, Difficulty.HARD),
@@ -2374,7 +2339,6 @@ object ExtraCards {
         Card("seed-longuevue", "Longue-vue", "Une lunette pour voir loin, celle des marins.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-luth", "Luth", "Un instrument à cordes de la Renaissance.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-mandoline", "Mandoline", "Un instrument à cordes, ou un outil pour trancher les légumes.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-maracas", "Maracas", "Des instruments qu’on secoue en rythme.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-marteaupiqueur", "Marteau-piqueur", "Il casse le bitume dans un grand vacarme.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-massue", "Massue", "Une grosse arme de bois.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-megaphone", "Mégaphone", "Il amplifie la voix dans la rue.", Category.OBJECTS, Difficulty.HARD),
@@ -2421,9 +2385,6 @@ object ExtraCards {
         Card("seed-glockenspiel", "Glockenspiel", "Un petit carillon à lames qu’on frappe.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-synthetiseur", "Synthétiseur", "Un clavier électronique aux mille sons.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-orguedebarbarie", "Orgue de Barbarie", "On tourne une manivelle pour jouer un air.", Category.OBJECTS, Difficulty.HARD),
-    )
-
-    private fun part6(): List<Card> = listOf(
         Card("seed-boiteamusique", "Boîte à musique", "On la remonte et une danseuse tourne.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-kazoo", "Kazoo", "Un petit instrument dans lequel on fredonne.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-banjo", "Banjo", "Un instrument à cordes rond de la musique country.", Category.OBJECTS, Difficulty.HARD),
@@ -2437,8 +2398,6 @@ object ExtraCards {
         Card("seed-espadrille", "Espadrille", "Une chaussure de toile à semelle de corde.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-mocassin", "Mocassin", "Une chaussure souple sans lacets.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-babouche", "Babouche", "Une pantoufle marocaine.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-tongs", "Tongs", "Des sandales qui claquent sous le pied.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-cuissardes", "Cuissardes", "Des bottes qui montent jusqu’aux cuisses.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-poncho", "Poncho", "Une couverture avec un trou pour la tête.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-kimono", "Kimono", "Une longue robe japonaise à larges manches.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-sari", "Sari", "Une longue étoffe drapée des femmes indiennes.", Category.OBJECTS, Difficulty.HARD),
@@ -2462,9 +2421,10 @@ object ExtraCards {
         Card("seed-cardigan", "Cardigan", "Un gilet de laine boutonné.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-jogging", "Jogging", "Un pantalon de sport molletonné.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-bermuda", "Bermuda", "Un short qui descend aux genoux.", Category.OBJECTS, Difficulty.HARD),
+    )
+
+    private fun part6(): List<Card> = listOf(
         Card("seed-collant", "Collant", "On le porte sous une jupe.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-chaussonsdedanse", "Chaussons de danse", "Les chaussures souples de la danseuse.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-pointes", "Pointes", "Les chaussons des danseuses étoiles.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-tutu", "Tutu", "La jupe en tulle des danseuses.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-diademe", "Diadème", "Une petite couronne de princesse.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-broche", "Broche", "Un bijou qu’on épingle sur un vêtement.", Category.OBJECTS, Difficulty.HARD),
@@ -2497,7 +2457,6 @@ object ExtraCards {
         Card("seed-presseail", "Presse-ail", "Il écrase les gousses.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-cassenoix", "Casse-noix", "Il ouvre les coques dures.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-pinceasucre", "Pince à sucre", "Elle attrape les morceaux de sucre.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-rincedoigts", "Rince-doigts", "Un petit bol d’eau citronnée sur la table.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-dessousdeplat", "Dessous-de-plat", "On le pose sous la casserole chaude.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-portecouteau", "Porte-couteau", "On y pose son couteau entre deux plats.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-cocotteenfonte", "Cocotte en fonte", "Une marmite lourde pour les plats mijotés.", Category.OBJECTS, Difficulty.HARD),
