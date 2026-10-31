@@ -485,7 +485,7 @@ struct LetterKeyboard: View {
                 }
                 HStack(spacing: 0) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    KeyCap(label: "espace", width: geo.size.width - unit * Self.submitUnits, slide: moveCursor) { press(" ") }
+                    KeyCap(label: "espace", width: geo.size.width - unit * Self.submitUnits, action: { press(" ") }, slide: moveCursor)
                         .accessibilityLabel("Espace")
                     Button("Valider") { Haptics.selection(); submit() }
                         .buttonStyle(PrimaryPillStyle(height: Self.rowHeight - 10))
