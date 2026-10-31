@@ -202,13 +202,18 @@ struct ModeGameView: View {
     }
 
     /// "C'était : TOURNESOL" for two seconds after a pass, so the answer is never lost.
+    /// Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble.
     private var passedLine: some View {
-        Text("C’était : " + (session.passed ?? "").uppercased())
-            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
-            .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
-            .opacity(showPassed && session.passed != nil ? 1 : 0)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
-            .accessibilityHidden(true)
+        ZStack {
+            if showPassed, let passed = session.passed {
+                Text("C’était : " + passed.uppercased())
+                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+                    .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                    .transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+        .accessibilityHidden(true)
     }
 
     private func clue(_ card: Card) -> some View {
