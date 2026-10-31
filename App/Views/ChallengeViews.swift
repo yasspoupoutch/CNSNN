@@ -512,12 +512,13 @@ struct ChallengeGameView: View {
             .accessibilityElement().accessibilityLabel("Mot \(min(game.index + 1, game.cards.count)) sur \(game.cards.count)")
         if let card = game.card { clue(card, number: game.index + 1) }
         // "C'était : …" over the free space for two seconds after a pass, so the board never moves.
-        // Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble.
+        // Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble;
+        // the text keeps its full height even when little room is left, or it vanished.
         Spacer(minLength: 8).overlay {
             ZStack {
                 if showPassed, let passed = session.passed {
                     Text("C’était : " + passed.uppercased())
-                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
                         .transition(.opacity)
                 }
