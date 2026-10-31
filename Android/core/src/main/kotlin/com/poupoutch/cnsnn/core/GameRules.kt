@@ -89,10 +89,14 @@ object DailySchedule {
 }
 
 object CardPicker {
+    /** Classique cards remembered per player, so the same card does not come back for a long while. */
+    const val MEMORY = 500
+
     /** Cards matching the filters, preferring those not seen recently. */
     fun candidates(cards: List<Card>, category: Category?, difficulty: Difficulty?, recent: List<String>): List<Card> {
         val eligible = cards.filter { it.status == ReviewStatus.APPROVED && (category == null || it.category == category) && (difficulty == null || it.difficulty == difficulty) }
-        val fresh = eligible.filter { it.id !in recent }
+        val seen = recent.toHashSet()
+        val fresh = eligible.filter { it.id !in seen }
         if (fresh.isNotEmpty()) return fresh
         return listOfNotNull(eligible.minByOrNull { recent.indexOf(it.id) })
     }

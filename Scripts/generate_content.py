@@ -430,21 +430,38 @@ def kotlin_string(value):
 HEADER = 'Généré par Scripts/generate_content.py depuis Shared/{}. Ne pas modifier à la main.'
 
 
+# Cards per generated chunk: one huge literal is slow to type-check in Swift and goes over the
+# 64 KB method limit of the JVM in Kotlin.
+CHUNK = 400
+
+
+def chunks(cards):
+    return [cards[i:i + CHUNK] for i in range(0, len(cards), CHUNK)]
+
+
 def swift_cards(cards):
+    parts = chunks(cards)
     lines = [f'// {HEADER.format("cards.tsv")}', 'import Foundation', '',
-             '/// Classique cards added in version 1.0, also played in Sprint and Survie. Ids are the', '/// normalized word, so they never shift when the list grows.',
-             'public enum ExtraCards {', '    public static let all: [Card] = ['] 
-    lines += [f'        Card(id: {swift_string(c["id"])}, wordFull: {swift_string(c["word"])}, hint: {swift_string(c["hint"])}, category: .{c["category"]}, difficulty: .{c["difficulty"]}),' for c in cards]
-    lines += ['    ]', '}', '']
+             '/// Classique cards added since version 1.0, also played in Sprint and Survie. Ids are the', '/// normalized word, so they never shift when the list grows.',
+             'public enum ExtraCards {', '    public static let all: [Card] = ' + ' + '.join(f'part{i}' for i in range(len(parts)))]
+    for i, part in enumerate(parts):
+        lines += ['', f'    private static let part{i}: [Card] = [']
+        lines += [f'        Card(id: {swift_string(c["id"])}, wordFull: {swift_string(c["word"])}, hint: {swift_string(c["hint"])}, category: .{c["category"]}, difficulty: .{c["difficulty"]}),' for c in part]
+        lines += ['    ]']
+    lines += ['}', '']
     return '\n'.join(lines)
 
 
 def kotlin_cards(cards):
+    parts = chunks(cards)
     lines = [f'// {HEADER.format("cards.tsv")}', 'package com.poupoutch.cnsnn.core', '',
-             '/** Classique cards added in version 1.0, also played in Sprint and Survie (same ids as Core/ExtraCards.swift). */',
-             'object ExtraCards {', '    val all: List<Card> = listOf(']
-    lines += [f'        Card({kotlin_string(c["id"])}, {kotlin_string(c["word"])}, {kotlin_string(c["hint"])}, Category.{KOTLIN_CATEGORIES[c["category"]]}, Difficulty.{c["difficulty"].upper()}),' for c in cards]
-    lines += ['    )', '}', '']
+             '/** Classique cards added since version 1.0, also played in Sprint and Survie (same ids as Core/ExtraCards.swift). */',
+             'object ExtraCards {', '    val all: List<Card> = ' + ' + '.join(f'part{i}()' for i in range(len(parts)))]
+    for i, part in enumerate(parts):
+        lines += ['', f'    private fun part{i}(): List<Card> = listOf(']
+        lines += [f'        Card({kotlin_string(c["id"])}, {kotlin_string(c["word"])}, {kotlin_string(c["hint"])}, Category.{KOTLIN_CATEGORIES[c["category"]]}, Difficulty.{c["difficulty"].upper()}),' for c in part]
+        lines += ['    )']
+    lines += ['}', '']
     return '\n'.join(lines)
 
 

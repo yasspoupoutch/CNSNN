@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeGame
 import com.poupoutch.cnsnn.core.ChallengeRules
+import com.poupoutch.cnsnn.core.TypedAnswer
 import com.poupoutch.cnsnn.core.WordEngine
 import com.poupoutch.cnsnn.data.CloudError
 import kotlinx.coroutines.launch
@@ -33,6 +34,10 @@ class ChallengeViewModel : ViewModel() {
     var game: ChallengeGame? = null; private set
     var phase by mutableStateOf<Phase>(Phase.Starting); private set
     var answer by mutableStateOf("")
+    /** The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all. */
+    var answerWrong by mutableStateOf(false); private set
+    /** The caret in the answer (TypedAnswer.cursor): null at the end. */
+    var cursor by mutableStateOf<Int?>(null); private set
     /** The core game is a plain object: this counter tells the screen it changed. */
     var version by mutableIntStateOf(0); private set
     var mistakeTick by mutableIntStateOf(0); private set
@@ -81,18 +86,27 @@ class ChallengeViewModel : ViewModel() {
     }
 
     fun press(letter: String) {
-        if (phase != Phase.Playing || answer.length >= 40) return
-        if (letter == " " && (answer.isEmpty() || answer.endsWith(" "))) return
-        answer += letter
+        if (phase != Phase.Playing) return
+        edit { it.insert(letter) }
     }
-    fun delete() { if (answer.isNotEmpty()) answer = answer.dropLast(1) }
+    fun delete() = edit { it.deleteBackward() }
+    /** Long press on ⌫. */
+    fun clear() = edit { TypedAnswer("") }
+    /** A slide on the space bar. */
+    fun moveCursor(steps: Int) = edit { it.move(steps) }
+    /** A touch on the answer. */
+    fun placeCursor(index: Int) = edit { it.place(index) }
+    private fun edit(change: (TypedAnswer) -> TypedAnswer) {
+        val typed = change(TypedAnswer(answer, cursor))
+        answer = typed.text; cursor = typed.cursor; answerWrong = false
+    }
 
     fun submit(state: AppViewModel) {
         val current = game
         if (phase != Phase.Playing || current == null || WordEngine.normalize(answer).isEmpty()) { mistakeTick++; return }
         when (current.answer(answer)) {
-            ChallengeGame.Outcome.RIGHT -> { answer = ""; successTick++ }
-            ChallengeGame.Outcome.WRONG -> { answer = ""; mistakeTick++ }
+            ChallengeGame.Outcome.RIGHT -> { answer = ""; answerWrong = false; successTick++ }
+            ChallengeGame.Outcome.WRONG -> { answerWrong = true; mistakeTick++ }
             ChallengeGame.Outcome.OVER -> {}
         }
         afterMove(state)
@@ -102,7 +116,7 @@ class ChallengeViewModel : ViewModel() {
     fun skip(state: AppViewModel) {
         val current = game ?: return
         if (phase != Phase.Playing) return
-        answer = ""
+        answer = ""; answerWrong = false
         current.card?.let { passed = it.wordFull; passedTick++ }
         current.skip()
         afterMove(state)

@@ -149,7 +149,7 @@ class LocalStore(context: Context) {
     fun recent(mode: PlayMode): List<String> =
         prefs.getString(recentKey(mode), null)?.let { json -> runCatching { ProgressJson.decodeFromString(ListSerializer(String.serializer()), json) }.getOrNull() } ?: emptyList()
     fun remember(ids: List<String>, mode: PlayMode) {
-        val limit = if (mode == PlayMode.DUO) 20 else 150
+        val limit = if (mode == PlayMode.DUO) 20 else 1000
         val list = (recent(mode).filter { it !in ids } + ids).takeLast(limit)
         prefs.edit().putString(recentKey(mode), ProgressJson.encodeToString(ListSerializer(String.serializer()), list)).apply()
     }

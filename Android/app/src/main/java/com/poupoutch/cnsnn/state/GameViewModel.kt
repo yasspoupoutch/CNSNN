@@ -18,6 +18,7 @@ import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.SecretDaily
+import com.poupoutch.cnsnn.core.TypedAnswer
 import com.poupoutch.cnsnn.core.WordEngine
 import com.poupoutch.cnsnn.data.CloudError
 import com.poupoutch.cnsnn.data.CloudRepository
@@ -37,6 +38,8 @@ class GameViewModel : ViewModel() {
     var phase by mutableStateOf<Phase>(Phase.Playing); private set
     var card by mutableStateOf<Card?>(null); private set
     var answer by mutableStateOf("")
+    /** The caret in the answer (TypedAnswer.cursor): null at the end. */
+    var cursor by mutableStateOf<Int?>(null); private set
     var feedback by mutableStateOf<String?>(null); private set
     var usedHint by mutableStateOf(false); private set
     var result by mutableStateOf<Attempt?>(null); private set
@@ -192,12 +195,18 @@ class GameViewModel : ViewModel() {
     }
 
     fun press(letter: String) {
-        if (result != null || answer.length >= 40) return
-        // No leading or double spaces.
-        if (letter == " " && (answer.isEmpty() || answer.endsWith(" "))) return
-        answer += letter
+        if (result != null) return
+        edit { it.insert(letter) }
     }
-    fun delete() { if (answer.isNotEmpty()) answer = answer.dropLast(1) }
+    fun delete() = edit { it.deleteBackward() }
+    /** A slide on the space bar. */
+    fun moveCursor(steps: Int) = edit { it.move(steps) }
+    /** A touch on the answer. */
+    fun placeCursor(index: Int) = edit { it.place(index) }
+    private fun edit(change: (TypedAnswer) -> TypedAnswer) {
+        val typed = change(TypedAnswer(answer, cursor))
+        answer = typed.text; cursor = typed.cursor
+    }
 
     fun submit(state: AppViewModel) {
         val shown = card ?: return

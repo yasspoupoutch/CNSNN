@@ -43,7 +43,7 @@ enum ModeRunStore {
         return (try? JSONDecoder().decode([String].self, from: data)) ?? []
     }
     static func remember(_ ids: [String], mode: PlayMode) {
-        let limit = mode == .duo ? 20 : 150
+        let limit = mode == .duo ? 20 : 1000
         var list = recent(mode).filter { !ids.contains($0) } + ids
         list = Array(list.suffix(limit))
         set(try? JSONEncoder().encode(list), "cnsnn.recent." + (mode == .duo ? "duo" : "cards"))

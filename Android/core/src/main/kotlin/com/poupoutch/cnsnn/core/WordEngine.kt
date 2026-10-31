@@ -32,3 +32,41 @@ object WordEngine {
         return normalize(character.toString()).let { it.isNotEmpty() && it.all { c -> c in "AEIOUY" } }
     }
 }
+
+/**
+ * The answer being typed, with its caret (same rules as TypedAnswer in Core/WordEngine.swift): letters go
+ * in at the caret, ⌫ erases the letter before it, and a slide on the space bar or on the answer moves it.
+ * `cursor` counts the characters before the caret; null keeps it at the end, where typing normally happens.
+ */
+data class TypedAnswer(val text: String, val cursor: Int? = null) {
+    /** Where the caret really is, even after the text was replaced behind its back. */
+    val position: Int get() = (cursor ?: text.length).coerceIn(0, text.length)
+    val before: String get() = text.take(position)
+    val after: String get() = text.drop(position)
+    /** The caret's place when it sits inside the text, null when it is at the end. */
+    val inside: Int? get() = position.takeIf { it < text.length }
+
+    /** No space at the start or next to another space, and 40 characters at most. */
+    fun insert(letter: String): TypedAnswer {
+        if (text.length + letter.length > MAX_LENGTH) return this
+        if (letter == " " && (before.isEmpty() || before.endsWith(" ") || after.startsWith(" "))) return this
+        return TypedAnswer(before + letter + after).place(position + letter.length)
+    }
+
+    fun deleteBackward(): TypedAnswer {
+        val at = position
+        if (at == 0) return this
+        return TypedAnswer(text.take(at - 1) + after).place(at - 1)
+    }
+
+    /** Moves the caret by a number of characters, staying inside the text. */
+    fun move(steps: Int): TypedAnswer = place(position + steps)
+
+    /** Puts the caret before character [index] (0 = start); past the end means at the end. */
+    fun place(index: Int): TypedAnswer {
+        val clamped = index.coerceIn(0, text.length)
+        return copy(cursor = if (clamped == text.length) null else clamped)
+    }
+
+    companion object { const val MAX_LENGTH = 40 }
+}

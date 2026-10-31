@@ -201,7 +201,7 @@ struct GameView: View {
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.result != nil)
         }.padding(.vertical, 12)
-        LetterKeyboard(press: press, delete: delete, submit: submit)
+        LetterKeyboard(press: press, delete: delete, moveCursor: { steps in edit { $0.move(by: steps) } }, submit: submit)
     }
 
     private var answerLine: some View {
@@ -209,8 +209,10 @@ struct GameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
-            if session.result == nil { Caret() }
+            if !session.answer.isEmpty {
+                AnswerLetters(answer: session.answer, cursor: session.result == nil ? session.cursor : nil, place: session.result == nil ? place : nil)
+            }
+            if session.result == nil, TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
         .lineLimit(1).minimumScaleFactor(0.4)
         .frame(maxWidth: .infinity, minHeight: 56)
@@ -259,14 +261,15 @@ struct GameView: View {
     // MARK: Actions
 
     private func press(_ letter: String) {
-        guard session.result == nil, session.answer.count < 40 else { return }
-        // No leading or double spaces.
-        if letter == " ", session.answer.isEmpty || session.answer.hasSuffix(" ") { return }
-        session.answer += letter
+        guard session.result == nil else { return }
+        edit { $0.insert(letter) }
     }
-    private func delete() {
-        guard !session.answer.isEmpty else { return }
-        session.answer.removeLast()
+    private func delete() { edit { $0.deleteBackward() } }
+    private func place(_ index: Int) { edit { $0.place(index) } }
+    private func edit(_ change: (inout TypedAnswer) -> Void) {
+        var typed = TypedAnswer(text: session.answer, cursor: session.cursor)
+        change(&typed)
+        session.answer = typed.text; session.cursor = typed.cursor
     }
     private func submit() {
         guard session.result == nil, !session.checking else { return }
@@ -455,7 +458,13 @@ private struct ResultSheet: View {
 struct LetterKeyboard: View {
     var press: (String) -> Void
     var delete: () -> Void
+    /// A long press on ⌫ erases the whole answer, when the screen offers it.
+    var clear: (() -> Void)? = nil
+    /// A slide on the space bar moves the caret, one letter every few points, as on the iPhone.
+    var moveCursor: ((Int) -> Void)? = nil
     var submit: () -> Void
+    /// Valider, in key widths: narrow enough that a thumb aiming at the space bar does not send the answer.
+    static let submitUnits: CGFloat = 2.2
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
     static let rowHeight: CGFloat = 57.5
@@ -471,17 +480,17 @@ struct LetterKeyboard: View {
                     Color.clear.frame(width: unit * 1.6)
                     letterRow(rows[2], unit)
                     Spacer(minLength: 0)
-                    KeyCap(label: "⌫", width: unit * 1.35, action: delete)
+                    KeyCap(label: "⌫", width: unit * 1.35, action: delete, longPress: clear)
                         .accessibilityLabel("Effacer")
                 }
                 HStack(spacing: 0) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
-                    KeyCap(label: "espace", width: geo.size.width - unit * 3) { press(" ") }
+                    KeyCap(label: "espace", width: geo.size.width - unit * Self.submitUnits, action: { press(" ") }, slide: moveCursor)
                         .accessibilityLabel("Espace")
                     Button("Valider") { Haptics.selection(); submit() }
                         .buttonStyle(PrimaryPillStyle(height: Self.rowHeight - 10))
                         .padding(.horizontal, 3)
-                        .frame(width: unit * 3, height: Self.rowHeight)
+                        .frame(width: unit * Self.submitUnits, height: Self.rowHeight)
                 }
             }
         }
@@ -509,6 +518,10 @@ private struct KeyCap: View {
     var vowel = false
     var width: CGFloat
     var action: () -> Void
+    var longPress: (() -> Void)? = nil
+    /// Called with the letters to move by while the finger slides along the key (space bar).
+    var slide: ((Int) -> Void)? = nil
+    @State private var slid = 0
     var body: some View {
         Button { Haptics.key(); action() } label: {
             Group {
@@ -519,6 +532,15 @@ private struct KeyCap: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .buttonStyle(KeyStyle(vowel: vowel, popup: label.count == 1 && label != "⌫" ? label : nil))
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            guard let longPress else { return }
+            Haptics.retry(); longPress()
+        }, including: longPress == nil ? .subviews : .all)
+        .highPriorityGesture(DragGesture(minimumDistance: 10).onChanged { drag in
+            guard let slide else { return }
+            let steps = Int(drag.translation.width / 12)
+            if steps != slid { Haptics.selection(); slide(steps - slid); slid = steps }
+        }.onEnded { _ in slid = 0 }, including: slide == nil ? .subviews : .all)
         .frame(width: max(width, 0), height: LetterKeyboard.rowHeight)
     }
 }
@@ -561,14 +583,52 @@ private struct KeyStyle: ButtonStyle {
 /// The typed answer as one text, vowels in gold: when a long answer has to shrink, every letter
 /// shrinks by the same amount (separate texts each shrank on their own, wide letters like M more).
 struct AnswerLetters: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let answer: String
+    /// A wrong answer kept on screen: all in red until the next key.
+    var wrong = false
+    /// Cursor inside the word, drawn in the same text so the whole line still shrinks evenly (at the end, the
+    /// screen draws its own `Caret`).
+    var cursor: Int? = nil
+    /// A touch or a slide on the word puts the caret before the letter under the finger.
+    var place: ((Int) -> Void)? = nil
     var body: some View {
-        Text(answer.reduce(into: AttributedString()) { line, character in
+        Group {
+            if let inside = TypedAnswer(text: answer, cursor: cursor).inside {
+                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                    letters(caret: inside, visible: reduceMotion || Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0)
+                }
+            } else {
+                letters(caret: nil, visible: false)
+            }
+        }
+        .overlay {
+            if let place {
+                GeometryReader { geo in
+                    Color.clear.contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
+                            guard geo.size.width > 0 else { return }
+                            place(Int((drag.location.x / geo.size.width * CGFloat(answer.count)).rounded()))
+                        })
+                }
+                .padding(.vertical, -12)
+            }
+        }
+    }
+
+    private func letters(caret: Int?, visible: Bool) -> some View {
+        var line = AttributedString()
+        for (index, character) in answer.enumerated() {
+            if index == caret {
+                var bar = AttributedString("|")
+                bar.foregroundColor = visible ? Palette.foreground : .clear
+                line += bar
+            }
             var letter = AttributedString(String(character))
-            letter.foregroundColor = Vowels.contains(character) ? Palette.accent : Palette.foreground
+            letter.foregroundColor = wrong ? Palette.red : Vowels.contains(character) ? Palette.accent : Palette.foreground
             line += letter
-        })
-        .tracking(4.4).scaledFont(30, .medium)
+        }
+        return Text(line).tracking(4.4).scaledFont(30, .medium)
     }
 }
 

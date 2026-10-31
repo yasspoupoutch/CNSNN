@@ -158,7 +158,7 @@ struct ModeGameView: View {
         Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −5 s", skipLabel: "Passer ce mot, 5 secondes de pénalité")
-        LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
     }
 
     @ViewBuilder private func survivalBoard(_ game: SurvivalGame) -> some View {
@@ -174,7 +174,7 @@ struct ModeGameView: View {
         Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −1 vie", skipLabel: "Passer ce mot, une vie en moins")
-        LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
     }
 
     @ViewBuilder private func duoBoard(_ game: DuoGame) -> some View {
@@ -196,19 +196,25 @@ struct ModeGameView: View {
             } else {
                 answerLine
                 actions(skip: "Passer la manche", skipLabel: "Passer la manche et voir les mots")
-                LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
+                LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
             }
         }
     }
 
     /// "C'était : TOURNESOL" for two seconds after a pass, so the answer is never lost.
+    /// Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble.
+    /// The text keeps its full height even when little room is left above the answer, or it vanished.
     private var passedLine: some View {
-        Text("C’était : " + (session.passed ?? "").uppercased())
-            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
-            .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
-            .opacity(showPassed && session.passed != nil ? 1 : 0)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
-            .accessibilityHidden(true)
+        ZStack {
+            if showPassed, let passed = session.passed {
+                Text("C’était : " + passed.uppercased())
+                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                    .transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+        .accessibilityHidden(true)
     }
 
     private func clue(_ card: Card) -> some View {
@@ -249,8 +255,8 @@ struct ModeGameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
-            Caret()
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
+            if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
         .lineLimit(1).minimumScaleFactor(0.4)
         .frame(maxWidth: .infinity, minHeight: 52)

@@ -7,6 +7,8 @@ import CNSNNCore
     var phase: Phase = .playing
     var card: Card?
     var answer = ""
+    /// The caret in the answer (TypedAnswer.cursor): nil at the end.
+    var cursor: Int?
     var feedback: String?
     var usedHint = false
     var result: Attempt?

@@ -512,13 +512,19 @@ struct ChallengeGameView: View {
             .accessibilityElement().accessibilityLabel("Mot \(min(game.index + 1, game.cards.count)) sur \(game.cards.count)")
         if let card = game.card { clue(card, number: game.index + 1) }
         // "C'était : …" over the free space for two seconds after a pass, so the board never moves.
+        // Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble;
+        // the text keeps its full height even when little room is left, or it vanished.
         Spacer(minLength: 8).overlay {
-            Text("C’était : " + (session.passed ?? "").uppercased())
-                .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
-                .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
-                .opacity(showPassed && session.passed != nil ? 1 : 0)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
-                .accessibilityHidden(true)
+            ZStack {
+                if showPassed, let passed = session.passed {
+                    Text("C’était : " + passed.uppercased())
+                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                        .transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+            .accessibilityHidden(true)
         }
         answerLine
         Button { Haptics.selection(); session.skip(state: state) } label: {
@@ -526,7 +532,7 @@ struct ChallengeGameView: View {
                 .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
         }
         .buttonStyle(PressStyle()).accessibilityLabel("Passer ce mot, 20 secondes de pénalité").padding(.vertical, 10)
-        LetterKeyboard(press: session.press, delete: session.delete, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
     }
 
     private func clue(_ card: Card, number: Int) -> some View {
@@ -553,8 +559,8 @@ struct ChallengeGameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer) }
-            Caret()
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
+            if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
         .lineLimit(1).minimumScaleFactor(0.4)
         .frame(maxWidth: .infinity, minHeight: 52)

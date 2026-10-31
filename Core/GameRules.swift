@@ -140,9 +140,13 @@ public enum DailySchedule {
     }
 }
 public enum CardPicker {
+    /// Classique cards remembered per player, so the same card does not come back for a long while.
+    public static let memory = 500
+
     public static func candidates(cards: [Card], category: Category?, difficulty: Difficulty?, recent: [String]) -> [Card] {
         let eligible = cards.filter { $0.status == .approved && (category == nil || $0.category == category) && (difficulty == nil || $0.difficulty == difficulty) }
-        let fresh = eligible.filter { !recent.contains($0.id) }
+        let seen = Set(recent)
+        let fresh = eligible.filter { !seen.contains($0.id) }
         if !fresh.isEmpty { return fresh }
         guard let oldest = eligible.min(by: { (recent.firstIndex(of: $0.id) ?? -1) < (recent.firstIndex(of: $1.id) ?? -1) }) else { return [] }
         return [oldest]
