@@ -32,4 +32,43 @@ final class WordEngineTests: XCTestCase {
   XCTAssertTrue(SeedCards.all.allSatisfy { WordEngine.validWord($0.wordFull) && !$0.hint.isEmpty })
   XCTAssertEqual(Set(SeedCards.all.map(\.category)),Set(Category.allCases))
  }
+
+    func testTypedAnswerCaret() {
+        var typed = TypedAnswer(text: "")
+        typed.insert(" ")
+        XCTAssertEqual(typed.text, "", "No leading space")
+        "CHVAL".forEach { typed.insert(String($0)) }
+        XCTAssertNil(typed.cursor)
+        // A typo fixed in the middle: back two letters, add the missing E.
+        typed.move(by: -2)
+        XCTAssertEqual(typed.cursor, 3)
+        typed.insert("E")
+        XCTAssertEqual(typed.text, "CHEVAL")
+        XCTAssertEqual(typed.position, 4)
+        typed.deleteBackward()
+        XCTAssertEqual(typed.text, "CHVAL")
+        XCTAssertEqual(typed.position, 3)
+        typed.move(by: 99)
+        XCTAssertNil(typed.cursor, "Past the end goes back to the end")
+        typed.place(-5)
+        XCTAssertEqual(typed.position, 0)
+        typed.deleteBackward()
+        XCTAssertEqual(typed.text, "CHVAL", "Nothing to erase before the start")
+        // No double spaces, on either side of the caret.
+        typed = TypedAnswer(text: "LES ARISTOCHATS", cursor: 4)
+        typed.insert(" ")
+        XCTAssertEqual(typed.text, "LES ARISTOCHATS")
+        typed.place(3)
+        typed.insert(" ")
+        XCTAssertEqual(typed.text, "LES ARISTOCHATS")
+        // The text replaced behind the caret's back (a right answer clears it): the caret stays inside.
+        typed.text = "AB"
+        XCTAssertEqual(typed.position, 2)
+        typed.insert("C")
+        XCTAssertEqual(typed.text, "ABC")
+        XCTAssertEqual(String(repeating: "A", count: 40).count, TypedAnswer.maxLength)
+        var full = TypedAnswer(text: String(repeating: "A", count: 40))
+        full.insert("B")
+        XCTAssertEqual(full.text.count, 40)
+    }
 }

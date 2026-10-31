@@ -158,7 +158,7 @@ struct ModeGameView: View {
         Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −5 s", skipLabel: "Passer ce mot, 5 secondes de pénalité")
-        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
     }
 
     @ViewBuilder private func survivalBoard(_ game: SurvivalGame) -> some View {
@@ -174,7 +174,7 @@ struct ModeGameView: View {
         Spacer(minLength: 8).overlay { passedLine }
         answerLine
         actions(skip: "Passer · −1 vie", skipLabel: "Passer ce mot, une vie en moins")
-        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, submit: { session.submit(state: state) })
+        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
     }
 
     @ViewBuilder private func duoBoard(_ game: DuoGame) -> some View {
@@ -196,7 +196,7 @@ struct ModeGameView: View {
             } else {
                 answerLine
                 actions(skip: "Passer la manche", skipLabel: "Passer la manche et voir les mots")
-                LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, submit: { session.submit(state: state) })
+                LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
             }
         }
     }
@@ -249,8 +249,8 @@ struct ModeGameView: View {
             if session.answer.isEmpty {
                 Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
             }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong) }
-            Caret()
+            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
+            if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
         .lineLimit(1).minimumScaleFactor(0.4)
         .frame(maxWidth: .infinity, minHeight: 52)

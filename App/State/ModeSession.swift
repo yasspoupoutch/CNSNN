@@ -19,6 +19,8 @@ import CNSNNCore
     var answer = ""
     /// The last answer was wrong: it stays on screen in red, so a typo is fixed without retyping it all.
     var answerWrong = false
+    /// The caret in the answer (TypedAnswer.cursor): nil at the end.
+    var cursor: Int?
     /// Bumped on each event, so the screen can shake, glow or animate a heart.
     var mistakeTick = 0
     var successTick = 0
@@ -75,13 +77,21 @@ import CNSNNCore
     // MARK: Typing
 
     func press(_ letter: String) {
-        guard !finished, answer.count < 40 else { return }
-        if letter == " ", answer.isEmpty || answer.hasSuffix(" ") { return }
-        answer += letter; answerWrong = false
+        guard !finished else { return }
+        edit { $0.insert(letter) }
     }
-    func delete() { if !answer.isEmpty { answer.removeLast() }; answerWrong = false }
+    func delete() { edit { $0.deleteBackward() } }
     /// Long press on ⌫.
-    func clear() { answer = ""; answerWrong = false }
+    func clear() { edit { $0 = TypedAnswer(text: "") } }
+    /// A slide on the space bar.
+    func moveCursor(by steps: Int) { edit { $0.move(by: steps) } }
+    /// A touch on the answer.
+    func placeCursor(_ index: Int) { edit { $0.place(index) } }
+    private func edit(_ change: (inout TypedAnswer) -> Void) {
+        var typed = TypedAnswer(text: answer, cursor: cursor)
+        change(&typed)
+        answer = typed.text; cursor = typed.cursor; answerWrong = false
+    }
 
     func submit(state: AppState) {
         guard !finished, !WordEngine.normalize(answer).isEmpty else { mistakeTick += 1; return }

@@ -18,6 +18,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import kotlin.math.roundToInt
+import com.poupoutch.cnsnn.core.TypedAnswer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -298,18 +306,23 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))
         }
     }
-    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = { game.submit(state) }, enabled = game.result == null && !game.checking)
+    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = { game.submit(state) }, enabled = game.result == null && !game.checking,
+        moveCursor = { game.moveCursor(it) })
     // Wrong guesses may be answered by the server a moment later: the buzz follows the shake.
     LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(game.result?.id) { if (game.result?.correct == true) haptics.success() }
 }
 
 @Composable
-private fun AnswerLine(game: GameViewModel) = AnswerLine(game.answer, game.mistakeTick, game.result == null)
+private fun AnswerLine(game: GameViewModel) =
+    AnswerLine(game.answer, game.mistakeTick, game.result == null, cursor = game.cursor, place = { game.placeCursor(it) })
 
-/** The typed answer, gold vowels, a caret, and a shake on each wrong guess; `wrong` keeps a wrong answer in red. */
+/**
+ * The typed answer, gold vowels, a caret, and a shake on each wrong guess; `wrong` keeps a wrong answer in red.
+ * The caret sits at `cursor` (TypedAnswer), and a touch or a slide on the word moves it there with `place`.
+ */
 @Composable
-fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean, wrong: Boolean = false) {
+fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean, wrong: Boolean = false, cursor: Int? = null, place: ((Int) -> Unit)? = null) {
     val shake = remember { Animatable(0f) }
     LaunchedEffect(mistakeTick) {
         if (mistakeTick > 0) { shake.snapTo(0f); shake.animateTo(1f, tween(420)) }
@@ -319,9 +332,30 @@ fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean, wrong: Boolean
         .drawBehind { drawLine(Palette.tertiary, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 2f) }
         .semantics { contentDescription = "Votre réponse : " + answer.ifEmpty { "vide" } },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        if (answer.isEmpty()) Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary)
-        else Text(if (wrong) highlighted(answer, Palette.red, Palette.red) else highlighted(answer), fontSize = if (answer.length > 14) 22.sp else 30.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
-        if (active) Caret()
+        if (answer.isEmpty()) { Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary); if (active) Caret(); return@Row }
+        val typed = TypedAnswer(answer, if (active) cursor else null)
+        val size = if (answer.length > 14) 22.sp else 30.sp
+        val letters: @Composable (String) -> Unit = { part ->
+            if (part.isNotEmpty()) Text(if (wrong) highlighted(part, Palette.red, Palette.red) else highlighted(part), fontSize = size, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
+        }
+        var width by remember { mutableIntStateOf(0) }
+        Row(Modifier.onSizeChanged { width = it.width }.then(if (place == null || !active) Modifier else Modifier.pointerInput(answer) {
+            // A touch, then a slide: the caret follows the finger, before the letter under it.
+            awaitEachGesture {
+                var change = awaitFirstDown()
+                while (true) {
+                    if (width > 0) place((change.position.x / width * answer.length).roundToInt())
+                    change.consume()
+                    change = awaitPointerEvent().changes.firstOrNull { it.id == change.id } ?: break
+                    if (!change.pressed) break
+                }
+            }
+        }), verticalAlignment = Alignment.CenterVertically) {
+            letters(typed.before)
+            if (active && typed.inside != null) Caret()
+            letters(typed.after)
+        }
+        if (active && typed.inside == null) Caret()
     }
 }
 
@@ -338,7 +372,7 @@ private fun Caret() {
  * touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
  */
 @Composable
-fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean, clear: (() -> Unit)? = null) {
+fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean, clear: (() -> Unit)? = null, moveCursor: ((Int) -> Unit)? = null) {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
     val rowHeight = 56.dp
@@ -363,7 +397,8 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     // Space for answers in several words (Les Aristochats); spaces are ignored when checking.
                     // Valider takes the last 2.2 keys: narrow enough that a thumb aiming at the space bar does not send the answer.
-                    Key("espace", false, unit * 7.8f, rowHeight, enabled, label = "Espace") { haptics.key(); press(" ") }
+                    Key("espace", false, unit * 7.8f, rowHeight, enabled, label = "Espace",
+                        slide = moveCursor?.let { move -> { steps: Int -> haptics.key(); move(steps) } }) { haptics.key(); press(" ") }
                     androidx.compose.material3.Button({ haptics.selection(); submit() }, Modifier.weight(1f).padding(horizontal = 3.dp).height(rowHeight - 10.dp),
                         enabled = enabled, shape = RoundedCornerShape(24.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)) { Text("Valider", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1) }
@@ -383,14 +418,27 @@ private fun Modifier.bleed(x: Dp) = layout { measurable, constraints ->
 /** One key: the whole cell takes the touch, the cap sits inside it with the phone's gaps around. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, longPress: (() -> Unit)? = null, action: () -> Unit) {
+private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Boolean, label: String? = null, longPress: (() -> Unit)? = null,
+                slide: ((Int) -> Unit)? = null, action: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(8.dp)
     val letter = text.length == 1 && text != "⌫"
     val face: Modifier = if (vowel) Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), shape)
         else Modifier.background(if (pressed && !letter) Palette.fill2 else Palette.fill1, shape).border(1.dp, Palette.border, shape)
+    // A slide along the key (space bar) moves the caret one letter every 12 dp, as on the phone's keyboard.
+    val step = with(LocalDensity.current) { 12.dp.toPx() }
     Box(Modifier.width(width).height(height)
+        .then(if (slide == null || !enabled) Modifier else Modifier.pointerInput(slide) {
+            var travelled = 0f
+            var moved = 0
+            detectHorizontalDragGestures(onDragStart = { travelled = 0f; moved = 0 }) { change, amount ->
+                change.consume()
+                travelled += amount
+                val steps = (travelled / step).toInt()
+                if (steps != moved) { slide(steps - moved); moved = steps }
+            }
+        })
         .combinedClickable(interaction, indication = null, enabled = enabled, onClickLabel = label ?: text, onLongClick = longPress, onClick = action)
         .semantics { contentDescription = label ?: text }) {
         Box(Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 5.dp).then(face), contentAlignment = Alignment.Center) {

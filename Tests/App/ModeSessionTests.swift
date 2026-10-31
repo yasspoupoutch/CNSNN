@@ -29,6 +29,14 @@ import CNSNNCore
         session.clear()
         XCTAssertEqual(session.answer, "")
         XCTAssertFalse(session.answerWrong)
+        // The caret moves with the space bar or a touch, and letters go in where it is.
+        "CHVAL".forEach { session.press(String($0)) }
+        session.moveCursor(by: -3)
+        session.press("E")
+        XCTAssertEqual(session.answer, "CHEVAL")
+        session.placeCursor(99)
+        XCTAssertNil(session.cursor)
+        session.clear()
         session.skip(state: state)
         XCTAssertEqual(session.sprint?.penaltyMs, SprintGame.skipPenaltyMs)
         XCTAssertNotNil(ModeRunStore.load(.sprint), "A Sprint in play is saved after every move")

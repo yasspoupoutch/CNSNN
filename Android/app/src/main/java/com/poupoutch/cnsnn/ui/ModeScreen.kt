@@ -294,9 +294,9 @@ private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: 
     if (duo.roundComplete) {
         PrimaryButton(if (duo.finished) "Voir le résultat" else "Manche suivante", Modifier.padding(bottom = 12.dp)) { game.nextRound(state) }
     } else {
-        AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong)
+        AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong, game.cursor) { game.placeCursor(it) }
         SkipChip("Passer la manche", "Passer la manche et voir les mots") { game.skip(state) }
-        LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, submit = { game.submit(state) }, enabled = true)
+        LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, moveCursor = { game.moveCursor(it) }, submit = { game.submit(state) }, enabled = true)
     }
 }
 
@@ -363,10 +363,10 @@ private fun ClueText(card: Card) {
 @Composable
 private fun Controls(state: AppViewModel, game: ModeViewModel, skip: String, skipLabel: String) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong)
+        AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong, game.cursor) { game.placeCursor(it) }
         SkipChip(skip, skipLabel) { game.skip(state) }
     }
-    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, submit = { game.submit(state) }, enabled = !game.finished)
+    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, moveCursor = { game.moveCursor(it) }, submit = { game.submit(state) }, enabled = !game.finished)
 }
 
 @Composable

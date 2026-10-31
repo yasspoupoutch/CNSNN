@@ -451,9 +451,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp))
         Clue(it, game.passed, game.passedTick)
     }
-    AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong)
+    AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong, game.cursor) { game.placeCursor(it) }
     SkipChip("Passer · +20 s", "Passer ce mot, 20 secondes de pénalité") { game.skip(state) }
-    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, submit = { game.submit(state) }, enabled = true)
+    LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, moveCursor = { game.moveCursor(it) }, submit = { game.submit(state) }, enabled = true)
 }
 
 @Composable

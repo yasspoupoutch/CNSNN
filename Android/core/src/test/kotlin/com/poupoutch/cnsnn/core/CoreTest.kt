@@ -317,3 +317,33 @@ class CatchUpTest {
         assertEquals(600_000, DailyScore.catchUpScoreMs(40_000, false, false))
     }
 }
+
+class TypedAnswerTest {
+    @Test fun caretInsertsDeletesAndMoves() {
+        var typed = TypedAnswer("").insert(" ")
+        assertEquals("No leading space", "", typed.text)
+        "CHVAL".forEach { typed = typed.insert(it.toString()) }
+        assertNull(typed.cursor)
+        // A typo fixed in the middle: back two letters, add the missing E.
+        typed = typed.move(-2)
+        assertEquals(3, typed.cursor)
+        typed = typed.insert("E")
+        assertEquals("CHEVAL", typed.text)
+        assertEquals(4, typed.position)
+        typed = typed.deleteBackward()
+        assertEquals("CHVAL", typed.text)
+        assertEquals(3, typed.position)
+        assertNull("Past the end goes back to the end", typed.move(99).cursor)
+        typed = typed.place(-5)
+        assertEquals(0, typed.position)
+        assertEquals("Nothing to erase before the start", "CHVAL", typed.deleteBackward().text)
+        // No double spaces, on either side of the caret.
+        assertEquals("LES ARISTOCHATS", TypedAnswer("LES ARISTOCHATS", 4).insert(" ").text)
+        assertEquals("LES ARISTOCHATS", TypedAnswer("LES ARISTOCHATS", 3).insert(" ").text)
+        // The text replaced behind the caret's back (a right answer clears it): the caret stays inside.
+        typed = TypedAnswer("AB", 7)
+        assertEquals(2, typed.position)
+        assertEquals("ABC", typed.insert("C").text)
+        assertEquals(40, TypedAnswer("A".repeat(40)).insert("B").text.length)
+    }
+}
