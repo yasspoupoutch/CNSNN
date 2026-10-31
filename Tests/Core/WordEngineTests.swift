@@ -39,15 +39,15 @@ final class WordEngineTests: XCTestCase {
         XCTAssertEqual(typed.text, "", "No leading space")
         "CHVAL".forEach { typed.insert(String($0)) }
         XCTAssertNil(typed.cursor)
-        // A typo fixed in the middle: back two letters, add the missing E.
-        typed.move(by: -2)
-        XCTAssertEqual(typed.cursor, 3)
+        // A typo fixed in the middle: back three letters, add the missing E.
+        typed.move(by: -3)
+        XCTAssertEqual(typed.cursor, 2)
         typed.insert("E")
         XCTAssertEqual(typed.text, "CHEVAL")
-        XCTAssertEqual(typed.position, 4)
+        XCTAssertEqual(typed.position, 3)
         typed.deleteBackward()
         XCTAssertEqual(typed.text, "CHVAL")
-        XCTAssertEqual(typed.position, 3)
+        XCTAssertEqual(typed.position, 2)
         typed.move(by: 99)
         XCTAssertNil(typed.cursor, "Past the end goes back to the end")
         typed.place(-5)

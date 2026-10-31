@@ -324,15 +324,15 @@ class TypedAnswerTest {
         assertEquals("No leading space", "", typed.text)
         "CHVAL".forEach { typed = typed.insert(it.toString()) }
         assertNull(typed.cursor)
-        // A typo fixed in the middle: back two letters, add the missing E.
-        typed = typed.move(-2)
-        assertEquals(3, typed.cursor)
+        // A typo fixed in the middle: back three letters, add the missing E.
+        typed = typed.move(-3)
+        assertEquals(2, typed.cursor)
         typed = typed.insert("E")
         assertEquals("CHEVAL", typed.text)
-        assertEquals(4, typed.position)
+        assertEquals(3, typed.position)
         typed = typed.deleteBackward()
         assertEquals("CHVAL", typed.text)
-        assertEquals(3, typed.position)
+        assertEquals(2, typed.position)
         assertNull("Past the end goes back to the end", typed.move(99).cursor)
         typed = typed.place(-5)
         assertEquals(0, typed.position)
