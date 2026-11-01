@@ -251,7 +251,9 @@ private fun SprintClock(remaining: () -> Int) {
     val haptics = rememberHaptics()
     val reduce = rememberReduceMotion()
     LaunchedEffect(seconds) { if (seconds in 1..5) haptics.key() }
-    val progress by animateFloatAsState(remainingMs / SprintGame.DURATION_MS.toFloat(), tween(200), label = "clock")
+    // No tween here: the clock moves every 200 ms anyway, and an animation restarted five times a
+    // second never lets the screen settle (Compose tests time out waiting for it on a slow emulator).
+    val progress = remainingMs / SprintGame.DURATION_MS.toFloat()
     val beat by animateFloatAsState(if (low && !reduce && seconds % 2 == 0) 1.06f else 1f, tween(250), label = "beat")
     Row(Modifier.fillMaxWidth().padding(top = 6.dp, start = 4.dp, end = 4.dp).semantics(mergeDescendants = true) { contentDescription = "Temps restant : $seconds secondes" },
         verticalAlignment = Alignment.CenterVertically) {
