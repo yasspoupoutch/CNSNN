@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poupoutch.cnsnn.core.ClassicLevel
 import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.core.DailyScore
 import com.poupoutch.cnsnn.core.DuoGame
 import com.poupoutch.cnsnn.core.DuoRecord
 import com.poupoutch.cnsnn.core.Format
@@ -73,7 +74,6 @@ import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.records
 import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
-import com.poupoutch.cnsnn.core.LeaderboardEntry
 import com.poupoutch.cnsnn.core.Mistakes
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
@@ -119,13 +119,13 @@ private fun MyStats(state: AppViewModel) {
     state.official?.let { entry ->
         SectionCard {
             Kicker("Mot du jour · officiel")
-            // This month's total time: every day counts, 10 min for a day not found or not played.
+            // This week's words found and their time, as in the week's ranking.
             Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
-                val total = entry.monthTotalMs()
-                if (total != null) {
-                    Text(Format.clock(total), fontSize = 34.sp, fontWeight = FontWeight.Black)
-                    Text("au total ce mois-ci", color = Palette.secondary, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
-                } else Text("Pas encore joué ce mois-ci", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary)
+                val week = entry.thisWeek()
+                if (week != null) {
+                    Text(weekDays(week), fontSize = 34.sp, fontWeight = FontWeight.Black)
+                    Text("cette semaine, en " + Format.clock(week.timeMs), color = Palette.secondary, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+                } else Text("Pas encore joué cette semaine", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary)
             }
             Row(Modifier.padding(top = 12.dp)) {
                 listOf("${entry.currentStreak()}" to "série", "${entry.bestStreak}" to "record de série",
@@ -221,10 +221,11 @@ private fun ModeRecordsCard(state: AppViewModel) {
     }
 }
 
-private enum class Board(val label: String) { TODAY("Aujourd’hui"), MONTH("Mois"), FASTEST("Records"), SPRINT("Sprint") }
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), WEEK("Semaine"), FASTEST("Records"), SPRINT("Sprint") }
 
-/** "12 jours joués" this month. */
-private fun monthDetail(entry: LeaderboardEntry): String = if (entry.monthPlayed > 1) "${entry.monthPlayed} jours joués" else "1 jour joué"
+/** "4/6 jours": words found this week out of the days gone (Monday is day 1). */
+private fun weekDays(week: DailyScore.Week, day: String = DailySchedule.key()): String =
+    "${week.found}/${DailyScore.dayOfWeek(day)} " + if (week.found > 1) "jours" else "jour"
 private data class Line(val id: String, val name: String, val value: String, val detail: String? = null, val crown: Boolean = false)
 private fun words(count: Int): String = if (count == 1) "1 mot" else "$count mots"
 
@@ -256,7 +257,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         val force = !arrived || pulled
         seenToken = refreshToken; arrived = true
         val day = DailySchedule.key()
-        val key = when (board) { Board.TODAY -> "today-$day"; Board.MONTH -> "month-" + day.take(7); Board.SPRINT -> "sprint"; Board.FASTEST -> board.name }
+        val key = when (board) { Board.TODAY -> "today-$day"; Board.WEEK -> "week-$day"; Board.SPRINT -> "sprint"; Board.FASTEST -> board.name }
         // The Sprint ranking keeps its own 5 minutes (see AppViewModel.sprintRankingIsStale).
         val stale = { if (board == Board.SPRINT) state.sprintRankingIsStale(pulled) else state.rankingIsStale(key, force) }
         val summary = state.rankingIsStale("summary", force)
@@ -266,14 +267,14 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
             if (summary) {
                 state.refreshOfficial()
                 // Read first, then copy: the rankings may change while the server answers (the friend code).
-                val rank = state.official?.let { state.cloud.monthlyRank(it, day) }
+                val rank = state.official?.let { state.cloud.weekRank(it, day) }
                 state.rankings = state.rankings.copy(myRank = rank)
                 state.rankingRead("summary")
             }
             if (stale()) {
                 when (board) {
                     Board.TODAY -> { val rows = state.cloud.dailyRanking(day); state.rankings = state.rankings.copy(today = rows) }
-                    Board.MONTH -> { val rows = state.cloud.monthlyPlayers(day); state.rankings = state.rankings.copy(players = rows) }
+                    Board.WEEK -> { val rows = state.cloud.weekPlayers(day); state.rankings = state.rankings.copy(players = rows) }
                     Board.FASTEST -> { val rows = state.cloud.fastestPlayers(); state.rankings = state.rankings.copy(fastest = rows) }
                     Board.SPRINT -> {
                         val top = state.cloud.sprintTop()
@@ -292,8 +293,9 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
 
     val entry = state.official
     if (entry != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        StatTile(myRank?.let { Format.ordinal(it.first) } ?: "—", myRank?.let { "du mois sur ${Format.number(it.second)}" } ?: "Rang du mois", Modifier.weight(1f))
-        StatTile(entry.monthTotalMs()?.let { Format.clock(it) } ?: "—", "total du mois", Modifier.weight(1f))
+        val week = entry.thisWeek()
+        StatTile(myRank?.let { Format.ordinal(it.first) } ?: "—", myRank?.let { "de la semaine sur ${Format.number(it.second)}" } ?: "Rang de la semaine", Modifier.weight(1f))
+        StatTile(week?.let { weekDays(it) } ?: "—", week?.let { "en " + Format.clock(it.timeMs) } ?: "cette semaine", Modifier.weight(1f))
         StatTile("${entry.currentStreak()}", "série en cours", Modifier.weight(1f))
     } else SectionCard { Text("Jouez le Mot du jour pour entrer au classement.", color = Palette.secondary) }
 
@@ -306,21 +308,21 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     if (state.isServerFull) Text(CloudError.serverFull(), fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
     // The rankings show only their first lines: says how many, so nobody looks for a missing name.
-    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.MONTH -> "Top 50 du mois"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes"; else -> "Top 25 des meilleurs temps" },
+    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.WEEK -> "Top 50 de la semaine"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes"; else -> "Top 25 des meilleurs temps" },
         fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     val hidden = state.hiddenPlayers
     val rows = when (board) {
         // The official time: a hint adds a minute.
         // A day's result keeps the pseudo of when it was played: the current one when known.
         Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") } }
-        // The month total: 10 min for every day not found or not played, so the lowest wins.
-        Board.MONTH -> players.mapNotNull { p -> p.monthTotalMs()?.let { Line(p.uid, p.username, Format.clock(it), monthDetail(p)) } }
+        // The most words found this week first, then the lowest total time.
+        Board.WEEK -> players.map { p -> val week = p.thisWeek() ?: DailyScore.Week(); Line(p.uid, p.username, Format.clock(week.timeMs), weekDays(week) + " trouvés") }
         Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
         Board.SPRINT -> state.rankings.sprint.mapIndexed { index, it -> Line(it.uid, it.username, words(it.best), crown = index == 0) }
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
         if (rows.isEmpty()) EmptyLine(loading, if (failed) unavailable(state) else
-            when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.MONTH -> "Personne n’a encore joué ce mois-ci."
+            when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.WEEK -> "Personne n’a encore joué cette semaine."
                 Board.SPRINT -> "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."; else -> "Aucun résultat pour le moment." })
         rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
@@ -479,7 +481,7 @@ private fun FriendsBoard(state: AppViewModel, refreshToken: Int) {
             val today = row.today
             Box {
                 RankRow(index, row.username, row.uid, mine,
-                    listOfNotNull(row.monthTotalMs?.let { "mois " + Format.clock(it) } ?: "pas joué ce mois", if (row.streak > 0) "série ${row.streak}" else null,
+                    listOfNotNull(row.week?.let { "semaine " + weekDays(it) + " · " + Format.clock(it.timeMs) } ?: "pas joué cette semaine", if (row.streak > 0) "série ${row.streak}" else null,
                         if (today?.correct == true) Mistakes.text(row.todayWrong ?: 0) else null, if (today?.correct == true && row.todayHint) "indice" else null).joinToString(" · "),
                     when { today == null -> "pas joué"; today.correct -> Format.clock(row.todayScoreMs ?: today.timeMs); else -> "raté" },
                     if (today?.correct == true) Palette.foreground else Palette.tertiary,

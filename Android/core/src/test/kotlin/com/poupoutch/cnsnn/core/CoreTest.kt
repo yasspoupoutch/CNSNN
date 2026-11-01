@@ -137,13 +137,30 @@ class GameRulesTest {
         assertNull(DailyStanding(1, 200, null).topPercent)
         assertEquals(1, DailyStanding(2, 200, null).topPercent)
         assertNull(DailyStanding(150, 200, null).topPercent)
-        fun row(uid: String, month: Int?, today: Pair<Boolean, Int>?, hint: Boolean = false) = FriendStanding(uid, uid, month, 0,
+        // The week's tally: words found, then time (the lower the better).
+        fun row(uid: String, week: Pair<Int, Int>?, today: Pair<Boolean, Int>?, hint: Boolean = false) = FriendStanding(uid, uid, week?.let { DailyScore.Week(2900, it.first, it.second, it.first) }, 0,
             today?.let { Attempt(cardID = "x", mode = GameMode.DAILY, correct = it.first, timeMs = it.second, date = Instant.now(), dailyKey = "d") },
             todayScoreMs = today?.let { DailyScore.scoreMs(it.second, hint, it.first) }, todayHint = hint)
-        // Found today first by today's time (the hint minute included), then the month total, lower first, none last.
-        val ordered = FriendStanding.ordered(listOf(row("slow", 900_000, true to 9000), row("idle", null, null), row("fast", 5_000_000, true to 3000),
-            row("hinted", 10, true to 2000, hint = true), row("miss", 1_200_000, false to 2000), row("steady", 800_000, null)))
+        // Found today first by today's time (the hint minute included), then the week's ranking, none last.
+        val ordered = FriendStanding.ordered(listOf(row("slow", 1 to 9000, true to 9000), row("idle", null, null), row("fast", 1 to 3000, true to 3000),
+            row("hinted", 5 to 10, true to 2000, hint = true), row("miss", 2 to 90_000, false to 2000), row("steady", 3 to 800_000, null)))
         assertEquals(listOf("fast", "slow", "hinted", "steady", "miss", "idle"), ordered.map { it.uid })
+    }
+    @Test fun weekMatchesTheRulesAndTheIphone() {
+        // 2026-10-26 is a Monday, 2026-11-01 the Sunday of the same week.
+        assertEquals(DailyScore.weekIndex("2026-10-26"), DailyScore.weekIndex("2026-11-01"))
+        assertEquals(DailyScore.weekIndex("2026-10-26")!! + 1, DailyScore.weekIndex("2026-11-02"))
+        assertEquals(1, DailyScore.dayOfWeek("2026-10-26")); assertEquals(7, DailyScore.dayOfWeek("2026-11-01"))
+        val monday = DailyScore.tally(DailyScore.Week(), "2026-10-26", true, 60_000)
+        val lost = DailyScore.tally(monday, "2026-10-27", false, 600_000)
+        assertEquals(DailyScore.Week(monday.week, 1, 60_000, 2), lost)
+        // A late result from the week before leaves this week alone; a new week starts from zero.
+        assertEquals(lost, DailyScore.tally(lost, "2026-10-25", true, 1000))
+        assertEquals(DailyScore.Week(monday.week + 1, 1, 5000, 1), DailyScore.tally(lost, "2026-11-02", true, 5000))
+        // More words found beats a lower time.
+        assertTrue(DailyScore.Week(monday.week, 2, 500_000, 2).rank > DailyScore.Week(monday.week, 1, 1000, 1).rank)
+        val entry = LeaderboardEntry("a", "A", 2, 1, 0, 1, 60_000, "2026-10-26", week = lost.week, weekFound = 1, weekTimeMs = 60_000, weekPlayed = 2)
+        assertEquals(lost, entry.thisWeek("2026-11-01")); assertNull(entry.thisWeek("2026-11-02"))
     }
     @Test fun tallyFollowsTheRules() {
         val october = DailyScore.monthIndex("2026-10-14")!!
@@ -152,7 +169,12 @@ class GameRulesTest {
         assertEquals(october, first["month"]); assertEquals(596_000, first["monthSaved"]); assertEquals(1, first["monthPlayed"])
         assertEquals(october * 100_000_000L + 596_000, first["monthRank"])
         // The keys the rules accept (updatedAt is added with the server time).
-        assertEquals(setOf("uid", "username", "played", "wins", "streak", "bestStreak", "bestTimeMs", "lastWinDay", "lastResult", "month", "monthSaved", "monthPlayed", "monthRank"), first.keys)
+        assertEquals(setOf("uid", "username", "played", "wins", "streak", "bestStreak", "bestTimeMs", "lastWinDay", "lastResult", "month", "monthSaved", "monthPlayed", "monthRank",
+            "week", "weekFound", "weekTimeMs", "weekPlayed", "weekRank"), first.keys)
+        // Without the week fields the line would drop out of the week's ranking (iPhone and Android).
+        val week = DailyScore.weekIndex("2026-10-14")!!
+        assertEquals(week, first["week"]); assertEquals(1, first["weekFound"]); assertEquals(4000, first["weekTimeMs"]); assertEquals(1, first["weekPlayed"])
+        assertEquals(week * 100_000_000L + 10_000_000L + 9_999_999 - 4000, first["weekRank"])
         val old = LeaderboardEntry("a", "A", 1, 1, 1, 1, 4000, "2026-10-14", october, 596_000, 1)
         val next = LeaderboardEntry.tally(old, "a", "A", "2026-10-15", true, 9000, 69_000)
         assertEquals(2, next["streak"]); assertEquals(4000, next["bestTimeMs"])

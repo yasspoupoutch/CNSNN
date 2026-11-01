@@ -107,13 +107,15 @@ class CloudRepositoryTest {
         assertEquals(1, entry.played); assertEquals(1, entry.streak)
         assertEquals(DailyScore.monthIndex(day), entry.month); assertEquals(1, entry.monthPlayed)
         assertEquals(DailyScore.MISSED_MS - scoreMs, entry.monthSaved)
+        // The week's ranking (shared with the iPhone): one word found, its official time.
+        assertEquals(DailyScore.Week(DailyScore.weekIndex(day)!!, 1, scoreMs, 1), entry.thisWeek(day))
         val alone = repo.standing(day, DailyScore.rank(day, scoreMs, true)!!, true)
         assertEquals(1, alone.players); assertEquals(1, alone.rank)
         val ranking = repo.dailyRanking(day)
         assertEquals(listOf("Alice"), ranking.map { it.username })
         assertEquals(scoreMs, ranking.single().scoreMs); assertTrue(ranking.single().usedHint)
-        assertEquals(listOf(alice.uid), repo.monthlyPlayers(day).map { it.uid })
-        assertEquals(1 to 1, repo.monthlyRank(entry, day))
+        assertEquals(listOf(alice.uid), repo.weekPlayers(day).map { it.uid })
+        assertEquals(1 to 1, repo.weekRank(entry, day))
         assertEquals(1, repo.wrongOf(alice.uid, day))
     }
 
@@ -427,7 +429,7 @@ class CloudRepositoryTest {
 
         repo.suspend(alice.uid, "Alice", "Temps suspect")
         assertTrue(repo.isSuspended(alice.uid))
-        assertTrue(repo.monthlyPlayers(day).none { it.uid == alice.uid })
+        assertTrue(repo.weekPlayers(day).none { it.uid == alice.uid })
         assertTrue(repo.fastestPlayers().none { it.uid == alice.uid })
         assertTrue(repo.dailyRanking(day).none { it.uid == alice.uid })
         assertTrue(repo.suspiciousTimes(day).none { it.uid == alice.uid })
@@ -439,7 +441,7 @@ class CloudRepositoryTest {
 
         repo.unsuspend(alice.uid)
         assertFalse(repo.isSuspended(alice.uid))
-        assertEquals(listOf(alice.uid), repo.monthlyPlayers(day).map { it.uid })
+        assertEquals(listOf(alice.uid), repo.weekPlayers(day).map { it.uid })
         assertEquals(listOf("Alice"), repo.dailyRanking(day).map { it.username })
         assertEquals(1, repo.standing(day, DailyScore.rank(day, DailyScore.MISSED_MS, false)!!, false).players)
     }

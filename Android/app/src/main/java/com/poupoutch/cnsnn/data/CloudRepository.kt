@@ -360,10 +360,22 @@ class CloudRepository(
 
     suspend fun leaderboardEntry(uid: String, source: Source = Source.DEFAULT): LeaderboardEntry? =
         db.collection("leaderboard").document(uid).get(source).await().data?.let { entry(uid, it) }
-    /** This month's ranking: the most time saved first, so the lowest month total (single-field `monthRank`). */
-    suspend fun monthlyPlayers(today: String = DailySchedule.key(), limit: Int = 50): List<LeaderboardEntry> {
-        val month = DailyScore.monthIndex(today) ?: return emptyList()
-        return visible(monthRange(month).orderBy("monthRank", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    /**
+     * This week's ranking (Monday to Sunday): the most words found first, then the lowest total time.
+     * One number sorts it (single-field `weekRank`), as on the iPhone. 50 lines, so who played only a day or two still appears.
+     */
+    suspend fun weekPlayers(today: String = DailySchedule.key(), limit: Int = 50): List<LeaderboardEntry> {
+        val week = DailyScore.weekIndex(today) ?: return emptyList()
+        return visible(weekRange(week).orderBy("weekRank", Query.Direction.DESCENDING), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
+    }
+    private fun weekRange(week: Int): Query = db.collection("leaderboard")
+        .whereGreaterThanOrEqualTo("weekRank", DailyScore.weekRank(week, 0, DailyScore.WEEK_TIME_CAP))
+        .whereLessThan("weekRank", DailyScore.weekRank(week + 1, 0, DailyScore.WEEK_TIME_CAP))
+    /** My place in this week's ranking and the players this week; null without a result this week. */
+    suspend fun weekRank(entry: LeaderboardEntry, today: String = DailySchedule.key()): Pair<Int, Int>? {
+        val mine = entry.thisWeek(today) ?: return null
+        val range = weekRange(mine.week)
+        return (count(range.whereGreaterThan("weekRank", mine.rank)) + 1) to count(range)
     }
     suspend fun fastestPlayers(limit: Int = 25): List<LeaderboardEntry> =
         visible(db.collection("leaderboard").whereGreaterThan("bestTimeMs", 0).orderBy("bestTimeMs"), limit).mapNotNull { d -> d.data?.let { entry(d.id, it) } }
@@ -406,17 +418,6 @@ class CloudRepository(
     /** A few more than needed, so the list stays full once suspended players are left out. */
     private suspend fun visible(query: Query, limit: Int): List<DocumentSnapshot> =
         query.limit(limit + 10L).get().await().documents.filter { it.getBoolean("suspended") != true }.take(limit)
-    private fun monthRange(month: Int): Query = db.collection("leaderboard")
-        .whereGreaterThanOrEqualTo("monthRank", DailyScore.monthRank(month, 0))
-        .whereLessThan("monthRank", DailyScore.monthRank(month + 1, 0))
-    /** My place in this month's ranking and the players this month; null without a result this month. */
-    suspend fun monthlyRank(entry: LeaderboardEntry, today: String = DailySchedule.key()): Pair<Int, Int>? {
-        val month = DailyScore.monthIndex(today) ?: return null
-        if (!entry.playedMonth(today)) return null
-        val mine = DailyScore.monthRank(month, entry.monthSaved)
-        val range = monthRange(month)
-        return (count(range.whereGreaterThan("monthRank", mine)) + 1) to count(range)
-    }
     /** Today's found words, fastest first (the hint minute included): one range on the single-field `rank`. */
     suspend fun dailyRanking(day: String, limit: Int = 25): List<DailyRank> {
         val base = DailyScore.dayBase(day) ?: return emptyList()
@@ -529,7 +530,7 @@ class CloudRepository(
             val today = result.data?.let { attempt(day, it) }
             val hint = result.getBoolean("usedHint") ?: false
             val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, hint, it.correct) }
-            rows += FriendStanding(player, entry?.username ?: name, entry?.monthTotalMs(day), entry?.currentStreak() ?: 0, today,
+            rows += FriendStanding(player, entry?.username ?: name, entry?.thisWeek(day), entry?.currentStreak() ?: 0, today,
                 result.getLong("wrongAnswers")?.toInt(), score, hint)
         }
         return FriendStanding.ordered(rows)
@@ -848,12 +849,13 @@ class CloudRepository(
         return Attempt(cardID = cardId, mode = GameMode.DAILY, correct = d["correct"] as? Boolean ?: false, timeMs = timeMs, date = date, dailyKey = day,
             catchUp = if (d["catchUp"] == true) true else null)
     }
-    /** A leaderboard line; an old one may still carry `points` (ignored) or lack the month fields (zeros). */
+    /** A leaderboard line; an old one may still carry `points` (ignored) or lack the month or week fields (zeros). */
     private fun entry(uid: String, d: Map<String, Any>): LeaderboardEntry? {
         if (d["played"] !is Number) return null
         fun int(key: String) = (d[key] as? Number)?.toInt() ?: 0
         return LeaderboardEntry(uid, d["username"] as? String ?: "Joueur", int("played"), int("wins"), int("streak"), int("bestStreak"),
-            (d["bestTimeMs"] as? Number)?.toInt(), d["lastWinDay"] as? String ?: "", int("month"), int("monthSaved"), int("monthPlayed"))
+            (d["bestTimeMs"] as? Number)?.toInt(), d["lastWinDay"] as? String ?: "", int("month"), int("monthSaved"), int("monthPlayed"),
+            int("week"), int("weekFound"), int("weekTimeMs"), int("weekPlayed"))
     }
 
     companion object {
