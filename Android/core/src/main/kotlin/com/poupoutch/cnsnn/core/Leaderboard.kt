@@ -16,6 +16,12 @@ data class LeaderboardEntry(
     val month: Int = 0,
     val monthSaved: Int = 0,
     val monthPlayed: Int = 0,
+    /** This week's tally (DailyScore.Week); zeros for a line from before the weekly ranking. */
+    val week: Int = 0,
+    val weekFound: Int = 0,
+    /** Total time of the words found this week, hint minutes included. */
+    val weekTimeMs: Int = 0,
+    val weekPlayed: Int = 0,
 ) {
     /** The stored streak only counts while the last win is today or yesterday. */
     fun currentStreak(at: Instant = Instant.now()): Int {
@@ -24,6 +30,10 @@ data class LeaderboardEntry(
     }
     val successRate: Double get() = if (played == 0) 0.0 else wins.toDouble() / played
     val monthTally: DailyScore.Month get() = DailyScore.Month(month, monthSaved, monthPlayed)
+    val weekTally: DailyScore.Week get() = DailyScore.Week(week, weekFound, weekTimeMs, weekPlayed)
+    /** This week's tally on `day`, null when not played this week (or only with an older app). */
+    fun thisWeek(day: String = DailySchedule.key()): DailyScore.Week? =
+        if (week > 0 && week == DailyScore.weekIndex(day)) weekTally else null
     /** Played the Mot du jour in the month of `today` (yyyy-MM-dd). */
     fun playedMonth(today: String = DailySchedule.key()): Boolean = monthPlayed > 0 && month == DailyScore.monthIndex(today)
     /** This month's total time on `today`, null if not played this month (lower is better). */
@@ -45,11 +55,14 @@ data class LeaderboardEntry(
             val streak = if (catchUp) oldStreak else if (laterWin) (if (previous) oldStreak + 1 else 1) else (if (!correct && day > lastWin) 0 else oldStreak)
             val best: Int? = if (!catchUp && correct) minOf(old?.bestTimeMs ?: timeMs, timeMs) else old?.bestTimeMs
             val month = DailyScore.tally(old?.monthTally ?: DailyScore.Month(), day, scoreMs)
+            // The week's ranking (`tallyWeek`): without it the line drops out of the week's ranking.
+            val week = DailyScore.tally(old?.weekTally ?: DailyScore.Week(), day, correct, scoreMs)
             return mapOf(
                 "uid" to uid, "username" to username, "played" to (old?.played ?: 0) + 1,
                 "wins" to (old?.wins ?: 0) + (if (correct) 1 else 0), "streak" to streak, "bestStreak" to maxOf(old?.bestStreak ?: 0, streak),
                 "bestTimeMs" to best, "lastWinDay" to if (laterWin) day else lastWin, "lastResult" to day,
                 "month" to month.month, "monthSaved" to month.saved, "monthPlayed" to month.played, "monthRank" to month.rank,
+                "week" to week.week, "weekFound" to week.found, "weekTimeMs" to week.timeMs, "weekPlayed" to week.played, "weekRank" to week.rank,
             )
         }
     }
@@ -74,8 +87,8 @@ data class DailyStanding(val rank: Int?, val players: Int, val beatenPercent: In
 data class FriendStanding(
     val uid: String,
     val username: String,
-    /** This month's total time (DailyScore.monthTotal), null when not played this month. */
-    val monthTotalMs: Int?,
+    /** This week's words found and time, null when not played this week. */
+    val week: DailyScore.Week?,
     val streak: Int,
     val today: Attempt?,
     val todayWrong: Int? = null,
@@ -84,18 +97,18 @@ data class FriendStanding(
     val todayHint: Boolean = false,
 ) {
     companion object {
-        /** Found today first (fastest first), then the others by month total (lower first, none last), then by name. */
+        /** Found today first (fastest first), then the others by the week's ranking (none last), then by name. */
         fun ordered(rows: List<FriendStanding>): List<FriendStanding> = rows.sortedWith { a, b ->
             val fa = a.today?.correct == true
             val fb = b.today?.correct == true
             val sa = a.todayScoreMs ?: a.today?.timeMs ?: 0
             val sb = b.todayScoreMs ?: b.today?.timeMs ?: 0
-            val ma = a.monthTotalMs ?: Int.MAX_VALUE
-            val mb = b.monthTotalMs ?: Int.MAX_VALUE
+            val wa = a.week?.rank ?: Long.MIN_VALUE
+            val wb = b.week?.rank ?: Long.MIN_VALUE
             when {
                 fa != fb -> if (fa) -1 else 1
                 fa && sa != sb -> sa.compareTo(sb)
-                ma != mb -> ma.compareTo(mb)
+                wa != wb -> wb.compareTo(wa)
                 else -> a.username.compareTo(b.username, ignoreCase = true)
             }
         }

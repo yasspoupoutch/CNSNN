@@ -57,6 +57,33 @@ object DailyScore {
         val same = month == old.month
         return Month(month, (if (same) old.saved else 0) + MISSED_MS - scoreMs, (if (same) old.played else 0) + 1)
     }
+
+    // The week's ranking (Monday to Sunday): the most words found first, then the lowest total time of
+    // the found days, hint minutes included. A lost or unplayed day adds nothing: no invented time.
+    /** Weeks since Monday 1969-12-29 (1970-01-01, day 0, was a Thursday), as the rules' `weekIndex`. */
+    fun weekIndex(day: String): Int? = dayIndex(day)?.let { ((it + 3) / 7).toInt() }
+    /** 1 on Monday to 7 on Sunday. */
+    fun dayOfWeek(day: String): Int = dayIndex(day)?.let { ((it + 3) % 7 + 1).toInt() } ?: 1
+    /** Above the most a week can add up to (7 days of 10 minutes), so the time fits in the rank's last digits. */
+    const val WEEK_TIME_CAP = 9_999_999
+    /** One number sorts the week, best first when descending: the week, the words found, then the time. */
+    fun weekRank(week: Int, found: Int, timeMs: Int): Long = week * 100_000_000L + found * 10_000_000L + (WEEK_TIME_CAP - timeMs)
+
+    /** One player's week: its index, the words found, their total time and the days played. */
+    data class Week(val week: Int = 0, val found: Int = 0, val timeMs: Int = 0, val played: Int = 0) {
+        val rank: Long get() = DailyScore.weekRank(week, found, timeMs)
+    }
+    /**
+     * The week after one more result: a new week starts from zero, and a late result from an older
+     * week leaves the current one alone (same as the rules' `tallyWeek`).
+     */
+    fun tally(old: Week, day: String, correct: Boolean, scoreMs: Int): Week {
+        val week = weekIndex(day) ?: return old
+        if (week < old.week) return old
+        val same = week == old.week
+        return Week(week, (if (same) old.found else 0) + (if (correct) 1 else 0),
+            (if (same) old.timeMs else 0) + (if (correct) scoreMs else 0), (if (same) old.played else 0) + 1)
+    }
 }
 
 /** Classique has no points: the level grows with the words found, 20 per level. */
