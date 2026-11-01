@@ -69,7 +69,8 @@ const weeks = new Map();
 for (const result of results) {
   const r = result.data();
   if (typeof r.day !== 'string' || typeof r.timeMs !== 'number' || weekIndex(r.day) !== thisWeek) continue;
-  const scoreMs = r.correct ? Math.min(r.timeMs + (r.usedHint ? 60000 : 0), MISSED) : MISSED;
+  // The stored score counts a caught-up day's 5 extra minutes.
+  const scoreMs = typeof r.scoreMs === 'number' ? r.scoreMs : r.correct ? Math.min(r.timeMs + (r.usedHint ? 60000 : 0), MISSED) : MISSED;
   const w = weeks.get(r.userId) ?? { found: 0, timeMs: 0, played: 0 };
   if (r.correct) { w.found++; w.timeMs += scoreMs; }
   w.played++;
