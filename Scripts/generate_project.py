@@ -15,7 +15,7 @@ main=ident('main');products=[];groups=[];targets=[]
 common={'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SWIFT_VERSION':'5.0','CLANG_ENABLE_MODULES':'YES','SWIFT_STRICT_CONCURRENCY':'targeted','TARGETED_DEVICE_FAMILY':q('1'),'CODE_SIGN_STYLE':'Automatic'}
 projectcfg=configs('Project',common)
 # Firebase SDK, linked only to app. Resolves in Xcode on Mac.
-remote=obj('firebase','isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 12.0.0;};')
+remote=obj('firebase','isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 12.19.3;};')
 packages=[]
 for name in ['FirebaseCore','FirebaseAuth','FirebaseFirestore']:
  packages.append(obj(name,'isa = XCSwiftPackageProductDependency; package = '+remote+'; productName = '+name+';'))
