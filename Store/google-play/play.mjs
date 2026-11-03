@@ -70,7 +70,8 @@ async function signingKey(versionCode) {
     const { generatedApks = [] } = await call('GET', `${api}/generatedApks/${versionCode}`);
     const hashes = [...new Set(generatedApks.map((g) => g.certificateSha256Hash).filter(Boolean))];
     for (const hash of hashes) {
-      const hex = /^[0-9a-f]{64}$/i.test(hash) ? hash : Buffer.from(hash, 'base64').toString('hex');
+      const plain = String(hash).replace(/[^0-9a-f]/gi, '');
+      const hex = plain.length === 64 ? plain : Buffer.from(hash, 'base64').toString('hex');
       console.log(`Clé de signature Google Play (version ${versionCode}) : ${hex.toUpperCase().match(/../g).join(':')}`);
     }
     if (!hashes.length) console.log(`::warning::Aucune clé de signature Google Play trouvée pour la version ${versionCode}.`);

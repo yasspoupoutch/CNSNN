@@ -59,8 +59,9 @@ const files = new Map();
 // Android App Links: a challenge link (/d/CODE) or a friend link (/a/CODE) opens the app directly once Android has checked this
 // file, which names the app and the certificate it is signed with. The release key lives in the
 // repository only encrypted (Android/signing); its fingerprint is read here. When Google Play signs
-// the app (Play App Signing), add the fingerprint it shows in the Play Console to this list.
-const playSigningSha256 = [];
+// the app (Play App Signing), its fingerprint must be in this list too: Play-installed apps carry that one.
+// Shown by `node Store/google-play/play.mjs verifier` (Play Console > Intégrité de l'appli > Signature de l'appli).
+const playSigningSha256 = ['FF:11:FC:DA:11:73:01:DD:B5:42:DC:4B:C3:65:DB:FC:46:50:A4:2B:66:A4:19:3B:63:D8:53:A9:84:B6:66:69'];
 function releaseSha256() {
   const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!credentials) return [];
