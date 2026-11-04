@@ -239,7 +239,9 @@ async function replace() {
   const answers = new Map((await db.collection('dailySecrets').get()).docs.map((d) => [d.get('answer'), d.id]));
   for (const d of days) {
     const other = answers.get(normalize(d.word));
-    if (other && other !== d.day) throw new Error(`Le remplacement du ${d.day} est déjà le mot du ${other}`);
+    // A word already planned later moves to its new day: the next seed gives that later day another word.
+    if (other && other !== d.day && other <= shiftDay(latestDay(), 1)) throw new Error(`Le remplacement du ${d.day} est déjà le mot du ${other}`);
+    if (other && other !== d.day) console.log(`Le mot du ${d.day} était prévu le ${other} : ce jour-là en recevra un autre au prochain seed.`);
   }
   for (const d of days) {
     const batch = db.batch();
