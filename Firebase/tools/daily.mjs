@@ -200,7 +200,9 @@ async function seed(dry) {
   // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
   const days = applyChanges(words, schedule(words, shiftDay(today, 1), scheduledDays, played), changes).days;
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
-  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots et ${single.length - words.length} mot(s) de football écartés), ${played.size} déjà joués.`);
+  const football = single.length - limitFootball(single).length;
+  const pools = Object.values(difficulties).map((level) => `${words.filter((w) => w.difficulty === level).length} ${level.toLowerCase()}s`).join(', ');
+  console.log(`${files.length} liste(s), ${words.length} mots gardés : ${pools} (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots, ${football} mot(s) de football et ${single.length - football - words.length} mot(s) retiré(s) écartés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
   if (dry) return;
   for (let i = 0; i < days.length; i += 150) {
