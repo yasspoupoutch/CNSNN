@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
+import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges, levelOf, byConsonants } from '../tools/daily.mjs';
 
 const list = parseList([
  'F\tGénéral\tBonbon\tUne douceur sucrée.', 'F\tAnimaux\tŒuf\tUn indice assez long.',
@@ -69,4 +69,18 @@ test('a too hard word is replaced on its day and never comes back', () => {
  assert.equal(days.length, 7);
  assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Hérisson', hint: 'Un petit animal piquant.', category: 'Animaux', difficulty: 'Facile' }] }));
  assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Cerf volant', hint: 'Il vole au bout d’un fil.', category: 'Objets', difficulty: 'Difficile' }] }));
+});
+
+test('the fewer consonants, the harder the day', () => {
+  assert.equal(levelOf('Écureuil'), 'Facile');   // CRL
+  assert.equal(levelOf('Amour'), 'Moyen');       // MR
+  assert.equal(levelOf('Oiseau'), 'Difficile');  // S
+  assert.equal(levelOf('Bouleau'), 'Difficile'); // BL, but five vowels
+  assert.equal(levelOf('Boulangerie'), null);    // BLNGR: too easy
+  const words = byConsonants([
+    { word: 'Boulangerie', hint: 'Un indice.', category: 'Général', difficulty: 'Moyen' },
+    { word: 'Amour', hint: 'Un indice.', category: 'Général', difficulty: 'Facile' },
+    { word: 'Miroir', hint: 'Un indice.', category: 'Objets', difficulty: 'Difficile' },
+  ]);
+  assert.deepEqual(words.map((w) => [w.word, w.difficulty]), [['Amour', 'Moyen'], ['Miroir', 'Difficile']]);
 });

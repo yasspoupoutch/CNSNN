@@ -86,6 +86,25 @@ export function limitFootball(words) {
   return out;
 }
 
+// The difficulty comes from the consonants shown: the fewer there are, the more words they could be
+// (MR is amour, mer, mur or mari; BLNGR can only be boulangerie). Three consonants make an easy day,
+// two a medium one, and one (or two in a word of four vowels or more) a hard one. A word with four
+// consonants or more is too easy to find and stays out of the schedule. A word already tagged harder
+// keeps its tag, so a rare word never lands on an easy day.
+const levels = ['Facile', 'Moyen', 'Difficile'];
+export function levelOf(word) {
+  const n = consonants(word).length, vowels = normalize(word).length - n;
+  if (n === 1 || (n === 2 && vowels >= 4)) return 'Difficile';
+  return n === 2 ? 'Moyen' : n === 3 ? 'Facile' : null;
+}
+export function byConsonants(words) {
+  return words.flatMap((w) => {
+    const level = levelOf(w.word);
+    if (!level) return [];
+    return [{ ...w, difficulty: levels[Math.max(levels.indexOf(level), levels.indexOf(w.difficulty))] }];
+  });
+}
+
 // A word judged too hard can be replaced on a given day without an app update.
 // changes.json: { "days": [{ day, word, hint, category, difficulty }], "drop": ["word"] }. A replaced
 // or dropped word never comes back, and the monthly seed keeps the replacements of the days ahead.
@@ -189,7 +208,7 @@ async function seed(dry) {
   const { words: all, skipped } = combine(lists);
   const single = all.filter(singleWord);
   const changes = await readChanges(privateKey);
-  const words = applyChanges(limitFootball(single), [], changes).words;
+  const words = applyChanges(byConsonants(limitFootball(single)), [], changes).words;
   validate(words);
   const { FieldPath } = await import('firebase-admin/firestore');
   const db = await firestore();
@@ -200,7 +219,9 @@ async function seed(dry) {
   // Today (in the time zone furthest ahead) and past days are never rewritten: someone may be playing them.
   const days = applyChanges(words, schedule(words, shiftDay(today, 1), scheduledDays, played), changes).days;
   const repeats = days.filter((d) => played.has(normalize(d.word))).length;
-  console.log(`${files.length} liste(s), ${words.length} mots (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots et ${single.length - words.length} mot(s) de football écartés), ${played.size} déjà joués.`);
+  const football = single.length - limitFootball(single).length;
+  const pools = levels.map((level) => `${words.filter((w) => w.difficulty === level).length} ${level.toLowerCase()}s`).join(', ');
+  console.log(`${files.length} liste(s), ${words.length} mots gardés : ${pools} (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots, ${football} mot(s) de football et ${single.length - football - words.length} autre(s) écartés : 4 consonnes ou plus, ou retirés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
   if (dry) return;
   for (let i = 0; i < days.length; i += 150) {
