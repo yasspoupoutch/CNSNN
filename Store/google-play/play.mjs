@@ -63,6 +63,23 @@ async function edit(work) {
   }
 }
 
+/** SHA-256 of the key Google Play signs the app with (Play App Signing): Android only opens challenge and
+ *  friend links in the app when /.well-known/assetlinks.json lists it (Firebase/tools/hosting.mjs). */
+async function signingKey(versionCode) {
+  try {
+    const { generatedApks = [] } = await call('GET', `${api}/generatedApks/${versionCode}`);
+    const hashes = [...new Set(generatedApks.map((g) => g.certificateSha256Hash).filter(Boolean))];
+    for (const hash of hashes) {
+      const plain = String(hash).replace(/[^0-9a-f]/gi, '');
+      const hex = plain.length === 64 ? plain : Buffer.from(hash, 'base64').toString('hex');
+      console.log(`Clé de signature Google Play (version ${versionCode}) : ${hex.toUpperCase().match(/../g).join(':')}`);
+    }
+    if (!hashes.length) console.log(`::warning::Aucune clé de signature Google Play trouvée pour la version ${versionCode}.`);
+  } catch (e) {
+    console.log(`::warning::Clé de signature Google Play illisible (${e.status ?? e.message}).`);
+  }
+}
+
 async function verifier() {
   console.log(`Compte de service : ${account.client_email}`);
   try {
@@ -71,6 +88,8 @@ async function verifier() {
       console.log(`Appli trouvée : ${pkg} (langue par défaut ${details.defaultLanguage ?? 'non définie'}).`);
       const tracks = await call('GET', `${api}/edits/${id}/tracks`);
       for (const t of tracks.tracks ?? []) console.log(`Canal ${t.track} : ${(t.releases ?? []).map((r) => `${r.name ?? '?'} (${r.status})`).join(', ') || 'vide'}`);
+      const codes = (tracks.tracks ?? []).flatMap((t) => (t.releases ?? []).flatMap((r) => r.versionCodes ?? [])).map(Number);
+      if (codes.length) await signingKey(Math.max(...codes));
       throw Object.assign(new Error('fin'), { done: true });
     });
   } catch (e) {
