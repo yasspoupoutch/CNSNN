@@ -52,9 +52,9 @@ on:
         type: boolean
         default: false
       daily_change:
-        description: "Mots du jour trop durs : voir (aujourd'hui et 14 jours, chiffré) ou appliquer (Firebase/daily/changes.enc.json)"
+        description: "Mots du jour : voir (aujourd'hui et 14 jours, chiffré), liste (tous les mots, chiffré) ou appliquer (Firebase/daily/changes.enc.json)"
         type: choice
-        options: ['', voir, appliquer]
+        options: ['', voir, liste, appliquer]
         default: ''
       android_app:
         description: Enregistrer l'application Android et afficher son google-services.json
@@ -128,7 +128,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.usage || inputs.players || inputs.week_check)) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.week_check)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -177,6 +177,9 @@ jobs:
       - name: Voir les mots du jour à venir (chiffrés)
         if: ${{ inputs.daily_change == 'voir' }}
         run: node tools/daily.mjs preview daily/preview.pem
+      - name: Relire tous les mots du jour (chiffrés)
+        if: ${{ inputs.daily_change == 'liste' }}
+        run: node tools/daily.mjs list daily/preview.pem
       - name: Remplacer des mots du jour
         if: ${{ inputs.daily_change == 'appliquer' && github.ref == 'refs/heads/main' }}
         run: node tools/daily.mjs replace
