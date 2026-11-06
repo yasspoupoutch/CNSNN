@@ -38,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SportsKabaddi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,7 +45,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -85,7 +83,6 @@ import com.poupoutch.cnsnn.core.Challenge
 import com.poupoutch.cnsnn.core.ChallengeFormat
 import com.poupoutch.cnsnn.core.ChallengeInvite
 import com.poupoutch.cnsnn.core.ChallengeRules
-import com.poupoutch.cnsnn.core.FriendInvite
 import com.poupoutch.cnsnn.core.Mistakes
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
@@ -185,7 +182,6 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
     val uid = state.uid
     var friends by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    var code by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var joinCode by remember { mutableStateOf("") }
@@ -213,7 +209,6 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
         friends = runCatching { state.cloud.friends(uid) }.getOrDefault(emptyList())
         loading = false
         state.refreshChallenges()
-        if (code == null) code = runCatching { state.cloud.friendCode(uid, state.progress.username.ifEmpty { "Joueur" }) }.getOrNull()
     }
     val now = nowMs()
     Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -263,7 +258,7 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
             SectionCard(padding = 0.dp, radius = 22.dp) {
                 if (friends.isEmpty()) Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (loading) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Palette.secondary); Spacer(Modifier.width(10.dp)) }
-                    Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou invitez-le ci-dessous.",
+                    Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou défiez-le par lien ci-dessous.",
                         fontSize = 14.sp, color = Palette.tertiary)
                 }
                 val names = state.currentNames
@@ -286,7 +281,7 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
             // For someone who is not a friend yet: play first, then send the link with its code.
             Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
                 Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. Le premier qui l’ouvre a 48 h pour vous battre.",
+                    Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. En l’ouvrant, il rejoint le défi et vous devenez amis. Il a 48 h pour vous battre.",
                         fontSize = 13.sp, color = Palette.secondary)
                     DuelButton("Défier par lien", Modifier.fillMaxWidth().testTag("openChallenge"), enabled = sending == null, busy = sending == "link") {
                         haptics.selection(); sending = "link"; message = null
@@ -316,12 +311,6 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
             }
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.red) }
-        OutlinedButton({
-            // A friend invite, not a challenge: its friend link adds me (challenges go by their own link).
-            Share.plain(context, code?.let { FriendInvite.shareText(it) } ?: "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! ${Site.URL}")
-        }, Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(25.dp)) {
-            Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Text("Inviter par message", Modifier.padding(start = 8.dp), fontWeight = FontWeight.SemiBold)
-        }
     }
 }
 
@@ -514,7 +503,7 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                 if (result == null && byLink && code != null) TonalButton("Envoyer le lien", Modifier.weight(1f).testTag("shareChallengeLink")) {
                     Share.plain(context, ChallengeInvite.shareText(code))
                 } else if (result == null) TonalButton("Prévenir ${other.name}", Modifier.weight(1f)) {
-                    Share.plain(context, "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! ${Site.URL}")
+                    Share.plain(context, "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! ${Site.APP}")
                 }
                 PrimaryButton("Terminer", Modifier.weight(1f), onClick = close)
             }

@@ -135,7 +135,6 @@ struct ChallengeSheet: View {
     @Environment(\.dismiss) private var dismiss
     var play: (Challenge) -> Void
     @State private var friends: [(uid: String, name: String)] = []
-    @State private var code: String?
     @State private var loading = true
     @State private var sending: String?
     @State private var message: String?
@@ -167,7 +166,6 @@ struct ChallengeSheet: View {
                     finishedList
                 }
                 if let message { Text(message).scaledFont(13).foregroundStyle(Palette.red) }
-                invite
             }.padding(.horizontal, 22).padding(.vertical, 20)
         }
         .scrollIndicators(.hidden)
@@ -228,7 +226,7 @@ struct ChallengeSheet: View {
             if friends.isEmpty {
                 HStack {
                     if loading { ProgressView().tint(Palette.secondary) }
-                    Text(loading ? "Chargement…" : "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou invitez-le ci-dessous.")
+                    Text(loading ? "Chargement…" : "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou défiez-le par lien ci-dessous.")
                         .scaledFont(14).foregroundStyle(Palette.tertiary).fixedSize(horizontal: false, vertical: true)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
             }
@@ -279,7 +277,7 @@ struct ChallengeSheet: View {
     /// For someone who is not a friend yet: play first, then send the link with its code.
     private var linkBox: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. Le premier qui l’ouvre a 48 h pour vous battre.")
+            Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. En l’ouvrant, il rejoint le défi et vous devenez amis. Il a 48 h pour vous battre.")
                 .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
             Button { sendOpen() } label: {
                 if sending == "link" { ProgressView().tint(Palette.duelText) } else { Label("Défier par lien", systemImage: "link") }
@@ -323,15 +321,6 @@ struct ChallengeSheet: View {
         return mine + " / " + theirs
     }
 
-    private var invite: some View {
-        // A friend invite, not a challenge: its friend link adds me (challenges go by their own link).
-        let text = code.map { FriendInvite.shareText(code: $0) }
-            ?? "Ajoute-moi en ami sur CNSNN, le jeu de mots sans voyelles : on pourra se défier et comparer nos temps ! " + Site.appStore.absoluteString
-        return ShareLink(item: text) {
-            Label("Inviter par message", systemImage: "square.and.arrow.up").scaledFont(15, .semibold)
-        }.buttonStyle(GlassPillStyle(height: 50)).padding(.top, 6)
-    }
-
     private func load() async {
         guard let cloud = state.cloud, let uid = state.uid else { loading = false; return }
         defer { loading = false }
@@ -339,7 +328,6 @@ struct ChallengeSheet: View {
         friends = (try? await cloud.friends(uid: uid)) ?? []
         loading = false
         await state.refreshChallenges()
-        if code == nil { code = try? await cloud.friendCode(uid: uid, username: state.progress.username.isEmpty ? "Joueur" : state.progress.username) }
     }
 
     private func send(_ friend: (uid: String, name: String)) {
@@ -608,7 +596,7 @@ private struct ChallengeResultView: View {
                     ShareLink(item: ChallengeInvite.shareText(code: code)) { Text("Envoyer le lien") }
                         .buttonStyle(GlassPillStyle(height: 54)).accessibilityIdentifier("shareChallengeLink")
                 } else if result == nil {
-                    ShareLink(item: "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! " + Site.appStore.absoluteString) {
+                    ShareLink(item: "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! " + Site.app.absoluteString) {
                         Text("Prévenir \(other.name)")
                     }.buttonStyle(GlassPillStyle(height: 54))
                 }

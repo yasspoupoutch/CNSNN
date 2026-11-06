@@ -91,7 +91,7 @@ const assetLinks = [{
 // entitlement (App/CNSNN.entitlements). Apple reads this file when the app is installed. The team
 // id comes from the APPLE_TEAM_ID secret; without it the link keeps opening the web page.
 const teamId = (process.env.APPLE_TEAM_ID || '').trim();
-const appSiteAssociation = { applinks: { details: [{ appIDs: [`${teamId}.com.poupoutch.cnsnn`], components: [{ '/': '/d/*' }, { '/': '/a/*' }] }] } };
+const appSiteAssociation = { applinks: { details: [{ appIDs: [`${teamId}.com.poupoutch.cnsnn`], components: [{ '/': '/d/*' }, { '/': '/a/*' }, { '/': '/app' }] }] } };
 if (!teamId) console.log('::warning::APPLE_TEAM_ID absent : sur iPhone, les liens de défi ouvriront la page web au lieu de l’app.');
 
 for (const name of await readdir(root)) {
