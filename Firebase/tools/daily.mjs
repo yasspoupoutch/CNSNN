@@ -8,6 +8,7 @@
 //   node tools/daily.mjs encrypt-changes changes.json  encrypts day replacements into daily/changes.enc.json (local)
 //   node tools/daily.mjs preview key.pem            prints today and the next 14 days, encrypted for key.pem (CI)
 //   node tools/daily.mjs replace                    publishes the replacements of daily/changes.enc.json (CI)
+//   node tools/daily.mjs list key.pem               prints every word of every list, encrypted for key.pem (CI)
 //
 // words.tsv: one word per line, tab separated: F|M|D, category, word, hint. Every daily/words*.enc.json
 // is used: a new list adds words without needing the older ones in clear. The monthly run of the
@@ -228,6 +229,19 @@ async function preview(keyFile) {
   console.log(JSON.stringify(encrypt(out, await readFile(keyFile, 'utf8'))));
 }
 
+// Every word of every list (word, category, difficulty, hint and the list it comes from), to proofread
+// categories and hints. Printed only encrypted for the given public key: the logs may become public.
+async function listWords(keyFile) {
+  const { private_key: privateKey } = await serviceAccount();
+  const files = (await readdir(listDir)).filter((name) => /^words.*\.enc\.json$/.test(name)).sort();
+  const out = [];
+  for (const name of files) {
+    for (const w of decrypt(JSON.parse(await readFile(new URL(name, listDir), 'utf8')), privateKey)) out.push({ list: name, ...w });
+  }
+  console.log(`${out.length} mots dans ${files.length} liste(s).`);
+  console.log(JSON.stringify(encrypt(out, await readFile(keyFile, 'utf8'))));
+}
+
 // Publishes the replacements of the days not over yet. Who started a replaced day without finishing
 // it starts again on the new word (the old consonants would no longer accept any answer).
 async function replace() {
@@ -294,6 +308,8 @@ if (command === 'public-key') {
   console.log(`${changes.days?.length ?? 0} remplacement(s) chiffré(s) dans daily/changes.enc.json`);
 } else if (command === 'preview') {
   await preview(arg);
+} else if (command === 'list') {
+  await listWords(arg);
 } else if (command === 'replace') {
   await replace();
 } else if (command) {
