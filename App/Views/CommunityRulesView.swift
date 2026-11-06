@@ -18,9 +18,10 @@ enum Site {
     static let home = URL(string: "https://cnsnn-9ctosy.web.app")!
     static let rules = URL(string: "https://cnsnn-9ctosy.web.app/regles")!
     static let privacy = URL(string: "https://cnsnn-9ctosy.web.app/confidentialite")!
-    /// What shares from the iPhone link to: the friend most likely has an iPhone too, and the store page
-    /// installs (or opens) the app in one tap instead of going through the site first.
     static let appStore = URL(string: "https://apps.apple.com/app/id6823569042")!
+    /// What shares end with: opens CNSNN when installed (universal link), otherwise the App Store or
+    /// Google Play, whichever fits the friend's phone.
+    static let app = URL(string: "https://cnsnn-9ctosy.web.app/app")!
 }
 
 /// The rules, readable from the profile, or to accept before playing on (`accepting`).

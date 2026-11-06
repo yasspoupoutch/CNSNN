@@ -27,7 +27,7 @@ object Share {
     fun text(attempt: Attempt, card: Card?, mode: GameMode): String {
         val outcome = if (attempt.correct) "trouvé en ${Format.clock(attempt.timeMs)}" else "raté"
         val title = if (mode == GameMode.DAILY) "Mot du jour ${attempt.dailyKey ?: DailySchedule.key(attempt.date)}" else "Classique"
-        return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "") + "\nJouez aussi : ${Site.URL}"
+        return "CNSNN · $title : $outcome" + (card?.let { "\n" + it.wordNoVowels } ?: "") + "\nJouez aussi : ${Site.APP}"
     }
 
     /** Shares plain text (challenge invitations). */

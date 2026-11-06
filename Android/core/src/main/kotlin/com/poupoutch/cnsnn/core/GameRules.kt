@@ -179,6 +179,8 @@ object Site {
     const val URL = "https://cnsnn-9ctosy.web.app"
     const val RULES = "$URL/regles"
     const val PRIVACY = "$URL/confidentialite"
+    /** What shares end with: opens CNSNN when installed, otherwise the App Store or Google Play of that phone. */
+    const val APP = "$URL/app"
     fun friendInvite(code: String) = FriendInvite.shareText(code)
 }
 

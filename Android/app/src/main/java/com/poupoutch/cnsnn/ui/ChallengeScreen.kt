@@ -503,7 +503,7 @@ private fun ChallengeResult(state: AppViewModel, game: ChallengeViewModel, close
                 if (result == null && byLink && code != null) TonalButton("Envoyer le lien", Modifier.weight(1f).testTag("shareChallengeLink")) {
                     Share.plain(context, ChallengeInvite.shareText(code))
                 } else if (result == null) TonalButton("Prévenir ${other.name}", Modifier.weight(1f)) {
-                    Share.plain(context, "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! ${Site.URL}")
+                    Share.plain(context, "Je t’ai défié sur CNSNN : 5 mots, mon chrono est caché jusqu’à ce que tu joues. Ouvre l’app pour relever le défi ! ${Site.APP}")
                 }
                 PrimaryButton("Terminer", Modifier.weight(1f), onClick = close)
             }

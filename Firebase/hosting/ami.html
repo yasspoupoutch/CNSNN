@@ -38,7 +38,7 @@
 </section>
 <h2>Vous n’avez pas encore l’application ?</h2>
 <ol>
-  <li>Installez CNSNN depuis l’App Store.</li>
+  <li>Installez CNSNN depuis l’App Store ou Google Play.</li>
   <li>Ouvrez-la une fois et choisissez un pseudo.</li>
   <li>Revenez dans la conversation et touchez de nouveau le lien : CNSNN s’ouvre et vous ajoute en amis.</li>
 </ol>
@@ -46,7 +46,8 @@
 <section class="card">
   <p class="muted" style="margin:0">Sur iPhone, CNSNN est gratuit sur l’App Store.</p>
   <div class="buttons"><a class="button" href="https://apps.apple.com/app/id6823569042">Télécharger sur l’App Store</a></div>
-  <p class="muted" style="margin:14px 0 0">Sur Android, CNSNN arrive bientôt sur Google Play.</p>
+  <p class="muted" style="margin:14px 0 0">Sur Android, CNSNN est gratuit sur Google Play.</p>
+  <div class="buttons"><a class="button" href="https://play.google.com/store/apps/details?id=com.poupoutch.cnsnn">Télécharger sur Google Play</a></div>
 </section>
 <!--/STORES-->
 <footer>CNSNN, une application créée par Poupoutch. Contact : <a href="mailto:jeucnsnn@gmail.com">jeucnsnn@gmail.com</a></footer>
@@ -66,12 +67,21 @@
     document.getElementById('open').hidden = true;
     document.getElementById('copy').hidden = true;
   }
-  // Android: no store yet (the page says Google Play is coming), so no install button there.
-  if (/android/i.test(navigator.userAgent)) document.getElementById('install').hidden = true;
-  // Same as defi.html: on an iPhone with CNSNN, iOS opens the app for this link, so reaching this page
-  // on an iPhone means the app is missing. Straight to the App Store; the player re-taps the link after.
+  const android = /android/i.test(navigator.userAgent);
+  const play = 'https://play.google.com/store/apps/details?id=com.poupoutch.cnsnn';
+  if (android) document.getElementById('install').href = play;
+  // With CNSNN installed, the phone opens the app for this link (universal link / App Link) and this
+  // page never shows. Reaching it on a phone means the app is missing (or, on Android, an older version
+  // that did not claim these links yet): open the app if it is there, otherwise go to the store.
+  // Once installed, the player taps the same link again and the app opens on it.
   const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (code && iPhone) location.replace(document.getElementById('install').href);
+  if (code && android) {
+    // Chrome opens the app when installed, else follows browser_fallback_url to Google Play.
+    location.replace('intent://a/' + code + '#Intent;scheme=cnsnn;package=com.poupoutch.cnsnn;S.browser_fallback_url=' + encodeURIComponent(play) + ';end');
+    // Browsers that ignore intent links (some in-app browsers): Google Play after a moment, unless the app opened.
+    setTimeout(() => { if (!document.hidden) location.replace(play); }, 1500);
+  }
   document.getElementById('copy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(code); status.className = 'status ok'; status.textContent = 'Code copié.'; }
     catch { status.className = 'status'; status.textContent = 'Notez le code : ' + code; }

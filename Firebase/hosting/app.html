@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jouer à CNSNN</title>
+<meta name="description" content="CNSNN, le jeu de mots sans voyelles : gratuit sur iPhone et Android.">
+<meta property="og:title" content="Joue à CNSNN">
+<meta property="og:description" content="Retrouve le mot à partir de ses seules consonnes. Mot du jour, chrono, défis entre amis.">
+<meta property="og:image" content="https://cnsnn-9ctosy.web.app/partage.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#06070c">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/style.css">
+<script>
+  // The link every share ends with. With CNSNN installed, the phone opens the app for it (universal
+  // link / App Link) and this page never shows. Without it: straight to the store of this phone.
+  (() => {
+    const ua = navigator.userAgent;
+    const iPhone = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (iPhone) location.replace('https://apps.apple.com/app/id6823569042');
+    else if (/android/i.test(ua)) location.replace('https://play.google.com/store/apps/details?id=com.poupoutch.cnsnn');
+  })();
+</script>
+</head>
+<body>
+<main>
+<nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a></nav>
+<h1>Joue à CNSNN</h1>
+<p class="lead">Le jeu de mots sans voyelles, gratuit sur iPhone et Android.</p>
+<div class="buttons">
+  <a class="button" href="https://apps.apple.com/app/id6823569042">App Store</a>
+  <a class="button" href="https://play.google.com/store/apps/details?id=com.poupoutch.cnsnn">Google Play</a>
+</div>
+<footer>CNSNN, une application créée par Poupoutch. Contact : <a href="mailto:jeucnsnn@gmail.com">jeucnsnn@gmail.com</a></footer>
+</main>
+</body>
+</html>
