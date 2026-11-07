@@ -1,0 +1,10 @@
+{
+  "defaultLocale": "fr",
+  "resetPasswordTemplate": {
+    "senderDisplayName": "CNSNN",
+    "replyTo": "jeucnsnn@gmail.com",
+    "subject": "Ton nouveau mot de passe CNSNN",
+    "bodyFormat": "HTML",
+    "body": "<div style=\"margin:0;padding:32px 16px;background:#f4efe6;font-family:Georgia,'Times New Roman',serif;color:#1f1d1a\"><div style=\"max-width:460px;margin:0 auto;background:#ffffff;border-radius:20px;padding:36px 28px;text-align:center;border:1px solid #eadfc8\"><div style=\"font-size:34px;font-weight:700;letter-spacing:6px;color:#1f1d1a\">CNSNN</div><div style=\"width:40px;height:3px;background:#c9a24a;margin:14px auto 26px;border-radius:2px\"></div><p style=\"font-size:18px;margin:0 0 12px\">Bonjour !</p><p style=\"font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#4a4540;margin:0 0 26px\">Tu as demandé à changer le mot de passe de ton compte CNSNN (%EMAIL%). Appuie sur le bouton pour en choisir un nouveau.</p><a href=\"%LINK%\" style=\"display:inline-block;background:#c9a24a;color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:600;font-size:16px;padding:14px 28px;border-radius:999px\">Choisir mon mot de passe</a><p style=\"font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#8a837a;margin:26px 0 0\">Ce n'est pas toi ? Ignore simplement ce mail, ton mot de passe ne change pas.</p></div><p style=\"font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#8a837a;text-align:center;margin:18px 0 0\">CNSNN, le jeu des mots sans voyelles · jeucnsnn@gmail.com</p></div>"
+  }
+}

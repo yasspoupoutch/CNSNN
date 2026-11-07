@@ -27,6 +27,15 @@ on:
         description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
         type: boolean
         default: false
+      auth_email:
+        description: "Mail « mot de passe oublié » : voir (réglages actuels) ou appliquer (Firebase/tools/auth-email.json)"
+        type: choice
+        options: ['', voir, appliquer]
+        default: ''
+      account_check:
+        description: "Vérifier un compte par son e-mail (existe ?, connexion, pseudo ; l'e-mail n'est pas affiché)"
+        type: string
+        default: ''
       deploy:
         description: Publier les règles et index Firestore sur cnsnn-9ctosy
         type: boolean
@@ -128,7 +137,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.week_check)) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -189,6 +198,17 @@ jobs:
       - name: Liste des joueurs (chiffrée)
         if: ${{ inputs.players }}
         run: node tools/players.mjs tools/players.pem
+      - name: Voir le mail « mot de passe oublié »
+        if: ${{ inputs.auth_email == 'voir' }}
+        run: node tools/auth-email.mjs show
+      - name: Appliquer le mail « mot de passe oublié »
+        if: ${{ inputs.auth_email == 'appliquer' && github.ref == 'refs/heads/main' }}
+        run: node tools/auth-email.mjs apply
+      - name: Vérifier un compte
+        if: ${{ inputs.account_check != '' }}
+        env:
+          ACCOUNT_EMAIL: ${{ inputs.account_check }}
+        run: node tools/account-check.mjs
       - name: Joueurs absents du classement de la semaine
         if: ${{ inputs.week_check }}
         run: node tools/week.mjs
