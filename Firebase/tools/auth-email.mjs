@@ -10,7 +10,7 @@ const { access_token: token } = await applicationDefault().getAccessToken();
 const call = async (method, target, body) => {
   const res = await fetch(target, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-goog-user-project': 'cnsnn-9ctosy' }, body: body && JSON.stringify(body) });
   const json = await res.json();
-  if (!res.ok) { console.error(`Erreur ${res.status} : ${json.error?.message ?? JSON.stringify(json)}`); process.exit(1); }
+  if (!res.ok) { const e = new Error(`Erreur ${res.status} : ${json.error?.message ?? JSON.stringify(json)}`); e.status = res.status; throw e; }
   return json;
 };
 const show = (config) => {
@@ -34,5 +34,14 @@ else if (mode === 'apply') {
   const wanted = JSON.parse(await readFile(new URL('./auth-email.json', import.meta.url), 'utf8'));
   const masks = ['notification.defaultLocale', ...Object.keys(wanted.resetPasswordTemplate).map((k) => `notification.sendEmail.resetPasswordTemplate.${k}`)];
   const body = { notification: { defaultLocale: wanted.defaultLocale, sendEmail: { resetPasswordTemplate: wanted.resetPasswordTemplate } } };
-  show(await call('PATCH', `${url}?updateMask=${masks.join(',')}`, body));
+  try {
+    show(await call('PATCH', `${url}?updateMask=${masks.join(',')}`, body));
+  } catch (e) {
+    // Firebase may refuse a custom text for this email (anti-spam): keep sender, subject and language.
+    console.log(`${e.message}\nNouvel essai sans le texte personnalisé.`);
+    delete body.notification.sendEmail.resetPasswordTemplate.body;
+    delete body.notification.sendEmail.resetPasswordTemplate.bodyFormat;
+    const kept = masks.filter((m) => !m.endsWith('.body') && !m.endsWith('.bodyFormat'));
+    show(await call('PATCH', `${url}?updateMask=${kept.join(',')}`, body));
+  }
 } else { console.error('Usage : auth-email.mjs show|apply'); process.exit(1); }
