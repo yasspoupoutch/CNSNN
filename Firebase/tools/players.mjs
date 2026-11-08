@@ -1,5 +1,6 @@
 // Every player who chose a pseudo, played or not: pseudo, account creation, last sign-in, guest or
-// email account, daily words played, practice progress synced. Accounts that never chose a pseudo are
+// email account, daily words played, practice progress synced, and games played per mode (Classique
+// counts each word played, Sprint, Survie and Double sens each finished game; read from the synced progress). Accounts that never chose a pseudo are
 // only counted. Read-only. Printed only encrypted for the given public key (the logs may become public),
 // never an email address. Costs about one read per player plus one per 1,000 daily results.
 // Usage: players.mjs key.pem   Needs GOOGLE_APPLICATION_CREDENTIALS.
@@ -27,7 +28,18 @@ for (const d of (await db.collection('dailyResults').select('userId').get()).doc
   dailies.set(uid, (dailies.get(uid) ?? 0) + 1);
 }
 const profiles = (await db.collection('users').select('username', 'createdAt').get()).docs;
-const progress = profiles.length ? await db.getAll(...profiles.map((p) => db.doc(`users/${p.id}/private/progress`)), { fieldMask: ['updatedAt'] }) : [];
+const progress = profiles.length ? await db.getAll(...profiles.map((p) => db.doc(`users/${p.id}/private/progress`)), { fieldMask: ['json'] }) : [];
+
+// Games per mode from the synced progress JSON (see Progress / ModeRecords in the apps).
+const played = (doc) => {
+  let p = {};
+  try { p = JSON.parse(doc.exists ? doc.get('json') ?? '{}' : '{}'); } catch { /* unreadable: zero */ }
+  const games = (key) => Object.values(p.modes?.[key]?.counts?.games ?? {}).reduce((a, b) => a + b, 0);
+  return {
+    classic: (p.attempts ?? []).filter((a) => a.mode === 'classic').length,
+    sprint: games('sprint'), survival: games('survival'), duo: games('duo'),
+  };
+};
 
 const iso = (t) => (t ? new Date(t).toISOString() : null);
 const players = profiles.map((p, i) => {
@@ -39,6 +51,7 @@ const players = profiles.map((p, i) => {
     account: account ? (account.email ? 'email' : 'invité') : 'supprimé',
     dailies: dailies.get(p.id) ?? 0,
     practice: progress[i].exists,
+    ...played(progress[i]),
   };
 }).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 
