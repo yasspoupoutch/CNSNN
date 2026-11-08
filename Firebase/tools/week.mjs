@@ -41,3 +41,18 @@ for (const [uid, u] of byUser) {
   console.log(`- ${u.name} : ${u.days.length} jour(s) joué(s) (${u.days.sort().join(', ')}), ${u.found} trouvé(s), ${u.catchUp} rattrapage(s) ; ligne : lastResult ${b?.lastResult ?? '—'}, week ${b?.week ?? '—'}/${b?.weekPlayed ?? '—'} joués, monthPlayed ${b?.monthPlayed ?? '—'} → ${why}`);
 }
 console.log(missing ? `${missing} joueur(s) absent(s).` : 'Personne ne manque.');
+
+// Today's Mot du jour games (finished since midnight in Paris), and which ones are out of today's
+// ranking: lost, caught-up day, suspended. One read per result finished today.
+const parisOffset = (d) => { const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Paris', timeZoneName: 'shortOffset' }).formatToParts(d).find((x) => x.type === 'timeZoneName').value; return Number(p.replace('GMT', '') || 0); };
+const midnight = new Date(Date.parse(today + 'T00:00:00Z') - parisOffset(new Date(today + 'T12:00:00Z')) * 3600000);
+const played = (await db.collection('dailyResults').where('finishedAt', '>=', midnight).get()).docs.map((d) => d.data())
+  .filter((r) => r.finishedAt.toDate() < new Date(midnight.getTime() + 86400000));
+const hour = (r) => new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(r.finishedAt.toDate());
+const inRanking = played.filter((r) => r.day === today && r.catchUp !== true && r.correct && r.suspended !== true);
+console.log(`\nAujourd'hui ${today} (heure de Paris) : ${played.length} parties de Mot du jour terminées, ${inRanking.length} dans le classement du jour.`);
+console.log('Dans le classement : ' + inRanking.sort((a, b) => a.rank - b.rank).map((r) => r.username).join(', '));
+for (const r of played.filter((x) => !inRanking.includes(x)).sort((a, b) => a.finishedAt.toMillis() - b.finishedAt.toMillis())) {
+  const why = r.suspended === true ? 'suspendu' : r.catchUp === true ? `rattrapage du ${r.day} (${r.correct ? 'trouvé' : 'perdu'})` : r.day !== today ? `mot du ${r.day} (autre fuseau horaire)` : 'perdu';
+  console.log(`- ${r.username} à ${hour(r)} : ${why}`);
+}
