@@ -56,3 +56,17 @@ for (const r of played.filter((x) => !inRanking.includes(x)).sort((a, b) => a.fi
   const why = r.suspended === true ? 'suspendu' : r.catchUp === true ? `rattrapage du ${r.day} (${r.correct ? 'trouvé' : 'perdu'})` : r.day !== today ? `mot du ${r.day} (autre fuseau horaire)` : 'perdu';
   console.log(`- ${r.username} à ${hour(r)} : ${why}`);
 }
+
+// Daily sessions started today with no result: finished but not published (still on the phone), or
+// abandoned (word open, no answer). One read per session started today.
+const resultIds = new Set(played.map((r) => r.userId + '_' + r.day));
+const sessions = (await db.collection('dailySessions').where('startedAt', '>=', midnight).get()).docs
+  .filter((d) => d.get('startedAt').toDate() < new Date(midnight.getTime() + 86400000) && !resultIds.has(d.id));
+const names = new Map();
+for (const s of sessions) { const u = await db.doc('users/' + s.get('userId')).get(); names.set(s.id, u.get('username') ?? '(sans pseudo)'); }
+console.log(`\nParties commencées aujourd'hui sans résultat publié : ${sessions.length}`);
+for (const s of sessions) {
+  const d = s.data(), at = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(d.startedAt.toDate());
+  const state = 'finishedAt' in d ? `terminée (${d.correct ? 'trouvé' : 'perdu'}) mais résultat pas publié` : `pas terminée (${d.wrongAnswers ?? 0} erreur(s), indice ${d.hintUsed ? 'oui' : 'non'})`;
+  console.log(`- ${names.get(s.id)} : mot du ${d.day}${d.catchUp ? ' (rattrapage)' : ''}, commencée à ${at}, ${state}`);
+}
