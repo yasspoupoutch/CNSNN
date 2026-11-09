@@ -410,12 +410,12 @@ service cloud.firestore {
    // Authors may withdraw a proposal that is not live, and admins may remove anything.
    allow delete: if (signedIn() && resource.data.createdBy == request.auth.uid && resource.data.status != 'approved') || admin();
   }
-  // Anti-spam: 30 s between proposals and at most 10 per rolling 24 h. The profile carries the
+  // Anti-spam: 10 s between proposals and at most 10 per rolling 24 h. The profile carries the
   // counters and they can only move forward, so a proposal must be paired with a quota update.
   function consumesProposalQuota(before, after) {
    let fresh = !('proposalWindowAt' in before) || request.time > before.proposalWindowAt + duration.value(24, 'h');
    return after.lastProposalAt == request.time
-    && (!('lastProposalAt' in before) || request.time > before.lastProposalAt + duration.value(30, 's'))
+    && (!('lastProposalAt' in before) || request.time > before.lastProposalAt + duration.value(10, 's'))
     && (fresh
       ? (after.proposalWindowAt == request.time && after.proposalCount == 1)
       : (after.proposalWindowAt == before.proposalWindowAt && after.proposalCount == before.proposalCount + 1 && after.proposalCount <= 10));

@@ -487,7 +487,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun submit(card: Card): Boolean = try {
         val word = WordEngine.normalize(card.wordFull)
-        if ((cards + DailyPool.all).any { WordEngine.normalize(it.wordFull) == word }) throw CloudError(CloudError.Kind.DUPLICATE_WORD)
+        if ((cards + DailyPool.all).any { WordEngine.normalize(it.wordFull) == word }) throw CloudError(CloudError.Kind.WORD_IN_GAME)
         val user = uid ?: throw CloudError(CloudError.Kind.OFFLINE)
         val stored = cloud.submit(card, user)
         update { it.copy(submissions = it.submissions + Submission(card = stored)) }

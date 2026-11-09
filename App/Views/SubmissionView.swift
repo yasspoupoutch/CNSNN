@@ -10,10 +10,12 @@ struct ProposeView: View {
     @State private var difficulty = Difficulty.easy
     @State private var busy = false
     @State private var sent = false
+    /// Seconds before the next proposal is allowed (the server wants 10 s between two).
+    @State private var wait = 0
     @FocusState private var focus: Field?
     private enum Field { case word, hint }
     private var trimmedHint: String { hint.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canSend: Bool { !busy && WordEngine.validWord(word) && (5...160).contains(trimmedHint.count) }
+    private var canSend: Bool { !busy && wait == 0 && WordEngine.validWord(word) && (5...160).contains(trimmedHint.count) }
 
     var body: some View {
         ScrollView {
@@ -34,7 +36,7 @@ struct ProposeView: View {
                 }
                 chips(CNSNNCore.Category.allCases, selection: $category)
                 chips(Difficulty.allCases, selection: $difficulty)
-                Button(busy ? "Envoi…" : (state.uid == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
+                Button(busy ? "Envoi…" : wait > 0 ? "Proposition suivante dans \(wait) s" : (state.uid == nil ? "Enregistrer la proposition" : "Envoyer pour validation"), action: send)
                     .buttonStyle(PrimaryPillStyle(height: 54)).disabled(!canSend).padding(.top, 2)
                 Text(sent ? (state.uid == nil ? "✓ Proposition enregistrée sur cet iPhone." : "✓ Proposition envoyée. Vous verrez son statut ci-dessous.") : (state.uid == nil ? "Y compte comme une voyelle. Sans serveur, les propositions restent sur cet iPhone." : "Y compte comme une voyelle. Chaque mot n’existe qu’une fois dans le jeu. Jusqu’à 10 propositions par jour, privées jusqu’à leur validation."))
                     .scaledFont(12).foregroundStyle(sent ? Palette.mint : Palette.tertiary).padding(.horizontal, 4)
@@ -129,6 +131,10 @@ struct ProposeView: View {
             if await state.submit(card) {
                 Haptics.success()
                 word = ""; hint = ""; sent = true
+                busy = false
+                guard state.uid != nil else { return }
+                wait = 11
+                while wait > 0 { try? await Task.sleep(for: .seconds(1)); wait -= 1 }
             }
             busy = false
         }
