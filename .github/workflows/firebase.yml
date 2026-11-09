@@ -27,6 +27,10 @@ on:
         description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
         type: boolean
         default: false
+      proposals:
+        description: Propositions de mots (tous statuts, auteurs, dates ; chiffrée)
+        type: boolean
+        default: false
       auth_email:
         description: "Mail « mot de passe oublié » : voir (réglages actuels) ou appliquer (Firebase/tools/auth-email.json)"
         type: choice
@@ -137,7 +141,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -198,6 +202,9 @@ jobs:
       - name: Liste des joueurs (chiffrée)
         if: ${{ inputs.players }}
         run: node tools/players.mjs tools/players.pem
+      - name: Propositions de mots (chiffrée)
+        if: ${{ inputs.proposals }}
+        run: node tools/proposals.mjs daily/preview.pem
       - name: Voir le mail « mot de passe oublié »
         if: ${{ inputs.auth_email == 'voir' }}
         run: node tools/auth-email.mjs show
