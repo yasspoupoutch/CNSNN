@@ -660,23 +660,24 @@ class CloudRepository(
 
     /**
      * Proposes a card under its normalized word, which makes duplicates impossible, and consumes
-     * the anti-spam quota (30 s apart, 10 per 24 h) in the same batch.
+     * the anti-spam quota (10 s apart, 10 per 24 h) in the same batch.
      */
     suspend fun submit(card: Card, uid: String): Card {
         val id = WordEngine.normalize(card.wordFull)
         val ref = db.collection("cards").document(id)
-        val exists = try {
-            ref.get(Source.SERVER).await().exists()
+        val existing = try {
+            ref.get(Source.SERVER).await().let { if (it.exists()) it.getString("status") ?: "" else null }
         } catch (error: Exception) {
             // Someone else's pending or refused proposal: it exists but is private.
-            if (CloudError.code(error) == CloudError.Code.PERMISSION_DENIED) true else throw error
+            if (CloudError.code(error) == CloudError.Code.PERMISSION_DENIED) "private" else throw error
         }
-        if (exists) throw CloudError(CloudError.Kind.DUPLICATE_WORD)
+        if (existing == "approved") throw CloudError(CloudError.Kind.WORD_IN_GAME)
+        if (existing != null) throw CloudError(CloudError.Kind.DUPLICATE_WORD)
         val userRef = db.collection("users").document(uid)
         val profile = userRef.get(Source.SERVER).await()
         val now = Instant.now()
         val quota = mutableMapOf<String, Any>("updatedAt" to FieldValue.serverTimestamp(), "lastProposalAt" to FieldValue.serverTimestamp())
-        profile.getTimestamp("lastProposalAt")?.let { if (now.epochSecond - it.seconds < 31) throw CloudError(CloudError.Kind.PROPOSAL_TOO_SOON) }
+        profile.getTimestamp("lastProposalAt")?.let { if (now.epochSecond - it.seconds < 11) throw CloudError(CloudError.Kind.PROPOSAL_TOO_SOON) }
         val window = profile.getTimestamp("proposalWindowAt")
         if (window != null && now.epochSecond - window.seconds < 24 * 3600 - 60) {
             val count = (profile.getLong("proposalCount") ?: 0).toInt() + 1

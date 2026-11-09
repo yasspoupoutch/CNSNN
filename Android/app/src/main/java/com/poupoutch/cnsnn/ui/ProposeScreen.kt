@@ -45,6 +45,7 @@ import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.ReviewStatus
 import com.poupoutch.cnsnn.core.WordEngine
 import com.poupoutch.cnsnn.state.AppViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -57,8 +58,10 @@ fun ProposeScreen(state: AppViewModel, inSheet: Boolean = false) {
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.entries.first()) }
     var busy by rememberSaveable { mutableStateOf(false) }
     var sent by rememberSaveable { mutableStateOf(false) }
+    // Seconds before the next proposal is allowed (the server wants 10 s between two).
+    var wait by rememberSaveable { mutableStateOf(0) }
     val trimmedHint = hint.trim()
-    val canSend = !busy && WordEngine.validWord(word) && trimmedHint.length in 5..160 && !state.isSuspended
+    val canSend = !busy && wait == 0 && WordEngine.validWord(word) && trimmedHint.length in 5..160 && !state.isSuspended
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val haptics = rememberHaptics()
@@ -90,11 +93,15 @@ fun ProposeScreen(state: AppViewModel, inSheet: Boolean = false) {
             supportingText = { Text("${trimmedHint.length}/160", color = if (trimmedHint.isEmpty() || trimmedHint.length in 5..160) Palette.tertiary else Palette.red) })
         ChipRow(Category.entries, category, { it.label }) { category = it }
         ChipRow(Difficulty.entries, difficulty, { it.label }) { difficulty = it }
-        PrimaryButton(if (busy) "Envoi…" else "Envoyer pour validation", enabled = canSend) {
+        PrimaryButton(if (busy) "Envoi…" else if (wait > 0) "Proposition suivante dans $wait s" else "Envoyer pour validation", enabled = canSend) {
             busy = true; sent = false; focus.clearFocus()
             scope.launch {
                 val card = Card(UUID.randomUUID().toString(), word.trim(), trimmedHint, category, difficulty, ReviewStatus.PENDING)
-                if (state.submit(card)) { haptics.success(); word = ""; hint = ""; sent = true }
+                if (state.submit(card)) {
+                    haptics.success(); word = ""; hint = ""; sent = true; busy = false
+                    wait = 11
+                    while (wait > 0) { delay(1000); wait -= 1 }
+                }
                 busy = false
             }
         }

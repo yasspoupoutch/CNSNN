@@ -536,9 +536,12 @@ test('proposal needs the quota update and respects the cooldown',async()=>{
  await assertFails(setDoc(doc(user(),'cards/CHOCOLAT'),card()));
  await assertSucceeds(propose());
  const second={...card(),wordFull:'Croissant',wordNoVowels:'CRSSNT',normalizedAnswer:'CROISSANT'};
- // Within 30 s of the previous proposal.
+ // Within 10 s of the previous proposal.
  const p=await read('users/alice');
  await assertFails(propose('alice','CROISSANT',second,{updatedAt:serverTimestamp(),lastProposalAt:serverTimestamp(),proposalWindowAt:p.proposalWindowAt,proposalCount:2}));
+ // 15 s later is fine.
+ await env.withSecurityRulesDisabled(async c=>{await updateDoc(doc(c.firestore(),'users/alice'),{lastProposalAt:Timestamp.fromMillis(Date.now()-15000)});});
+ await assertSucceeds(propose('alice','CROISSANT',second,{updatedAt:serverTimestamp(),lastProposalAt:serverTimestamp(),proposalWindowAt:p.proposalWindowAt,proposalCount:2}));
  // Quota counters cannot be reset by hand.
  await assertFails(updateDoc(doc(user(),'users/alice'),{updatedAt:serverTimestamp(),proposalCount:0}));
 });

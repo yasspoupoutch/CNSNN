@@ -844,12 +844,13 @@ enum DailyGuesses {
         batch.setData(["updatedAt": FieldValue.serverTimestamp()], forDocument: db.collection("meta").document("cards"))
     }
     /// Proposes a card under its normalized word, which makes duplicates impossible,
-    /// and consumes the anti-spam quota (30 s apart, 10 per 24 h) in the same batch.
+    /// and consumes the anti-spam quota (10 s apart, 10 per 24 h) in the same batch.
     func submit(card: Card, uid: String) async throws -> Card {
         let id = WordEngine.normalize(card.wordFull)
         let ref = db.collection("cards").document(id)
         do {
-            if try await ref.getDocument(source: .server).exists { throw CloudError.duplicateWord }
+            let existing = try await ref.getDocument(source: .server)
+            if existing.exists { throw existing.data()?["status"] as? String == "approved" ? CloudError.wordInGame : CloudError.duplicateWord }
         } catch where CloudError.code(error) == .permissionDenied {
             // Someone else's pending or refused proposal: it exists but is private.
             throw CloudError.duplicateWord
@@ -857,7 +858,7 @@ enum DailyGuesses {
         let userRef = db.collection("users").document(uid)
         let profile = try await userRef.getDocument(source: .server).data() ?? [:]
         var quota: [String: Any] = ["updatedAt": FieldValue.serverTimestamp(), "lastProposalAt": FieldValue.serverTimestamp()]
-        if let last = (profile["lastProposalAt"] as? Timestamp)?.dateValue(), Date().timeIntervalSince(last) < 31 { throw CloudError.proposalTooSoon }
+        if let last = (profile["lastProposalAt"] as? Timestamp)?.dateValue(), Date().timeIntervalSince(last) < 11 { throw CloudError.proposalTooSoon }
         if let window = profile["proposalWindowAt"] as? Timestamp, Date().timeIntervalSince(window.dateValue()) < 24 * 3600 - 60 {
             let count = (profile["proposalCount"] as? Int ?? 0) + 1
             guard count <= 10 else { throw CloudError.proposalQuota }
@@ -1088,6 +1089,7 @@ enum CloudError: LocalizedError {
     case offline
     case progressTooLarge
     case duplicateWord
+    case wordInGame
     case proposalTooSoon
     case proposalQuota
     case alreadyReported
@@ -1147,7 +1149,8 @@ enum CloudError: LocalizedError {
         case .offline: "Pas de connexion au serveur. Vérifiez le réseau puis réessayez."
         case .progressTooLarge: "Votre historique est trop volumineux pour être synchronisé."
         case .duplicateWord: "Ce mot a déjà été proposé. Essayez-en un autre."
-        case .proposalTooSoon: "Patientez quelques secondes avant une nouvelle proposition."
+        case .wordInGame: "Ce mot est déjà dans le jeu. Essayez-en un autre."
+        case .proposalTooSoon: "Patientez 10 secondes entre deux propositions."
         case .proposalQuota: "Vous avez atteint la limite de 10 propositions par jour. Revenez demain."
         case .alreadyReported: "Votre signalement est déjà envoyé. Merci !"
         case .friendNotFound: "Aucun joueur n’a ce code. Vérifiez les 6 caractères."
