@@ -75,7 +75,21 @@
   // that did not claim these links yet): open the app if it is there, otherwise go to the store.
   // Once installed, the player taps the same link again and the app opens on it.
   const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (code && iPhone) location.replace(document.getElementById('install').href);
+  // Snapchat, Instagram, TikTok, Facebook… show links in their own browser, which never hands a
+  // universal link to the app: there, reaching this page does not mean CNSNN is missing. So try the
+  // app's own address and stay on the page (no App Store jump), with « Ouvrir » as the main button,
+  // since some of these browsers only follow cnsnn:// after a tap.
+  const ua = navigator.userAgent;
+  const inApp = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|LinkedInApp|Twitter|Pinterest|Line\/|GSA\/|KAKAOTALK/i.test(ua) || !/Safari\//.test(ua);
+  if (code && iPhone && inApp) {
+    const open = document.getElementById('open');
+    open.textContent = 'Ouvrir le défi dans CNSNN';
+    open.className = 'button';
+    document.getElementById('install').className = 'button ghost';
+    open.parentNode.insertBefore(open, open.parentNode.firstChild);
+    document.getElementById('hint').textContent = 'Si CNSNN ne s’ouvre pas tout seul, touchez « Ouvrir le défi dans CNSNN ». Pas encore l’application ? Installez-la, puis revenez toucher le lien.';
+    location.href = 'cnsnn://d/' + code;
+  } else if (code && iPhone) location.replace(document.getElementById('install').href);
   if (code && android) {
     // Chrome opens the app when installed, else follows browser_fallback_url to Google Play.
     location.replace('intent://d/' + code + '#Intent;scheme=cnsnn;package=com.poupoutch.cnsnn;S.browser_fallback_url=' + encodeURIComponent(play) + ';end');
