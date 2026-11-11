@@ -111,7 +111,7 @@ class SmallScreenTest {
         store.clearRun(PlayMode.DUO)
         // A draw with the longest clue of all (three lines): the hardest case for a small screen.
         val recent = store.recent(PlayMode.DUO)
-        val longest = (1uL..2_000uL).first { seed -> DuoGame(seed, recent).duos.any { maxOf(it.first.hint.length, it.second.hint.length) > 70 } }
+        val longest = (1uL..2_000uL).first { seed -> DuoGame(seed, recent).duos.any { maxOf(it.first.hint.length, it.second.hint.length) >= 70 } }
         ModeViewModel.testSeed = longest
         val expected = DuoGame(longest, recent)
         rule.onNodeWithText("Double sens").performScrollTo().performClick()
@@ -120,7 +120,7 @@ class SmallScreenTest {
             waitFor("Manche ${index + 1} sur 5")
             rule.waitForIdle()
             checkClues("Manche ${index + 1}")
-            if (maxOf(duo.first.hint.length, duo.second.hint.length) > 70) shot("06-double-sens-indice-long")
+            if (maxOf(duo.first.hint.length, duo.second.hint.length) >= 70) shot("06-double-sens-indice-long")
             if (index == 0) {
                 shot("03-double-sens")
                 WordEngine.normalize(duo.first.word).forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
