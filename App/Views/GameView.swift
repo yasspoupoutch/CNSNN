@@ -21,7 +21,7 @@ struct GameView: View {
     /// true on "À vous de jouer", false on "Passer".
     var tutorial: ((Bool) -> Void)? = nil
     @State private var demo = TutorialDemo()
-    /// "Besoin d’un indice ?" over the Indice button, after a minute on the Mot du jour.
+    /// "Un indice ?" beside the Indice button, 30 s into the Mot du jour and 30 s after the first hint.
     @State private var hintNudge = false
 
     var body: some View {
@@ -41,8 +41,8 @@ struct GameView: View {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
                 VStack {
                     Spacer()
-                    ResultSheet(result: result, card: session.card, mode: mode, firstTry: finishedHere && session.wrongAnswers == 0 && !session.usedHint,
-                                usedHint: session.usedHint, standing: session.standing, pending: session.pendingOfficial, ranked: session.ranked,
+                    ResultSheet(result: result, card: session.card, mode: mode, firstTry: finishedHere && session.wrongAnswers == 0 && session.hintsTaken == 0,
+                                usedHint: session.usedHint, usedVowels: session.usedVowels, standing: session.standing, pending: session.pendingOfficial, ranked: session.ranked,
                                 catchUp: catchUpDay != nil, next: nextCard, close: { dismiss() })
                         .padding(.horizontal, 8)
                 }.readableWidth().transition(.move(edge: .bottom))
@@ -65,7 +65,7 @@ struct GameView: View {
             Button("Annuler", role: .cancel) {}
         }
         // In the tutorial, the real Indice moves the bubble on.
-        .onChange(of: session.usedHint) { _, used in if tutorial != nil && used { demo.hintShown = true } }
+        .onChange(of: session.hintsTaken) { _, taken in if tutorial != nil && taken > 0 { demo.hintShown = true } }
         .onChange(of: session.result?.id) { _, _ in
             guard mode == .daily, catchUpDay == nil, session.result?.correct == true else { return }
             if ReminderOffer.shouldOffer() { state.reminderPending = true }
@@ -77,11 +77,15 @@ struct GameView: View {
             }
         }
         .task { if tutorial != nil { session.loadTutorial(Tutorial.card) } else if session.card == nil && session.result == nil { session.load(mode: mode, category: category, difficulty: difficulty, catchUp: catchUpDay, state: state) } }
-        .task(id: session.card?.id) {
+        // "Un indice ?" 30 s after the start, then again 30 s after the first hint, for the second one.
+        .task(id: "\(session.card?.id ?? "")-\(session.hintsTaken)") {
             hintNudge = false
-            guard mode == .daily, tutorial == nil else { return }
+            guard mode == .daily, tutorial == nil, !session.usedHint else { return }
+            let firstHint = session.hintsTaken == 0
+            let since = Date()
             while !Task.isCancelled, !session.usedHint, session.result == nil {
-                if session.phase == .playing, session.card != nil, session.elapsedMs >= 60_000 { hintNudge = true; return }
+                let waited = firstHint ? session.elapsedMs >= HintNudge.delayMs : Date().timeIntervalSince(since) * 1000 >= Double(HintNudge.delayMs)
+                if session.phase == .playing, session.card != nil, waited { hintNudge = true; return }
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -184,16 +188,19 @@ struct GameView: View {
             if hintNudge && !session.usedHint && session.result == nil && tutorial == nil {
                 HintNudge().transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
             }
+            // Two hints, one tap each: the word's vowels light up on the keyboard, then the sentence.
             Button {
                 Haptics.selection()
                 withAnimation(reduceMotion ? nil : CNSNNTheme.ease) { session.revealHint(state: state) }
             } label: {
                 HStack(spacing: 8) {
-                    Text("Indice").fontWeight(.bold)
-                    if session.usedHint { Text("révélé") } else if session.ranked { Text("+1 min") }
+                    Text(session.usedHint ? "Indices" : session.hintsTaken == 0 ? "Indice" : "Indice 2").fontWeight(.bold)
+                    if session.usedHint { Text("révélés") }
+                    else if session.ranked { Text(HintCost.text(session.hintsTaken == 0 ? HintCost.vowelsMs : HintCost.sentenceMs)) }
                 }.scaledFont(13, .medium).foregroundStyle(Palette.foreground)
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.usedHint || session.result != nil || session.checking).opacity(session.usedHint ? 0.5 : 1)
+            .accessibilityHint(session.hintsTaken == 0 ? "Allume les voyelles du mot sur le clavier." : session.usedHint ? "" : "Affiche une phrase sur le mot.")
             .tutorialTarget(.hint)
             .animation(reduceMotion ? nil : CNSNNTheme.ease, value: hintNudge)
             Button { confirmSkip = true } label: {
@@ -201,7 +208,13 @@ struct GameView: View {
                     .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
             }.buttonStyle(PressStyle()).disabled(session.result != nil)
         }.padding(.vertical, 12)
-        LetterKeyboard(press: press, delete: delete, moveCursor: { steps in edit { $0.move(by: steps) } }, submit: submit)
+        LetterKeyboard(lit: session.vowels ?? "", press: press, delete: delete, moveCursor: { steps in edit { $0.move(by: steps) } }, submit: submit)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.45), value: session.vowels)
+            .onChange(of: session.vowels) { _, lit in
+                guard let lit, !lit.isEmpty else { return }
+                Haptics.success()
+                AccessibilityNotification.Announcement("Voyelles du mot : " + lit.map(String.init).joined(separator: ", ")).post()
+            }
     }
 
     private var answerLine: some View {
@@ -309,12 +322,20 @@ private struct ResultSheet: View {
     var mode: GameMode
     var firstTry: Bool
     var usedHint: Bool
+    var usedVowels = false
     var standing: DailyStanding?
     var pending: Bool
     var ranked: Bool
     var catchUp = false
     var next: () -> Void
     var close: () -> Void
+
+    /// The hints' price ("+30 s", "+1 min") or "non".
+    private var hintsTile: String {
+        let ms = DailyScore.penaltyMs(usedHint: usedHint, usedVowels: usedVowels)
+        return ms == 0 ? "non" : HintCost.text(ms)
+    }
+    private var hintsLabel: String { usedHint && usedVowels ? "indices" : "indice" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -332,14 +353,14 @@ private struct ResultSheet: View {
             }
             HStack(spacing: 10) {
                 if catchUp {
-                    // Counted in the week: the real time, the hint minute, then 5 minutes more.
-                    tile(Format.clock(DailyScore.catchUpScoreMs(timeMs: result.timeMs, usedHint: usedHint, correct: result.correct)), "compté", Palette.foreground)
-                    tile(usedHint ? "+1 min" : "non", "indice", Palette.foreground)
+                    // Counted in the week: the real time, the hints, then 5 minutes more.
+                    tile(Format.clock(DailyScore.catchUpScoreMs(timeMs: result.timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: result.correct)), "compté", Palette.foreground)
+                    tile(hintsTile, hintsLabel, Palette.foreground)
                     tile("\(CatchUp.toPlay(state.catchUpDays()))", "à rattraper", Palette.foreground)
                 } else if mode == .daily {
-                    // The ranked time: the hint adds a minute, a lost word counts ten.
-                    tile(Format.clock(DailyScore.scoreMs(timeMs: result.timeMs, usedHint: usedHint, correct: result.correct)), result.correct ? "temps" : "compté", Palette.foreground)
-                    tile(usedHint ? "+1 min" : "non", "indice", Palette.foreground)
+                    // The ranked time: the vowels add 30 s, the sentence 30 s more, a lost word counts ten.
+                    tile(Format.clock(DailyScore.scoreMs(timeMs: result.timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: result.correct)), result.correct ? "temps" : "compté", Palette.foreground)
+                    tile(hintsTile, hintsLabel, Palette.foreground)
                     tile("\(state.official?.currentStreak() ?? state.progress.streak())", "jours de série", Palette.foreground)
                 } else {
                     tile(Format.clock(result.timeMs), "temps", Palette.foreground)
@@ -454,8 +475,11 @@ private struct ResultSheet: View {
 
 /// AZERTY glass keyboard laid out like the iPhone's French one: same rows and key sizes, ⌫ at the right
 /// end of the third row, a wide space bar with Valider where Return goes, no dead zone between keys (a
-/// touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
+/// touch in a gap goes to the nearest key) and the letter popping up above the finger. Every key is
+/// grey: only the first hint lights the word's vowels in gold.
 struct LetterKeyboard: View {
+    /// The letters lit in gold (the word's vowels, once the first hint is taken).
+    var lit: String = ""
     var press: (String) -> Void
     var delete: () -> Void
     /// A long press on ⌫ erases the whole answer, when the screen offers it.
@@ -506,7 +530,7 @@ struct LetterKeyboard: View {
     private func letterRow(_ row: String, _ unit: CGFloat) -> some View {
         HStack(spacing: 0) {
             ForEach(Array(row), id: \.self) { letter in
-                KeyCap(label: String(letter), vowel: Vowels.contains(letter), width: unit) { press(String(letter)) }
+                KeyCap(label: String(letter), vowel: lit.contains(letter), width: unit) { press(String(letter)) }
             }
         }
     }
@@ -733,7 +757,25 @@ struct VowelReveal: View {
 
 /// "Un indice ?": a light bubble whose arrow points right at the Indice button. It blinks for its
 /// first 5 seconds, then stays.
+/// What each hint adds to the Mot du jour time (DailyScore): the vowels, then the sentence.
+enum HintCost {
+    static let vowelsMs = DailyScore.vowelsPenaltyMs
+    static let sentenceMs = DailyScore.hintPenaltyMs - DailyScore.vowelsPenaltyMs
+    /// " · voyelles +30 s", " · indices +1 min" in the day's ranking, nothing without a hint.
+    static func detail(usedHint: Bool, usedVowels: Bool) -> String {
+        let ms = DailyScore.penaltyMs(usedHint: usedHint, usedVowels: usedVowels)
+        guard ms > 0 else { return "" }
+        return (usedHint ? (usedVowels ? " · indices " : " · indice ") : " · voyelles ") + text(ms)
+    }
+    /// "+30 s", "+1 min".
+    static func text(_ ms: Int) -> String {
+        ms % 60_000 == 0 ? "+\(ms / 60_000) min" : "+\(ms / 1000) s"
+    }
+}
+
 private struct HintNudge: View {
+    /// Before the first hint (from the start), and before the second (from the first).
+    static let delayMs = 30_000
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dim = false
     var body: some View {

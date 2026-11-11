@@ -51,7 +51,7 @@ enum TutorialStep: Int, CaseIterable {
         case .first: "Les voyelles O et U reviennent se glisser entre T et R."
         case .second: "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !"
         case .top: "Sous les consonnes, le thème du mot pour vous mettre sur la piste. Le chrono, en haut à droite, part dès que vous appuyez sur Jouer."
-        case .help: "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."
+        case .help: "… prenez un indice ! Appuyez sur Indice : les voyelles du mot s’allument sur le clavier (+30 s sur le mot du jour)."
         }
     }
     /// What the board shows: the consonants, or the word with its vowels sliding in.
@@ -255,7 +255,7 @@ struct TutorialBubble: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($titleFocused)
-            Text(step == .help && hintShown ? "« Il a écrit le livre. » : c’est AUTEUR ! À vous de trouver le mot du jour." : step.message)
+            Text(step == .help && hintShown ? "A, E et U s’allument : avec TR, c’est AUTEUR ! Toujours bloqué ? Indice 2 donne une phrase (+30 s). À vous de jouer !" : step.message)
                 .scaledFont(15).foregroundStyle(Palette.ink.opacity(0.75)).padding(.top, 6)
                 .fixedSize(horizontal: false, vertical: true)
             // On the home page, Jouer is the only way on; on the hint step, Indice first.
