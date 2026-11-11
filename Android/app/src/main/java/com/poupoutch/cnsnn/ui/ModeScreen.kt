@@ -298,9 +298,10 @@ private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: 
         val top = if (compact) 6.dp else 18.dp
         val subtitle = if (compact) 0.dp else 16.dp
         val gap = if (compact) 10.dp else 16.dp
-        val room = maxHeight - with(density) { cluesHeight.toDp() } - top - subtitle - gap
-        // Serif line height is 1.1 × the size; a line in dp is the size in sp × the font scale.
-        val fitted = (room.value / 1.1f / density.fontScale).toInt()
+        // A little air under the clues, so the second card never touches the answer line.
+        val room = maxHeight - with(density) { cluesHeight.toDp() } - top - subtitle - gap - 12.dp
+        // The serif line takes about 1.2 × its size (line height and font padding), times the font scale.
+        val fitted = (room.value / 1.2f / density.fontScale).toInt()
         val size = if (cluesHeight == 0) base else fitted.coerceIn(40, base)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(consonants, style = Type.serif(size), letterSpacing = 4.sp, maxLines = 1,
