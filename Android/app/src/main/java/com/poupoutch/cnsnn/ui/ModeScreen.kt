@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -283,14 +287,29 @@ private fun ColumnScope.SurvivalBoard(state: AppViewModel, game: ModeViewModel, 
 private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: DuoGame) {
     game.version // The core games are plain objects: each part re-reads them after every move.
     val current = duo.duo ?: return
-    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    // Both clues must show without scrolling, even on a small phone (Galaxy S9): they keep their room,
+    // and the consonants above take what is left, smaller if need be.
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val compact = maxHeight < 360.dp
+        val density = LocalDensity.current
+        var cluesHeight by remember { mutableIntStateOf(0) }
         val consonants = current.consonants
-        Text(consonants, style = Type.serif(if (consonants.length > 4) 64 else 84), letterSpacing = 4.sp, maxLines = 1,
-            modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
-        Text("Deux mots, les mêmes consonnes", fontSize = 12.sp, color = Palette.tertiary)
-        Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            DuoClue(1, current.first, duo.found[duo.round][0], duo.roundComplete)
-            DuoClue(2, current.second, duo.found[duo.round][1], duo.roundComplete)
+        val base = if (consonants.length > 4) 64 else 84
+        val top = if (compact) 6.dp else 18.dp
+        val subtitle = if (compact) 0.dp else 16.dp
+        val gap = if (compact) 10.dp else 16.dp
+        val room = maxHeight - with(density) { cluesHeight.toDp() } - top - subtitle - gap
+        // Serif line height is 1.1 × the size; a line in dp is the size in sp × the font scale.
+        val fitted = (room.value / 1.1f / density.fontScale).toInt()
+        val size = if (cluesHeight == 0) base else fitted.coerceIn(40, base)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(consonants, style = Type.serif(size), letterSpacing = 4.sp, maxLines = 1,
+                modifier = Modifier.padding(top = top).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
+            if (!compact) Text("Deux mots, les mêmes consonnes", fontSize = 12.sp, color = Palette.tertiary)
+            Column(Modifier.padding(top = gap).onSizeChanged { cluesHeight = it.height }, verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)) {
+                DuoClue(1, current.first, duo.found[duo.round][0], duo.roundComplete, compact)
+                DuoClue(2, current.second, duo.found[duo.round][1], duo.roundComplete, compact)
+            }
         }
     }
     if (duo.roundComplete) {
@@ -303,20 +322,23 @@ private fun ColumnScope.DuoBoard(state: AppViewModel, game: ModeViewModel, duo: 
 }
 
 @Composable
-private fun DuoClue(number: Int, word: DuoWord, found: Boolean, revealed: Boolean) {
+private fun DuoClue(number: Int, word: DuoWord, found: Boolean, revealed: Boolean, compact: Boolean) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = if (found) Palette.fill2 else Palette.fill1,
         border = androidx.compose.foundation.BorderStroke(1.dp, if (found) Palette.mint.copy(alpha = 0.5f) else Palette.line)) {
-        Row(Modifier.padding(14.dp).semantics(mergeDescendants = true) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = if (compact) 10.dp else 14.dp).semantics(mergeDescendants = true) {
             contentDescription = "Indice $number : ${word.hint}" + when { found -> ". Trouvé : ${word.word}"; revealed -> ". Réponse : ${word.word}"; else -> "" }
         }, verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(26.dp).background(if (found) Palette.mint else Palette.fill2, CircleShape), contentAlignment = Alignment.Center) {
                 Text("$number", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (found) Palette.ink else Palette.secondary)
             }
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(word.hint, style = Type.serifItalic(19))
-                AnimatedContent(found || revealed, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "duo") { shown ->
-                    if (shown) VowelReveal(word.word.uppercase(), found, Modifier.padding(top = 4.dp), maxSize = 26f, width = 230f)
-                    else Text("à trouver", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
+                Text(word.hint, style = Type.serifItalic(if (compact) 17 else 19))
+                // The answer's room is kept from the start: finding a word does not push the board around.
+                Box(Modifier.heightIn(min = if (compact) 32.dp else 38.dp), contentAlignment = Alignment.CenterStart) {
+                    AnimatedContent(found || revealed, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "duo") { shown ->
+                        if (shown) VowelReveal(word.word.uppercase(), found, Modifier.padding(top = 4.dp), maxSize = if (compact) 22f else 26f, width = 230f)
+                        else Text("à trouver", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
+                    }
                 }
             }
         }

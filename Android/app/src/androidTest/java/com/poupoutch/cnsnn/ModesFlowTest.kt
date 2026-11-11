@@ -50,7 +50,7 @@ class ModesFlowTest {
         if (has("Continuer")) {
             rule.onNodeWithText("Continuer").performClick()
             rule.onNodeWithText("Pseudo").performTextInput("Testeur")
-            rule.onNodeWithText("J’accepte les règles de la communauté", substring = true).performScrollTo().performClick()
+            rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
             rule.onNodeWithText("C’est parti").performClick()
         }
         waitFor("Bonjour,", 20_000)

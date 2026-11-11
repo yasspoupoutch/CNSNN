@@ -71,6 +71,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -336,6 +348,7 @@ private fun Bullet(text: String) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Pseudo(state: AppViewModel, back: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
@@ -346,14 +359,23 @@ private fun Pseudo(state: AppViewModel, back: () -> Unit) {
     val haptics = rememberHaptics()
     val links = LocalUriHandler.current
     val start = { if (valid && accepted && !state.isBusy) { haptics.success(); state.start(name) } }
+    // On a small phone with the keyboard up (Galaxy S9), everything that matters stays on screen without
+    // scrolling: the box to tick and the button are pinned at the bottom, and the avatar steps aside while typing.
+    val typing = WindowInsets.isImeVisible
+    val short = LocalConfiguration.current.screenHeightDp < 760
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 26.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             IconButton(back, Modifier.padding(top = 6.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
-            Text("Choisissez un pseudo", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 16.dp))
-            Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.", color = Palette.secondary, modifier = Modifier.padding(top = 8.dp))
-            Avatar(trimmed.ifEmpty { "?" }, state.avatar, 104.dp, Modifier.align(Alignment.CenterHorizontally).padding(top = 34.dp))
-            AvatarPicker(state.avatar, state::chooseAvatar, Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp))
-            OutlinedTextField(name, { name = it.take(20) }, Modifier.fillMaxWidth().padding(top = 30.dp),
+            Text("Choisissez un pseudo", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = if (short) 10.dp else 16.dp))
+            AnimatedVisibility(!typing) {
+                Column {
+                    Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.", color = Palette.secondary, modifier = Modifier.padding(top = 8.dp))
+                    Avatar(trimmed.ifEmpty { "?" }, state.avatar, if (short) 92.dp else 104.dp,
+                        Modifier.align(Alignment.CenterHorizontally).padding(top = if (short) 22.dp else 34.dp))
+                    AvatarPicker(state.avatar, state::chooseAvatar, Modifier.align(Alignment.CenterHorizontally).padding(top = if (short) 14.dp else 20.dp))
+                }
+            }
+            OutlinedTextField(name, { name = it.take(20) }, Modifier.fillMaxWidth().padding(top = if (typing || short) 18.dp else 30.dp),
                 placeholder = { Text("ex. voyelle_hunter") }, singleLine = true, shape = RoundedCornerShape(20.dp),
                 label = { Text("Pseudo") }, supportingText = {
                     when {
@@ -365,26 +387,45 @@ private fun Pseudo(state: AppViewModel, back: () -> Unit) {
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { start() }),
                 colors = TextFieldDefaults.colors(focusedContainerColor = Palette.fill1, unfocusedContainerColor = Palette.fill1))
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(16.dp))
-                .toggleable(accepted, role = Role.Checkbox) { haptics.selection(); accepted = it }.padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(accepted, onCheckedChange = null, modifier = Modifier.padding(horizontal = 8.dp),
-                    colors = CheckboxDefaults.colors(checkedColor = Palette.accent, checkmarkColor = Palette.onAccent, uncheckedColor = Palette.tertiary))
-                Text("J’accepte les règles de la communauté et la politique de confidentialité", fontSize = 14.sp, modifier = Modifier.padding(end = 8.dp))
-            }
-            Row(Modifier.padding(start = 44.dp)) {
-                TextButton({ runCatching { links.openUri(Site.RULES) } }) { Text("Lire les règles", fontSize = 13.sp) }
-                TextButton({ runCatching { links.openUri(Site.PRIVACY) } }) { Text("Confidentialité", fontSize = 13.sp) }
-            }
         }
-        Column(Modifier.padding(bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", enabled = valid && accepted && !state.isBusy, onClick = start)
-            Text("Modifiable à tout moment depuis votre profil.", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary,
-                modifier = Modifier.padding(top = 12.dp))
-            TextButton({ signingIn = true }, Modifier.padding(top = 4.dp)) { Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold) }
+        Column(Modifier.padding(top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Acceptance(accepted, links) { haptics.selection(); accepted = it }
+            PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", Modifier.padding(top = 10.dp), enabled = valid && accepted && !state.isBusy, onClick = start)
+            AnimatedVisibility(!typing) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Modifiable à tout moment depuis votre profil.", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary,
+                        modifier = Modifier.padding(top = 12.dp))
+                    TextButton({ signingIn = true }, Modifier.padding(top = 4.dp)) { Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold) }
+                }
+            }
         }
     }
     if (signingIn) SignInDialog(state) { signingIn = false }
+}
+
+/**
+ * Community rules and privacy policy, accepted before the first game, as on the iPhone: the box ticks,
+ * the two underlined words open the pages.
+ */
+@Composable
+private fun Acceptance(accepted: Boolean, links: androidx.compose.ui.platform.UriHandler, toggle: (Boolean) -> Unit) {
+    val linkStyle = TextLinkStyles(SpanStyle(color = Palette.foreground, textDecoration = TextDecoration.Underline))
+    fun link(url: String) = LinkAnnotation.Url(url, linkStyle) { runCatching { links.openUri(url) } }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(48.dp).clip(CircleShape).toggleable(accepted, role = Role.Checkbox, onValueChange = toggle)
+            .semantics { contentDescription = "J’accepte les règles de la communauté et la politique de confidentialité" },
+            contentAlignment = Alignment.Center) {
+            Checkbox(accepted, onCheckedChange = null,
+                colors = CheckboxDefaults.colors(checkedColor = Palette.accent, checkmarkColor = Palette.onAccent, uncheckedColor = Palette.tertiary))
+        }
+        Text(buildAnnotatedString {
+            append("J’accepte les ")
+            withLink(link(Site.RULES)) { append("règles de la communauté") }
+            append(" et la ")
+            withLink(link(Site.PRIVACY)) { append("politique de confidentialité") }
+            append(".")
+        }, fontSize = 14.sp, color = Palette.secondary, modifier = Modifier.padding(start = 4.dp))
+    }
 }
 
 /** Signs in to an existing account from the first launch, so a returning player (new phone, reinstall) finds their profile instead of creating a second one. */

@@ -61,7 +61,7 @@ class StoreScreenshotsTest {
         waitFor("Continuer")
         rule.onNodeWithText("Continuer").performClick()
         rule.onNodeWithText("Pseudo").performTextInput("Alex")
-        rule.onNodeWithText("J’accepte les règles de la communauté", substring = true).performScrollTo().performClick()
+        rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
         rule.onNodeWithText("C’est parti").performClick()
         waitFor("Bonjour,")
         rule.skipTutorial()

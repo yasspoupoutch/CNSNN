@@ -32,7 +32,7 @@ class TutorialFlowTest {
         if (has("Continuer")) {
             rule.onNodeWithText("Continuer").performClick()
             rule.onNodeWithText("Pseudo").performTextInput("Tuto")
-            rule.onNodeWithText("J’accepte les règles de la communauté", substring = true).performScrollTo().performClick()
+            rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
             rule.onNodeWithText("C’est parti").performClick()
         }
         rule.waitUntil(20_000) { has("Bonjour,") }
