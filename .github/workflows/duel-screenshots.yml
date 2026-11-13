@@ -5,6 +5,9 @@ name: CNSNN - Captures du duel
 # LiveDuelViewModel.kt), rien n'est envoyé à Firebase. Les PNG vont sur la branche apercus-duel
 # (dossiers ios/ et android/). Lancé aussi par un push qui touche ce fichier.
 on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/duel-screenshots.yml', 'Android/tools/duel-screenshots.sh']
   workflow_dispatch:
 
 permissions:
