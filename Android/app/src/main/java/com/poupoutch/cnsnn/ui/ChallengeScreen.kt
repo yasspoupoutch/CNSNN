@@ -245,6 +245,7 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit, live: (String
                     }
                 }
             }
+            TournamentBox(state) { live("tournament") }
             val open = state.challenges.filter { it.state(uid, now) !is Challenge.State.Over }
             if (open.isNotEmpty()) {
                 Kicker("En cours", Palette.tertiary, Modifier.padding(top = 6.dp))

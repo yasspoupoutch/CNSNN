@@ -677,8 +677,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is CloudRepository.InviteTarget.OfChallenge -> joinChallenge(code) to null
         }
     }
-    /** A live duel to open ("random", "link" or "join:ID"): the app's navigation takes it. */
+    /** A live duel to open ("random", "link" or "join:ID"), or "tournament": the app's navigation takes it. */
     var liveDuelRequest by mutableStateOf<String?>(null)
+    /** The weekly tournament (sign-ups, bracket), read when it is on screen. */
+    val tournament = TournamentStore()
     /** A live duel counts as a challenge played in the attendance numbers. */
     fun noteLiveDuelPlayed() = notePlayed("challenge")
 

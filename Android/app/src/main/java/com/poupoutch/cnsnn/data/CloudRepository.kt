@@ -38,6 +38,9 @@ import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.SprintRecords
+import com.poupoutch.cnsnn.core.TournamentPlayer
+import com.poupoutch.cnsnn.core.TournamentRules
+import com.poupoutch.cnsnn.core.TournamentRun
 import com.poupoutch.cnsnn.core.Submission
 import com.poupoutch.cnsnn.core.WordEngine
 import kotlinx.coroutines.tasks.await
@@ -183,6 +186,11 @@ class CloudRepository(
         // Live duels, and the place in the waiting line for a random opponent.
         for (field in listOf("from", "to")) refs += db.collection("duels").whereEqualTo(field, uid).get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("duelQueue").document(uid)
+        // Weekly tournaments since they began: the sign-up and each round's run, deleted without reading.
+        for (week in TournamentRules.weeks(System.currentTimeMillis())) {
+            refs += db.collection("tournaments").document(week).collection("players").document(uid)
+            refs += (1..6).map { db.collection("tournaments").document(week).collection("runs").document("${it}_$uid") }
+        }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }
         }
@@ -761,6 +769,58 @@ class CloudRepository(
         return id?.takeIf { it.isNotEmpty() }
     }
 
+    // ---- Weekly tournament (Core/Tournament.kt, same documents as the iPhone app)
+
+    private fun tournament(week: String) = db.collection("tournaments").document(week)
+    /** The players signed up for a week (the draw takes the first 64). */
+    suspend fun tournamentPlayers(week: String): List<TournamentPlayer> =
+        tournament(week).collection("players").orderBy("at").limit(200).get(Source.SERVER).await().documents.mapNotNull { doc ->
+            val at = doc.getTimestamp("at") ?: return@mapNotNull null
+            TournamentPlayer(doc.id, doc.getString("name") ?: "Joueur", millis(at))
+        }
+    /** How many have signed up (one read, whatever the number). */
+    suspend fun tournamentCount(week: String): Int = count(tournament(week).collection("players"))
+    suspend fun isSignedUp(week: String, uid: String): Boolean =
+        tournament(week).collection("players").document(uid).get(Source.SERVER).await().exists()
+    suspend fun signUp(week: String, uid: String, username: String) {
+        val ref = tournament(week).collection("players").document(uid)
+        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp())))) throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    suspend fun withdraw(week: String, uid: String) {
+        if (!awaitWrite(tournament(week).collection("players").document(uid).delete())) throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** The runs of a week from a round on (the earlier ones never change and stay on the phone). */
+    suspend fun tournamentRuns(week: String, fromRound: Int): List<TournamentRun> =
+        tournament(week).collection("runs").whereGreaterThanOrEqualTo("round", fromRound).limit(300).get(Source.SERVER).await()
+            .documents.mapNotNull { it.data?.let(::runOf) }
+    suspend fun tournamentRun(week: String, round: Int, uid: String): TournamentRun? =
+        tournament(week).collection("runs").document("${round}_$uid").get(Source.SERVER).await().data?.let(::runOf)
+    /** Starts my clock for a round (once), then gives its words: drawn by the first player to start. */
+    suspend fun startTournamentRound(week: String, round: Int, uid: String): Triple<TournamentRun, List<String>, ServerClock?> {
+        val runRef = tournament(week).collection("runs").document("${round}_$uid")
+        var run = runRef.get(Source.SERVER).await().data?.let(::runOf)
+        var clock: ServerClock? = null
+        if (run == null) {
+            val (data, learnt) = stamped(runRef, "startedAt") { runRef.set(mapOf("uid" to uid, "round" to round, "startedAt" to FieldValue.serverTimestamp())) }
+            run = runOf(data); clock = learnt
+        }
+        val started = run ?: throw CloudError(CloudError.Kind.OFFLINE)
+        val roundRef = tournament(week).collection("rounds").document("$round")
+        fun ids(d: Map<String, Any?>?) = (d?.get("cardIds") as? List<*>)?.filterIsInstance<String>()
+        ids(roundRef.get(Source.SERVER).await().data)?.let { return Triple(started, it, clock) }
+        try {
+            awaitWrite(roundRef.set(mapOf("cardIds" to TournamentRules.draw(week, round), "at" to FieldValue.serverTimestamp())))
+        } catch (e: Exception) {
+            // Someone else drew them just before.
+            if (CloudError.code(e) != CloudError.Code.PERMISSION_DENIED) throw e
+        }
+        val ids = ids(roundRef.get(Source.SERVER).await().data) ?: throw CloudError(CloudError.Kind.OFFLINE)
+        return Triple(started, ids, clock)
+    }
+    suspend fun finishTournamentRound(week: String, round: Int, uid: String, skips: Int, errors: Int): Boolean =
+        awaitWrite(tournament(week).collection("runs").document("${round}_$uid")
+            .update(mapOf("finishedAt" to FieldValue.serverTimestamp(), "skips" to skips, "errors" to errors)))
+
     /** One read: whether this player has at least one friend to be challenged by. */
     suspend fun hasFriends(uid: String): Boolean =
         !db.collection("users").document(uid).collection("friends").limit(1).get(Source.SERVER).await().isEmpty
@@ -1015,6 +1075,14 @@ class CloudRepository(
             fun side(key: String, uid: String) = LiveDuel.Side(uid, d[key + "Name"] as? String ?: "Joueur", int(key + "Done"), int(key + "Skips"),
                 ms(key + "FinishedAt"), d[key + "Quit"] as? Boolean ?: false)
             return LiveDuel(id, ids, created, ms("readyAt")?.let { it + LiveDuelRules.COUNTDOWN_MS }, side("from", from), side("to", to), d["code"] as? String)
+        }
+
+        fun runOf(d: Map<String, Any?>): TournamentRun? {
+            val uid = d["uid"] as? String ?: return null
+            val round = (d["round"] as? Number)?.toInt() ?: return null
+            val started = d["startedAt"] as? Timestamp ?: return null
+            return TournamentRun(uid, round, millis(started), (d["finishedAt"] as? Timestamp)?.let { millis(it) },
+                (d["skips"] as? Number)?.toInt() ?: 0, (d["errors"] as? Number)?.toInt() ?: 0)
         }
 
         /** Milliseconds exactly as the rules' `timestamp.toMillis()`. */
