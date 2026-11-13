@@ -24,6 +24,8 @@
   #snap h1 b { color: var(--gold); }
   #snap .dots { display: inline-block; padding: 0 10px; border-radius: 12px; background: rgba(255,198,90,.16); color: var(--gold); letter-spacing: .08em; }
   #snap p { color: var(--muted, #a9adbd); margin: 20px 0 0; font-size: 17px; }
+  #snap .snapcode { margin-top: 34px; }
+  #snap .snapcode .code { margin: 2px 0 12px; }
   #snap .later { margin-top: auto; padding-top: 40px; font-size: 15px; }
   .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
 </style>
@@ -35,6 +37,9 @@
   </svg>
   <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b><br>pour ouvrir le défi.</h1>
   <p>CNSNN s’ouvrira directement sur le défi.</p>
+  <div class="snapcode"><div class="small">Code du défi</div><div class="code" id="snapCode"></div>
+    <button class="button ghost" id="snapCopy" type="button">Copier le code</button>
+    <p class="status" id="snapStatus" role="status"></p></div>
   <p class="later">Pas encore l’application ? <a href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>, puis revenez toucher le lien.</p>
 </div>
 <main>
@@ -98,6 +103,12 @@
   if (code && iPhone) {
     document.querySelector('main').hidden = true;
     document.getElementById('snap').hidden = false;
+    document.getElementById('snapCode').textContent = code;
+    document.getElementById('snapCopy').addEventListener('click', async () => {
+      const done = document.getElementById('snapStatus');
+      try { await navigator.clipboard.writeText(code); done.className = 'status ok'; done.textContent = 'Code copié.'; }
+      catch { done.className = 'status'; done.textContent = 'Notez le code : ' + code; }
+    });
   }
   if (code && android) {
     // Chrome opens the app when installed, else follows browser_fallback_url to Google Play.
