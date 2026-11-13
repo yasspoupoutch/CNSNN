@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import com.poupoutch.cnsnn.core.TournamentRules
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -377,7 +378,7 @@ private fun LaterChallenges(state: AppViewModel, uid: String, now: Long, friends
 @Composable
 private fun BackTitle(title: String, back: () -> Unit) {
     Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        IconButton(back, Modifier.size(40.dp).background(Duel.color.copy(alpha = 0.18f), CircleShape)) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(Duel.color.copy(alpha = 0.18f)).clickable(onClick = back), contentAlignment = Alignment.Center) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Retour", tint = Duel.text)
         }
         Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
