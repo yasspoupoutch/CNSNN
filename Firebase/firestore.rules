@@ -619,6 +619,53 @@ service cloud.firestore {
    allow delete: if owner(uid) || admin();
   }
 
+  // ---- Tournoi de la semaine: sign up until Monday 08:00 UTC (the week's id is that Monday), then one
+  // knockout round a day. No server: the apps work the bracket out from the players and the runs.
+  function tournamentStart(week) { return dayDate(week) + duration.value(8, 'h'); }
+  function validWeek(week) { return validDayKey(week) && dayDate(week).dayOfWeek() == 1; }
+  function signedUp(week) { return exists(at('tournaments/' + week + '/players/' + request.auth.uid)); }
+  // Round r (1 to 6) is open from start + (r-1) days to start + r days.
+  function roundOpen(week, r) {
+   return r is int && r >= 1 && r <= 6
+    && request.time >= tournamentStart(week) + duration.value(r - 1, 'd')
+    && request.time < tournamentStart(week) + duration.value(r, 'd');
+  }
+  match /tournaments/{week}/players/{uid} {
+   allow get, list: if signedIn();
+   allow create: if active() && owner(uid) && validWeek(week)
+    && request.resource.data.keys().hasOnly(['uid','name','at']) && request.resource.data.uid == uid
+    && request.resource.data.name == get(at('users/' + uid)).data.username && request.resource.data.at == request.time
+    && request.time < tournamentStart(week) && request.time >= tournamentStart(week) - duration.value(7, 'd');
+   // Withdrawn before the draw, or with the account.
+   allow delete: if owner(uid) && (request.time < tournamentStart(week) || leaving());
+  }
+  // The 5 words of a round: drawn by the first player who starts it, then the same for everyone. Read
+  // only once one's own run has started (its clock is running).
+  match /tournaments/{week}/rounds/{round} {
+   allow get: if signedIn() && exists(at('tournaments/' + week + '/runs/' + round + '_' + request.auth.uid));
+   allow create: if active() && validWeek(week) && signedUp(week) && roundOpen(week, int(round))
+    && request.resource.data.keys().hasOnly(['cardIds','at']) && challengeCards(request.resource.data.cardIds)
+    && request.resource.data.at == request.time;
+  }
+  // One player's run in one round ({round}_{uid}): started and finished at the server's time, within the
+  // round's 24 hours, at least 2 s per word found. Anyone signed in reads them (the bracket needs them).
+  match /tournaments/{week}/runs/{id} {
+   allow get, list: if signedIn();
+   allow create: if active() && validWeek(week) && signedUp(week)
+    && request.resource.data.keys().hasOnly(['uid','round','startedAt'])
+    && request.resource.data.uid == request.auth.uid && id == string(request.resource.data.round) + '_' + request.auth.uid
+    && roundOpen(week, request.resource.data.round) && request.resource.data.startedAt == request.time;
+   allow update: if active() && resource.data.uid == request.auth.uid && !('finishedAt' in resource.data)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','skips','errors'])
+    && request.resource.data.finishedAt == request.time
+    && request.time < tournamentStart(week) + duration.value(resource.data.round, 'd')
+    && request.resource.data.skips is int && request.resource.data.skips >= 0 && request.resource.data.skips <= 5
+    && request.resource.data.errors is int && request.resource.data.errors >= 0 && request.resource.data.errors <= 500
+    && request.time >= resource.data.startedAt + duration.value((5 - request.resource.data.skips) * 2, 's');
+   // With the account, even blindly (the apps delete every round's id without reading it first).
+   allow delete: if signedIn() && id.matches('^[1-6]_' + request.auth.uid + '$') && leaving();
+  }
+
   // ---- Anonymous attendance (Core/Usage.swift): one document per day of counters, no name, no id.
   // Each phone only adds to them, a little at a time; only the admins read them. A phone without a
   // pseudo yet (no account) can only count itself as opened.
