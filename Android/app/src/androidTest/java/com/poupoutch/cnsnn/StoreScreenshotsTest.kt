@@ -45,7 +45,7 @@ class StoreScreenshotsTest {
     private fun waitFor(text: String, timeout: Long = 20_000) = rule.waitUntil(timeout) { has(text) }
 
     @Test fun takeStoreScreenshots() {
-        try { takeAll() } catch (e: Throwable) {
+        try { takeAll() } catch (e: org.junit.AssumptionViolatedException) { throw e } catch (e: Throwable) {
             runCatching { shot("zz-echec") }
             // What the screen showed, readable in the CI log (the picture stays in the artifact).
             val screen = runCatching {
