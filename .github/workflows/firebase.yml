@@ -31,6 +31,11 @@ on:
         description: Propositions de mots (tous statuts, auteurs, dates ; chiffrée)
         type: boolean
         default: false
+      card_fixes:
+        description: "Corriger des cartes de joueurs (Firebase/tools/card-fixes.json) : voir ou appliquer"
+        type: choice
+        options: ['', voir, appliquer]
+        default: ''
       auth_email:
         description: "Mail « mot de passe oublié » : voir (réglages actuels) ou appliquer (Firebase/tools/auth-email.json)"
         type: choice
@@ -141,7 +146,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.card_fixes == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.card_fixes == 'voir' || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -205,6 +210,12 @@ jobs:
       - name: Propositions de mots (chiffrée)
         if: ${{ inputs.proposals }}
         run: node tools/proposals.mjs daily/preview.pem
+      - name: Voir les corrections de cartes
+        if: ${{ inputs.card_fixes == 'voir' }}
+        run: node tools/card-fixes.mjs
+      - name: Corriger des cartes de joueurs
+        if: ${{ inputs.card_fixes == 'appliquer' && github.ref == 'refs/heads/main' }}
+        run: node tools/card-fixes.mjs --apply
       - name: Voir le mail « mot de passe oublié »
         if: ${{ inputs.auth_email == 'voir' }}
         run: node tools/auth-email.mjs show
