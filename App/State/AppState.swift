@@ -594,6 +594,20 @@ import CNSNNCore
         ChallengeWatch.setActive(true)
         return challenge
     }
+    /// A code typed or opened from a link: a friend challenge (joined here) or a live duel (joined by
+    /// its own screen, so the 3-2-1 is not missed).
+    enum Invite { case challenge(Challenge), duel(String) }
+    func openInvite(code: String) async throws -> Invite {
+        guard let cloud, uid != nil else { throw CloudError.offline }
+        if isSuspended { throw CloudError.suspended }
+        switch try await cloud.inviteTarget(code: code) {
+        case .duel(let id): return .duel(id)
+        case .challenge: return .challenge(try await joinChallenge(code: code))
+        }
+    }
+    /// A live duel counts as a challenge played in the attendance numbers.
+    func noteLiveDuelPlayed() { notePlayed("challenge") }
+
     /// Whoever joined my challenges by link becomes a friend too, once (remembered on the phone).
     private func befriendJoiners(_ list: [Challenge], uid: String) async {
         guard let cloud else { return }

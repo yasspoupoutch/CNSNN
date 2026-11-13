@@ -828,6 +828,156 @@ enum DailyGuesses {
                          code: d["code"] as? String)
     }
 
+    // MARK: Live duels
+
+    /// What a 6-character code names: a friend challenge or a live duel (same invites, same links).
+    enum InviteTarget { case challenge(String), duel(String) }
+    func inviteTarget(code: String) async throws -> InviteTarget {
+        let data = try await db.collection("challengeInvites").document(code).getDocument(source: .server).data()
+        if let id = data?["duel"] as? String { return .duel(id) }
+        if let id = data?["challenge"] as? String { return .challenge(id) }
+        throw CloudError.inviteNotFound
+    }
+    private func newDuelRef() -> DocumentReference {
+        let random = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
+        return db.collection("duels").document(ChallengeRules.newId(nowMs: Int(Date().timeIntervalSince1970 * 1000), random: random))
+    }
+    /// Writes, then reads back what the server stamped: the gap tells how far this phone's clock is.
+    private func stamped(_ ref: DocumentReference, field: String, write: (@escaping (Error?) -> Void) -> Void) async throws -> (data: [String: Any], clock: ServerClock?) {
+        let sent = Int(Date().timeIntervalSince1970 * 1000)
+        guard try await Self.awaitWrite(write) else { throw CloudError.offline }
+        let received = Int(Date().timeIntervalSince1970 * 1000)
+        guard let data = try await ref.getDocument(source: .server).data() else { throw CloudError.duelGone }
+        var clock: ServerClock?
+        if let stamp = data[field] as? Timestamp {
+            var learnt = ServerClock()
+            learnt.learn(serverMs: Self.millis(stamp), sentMs: sent, receivedMs: received)
+            clock = learnt
+        }
+        return (data, clock)
+    }
+    /// A duel by link: a code to share, the words come once a friend opens it (within 15 min).
+    func createLinkDuel(uid: String, username: String, cardIDs: [String]) async throws -> (duel: LiveDuel, clock: ServerClock?) {
+        let ref = newDuelRef()
+        for attempt in 1...3 {
+            let code = ChallengeInvite.newCode()
+            let batch = db.batch()
+            batch.setData(["from": uid, "fromName": username, "to": "", "toName": "", "code": code, "cardIds": cardIDs,
+                           "createdAt": FieldValue.serverTimestamp()], forDocument: ref)
+            batch.setData(["duel": ref.documentID, "from": uid, "createdAt": FieldValue.serverTimestamp()],
+                          forDocument: db.collection("challengeInvites").document(code))
+            do {
+                let (data, clock) = try await stamped(ref, field: "createdAt") { done in batch.commit(completion: done) }
+                guard let duel = Self.duel(id: ref.documentID, data) else { throw CloudError.offline }
+                return (duel, clock)
+            } catch where CloudError.code(error) == .permissionDenied && attempt < 3 { continue }
+        }
+        throw CloudError.offline
+    }
+    /// Withdraws a link nobody joined (and its code).
+    func cancelLinkDuel(_ duel: LiveDuel) async {
+        let batch = db.batch()
+        batch.deleteDocument(db.collection("duels").document(duel.id))
+        if let code = duel.code { batch.deleteDocument(db.collection("challengeInvites").document(code)) }
+        _ = try? await Self.awaitWrite { done in batch.commit(completion: done) }
+    }
+    /// Takes the empty place of a duel by link: the words come 5 s later for both.
+    func joinDuel(id: String, uid: String, username: String) async throws -> (duel: LiveDuel, clock: ServerClock?) {
+        let ref = db.collection("duels").document(id)
+        let found: LiveDuel?
+        do { found = try await duel(id: id) } catch where CloudError.code(error) == .permissionDenied { throw CloudError.inviteTaken }
+        guard let open = found else { throw CloudError.duelGone }
+        if open.to.uid == uid { return (open, nil) }
+        guard open.from.uid != uid else { throw CloudError.inviteIsYours }
+        guard open.isOpen else { throw CloudError.inviteTaken }
+        let (data, clock) = try await stamped(ref, field: "readyAt") { done in
+            ref.updateData(["to": uid, "toName": username, "readyAt": FieldValue.serverTimestamp()], completion: done)
+        }
+        guard let joined = Self.duel(id: id, data) else { throw CloudError.offline }
+        return (joined, clock)
+    }
+    func duel(id: String) async throws -> LiveDuel? {
+        let doc = try await db.collection("duels").document(id).getDocument(source: .server)
+        return doc.data().flatMap { Self.duel(id: id, $0) }
+    }
+    /// Every change of the duel, the other player's included: one read each.
+    func listenDuel(id: String, _ change: @escaping (LiveDuel?) -> Void) -> ListenerRegistration {
+        db.collection("duels").document(id).addSnapshotListener { snapshot, _ in
+            guard let snapshot else { return }
+            change(snapshot.data().flatMap { Self.duel(id: id, $0) })
+        }
+    }
+    /// My words behind me so far (the total: a write lost on the way is caught up by the next one).
+    /// The 5th is the finish, stamped by the server. Not awaited: Firestore sends them in order.
+    func moveInDuel(_ duel: LiveDuel, uid: String, done: Int, skips: Int, completion: @escaping (Error?) -> Void) {
+        let side = duel.from.uid == uid ? "from" : "to"
+        var data: [String: Any] = [side + "Done": done, side + "Skips": skips]
+        if done >= ChallengeRules.words { data[side + "FinishedAt"] = FieldValue.serverTimestamp() }
+        db.collection("duels").document(duel.id).updateData(data, completion: completion)
+    }
+    func quitDuel(_ duel: LiveDuel, uid: String) {
+        let side = duel.from.uid == uid ? "from" : "to"
+        db.collection("duels").document(duel.id).updateData([side + "Quit": true], completion: nil)
+    }
+
+    /// Random opponent, first: someone already waiting in the line (oldest first), taken in one batch
+    /// with my own place gone. Nil when nobody is there (or everyone was taken just before).
+    func takeOpponent(uid: String, username: String, cardIDs: [String], clock: ServerClock) async throws -> (duel: LiveDuel, clock: ServerClock?)? {
+        let since = Timestamp(date: Date(timeIntervalSince1970: TimeInterval(clock.now(localMs: Int(Date().timeIntervalSince1970 * 1000)) - LiveDuelRules.searchMs) / 1000))
+        let docs = try await db.collection("duelQueue").whereField("at", isGreaterThan: since).order(by: "at").limit(to: 10)
+            .getDocuments(source: .server).documents
+        for place in docs where place.documentID != uid && (place.data()["duel"] as? String) == "" {
+            guard let name = place.data()["name"] as? String else { continue }
+            let ref = newDuelRef()
+            let batch = db.batch()
+            batch.setData(["from": uid, "fromName": username, "to": place.documentID, "toName": name, "random": true, "cardIds": cardIDs,
+                           "createdAt": FieldValue.serverTimestamp(), "readyAt": FieldValue.serverTimestamp()], forDocument: ref)
+            batch.updateData(["duel": ref.documentID], forDocument: place.reference)
+            batch.deleteDocument(db.collection("duelQueue").document(uid))
+            do {
+                let (data, learnt) = try await stamped(ref, field: "readyAt") { done in batch.commit(completion: done) }
+                guard let duel = Self.duel(id: ref.documentID, data) else { continue }
+                return (duel, learnt)
+            } catch where CloudError.code(error) == .permissionDenied { continue }
+        }
+        return nil
+    }
+    /// Then, a place in the line, at the server's time: whoever comes next takes me.
+    func enterDuelQueue(uid: String, username: String) async throws -> ServerClock? {
+        let ref = db.collection("duelQueue").document(uid)
+        return try await stamped(ref, field: "at") { done in
+            ref.setData(["name": username, "at": FieldValue.serverTimestamp(), "duel": ""], completion: done)
+        }.clock
+    }
+    /// The duel my place was taken for, as soon as someone takes it.
+    func listenDuelQueue(uid: String, _ taken: @escaping (String) -> Void) -> ListenerRegistration {
+        db.collection("duelQueue").document(uid).addSnapshotListener { snapshot, _ in
+            if let id = snapshot?.data()?["duel"] as? String, !id.isEmpty { taken(id) }
+        }
+    }
+    /// Leaves the line, unless someone took my place in the meantime: then that duel.
+    func leaveDuelQueue(uid: String) async -> String? {
+        let ref = db.collection("duelQueue").document(uid)
+        if let id = try? await ref.getDocument(source: .server).data()?["duel"] as? String, !id.isEmpty {
+            try? await ref.delete()
+            return id
+        }
+        try? await ref.delete()
+        return nil
+    }
+    nonisolated static func duel(id: String, _ d: [String: Any]) -> LiveDuel? {
+        guard let from = d["from"] as? String, let to = d["to"] as? String, let ids = d["cardIds"] as? [String] else { return nil }
+        // A write of ours not yet stamped: the server's time comes with the next snapshot.
+        let created = (d["createdAt"] as? Timestamp).map(millis) ?? Int(Date().timeIntervalSince1970 * 1000)
+        func ms(_ key: String) -> Int? { (d[key] as? Timestamp).map(millis) }
+        func side(_ key: String, uid: String) -> LiveDuel.Side {
+            .init(uid: uid, name: d[key + "Name"] as? String ?? "Joueur", done: d[key + "Done"] as? Int ?? 0, skips: d[key + "Skips"] as? Int ?? 0,
+                  finishedMs: ms(key + "FinishedAt"), quit: d[key + "Quit"] as? Bool ?? false)
+        }
+        return LiveDuel(id: id, cardIds: ids, createdMs: created, startMs: ms("readyAt").map { $0 + LiveDuelRules.countdownMs },
+                        from: side("from", uid: from), to: side("to", uid: to), code: d["code"] as? String)
+    }
+
     // MARK: Cards
 
     /// Version of the approved catalogue (`meta/cards`), moved by moderators: the cards are downloaded
@@ -1103,6 +1253,7 @@ enum CloudError: LocalizedError {
     case inviteIsYours
     case inviteTaken
     case inviteExpired
+    case duelGone
     case usernameTaken
     case usernameInvalid
     case serverFull
@@ -1163,6 +1314,7 @@ enum CloudError: LocalizedError {
         case .inviteIsYours: "C’est votre propre défi. Envoyez le lien à un ami !"
         case .inviteTaken: "Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."
         case .inviteExpired: "Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."
+        case .duelGone: "Ce duel n’existe plus : votre ami l’a annulé ou il a expiré. Demandez-lui un nouveau code."
         case .usernameTaken: "Ce pseudo est déjà pris. Choisissez-en un autre."
         case .usernameInvalid: "Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."
         case .serverFull: "Beaucoup de joueurs aujourd’hui : le serveur gratuit de CNSNN est plein. Le mot du jour classé et les classements reviennent à " + Self.quotaResetText() + ". Les autres modes restent jouables."
