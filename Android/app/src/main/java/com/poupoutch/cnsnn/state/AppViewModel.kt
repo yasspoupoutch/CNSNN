@@ -90,6 +90,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         progress.attempts.mapNotNull { a -> a.dailyKey?.let { it to a.correct } }.reversed().toMap()
     /** Set by a found daily word while the 12h reminder was never offered; offered once back on the home page. */
     var reminderPending by mutableStateOf(false)
+    /** A found daily word asks for Google Play's rating prompt once back on the home page (see ReviewPrompt). */
+    var reviewPending by mutableStateOf(false)
 
     private var scope: String? = local.activeScope
     private var savingAllowed = true

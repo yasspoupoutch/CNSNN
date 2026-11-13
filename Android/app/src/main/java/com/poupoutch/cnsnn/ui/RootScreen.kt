@@ -136,7 +136,7 @@ fun RootScreen(state: AppViewModel) {
         AnimatedContent(screen, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "root") { page ->
             when (page) {
                 0 -> LaunchScreen(loading = introDone)
-                1 -> OnboardingScreen(state)
+                1 -> Box(Modifier.readableWidth().fillMaxSize()) { OnboardingScreen(state) }
                 else -> AppNavigation(state)
             }
         }
@@ -265,7 +265,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
                     }
                 }
             }) { padding ->
-                AnimatedContent(tab, Modifier.padding(padding), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
+                AnimatedContent(tab, Modifier.padding(padding).readableWidth(), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tabs") { page ->
                     holder.SaveableStateProvider(page.name) {
                         when (page) {
                             Tab.PLAY -> HomeScreen(state, play, playMode, playChallenge, playCatchUp)
@@ -282,6 +282,7 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
         }
     }
     ReminderOffer(state)
+    ReviewOffer(state)
 }
 
 /**

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -54,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 /** Night background with two slow cool glows; gold stays for the vowels. */
+/** Content at most 560 dp wide, centred, on tablets and unfolded phones (like the iPhone app); no change on a phone. */
+fun Modifier.readableWidth(): Modifier = fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 560.dp)
+
 @Composable
 fun AmbientBackground(dimmed: Boolean = false) {
     val reduce = rememberReduceMotion()
