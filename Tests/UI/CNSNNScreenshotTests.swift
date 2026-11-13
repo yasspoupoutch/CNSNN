@@ -82,6 +82,51 @@ final class CNSNNScreenshotTests: XCTestCase {
         capture("06-profil")
     }
 
+    /// The live duel's pictures (`--duel-demo`, App/State/LiveDuelSession.swift): the sheet, the search,
+    /// the 3-2-1, both players moving forward, the result, and the link for a friend.
+    @MainActor func testDuelScreenshots() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--screenshots", "--duel-demo", "--mode-seed=7"]
+        app.launch()
+        let next = app.buttons["Continuer"]
+        XCTAssertTrue(next.waitForExistence(timeout: 10))
+        next.tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+        XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
+        dismissKeyboardIfNeeded(app)
+
+        let tile = app.buttons["challengeTile"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let random = app.buttons["liveRandom"]
+        XCTAssertTrue(random.waitForExistence(timeout: 5))
+        capture("duel-01-feuille")
+        random.tap()
+        XCTAssertTrue(app.staticTexts["Recherche d’un adversaire…"].waitForExistence(timeout: 10))
+        capture("duel-02-recherche", settle: 1)
+        XCTAssertTrue(app.staticTexts["Duel contre"].waitForExistence(timeout: 10))
+        capture("duel-03-compte-a-rebours", settle: 0.8)
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        capture("duel-04-partie", settle: 6)
+        capture("duel-05-partie-suite", settle: 6)
+        XCTAssertTrue(app.buttons["Terminer"].waitForExistence(timeout: 20))
+        capture("duel-06-resultat")
+        app.buttons["Terminer"].tap()
+
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let link = app.buttons["liveLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
+        XCTAssertTrue(app.staticTexts["Envoyez ce code à un ami"].waitForExistence(timeout: 10))
+        capture("duel-07-lien")
+    }
+
     /// The App Store preview video: the workflow films the simulator during this test and keeps the
     /// 30 seconds that follow the "PREVIEW_START" line. Same invented data as the screenshots.
     @MainActor func testAppPreview() {

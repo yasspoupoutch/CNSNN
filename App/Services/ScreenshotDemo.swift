@@ -8,6 +8,8 @@ import CNSNNCore
 enum ScreenshotDemo {
     static var isActive: Bool { RuntimeFlags.isTesting && ProcessInfo.processInfo.arguments.contains("--screenshots") }
     static let uid = "demo-camille"
+    /// The live duel's pictures (`--duel-demo`): an invented duel against Léa, played on its own.
+    static var duelActive: Bool { isActive && ProcessInfo.processInfo.arguments.contains("--duel-demo") }
     /// The word found today, shown on the home page.
     static var todayCard: Card { card("Croissant") }
     /// The Classique card being played.
@@ -127,5 +129,7 @@ enum ScreenshotDemo {
             challenge("demo-challenge-4", hoursAgo: 46, seed: 14, from: side(uid, me, startedHoursAgo: 46, ms: 118_000),
                       to: side("demo-lea", "Léa", startedHoursAgo: 45, ms: 83_000)),
         ]
+        // The duel's pictures: no challenge waiting, so the lilac tile opens the sheet.
+        if duelActive { state.challenges.removeAll { $0.id == "demo-challenge-1" } }
     }
 }

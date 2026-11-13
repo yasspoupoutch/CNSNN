@@ -63,6 +63,7 @@ import CNSNNCore
         guard let cloud = state.cloud, let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
         if state.isSuspended { phase = .failed(CloudError.suspended.errorDescription ?? ""); return }
         phase = .connecting
+        if ScreenshotDemo.duelActive { demo(state: state); return }
         do {
             switch start {
             case .link:
@@ -79,6 +80,58 @@ import CNSNNCore
                 await search(state: state)
             }
         } catch { phase = .failed(CloudError.message(error)) }
+    }
+
+    // MARK: Pictures (`--duel-demo`, tests only)
+
+    /// An invented duel against Léa, played on its own: the search, the 3-2-1, both players moving
+    /// forward (she passes a word and finishes first, then you), and the result. Nothing is sent.
+    private func demo(state: AppState) {
+        let uid = state.uid ?? ScreenshotDemo.uid
+        let now = { Int(Date().timeIntervalSince1970 * 1000) }
+        if start == .link {
+            duel = LiveDuel(id: "demo", cardIds: ChallengeRules.draw(seed: 21), createdMs: now(),
+                            from: .init(uid: uid, name: state.progress.username), to: .init(uid: "", name: ""), code: "K7M2QX")
+            phase = .waiting
+            return
+        }
+        phase = .searching(Date())
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, !Task.isCancelled else { return }
+            let startMs = now() + LiveDuelRules.countdownMs
+            let found = LiveDuel(id: "demo", cardIds: ChallengeRules.draw(seed: 21), createdMs: now(), startMs: startMs,
+                                 from: .init(uid: uid, name: state.progress.username), to: .init(uid: "demo-lea", name: "Léa"))
+            self.apply(found, state: state)
+            try? await Task.sleep(for: .milliseconds(LiveDuelRules.countdownMs))
+            // Every 0.5 s: Léa moves every 3 s (a word passed, then the finish at 15 s), and you every 4 s,
+            // the next answer half typed in between.
+            var lea = 0, me = 0
+            for tick in 1...40 {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled, var current = self.duel, var game = self.game else { return }
+                let elapsed = tick * 500
+                if elapsed % 3_000 == 0, lea < ChallengeRules.words {
+                    lea += 1
+                    current.to.done = lea
+                    if lea == 2 { current.to.skips = 1 }
+                    if lea == ChallengeRules.words { current.to.finishedMs = startMs + elapsed }
+                }
+                if elapsed % 4_000 == 0, me < ChallengeRules.words, let card = game.card {
+                    me += 1
+                    game.answer(card.wordFull)
+                    self.answer = ""
+                    self.successTick += 1
+                    current.from.done = me
+                    if me == ChallengeRules.words { current.from.finishedMs = startMs + elapsed }
+                } else if elapsed % 4_000 == 1_500, let card = game.card {
+                    self.answer = String(card.wordFull.uppercased().prefix(3))
+                }
+                self.game = game
+                self.duel = current
+                if me == ChallengeRules.words { return }
+            }
+        }
     }
 
     // MARK: Random opponent

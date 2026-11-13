@@ -79,6 +79,7 @@ class LiveDuelViewModel : ViewModel() {
             phase = Phase.Connecting
             try {
                 when {
+                    start.startsWith("demo") -> demo(start, state)
                     start == "link" -> {
                         val (made, learnt) = state.cloud.createLinkDuel(uid, state.progress.username, draw(state))
                         learnt?.let { clock.offsetMs = it.offsetMs }
@@ -95,6 +96,57 @@ class LiveDuelViewModel : ViewModel() {
         }
     }
     private fun draw(state: AppViewModel) = LiveDuelRules.draw(ModeRandom.seed(), state.progress.recentCards)
+
+    // ---- Pictures (tests only: "demo" or "demo-link", never offered by the app)
+
+    /**
+     * An invented duel against Léa, played on its own: the search, the 3-2-1, both players moving
+     * forward (she passes a word and finishes first, then you), and the result. Nothing is sent.
+     */
+    private fun demo(start: String, state: AppViewModel) {
+        val uid = state.uid ?: return
+        val me = LiveDuel.Side(uid, state.progress.username)
+        if (start == "demo-link") {
+            duel = LiveDuel("demo", ChallengeRules.draw(21uL), System.currentTimeMillis(), null, me, LiveDuel.Side("", ""), "K7M2QX")
+            phase = Phase.Waiting
+            return
+        }
+        phase = Phase.Searching(System.currentTimeMillis())
+        searchJob = viewModelScope.launch {
+            delay(4_000)
+            val startMs = System.currentTimeMillis() + LiveDuelRules.COUNTDOWN_MS
+            var current = LiveDuel("demo", ChallengeRules.draw(21uL), System.currentTimeMillis(), startMs, me, LiveDuel.Side("demo-lea", "Léa"))
+            apply(current, state)
+            delay(LiveDuelRules.COUNTDOWN_MS)
+            // Every 0.5 s: Léa moves every 3 s (a word passed, then the finish at 15 s), and you every
+            // 4 s, the next answer half typed in between.
+            var lea = 0
+            var mine = 0
+            for (tick in 1..40) {
+                delay(500)
+                val game = game ?: return@launch
+                val elapsed = tick * 500L
+                if (elapsed % 3_000 == 0L && lea < ChallengeRules.WORDS) {
+                    lea++
+                    current = current.copy(to = current.to.copy(done = lea, skips = if (lea >= 2) 1 else 0,
+                        finishedMs = if (lea == ChallengeRules.WORDS) startMs + elapsed else null))
+                }
+                val card = game.card
+                if (elapsed % 4_000 == 0L && mine < ChallengeRules.WORDS && card != null) {
+                    mine++
+                    game.answer(card.wordFull)
+                    answer = ""; successTick++
+                    current = current.copy(from = current.from.copy(done = mine,
+                        finishedMs = if (mine == ChallengeRules.WORDS) startMs + elapsed else null))
+                } else if (elapsed % 4_000 == 1_500L && card != null) {
+                    answer = card.wordFull.uppercase().take(3)
+                }
+                version++
+                duel = current
+                if (mine == ChallengeRules.WORDS) return@launch
+            }
+        }
+    }
 
     // ---- Random opponent
 
