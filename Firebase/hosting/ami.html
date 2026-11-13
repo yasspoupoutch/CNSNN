@@ -17,11 +17,26 @@
 <link rel="stylesheet" href="/style.css">
 <style>
   .code { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 6px 0 0; }
-  .tip { margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: rgba(201,167,255,.14); border: 1px solid rgba(201,167,255,.35); line-height: 1.45; }
+  #snap { min-height: 100vh; min-height: 100dvh; padding: 18px 22px 28px; display: flex; flex-direction: column; text-align: center; }
+  #snap[hidden] { display: none; }
+  #snap .arrow { align-self: flex-end; width: 120px; height: 130px; color: var(--gold); margin-right: -6px; }
+  #snap h1 { font-size: clamp(28px, 8.5vw, 38px); line-height: 1.2; margin: 18px 0 0; }
+  #snap h1 b { color: var(--gold); }
+  #snap .dots { display: inline-block; padding: 0 10px; border-radius: 12px; background: rgba(255,198,90,.16); color: var(--gold); letter-spacing: .08em; }
+  #snap p { color: var(--muted, #a9adbd); margin: 20px 0 0; font-size: 17px; }
+  #snap .later { margin-top: auto; padding-top: 40px; font-size: 15px; }
   .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
 </style>
 </head>
 <body>
+<div id="snap" hidden>
+  <svg class="arrow" viewBox="0 0 120 130" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M18 122 C 30 70, 60 40, 104 14"/><path d="M70 12 L 106 12 L 100 46"/>
+  </svg>
+  <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b><br>pour ouvrir l’invitation.</h1>
+  <p>CNSNN s’ouvrira directement sur l’invitation.</p>
+  <p class="later">Pas encore l’application ? <a href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>, puis revenez toucher le lien.</p>
+</div>
 <main>
 <nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a></nav>
 <h1>Un ami vous invite !</h1>
@@ -30,7 +45,6 @@
   <div class="small">Code ami</div>
   <div class="code" id="code" aria-live="polite">······</div>
   <p class="muted" id="hint">Avec l’application, ce lien vous ajoute en amis directement.</p>
-  <p class="tip" id="tip" hidden><b>Lien ouvert dans Snapchat, Instagram ou TikTok ?</b> Touchez <b>⋯</b> en haut de l’écran, puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b> : CNSNN s’ouvre directement sur l’invitation.</p>
   <div class="buttons">
     <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
     <a class="button ghost" id="open" href="/">J’ai déjà l’application</a>
@@ -77,29 +91,13 @@
   // that did not claim these links yet): open the app if it is there, otherwise go to the store.
   // Once installed, the player taps the same link again and the app opens on it.
   const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  // Snapchat, Instagram, TikTok, Facebook… show links in their own browser, which never hands a
-  // universal link to the app, and some of them look exactly like Safari: on an iPhone, reaching this
-  // page does not mean CNSNN is missing. So never jump to the App Store: « Ouvrir » is the main button
-  // (cnsnn:// opens the app on the challenge), « Installer » the second. Where the browser is known to
-  // be an app's, the app is tried at once (not in Safari, which shows an error when the app is missing).
-  const ua = navigator.userAgent;
-  const inApp = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|LinkedInApp|Twitter|Pinterest|Line\/|GSA\/|KAKAOTALK/i.test(ua) || !/Safari\//.test(ua);
-  // A link tapped in a page opens the app only when it points to ANOTHER domain than the page. So on an
-  // iPhone this page moves to the project's second address (same site, firebaseapp.com), where « Ouvrir »
-  // is the real https://…web.app link: one tap opens CNSNN, even where cnsnn:// is blocked (Snapchat).
-  const home = 'cnsnn-9ctosy.web.app';
-  if (code && iPhone && location.hostname === home) location.replace('https://cnsnn-9ctosy.firebaseapp.com/a/' + code);
+  // Snapchat and the like open links in their own browser, which never hands them to the app: neither
+  // the universal link nor cnsnn:// works there (tested by Yasin), but their « Ouvrir dans le navigateur »
+  // does, and CNSNN opens at once on the link. So on an iPhone the page shows only that instruction,
+  // an arrow toward ⋯ at the top. (Safari never shows this page when CNSNN is installed.)
   if (code && iPhone) {
-    const open = document.getElementById('open');
-    open.href = 'https://' + home + '/a/' + code;
-    open.textContent = 'Ouvrir dans CNSNN';
-    open.className = 'button';
-    document.getElementById('install').className = 'button ghost';
-    open.parentNode.insertBefore(open, open.parentNode.firstChild);
-    // Snapchat and others block both universal links and cnsnn:// (tested): their « open in browser » works.
-    document.getElementById('tip').hidden = false;
-    document.getElementById('hint').textContent = 'Vous avez CNSNN ? Touchez « Ouvrir dans CNSNN ». Pas encore l’application ? Installez-la, puis revenez toucher le lien.';
-    if (inApp) location.href = 'cnsnn://a/' + code;
+    document.querySelector('main').hidden = true;
+    document.getElementById('snap').hidden = false;
   }
   if (code && android) {
     // Chrome opens the app when installed, else follows browser_fallback_url to Google Play.
