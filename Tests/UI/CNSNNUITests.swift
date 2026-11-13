@@ -187,9 +187,9 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Le thème et le chrono"].waitForExistence(timeout: 5))
         app.buttons["Suivant"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Si vous ne trouvez pas…"].waitForExistence(timeout: 5))
-        // Indice blinks; the real button shows the hint on the game page.
+        // Indice blinks; the real button lights the word's vowels (A, E, U) on the keyboard.
         app.buttons["Indice"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["« Il a écrit le livre. »"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "A, E et U s’allument")).firstMatch.waitForExistence(timeout: 5))
         app.buttons["À vous de jouer"].tap()
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["tutorial.skip"])], timeout: 5)
         // The real daily game opens next.

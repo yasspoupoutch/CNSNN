@@ -25,7 +25,8 @@ import org.junit.runner.RunWith
 class TutorialFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private fun has(text: String) = rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
-    private fun waitFor(text: String) = rule.waitUntil(5_000) { has(text) }
+    private fun waitFor(text: String, substring: Boolean = false) =
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty() }
 
     @Test fun tutorialFromProfile() {
         rule.waitUntil(15_000) { has("Continuer") || has("Bonjour,") }
@@ -60,9 +61,12 @@ class TutorialFlowTest {
         waitFor("Le thème et le chrono")
         rule.onNodeWithText("Suivant").performClick()
         waitFor("Si vous ne trouvez pas…")
-        // Indice blinks; tapping it really shows the hint on the game page.
+        // Indice blinks; tapping it really lights the word's vowels (A, E, U) on the keyboard.
         rule.onNodeWithTag("tutorial.hint").performClick()
-        waitFor("« Il a écrit le livre. »")
+        waitFor("A, E et U s’allument", substring = true)
+        rule.onNodeWithContentDescription("A, voyelle du mot").assertExists()
+        rule.onNodeWithContentDescription("U, voyelle du mot").assertExists()
+        assertFalse(rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("O, voyelle du mot")).fetchSemanticsNodes().isNotEmpty())
         rule.onNodeWithText("À vous de jouer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("tutorial")).fetchSemanticsNodes().isEmpty() }
         // The real daily game opens next.

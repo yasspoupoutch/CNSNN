@@ -42,7 +42,20 @@ class StoreScreenshotsTest {
     private fun waitFor(text: String, timeout: Long = 20_000) = rule.waitUntil(timeout) { has(text) }
 
     @Test fun takeStoreScreenshots() {
-        try { takeAll() } catch (e: Throwable) { runCatching { shot("zz-echec") }; throw e }
+        try { takeAll() } catch (e: Throwable) {
+            runCatching { shot("zz-echec") }
+            // What the screen showed, readable in the CI log (the picture stays in the artifact).
+            val screen = runCatching {
+                rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().flatMap { root ->
+                    fun walk(n: androidx.compose.ui.semantics.SemanticsNode): List<String> =
+                        (n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.map { it.text } ?: emptyList()) +
+                        (n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) ?: emptyList()) +
+                        n.children.flatMap { walk(it) }
+                    walk(root)
+                }.joinToString(" | ")
+            }.getOrDefault("?")
+            throw AssertionError("Écran : $screen", e)
+        }
     }
 
     private fun takeAll() {
