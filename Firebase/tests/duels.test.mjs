@@ -76,12 +76,15 @@ test('each player moves one word at a time and finishes at the server time', asy
   await started();
   const a = user('alice'), b = user('bob');
   await assertFails(updateDoc(doc(b, 'duels/d1'), move('from', 1)));
-  await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 2)));
+  await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 0)));
+  await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 1, 2)));
   await assertSucceeds(updateDoc(doc(a, 'duels/d1'), move('from', 1)));
   await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 2, 2)));
   await assertSucceeds(updateDoc(doc(a, 'duels/d1'), move('from', 2, 1)));
-  await assertSucceeds(updateDoc(doc(a, 'duels/d1'), move('from', 3, 1)));
+  // A lost write: the next one carries the total.
   await assertSucceeds(updateDoc(doc(a, 'duels/d1'), move('from', 4, 1)));
+  await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 3, 1)));
+  await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 4, 0)));
   // The 5th word is the finish, stamped by the server.
   await assertFails(updateDoc(doc(a, 'duels/d1'), move('from', 5, 1)));
   await assertFails(updateDoc(doc(a, 'duels/d1'), { ...move('from', 5, 1), fromFinishedAt: Timestamp.now() }));
@@ -98,10 +101,12 @@ test('nothing moves before the start, after 11 minutes, or too fast', async () =
   await players();
   await seed('duels/d1', { from: 'alice', fromName: 'Alice', to: 'bob', toName: 'Bob', code: 'ABC234', cardIds: cards, createdAt: ago(1000), readyAt: ago(1000) });
   await assertFails(updateDoc(doc(user('alice'), 'duels/d1'), move('from', 1)));
+  await patch('duels/d1', { readyAt: ago(4500) });
+  await assertSucceeds(updateDoc(doc(user('bob'), 'duels/d1'), move('to', 1)));
   await patch('duels/d1', { readyAt: ago(12 * 60000) });
   await assertFails(updateDoc(doc(user('alice'), 'duels/d1'), move('from', 1)));
   // 5 words found in 4 s: too fast. 5 passed: no minimum.
-  await patch('duels/d1', { readyAt: ago(9000), fromDone: 4, fromSkips: 0, toDone: 4, toSkips: 4 });
+  await patch('duels/d1', { readyAt: ago(9000), fromDone: 4, fromSkips: 0, toDone: 4, toSkips: 4, toFinishedAt: deleteField() });
   await assertFails(updateDoc(doc(user('alice'), 'duels/d1'), move('from', 5, 0, true)));
   await assertSucceeds(updateDoc(doc(user('bob'), 'duels/d1'), move('to', 5, 5, true)));
 });
@@ -141,6 +146,10 @@ test('a random opponent is taken from the waiting line, once, in one batch', asy
   // Someone also waiting in the line cannot take: they would take each other.
   await assertSucceeds(setDoc(doc(a, 'duelQueue/alice'), { name: 'Alice', at: serverTimestamp(), duel: '' }));
   await assertFails(take(a, 'r1', random()));
+  // Alice's own place was just taken by Carol: she cannot take Bob as well.
+  await patch('duelQueue/alice', { duel: 'other' });
+  await assertFails(take(a, 'r1', random(), 'bob', (batch) => batch.delete(doc(a, 'duelQueue/alice'))));
+  await patch('duelQueue/alice', { duel: '' });
   await assertSucceeds(take(a, 'r1', random(), 'bob', (batch) => batch.delete(doc(a, 'duelQueue/alice'))));
   assert.equal((await read('duelQueue/bob')).duel, 'r1');
   // Taken: nobody else can take it.

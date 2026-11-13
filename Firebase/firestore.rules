@@ -575,6 +575,7 @@ service cloud.firestore {
     && d.toName == place.name && place.duel == '' && request.time < place.at + duration.value(90, 's')
     && getAfter(at('duelQueue/' + d.to)).data.duel == id
     && !existsAfter(at('duelQueue/' + request.auth.uid))
+    && (!exists(at('duelQueue/' + request.auth.uid)) || get(at('duelQueue/' + request.auth.uid)).data.duel == '')
     && challengeCards(d.cardIds) && d.createdAt == request.time && d.readyAt == request.time;
   }
   function joinsDuel(old, d) {
@@ -583,16 +584,18 @@ service cloud.firestore {
     && d.to == request.auth.uid && d.toName == get(at('users/' + request.auth.uid)).data.username
     && d.readyAt == request.time && request.time < old.createdAt + duration.value(15, 'm');
   }
-  // One word at a time (found or passed), between the start and the 11th minute; the 5th one is the
-  // finish, at the server's time, at least 2 s per word found.
+  // Words found or passed only add up (several at once when a write was lost on the way), from the
+  // start (1 s of slack for the phone's guess of the server clock) to the 11th minute; the 5th word is
+  // the finish, at the server's time, at least 2 s per word found.
   function movesInDuel(side, old, d) {
    let done = old.get(side + 'Done', 0);
    let skips = old.get(side + 'Skips', 0);
    let last = d[side + 'Done'] == 5;
    return old[side] == request.auth.uid && ('readyAt' in old) && !((side + 'FinishedAt') in old) && !((side + 'Quit') in old)
-    && request.time >= duelStart(old) && request.time < duelStart(old) + duration.value(11, 'm')
+    && request.time >= old.readyAt + duration.value(4, 's') && request.time < duelStart(old) + duration.value(11, 'm')
     && d.diff(old).affectedKeys().hasOnly([side + 'Done', side + 'Skips', side + 'FinishedAt'])
-    && d[side + 'Done'] == done + 1 && (d[side + 'Skips'] == skips || d[side + 'Skips'] == skips + 1)
+    && d[side + 'Done'] is int && d[side + 'Done'] > done && d[side + 'Done'] <= 5
+    && d[side + 'Skips'] is int && d[side + 'Skips'] >= skips && d[side + 'Skips'] - skips <= d[side + 'Done'] - done
     && (last ? (d[side + 'FinishedAt'] == request.time
                 && request.time >= duelStart(old) + duration.value((5 - d[side + 'Skips']) * 2, 's'))
              : !((side + 'FinishedAt') in d));
