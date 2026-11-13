@@ -1,6 +1,9 @@
 package com.poupoutch.cnsnn
 
 import android.graphics.Bitmap
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -47,10 +50,10 @@ class StoreScreenshotsTest {
             // What the screen showed, readable in the CI log (the picture stays in the artifact).
             val screen = runCatching {
                 rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().flatMap { root ->
-                    fun walk(n: androidx.compose.ui.semantics.SemanticsNode): List<String> =
-                        (n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.map { it.text } ?: emptyList()) +
-                        (n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) ?: emptyList()) +
-                        n.children.flatMap { walk(it) }
+                    fun walk(n: SemanticsNode): List<String> =
+                        n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { t -> t.text } +
+                        n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
+                        n.children.flatMap { c -> walk(c) }
                     walk(root)
                 }.joinToString(" | ")
             }.getOrDefault("?")
