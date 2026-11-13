@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="/style.css">
 <style>
   .code { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 6px 0 0; }
+  .tip { margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: rgba(201,167,255,.14); border: 1px solid rgba(201,167,255,.35); line-height: 1.45; }
   .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
 </style>
 </head>
@@ -29,6 +30,7 @@
   <div class="small">Code ami</div>
   <div class="code" id="code" aria-live="polite">······</div>
   <p class="muted" id="hint">Avec l’application, ce lien vous ajoute en amis directement.</p>
+  <p class="tip" id="tip" hidden><b>Lien ouvert dans Snapchat, Instagram ou TikTok ?</b> Touchez <b>⋯</b> en haut de l’écran, puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b> : CNSNN s’ouvre directement sur l’invitation.</p>
   <div class="buttons">
     <a class="button" id="install" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
     <a class="button ghost" id="open" href="/">J’ai déjà l’application</a>
@@ -88,6 +90,8 @@
     open.className = 'button';
     document.getElementById('install').className = 'button ghost';
     open.parentNode.insertBefore(open, open.parentNode.firstChild);
+    // Snapchat and others block both universal links and cnsnn:// (tested): their « open in browser » works.
+    document.getElementById('tip').hidden = false;
     document.getElementById('hint').textContent = 'Vous avez CNSNN ? Touchez « Ouvrir dans CNSNN ». Pas encore l’application ? Installez-la, puis revenez toucher le lien.';
     if (inApp) location.href = 'cnsnn://a/' + code;
   }
