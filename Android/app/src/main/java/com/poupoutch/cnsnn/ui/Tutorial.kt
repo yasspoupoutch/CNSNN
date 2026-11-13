@@ -121,7 +121,7 @@ enum class TutorialStep(val target: TutorialTarget, val title: String, val messa
         "On repart de TR : cette fois, des voyelles se glissent aussi avant le T. Plusieurs mots sont possibles !", "AUTEUR"),
     TOP(TutorialTarget.TITLE, "Le thème et le chrono",
         "Sous les consonnes, le thème du mot pour vous mettre sur la piste. Le chrono, en haut à droite, part dès que vous appuyez sur Jouer."),
-    HELP(TutorialTarget.HINT, "Si vous ne trouvez pas…", "… prenez un indice ! Appuyez sur Indice (+1 min sur le mot du jour)."),
+    HELP(TutorialTarget.HINT, "Si vous ne trouvez pas…", "… prenez un indice ! Appuyez sur Indice : les voyelles du mot s’allument sur le clavier (+30 s sur le mot du jour)."),
 }
 
 /** The tutorial's progress on the Mot du jour page, shared by the board (which morphs the example) and the overlay. */
@@ -276,7 +276,7 @@ private fun TutorialBubble(step: TutorialStep, hintShown: Boolean, arrowX: Float
                     }
                     Text(shown.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = ink,
                         modifier = Modifier.padding(top = 12.dp).semantics { heading() })
-                    Text(if (shown == TutorialStep.HELP && hint) "« Il a écrit le livre. » : c’est AUTEUR ! À vous de trouver le mot du jour." else shown.message,
+                    Text(if (shown == TutorialStep.HELP && hint) "A, E et U s’allument : avec TR, c’est AUTEUR ! Toujours bloqué ? Indice 2 donne une phrase (+30 s). À vous de jouer !" else shown.message,
                         color = ink.copy(alpha = 0.75f), modifier = Modifier.padding(top = 6.dp))
                     if (next != null) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (back != null && shown != TutorialStep.CONSONANTS) TextButton(back) { Text("Retour", color = ink.copy(alpha = 0.6f), fontWeight = FontWeight.SemiBold) }

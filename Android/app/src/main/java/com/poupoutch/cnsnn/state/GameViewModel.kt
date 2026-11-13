@@ -141,7 +141,7 @@ class GameViewModel : ViewModel() {
                 usedHint = session.hintUsed; usedVowels = session.vowelsUsed
                 if (session.vowelsUsed || session.hintUsed) {
                     // Taken before leaving: lit again (a secret word's vowels come back from the server).
-                    vowels = if (secret) runCatching { cloud.dailyVowels(key) }.getOrNull() else card?.let { WordEngine.vowels(it.word) }
+                    vowels = if (secret) runCatching { cloud.dailyVowels(key) }.getOrNull() else card?.let { WordEngine.vowels(it.wordFull) }
                 }
                 dailyStart = session.startedAt
                 // Every guess counted so far was wrong (a right one ends the game).
@@ -189,7 +189,7 @@ class GameViewModel : ViewModel() {
         if (usedVowels || usedHint) revealSentence(state) else revealVowels(state)
     }
 
-    private fun localVowels(): String? = card?.word?.takeIf { it.isNotEmpty() }?.let { WordEngine.vowels(it) }
+    private fun localVowels(): String? = card?.wordFull?.takeIf { it.isNotEmpty() }?.let { WordEngine.vowels(it) }
 
     private fun revealVowels(state: AppViewModel) {
         if (usedVowels || usedHint || result != null || checking) return

@@ -221,7 +221,7 @@ private fun ModeRecordsCard(state: AppViewModel) {
     }
 }
 
-private enum class Board(val label: String) { TODAY("Aujourd’hui"), WEEK("Semaine"), FASTEST("Records"), SPRINT("Sprint") }
+private enum class Board(val label: String) { TODAY("Aujourd’hui"), WEEK("Semaine"), SPRINT("Sprint") }
 
 /** "4/6 jours": words found this week out of the days gone (Monday is day 1). */
 private fun weekDays(week: DailyScore.Week, day: String = DailySchedule.key()): String =
@@ -241,7 +241,6 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     var arrived by remember { mutableStateOf(false) }
     val today = state.rankings.today
     val players = state.rankings.players
-    val fastest = state.rankings.fastest
     val myRank = state.rankings.myRank
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
@@ -257,7 +256,7 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
         val force = !arrived || pulled
         seenToken = refreshToken; arrived = true
         val day = DailySchedule.key()
-        val key = when (board) { Board.TODAY -> "today-$day"; Board.WEEK -> "week-$day"; Board.SPRINT -> "sprint"; Board.FASTEST -> board.name }
+        val key = when (board) { Board.TODAY -> "today-$day"; Board.WEEK -> "week-$day"; Board.SPRINT -> "sprint" }
         // The Sprint ranking keeps its own 5 minutes (see AppViewModel.sprintRankingIsStale).
         val stale = { if (board == Board.SPRINT) state.sprintRankingIsStale(pulled) else state.rankingIsStale(key, force) }
         val summary = state.rankingIsStale("summary", force)
@@ -275,7 +274,6 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
                 when (board) {
                     Board.TODAY -> { val rows = state.cloud.dailyRanking(day); state.rankings = state.rankings.copy(today = rows) }
                     Board.WEEK -> { val rows = state.cloud.weekPlayers(day); state.rankings = state.rankings.copy(players = rows) }
-                    Board.FASTEST -> { val rows = state.cloud.fastestPlayers(); state.rankings = state.rankings.copy(fastest = rows) }
                     Board.SPRINT -> {
                         val top = state.cloud.sprintTop()
                         // My own line only when the top 10 does not hold it (one read and one count).
@@ -308,22 +306,21 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     if (state.isServerFull) Text(CloudError.serverFull(), fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     message?.let { Text(it, fontSize = 13.sp, color = Palette.secondary) }
     // The rankings show only their first lines: says how many, so nobody looks for a missing name.
-    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.WEEK -> "Top 50 de la semaine"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes"; else -> "Top 25 des meilleurs temps" },
+    Text(when (board) { Board.TODAY -> "Top 25 des plus rapides du jour"; Board.WEEK -> "Top 50 de la semaine"; Board.SPRINT -> "Top 10 du Sprint : le plus de mots en 90 secondes" },
         fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(horizontal = 4.dp))
     val hidden = state.hiddenPlayers
     val rows = when (board) {
         // The official time: a hint adds a minute.
         // A day's result keeps the pseudo of when it was played: the current one when known.
-        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + if (it.usedHint) " · indice +1 min" else "") } }
+        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + hintDetail(it.usedHint, it.usedVowels)) } }
         // The most words found this week first, then the lowest total time.
         Board.WEEK -> players.map { p -> val week = p.thisWeek() ?: DailyScore.Week(); Line(p.uid, p.username, Format.clock(week.timeMs), weekDays(week) + " trouvés") }
-        Board.FASTEST -> fastest.map { Line(it.uid, it.username, Format.seconds(it.bestTimeMs)) }
         Board.SPRINT -> state.rankings.sprint.mapIndexed { index, it -> Line(it.uid, it.username, words(it.best), crown = index == 0) }
     }.filter { it.id !in hidden }
     SectionCard(padding = 0.dp, radius = 24.dp) {
         if (rows.isEmpty()) EmptyLine(loading, if (failed) unavailable(state) else
             when (board) { Board.TODAY -> "Personne n’a encore trouvé le mot du jour."; Board.WEEK -> "Personne n’a encore joué cette semaine."
-                Board.SPRINT -> "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."; else -> "Aucun résultat pour le moment." })
+                Board.SPRINT -> "Aucun record pour le moment. Jouez un Sprint pour entrer au classement." })
         rows.forEachIndexed { index, row ->
             if (index > 0) Divider()
             val mine = row.id == state.uid
@@ -574,4 +571,12 @@ private fun rememberResumeCount(): Int {
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
     return count
+}
+
+/** The hints a player took on the day: vowels 30 s, sentence 30 s more (a minute alone for older versions). */
+fun hintDetail(usedHint: Boolean, usedVowels: Boolean): String = when {
+    usedHint && usedVowels -> " · indices +1 min"
+    usedHint -> " · indice +1 min"
+    usedVowels -> " · voyelles +30 s"
+    else -> ""
 }

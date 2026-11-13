@@ -60,7 +60,8 @@ data class SprintRecord(val uid: String, val username: String, val best: Int)
 /** One day of anonymous attendance (`stats/{day}`): counter name to value. */
 data class DayUsage(val day: String, val counts: Map<String, Int>)
 /** One line of the day's ranking. `scoreMs` is the official time: the hint minute included, 10 min for a lost day. */
-data class DailyRank(val uid: String, val username: String, val timeMs: Int, val scoreMs: Int, val usedHint: Boolean, val wrongAnswers: Int, val correct: Boolean = true)
+data class DailyRank(val uid: String, val username: String, val timeMs: Int, val scoreMs: Int, val usedHint: Boolean, val wrongAnswers: Int, val correct: Boolean = true,
+                     val usedVowels: Boolean = false)
 /** Server state of today's Mot du jour for the signed-in player. */
 data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean,
                         /** Guesses the server has counted, and the last one (normalized). */
@@ -459,8 +460,9 @@ class CloudRepository(
         val timeMs = d.getLong("timeMs")?.toInt() ?: return null
         val usedHint = d.getBoolean("usedHint") ?: false
         val correct = d.getBoolean("correct") ?: false
-        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct, d.getBoolean("usedVowels") ?: false)
-        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct)
+        val usedVowels = d.getBoolean("usedVowels") ?: false
+        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels)
+        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct, usedVowels)
     }
     /**
      * "3e sur 4 aujourd'hui": my rank and the count among the players who found the word, like the day's
@@ -558,8 +560,9 @@ class CloudRepository(
             }
             val result = resultRef(player, day).get(Source.SERVER).await()
             val today = result.data?.let { attempt(day, it) }
-            val hint = result.getBoolean("usedHint") ?: false
-            val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, hint, it.correct, result.getBoolean("usedVowels") ?: false) }
+            val vowels = result.getBoolean("usedVowels") ?: false
+            val hint = (result.getBoolean("usedHint") ?: false) || vowels
+            val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, result.getBoolean("usedHint") ?: false, it.correct, vowels) }
             rows += FriendStanding(player, entry?.username ?: name, entry?.thisWeek(day), entry?.currentStreak() ?: 0, today,
                 result.getLong("wrongAnswers")?.toInt(), score, hint)
         }

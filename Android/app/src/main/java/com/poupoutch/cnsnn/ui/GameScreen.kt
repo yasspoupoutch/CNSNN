@@ -191,8 +191,8 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         AnimatedVisibility(result != null, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
             result?.let {
-                ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && !game.usedHint, game.standing,
-                    game.pendingOfficial, game.ranked, game.usedHint, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
+                ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && game.hintsTaken == 0, game.standing,
+                    game.pendingOfficial, game.ranked, game.usedHint, game.usedVowels, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
                     next = { game.next(state) }, close = close)
             }
         }
@@ -281,25 +281,27 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             }
         }
     }
-    // After a minute on the Mot du jour without the hint, a small bubble points at Indice.
+    // 30 s on the Mot du jour without a hint, then 30 s after the vowels: a small bubble points at Indice.
     var hintNudge by remember(card.id) { mutableStateOf(false) }
-    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id) {
+    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id, game.usedVowels) {
+        hintNudge = false
+        val from = if (game.usedVowels) game.elapsedMs else 0
         while (!game.usedHint && game.result == null) {
-            if (game.elapsedMs >= 60_000) { hintNudge = true; break }
+            if (game.elapsedMs - from >= 30_000) { hintNudge = true; break }
             delay(1_000)
         }
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         AnswerLine(game)
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // After a minute without the hint, a small bubble on its left points at it (no room above,
+            // After 30 s without a hint, a small bubble on its left points at it (no room above,
             // under the answer); the buttons slide right to make room.
             AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
                 HintNudge()
             }
             AssistChip({ haptics.selection(); game.revealHint(state) }, {
-                // The hint costs a minute on the Mot du jour only; in Classique it is free.
-                Text(buildString { append("Indice"); if (game.usedHint) append("  révélé") else if (game.ranked) append("  +1 min") })
+                // Indice 1 lights the word's vowels, Indice 2 shows the sentence: 30 s each on the Mot du jour, free in Classique.
+                Text(when (game.hintsTaken) { 0 -> "Indice"; 1 -> "Indice 2"; else -> "Indices révélés" } + if (!game.usedHint && game.ranked) "  +30 s" else "")
             }, Modifier.tutorialTarget(TutorialTarget.HINT), enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
             AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
@@ -307,7 +309,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
         }
     }
     LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = { game.submit(state) }, enabled = game.result == null && !game.checking,
-        moveCursor = { game.moveCursor(it) })
+        moveCursor = { game.moveCursor(it) }, lit = game.vowels ?: "")
     // Wrong guesses may be answered by the server a moment later: the buzz follows the shake.
     LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(game.result?.id) { if (game.result?.correct == true) haptics.success() }
@@ -369,10 +371,12 @@ private fun Caret() {
 /**
  * AZERTY keyboard laid out like the phone's French one (Gboard, iPhone): same rows and key sizes, ⌫ at the
  * right end of the third row, a wide space bar with Valider where Enter goes, no dead zone between keys (a
- * touch in a gap goes to the nearest key) and the letter popping up above the finger. Vowels in gold.
+ * touch in a gap goes to the nearest key) and the letter popping up above the finger. All keys grey; the word's vowels light up in gold
+ * once the first hint is taken (lit).
  */
 @Composable
-fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean, clear: (() -> Unit)? = null, moveCursor: ((Int) -> Unit)? = null) {
+fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, enabled: Boolean, clear: (() -> Unit)? = null, moveCursor: ((Int) -> Unit)? = null,
+                   lit: String = "") {
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
     val rowHeight = 56.dp
@@ -383,13 +387,13 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
             Column {
                 rows.take(2).forEach { row ->
                     Row(Modifier.fillMaxWidth()) {
-                        row.forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
+                        row.forEach { letter -> Key(letter.toString(), letter in lit, unit, rowHeight, enabled, label = if (letter in lit) "$letter, voyelle du mot" else null) { haptics.key(); press(letter.toString()) } }
                     }
                 }
                 Row(Modifier.fillMaxWidth()) {
                     // Where the phone has ⇧: left empty, so W to N sit where the thumb expects them.
                     Spacer(Modifier.width(unit * 1.6f))
-                    rows[2].forEach { letter -> Key(letter.toString(), isVowel(letter), unit, rowHeight, enabled) { haptics.key(); press(letter.toString()) } }
+                    rows[2].forEach { letter -> Key(letter.toString(), letter in lit, unit, rowHeight, enabled, label = if (letter in lit) "$letter, voyelle du mot" else null) { haptics.key(); press(letter.toString()) } }
                     Spacer(Modifier.weight(1f))
                     Key("⌫", false, unit * 1.35f, rowHeight, enabled, label = "Effacer",
                         longPress = clear?.let { { haptics.retry(); it() } }) { haptics.key(); delete() }
@@ -462,7 +466,7 @@ private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Bo
 
 @Composable
 private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode: GameMode, firstTry: Boolean, standing: DailyStanding?,
-                        pending: Boolean, ranked: Boolean, usedHint: Boolean, wrongAnswers: Int, officialMs: Int, catchUp: Boolean, next: () -> Unit, close: () -> Unit) {
+                        pending: Boolean, ranked: Boolean, usedHint: Boolean, usedVowels: Boolean, wrongAnswers: Int, officialMs: Int, catchUp: Boolean, next: () -> Unit, close: () -> Unit) {
     val context = LocalContext.current
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
@@ -475,13 +479,13 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
             }
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (catchUp) {
-                    // Counted: the real time, the hint minute, then 5 minutes more.
-                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct)), "compté", Modifier.weight(1f))
-                    ResultTile(if (usedHint) "+1 min" else "non", "indice", Modifier.weight(1f))
+                    // Counted: the real time, the hints (30 s each), then 5 minutes more.
+                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct, usedVowels)), "compté", Modifier.weight(1f))
+                    ResultTile(when { usedHint -> "+1 min"; usedVowels -> "+30 s"; else -> "non" }, if (usedHint && usedVowels) "indices" else "indice", Modifier.weight(1f))
                     ResultTile("${CatchUp.toPlay(state.catchUpDays())}", "à rattraper", Modifier.weight(1f))
                 } else if (mode == GameMode.DAILY) {
-                    // The official time: the hint adds a minute, a lost day counts ten.
-                    ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
+                    // The official time: the hints add 30 s each, a lost day counts ten.
+                    ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint && usedVowels -> "avec indices"; usedHint || usedVowels -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
                     ResultTile("$wrongAnswers", if (wrongAnswers > 1) "erreurs" else "erreur", Modifier.weight(1f))
                     ResultTile("${state.streak}", "jours de série", Modifier.weight(1f))
                 } else {

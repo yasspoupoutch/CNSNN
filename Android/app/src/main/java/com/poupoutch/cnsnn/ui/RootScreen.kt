@@ -344,7 +344,7 @@ private fun Rules(next: () -> Unit) {
             }
             Column(Modifier.padding(top = 28.dp, start = 6.dp, end = 6.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Bullet("Tapez le mot complet, les accents sont ignorés")
-                Bullet("Un chrono tourne. Un indice si vous séchez, contre 1 minute de pénalité")
+                Bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
                 Bullet("Un mot du jour commun, et le mode Classique sans limite")
             }
             Spacer(Modifier.height(16.dp))
