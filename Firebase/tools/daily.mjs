@@ -34,6 +34,8 @@ export function normalize(value) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
 }
 export const consonants = (value) => normalize(value).replace(/[AEIOUY]/g, '');
+// Same as Core/WordEngine.swift vowels: each vowel of the word once, in alphabetical order (first hint).
+export const vowels = (value) => [...'AEIOUY'].filter((v) => normalize(value).includes(v)).join('');
 
 // Same table as Core/GameRules.swift DailySchedule.difficulty and firestore.rules dailyBase.
 export function difficultyOf(day) {
@@ -180,6 +182,7 @@ async function firestore() {
 function publish(batch, db, d) {
   batch.set(db.doc(`dailyPuzzles/${d.day}`), { consonants: consonants(d.word), category: d.category, difficulty: d.difficulty });
   batch.set(db.doc(`dailyHints/${d.day}`), { hint: d.hint });
+  batch.set(db.doc(`dailyVowels/${d.day}`), { vowels: vowels(d.word) });
   batch.set(db.doc(`dailySecrets/${d.day}`), { answer: normalize(d.word), word: d.word, hint: d.hint, category: d.category, difficulty: d.difficulty });
 }
 
@@ -205,7 +208,16 @@ async function seed(dry) {
   const pools = Object.values(difficulties).map((level) => `${words.filter((w) => w.difficulty === level).length} ${level.toLowerCase()}s`).join(', ');
   console.log(`${files.length} liste(s), ${words.length} mots gardés : ${pools} (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots, ${football} mot(s) de football et ${single.length - football - words.length} mot(s) retiré(s) écartés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
+  // The vowels hint came later: today and the past days (still caught up this week) get theirs from
+  // their secret, without touching anything else of a day someone may be playing.
+  const missing = past.docs.filter((d) => typeof d.get('word') === 'string');
+  console.log(`${missing.length} jour(s) déjà publiés reçoivent leurs voyelles.`);
   if (dry) return;
+  for (let i = 0; i < missing.length; i += 400) {
+    const batch = db.batch();
+    for (const d of missing.slice(i, i + 400)) batch.set(db.doc(`dailyVowels/${d.id}`), { vowels: vowels(d.get('word')) });
+    await batch.commit();
+  }
   for (let i = 0; i < days.length; i += 150) {
     const batch = db.batch();
     for (const d of days.slice(i, i + 150)) publish(batch, db, d);

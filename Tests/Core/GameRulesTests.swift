@@ -8,6 +8,12 @@ final class GameRulesTests: XCTestCase {
   XCTAssertEqual(DailyScore.scoreMs(timeMs:590000,usedHint:true,correct:true),600000)
   XCTAssertEqual(DailyScore.scoreMs(timeMs:3_600_000,usedHint:false,correct:true),600000)
  }
+ func testTheVowelsCostHalfAMinuteAndBothHintsAMinute() {
+  XCTAssertEqual(DailyScore.scoreMs(timeMs:10000,usedHint:false,usedVowels:true,correct:true),40000)
+  XCTAssertEqual(DailyScore.scoreMs(timeMs:10000,usedHint:true,usedVowels:true,correct:true),70000)
+  XCTAssertEqual(DailyScore.scoreMs(timeMs:10000,usedHint:false,usedVowels:true,correct:false),600000)
+  XCTAssertEqual(DailyScore.catchUpScoreMs(timeMs:10000,usedHint:false,usedVowels:true,correct:true),340000)
+ }
  func testDailyRankSortsByDayThenScore() {
   // Same numbers as the rules: days since 1970, lost words after every found one.
   XCTAssertEqual(DailyScore.dayIndex("1970-01-01"),0)

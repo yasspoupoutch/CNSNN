@@ -190,7 +190,7 @@ struct LeaderboardView: View {
         switch board {
         // A day's result keeps the pseudo of when it was played: the current one when known.
         case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.scoreMs),
-                                     detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice +1 min" : "")) }
+                                     detail: Mistakes.text($0.wrongAnswers) + HintCost.detail(usedHint: $0.usedHint, usedVowels: $0.usedVowels)) }
         case .week: players.map { p in
             let week = p.thisWeek() ?? .none
             return Row(id: p.uid, name: p.username, value: Format.clock(week.timeMs), detail: Format.weekDays(week) + " trouvés")
@@ -332,7 +332,7 @@ struct FriendsBoard: View {
                                 if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
                             }
                             Text((row.week.map { "semaine " + Format.weekDays($0) + " · " + Format.clock($0.timeMs) } ?? "pas joué cette semaine") + (row.streak > 0 ? " · série \(row.streak)" : "")
-                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) + (row.todayHint ? " · indice" : "") : ""))
+                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) + (row.todayHint || row.todayVowels ? " · indice" : "") : ""))
                                 .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
                             // Friend challenges: "2 victoires · 1 défaite" against this friend.
                             if !mine, let tally = state.challengeTally(friend: row.uid).label {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { normalize, consonants, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
+import { normalize, consonants, vowels, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
 
 const list = parseList([
  'F\tGénéral\tBonbon\tUne douceur sucrée.', 'F\tAnimaux\tŒuf\tUn indice assez long.',
@@ -69,4 +69,12 @@ test('a too hard word is replaced on its day and never comes back', () => {
  assert.equal(days.length, 7);
  assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Hérisson', hint: 'Un petit animal piquant.', category: 'Animaux', difficulty: 'Facile' }] }));
  assert.throws(() => parseChanges({ days: [{ day: '2026-10-18', word: 'Cerf volant', hint: 'Il vole au bout d’un fil.', category: 'Objets', difficulty: 'Difficile' }] }));
+});
+
+test('vowels for the first hint: each once, alphabetical, same as WordEngine.vowels', () => {
+  assert.equal(vowels('Amour'), 'AOU');
+  assert.equal(vowels('Éléphant'), 'AE');
+  assert.equal(vowels('œuf'), 'EOU');
+  assert.equal(vowels('Penalty'), 'AEY');
+  assert.equal(vowels('Rythme'), 'EY');
 });

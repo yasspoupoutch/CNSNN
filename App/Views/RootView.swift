@@ -283,7 +283,7 @@ struct OnboardingView: View {
                     }.glassCard(radius: 30, padding: 22).padding(.top, 38)
                     VStack(alignment: .leading, spacing: 14) {
                         bullet("Tapez le mot complet, les accents sont ignorés")
-                        bullet("Un chrono tourne. Un indice si vous séchez, contre 1 minute de plus")
+                        bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
                         bullet("Un mot du jour commun, et le mode Classique sans limite")
                     }.padding(.horizontal, 6).padding(.top, 28)
                 }.padding(.horizontal, 26)
