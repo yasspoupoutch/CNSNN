@@ -23,6 +23,9 @@ export async function deleteAccountData(db, uid, fs) {
   // Friend challenges, sent or received: they carry the player's name.
   for (const field of ['from', 'to']) refs.push(...(await owned('challenges', field)).map((d) => d.ref));
   refs.push(...(await owned('challengeInvites', 'from')).map((d) => d.ref));
+  // Live duels, and the place in the waiting line for a random opponent.
+  for (const field of ['from', 'to']) refs.push(...(await owned('duels', field)).map((d) => d.ref));
+  refs.push(doc(db, 'duelQueue', uid));
   // Approved cards stay in the game without the author's name or id; the other proposals go.
   const authored = await owned('cards', 'createdBy');
   refs.push(...authored.filter((d) => d.data().status !== 'approved').map((d) => d.ref));

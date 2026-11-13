@@ -147,12 +147,17 @@ service cloud.firestore {
   match /challengeInvites/{code} {
    allow get: if signedIn();
    allow list: if signedIn() && resource.data.from == request.auth.uid;
+   // It names a challenge, or a live duel (duel instead of challenge: older apps say the code is unknown).
    allow create: if active() && code.matches('^[A-HJ-NP-Z2-9]{6}$')
-    && request.resource.data.keys().hasOnly(['challenge','from','createdAt'])
     && request.resource.data.from == request.auth.uid && request.resource.data.createdAt == request.time
-    && request.resource.data.challenge is string
-    && getAfter(at('challenges/' + request.resource.data.challenge)).data.from == request.auth.uid
-    && getAfter(at('challenges/' + request.resource.data.challenge)).data.code == code;
+    && ((request.resource.data.keys().hasOnly(['challenge','from','createdAt'])
+      && request.resource.data.challenge is string
+      && getAfter(at('challenges/' + request.resource.data.challenge)).data.from == request.auth.uid
+      && getAfter(at('challenges/' + request.resource.data.challenge)).data.code == code)
+     || (request.resource.data.keys().hasOnly(['duel','from','createdAt'])
+      && request.resource.data.duel is string
+      && getAfter(at('duels/' + request.resource.data.duel)).data.from == request.auth.uid
+      && getAfter(at('duels/' + request.resource.data.duel)).data.code == code));
    allow delete: if signedIn() && resource.data.from == request.auth.uid;
   }
   // Suspensions, decided by moderators from the leaderboard or a report.
@@ -532,6 +537,83 @@ service cloud.firestore {
     && c[side + 'Skips'] is int && c[side + 'Skips'] >= 0 && c[side + 'Skips'] <= 5
     && c[side + 'Errors'] is int && c[side + 'Errors'] >= 0 && c[side + 'Errors'] <= 500
     && request.time >= old[side + 'StartedAt'] + duration.value((5 - c[side + 'Skips']) * 2, 's');
+  }
+
+  // ---- Live duels: two players on the same 5 public words at the same moment, each one watching
+  // the other's progress. The server stamps when both are there (readyAt: the words come 5 s later,
+  // after a 3-2-1) and every finish; a duel lasts 10 minutes at most. Score = finish - start + 20 s per word passed.
+  // By link: created with its invite code, nobody named; the first one who opens it within 15 min joins.
+  // At random: taken from the waiting line (duelQueue), in one batch with the line's place.
+  match /duels/{id} {
+   allow get: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid
+    || resource.data.to == '' || admin());
+   allow list: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid || admin());
+   allow create: if active() && (createsLinkDuel(id, request.resource.data) || createsRandomDuel(id, request.resource.data));
+   allow update: if active() && (joinsDuel(resource.data, request.resource.data)
+    || movesInDuel('from', resource.data, request.resource.data) || movesInDuel('to', resource.data, request.resource.data)
+    || quitsDuel('from', resource.data, request.resource.data) || quitsDuel('to', resource.data, request.resource.data));
+   // A link nobody joined can be withdrawn; otherwise only with the account.
+   allow delete: if admin() || (signedIn() && resource.data.from == request.auth.uid && resource.data.to == '')
+    || (signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid) && leaving());
+  }
+  function duelStart(d) { return d.readyAt + duration.value(5, 's'); }
+  function createsLinkDuel(id, d) {
+   return d.keys().hasOnly(['from','fromName','to','toName','code','cardIds','createdAt'])
+    && d.from == request.auth.uid && d.to == '' && d.toName == ''
+    && d.fromName == get(at('users/' + request.auth.uid)).data.username
+    && d.code is string && d.code.matches('^[A-HJ-NP-Z2-9]{6}$')
+    && getAfter(at('challengeInvites/' + d.code)).data.duel == id
+    && challengeCards(d.cardIds) && d.createdAt == request.time;
+  }
+  // The opponent was waiting in the line (fresh, not taken), and their place now names this duel.
+  // The one who takes cannot be waiting at the same time: two players never take each other.
+  function createsRandomDuel(id, d) {
+   let place = get(at('duelQueue/' + d.to)).data;
+   return d.keys().hasOnly(['from','fromName','to','toName','random','cardIds','createdAt','readyAt'])
+    && d.from == request.auth.uid && d.to is string && d.to != d.from && d.random == true
+    && d.fromName == get(at('users/' + request.auth.uid)).data.username
+    && d.toName == place.name && place.duel == '' && request.time < place.at + duration.value(90, 's')
+    && getAfter(at('duelQueue/' + d.to)).data.duel == id
+    && !existsAfter(at('duelQueue/' + request.auth.uid))
+    && challengeCards(d.cardIds) && d.createdAt == request.time && d.readyAt == request.time;
+  }
+  function joinsDuel(old, d) {
+   return old.to == '' && old.from != request.auth.uid
+    && d.diff(old).affectedKeys().hasOnly(['to','toName','readyAt'])
+    && d.to == request.auth.uid && d.toName == get(at('users/' + request.auth.uid)).data.username
+    && d.readyAt == request.time && request.time < old.createdAt + duration.value(15, 'm');
+  }
+  // One word at a time (found or passed), between the start and the 11th minute; the 5th one is the
+  // finish, at the server's time, at least 2 s per word found.
+  function movesInDuel(side, old, d) {
+   let done = old.get(side + 'Done', 0);
+   let skips = old.get(side + 'Skips', 0);
+   let last = d[side + 'Done'] == 5;
+   return old[side] == request.auth.uid && ('readyAt' in old) && !((side + 'FinishedAt') in old) && !((side + 'Quit') in old)
+    && request.time >= duelStart(old) && request.time < duelStart(old) + duration.value(11, 'm')
+    && d.diff(old).affectedKeys().hasOnly([side + 'Done', side + 'Skips', side + 'FinishedAt'])
+    && d[side + 'Done'] == done + 1 && (d[side + 'Skips'] == skips || d[side + 'Skips'] == skips + 1)
+    && (last ? (d[side + 'FinishedAt'] == request.time
+                && request.time >= duelStart(old) + duration.value((5 - d[side + 'Skips']) * 2, 's'))
+             : !((side + 'FinishedAt') in d));
+  }
+  function quitsDuel(side, old, d) {
+   return old[side] == request.auth.uid && !((side + 'FinishedAt') in old) && !((side + 'Quit') in old)
+    && d.diff(old).affectedKeys().hasOnly([side + 'Quit']) && d[side + 'Quit'] == true;
+  }
+  // The waiting line for a random opponent: one place per player, under their real name, at the
+  // server's time. Anyone signed in reads it (a name and when); taking a place only writes its duel.
+  match /duelQueue/{uid} {
+   allow get, list: if signedIn();
+   allow create, update: if (active() && owner(uid)
+     && request.resource.data.keys().hasOnly(['name','at','duel'])
+     && request.resource.data.name == get(at('users/' + uid)).data.username
+     && request.resource.data.at == request.time && request.resource.data.duel == '')
+    || (active() && !owner(uid) && resource != null && resource.data.duel == ''
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['duel'])
+     && getAfter(at('duels/' + request.resource.data.duel)).data.from == request.auth.uid
+     && getAfter(at('duels/' + request.resource.data.duel)).data.to == uid);
+   allow delete: if owner(uid) || admin();
   }
 
   // ---- Anonymous attendance (Core/Usage.swift): one document per day of counters, no name, no id.
