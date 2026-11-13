@@ -29,10 +29,11 @@ fun ReviewOffer(state: AppViewModel) {
     val context = LocalContext.current
     LaunchedEffect(state.reviewPending) {
         if (!state.reviewPending) return@LaunchedEffect
+        delay(800)
+        // Cleared only after the pause: clearing the key first would cancel this effect at once.
         state.reviewPending = false
         state.local.reviewAskedVersion = BuildConfig.VERSION_NAME
         val activity = context.findActivity() ?: return@LaunchedEffect
-        delay(800)
         runCatching {
             val manager = ReviewManagerFactory.create(activity)
             manager.requestReviewFlow().addOnCompleteListener { request ->

@@ -72,6 +72,10 @@ class StoreScreenshotsTest {
         listOf("Lina" to 34_000, "Hugo_R" to 47_000, "camille" to 58_000, "Mehdi" to 71_000, "Sarah.B" to 96_000, "Tom" to 124_000, "Nora" to 155_000)
             .forEachIndexed { i, (name, timeMs) -> seedResult(day, "demo$i", name, timeMs, usedHint = i == 3) }
         File(context.filesDir, "shots").deleteRecursively()
+        // The midday reminder offer after the daily word: CNSNN's own question (closed in shot()),
+        // not Android's permission window, which would hide the app.
+        if (android.os.Build.VERSION.SDK_INT >= 33) InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission(context.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
 
         ActivityScenario.launch(MainActivity::class.java)
         waitFor("Continuer")

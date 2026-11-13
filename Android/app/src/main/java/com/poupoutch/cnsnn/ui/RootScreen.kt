@@ -300,8 +300,8 @@ private fun ReminderOffer(state: AppViewModel) {
     LaunchedEffect(state.reminderPending) {
         if (!state.reminderPending) return@LaunchedEffect
         delay(800)
-        // Marked as offered only now, when it really shows: leaving the home page during the pause
-        // keeps it pending for the next time, instead of losing it for good.
+        // Cleared only now: clearing the key before the pause cancelled this effect at once, so the
+        // offer never showed (and was marked as made). Leaving the home page during the pause keeps it pending.
         state.reminderPending = false
         state.local.reminderOffered = true
         if (Build.VERSION.SDK_INT >= 33 &&
