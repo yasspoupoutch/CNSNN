@@ -116,7 +116,7 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = !game.over)
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
+        Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
             TopBar(game, mode, leave)
             game.version // Recomposes on every move: the core games are plain objects.
             if (!game.over) when (mode) {

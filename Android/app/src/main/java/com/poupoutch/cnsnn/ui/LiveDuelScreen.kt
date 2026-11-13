@@ -86,7 +86,7 @@ fun LiveDuelScreen(state: AppViewModel, start: String, close: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = duelVm.phase == LiveDuelViewModel.Phase.Live)
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
+        Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
             Box(Modifier.fillMaxWidth().height(56.dp)) {
                 IconButton(leave, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Quitter") }
                 Column(Modifier.align(Alignment.Center).semantics(mergeDescendants = true) { heading() }, horizontalAlignment = Alignment.CenterHorizontally) {

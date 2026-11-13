@@ -128,7 +128,7 @@ fun TournamentScreen(state: AppViewModel, play: (Int) -> Unit, close: () -> Unit
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = false)
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp)) {
                 IconButton(close, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Fermer") }
                 Text("Tournoi de la semaine", fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
@@ -281,7 +281,7 @@ fun TournamentPlayScreen(state: AppViewModel, round: Int, close: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = vm.phase == TournamentPlayViewModel.Phase.Playing)
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
+        Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
             Box(Modifier.fillMaxWidth().height(56.dp)) {
                 IconButton(leave, Modifier.align(Alignment.CenterStart)) { Icon(Icons.Filled.Close, "Quitter") }
                 Text("Match du tournoi", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center).semantics { heading() })
