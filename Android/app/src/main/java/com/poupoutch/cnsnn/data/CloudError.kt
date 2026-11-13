@@ -35,6 +35,7 @@ class CloudError(val kind: Kind) : Exception(kind.message) {
         INVITE_IS_YOURS("C’est votre propre défi. Envoyez le lien à un ami !"),
         INVITE_TAKEN("Quelqu’un a déjà rejoint ce défi. Demandez un nouveau lien."),
         INVITE_EXPIRED("Ce défi a expiré : on a 48 h pour le rejoindre. Demandez un nouveau lien."),
+        DUEL_GONE("Ce duel n’existe plus : votre ami l’a annulé ou il a expiré. Demandez-lui un nouveau code."),
         USERNAME_TAKEN("Ce pseudo est déjà pris. Choisissez-en un autre."),
         USERNAME_INVALID("Ce pseudo ne peut pas contenir de « / ». Choisissez-en un autre."),
         SERVER_FULL("Beaucoup de joueurs aujourd’hui : le serveur gratuit de CNSNN est plein."),

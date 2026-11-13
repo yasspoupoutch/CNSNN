@@ -11,6 +11,13 @@ async function commit(db, fs, writes) {
   }
 }
 
+/** Every tournament week (Mondays) from the first one to the one open for sign-ups. */
+export function tournamentWeeks(now = Date.now()) {
+  const weeks = [];
+  for (let ms = Date.parse('2026-11-09T00:00:00Z'); ms <= now + 7 * 86_400_000; ms += 7 * 86_400_000) weeks.push(new Date(ms).toISOString().slice(0, 10));
+  return weeks;
+}
+
 export async function deleteAccountData(db, uid, fs) {
   const { doc, collection, query, where, getDocs } = fs;
   const owned = async (name, field = 'userId') => (await getDocs(query(collection(db, name), where(field, '==', uid)))).docs;
@@ -23,6 +30,14 @@ export async function deleteAccountData(db, uid, fs) {
   // Friend challenges, sent or received: they carry the player's name.
   for (const field of ['from', 'to']) refs.push(...(await owned('challenges', field)).map((d) => d.ref));
   refs.push(...(await owned('challengeInvites', 'from')).map((d) => d.ref));
+  // Live duels, and the place in the waiting line for a random opponent.
+  for (const field of ['from', 'to']) refs.push(...(await owned('duels', field)).map((d) => d.ref));
+  refs.push(doc(db, 'duelQueue', uid));
+  // Weekly tournaments since they began: the sign-up and each round's run, deleted without reading.
+  for (const week of tournamentWeeks()) {
+    refs.push(doc(db, 'tournaments', week, 'players', uid));
+    for (let round = 1; round <= 6; round++) refs.push(doc(db, 'tournaments', week, 'runs', `${round}_${uid}`));
+  }
   // Approved cards stay in the game without the author's name or id; the other proposals go.
   const authored = await owned('cards', 'createdBy');
   refs.push(...authored.filter((d) => d.data().status !== 'approved').map((d) => d.ref));

@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SportsKabaddi
 import androidx.compose.material3.AlertDialog
@@ -106,7 +107,7 @@ object Duel {
 private fun nowMs() = System.currentTimeMillis()
 
 @Composable
-private fun DuelGlyph(size: Int = 46) {
+internal fun DuelGlyph(size: Int = 46) {
     Box(Modifier.size(size.dp).background(Duel.color.copy(alpha = 0.22f), CircleShape).border(1.dp, Duel.color.copy(alpha = 0.5f), CircleShape),
         contentAlignment = Alignment.Center) {
         Icon(Icons.Filled.SportsKabaddi, null, Modifier.size((size * 0.48f).dp), tint = Duel.text)
@@ -114,7 +115,7 @@ private fun DuelGlyph(size: Int = 46) {
 }
 
 @Composable
-private fun DuelButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
+internal fun DuelButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
     Button(onClick, modifier.heightIn(min = 40.dp), enabled = enabled, shape = RoundedCornerShape(50),
         colors = ButtonDefaults.buttonColors(containerColor = Duel.color.copy(alpha = 0.22f), contentColor = Duel.text,
             disabledContainerColor = Duel.color.copy(alpha = 0.1f), disabledContentColor = Duel.text.copy(alpha = 0.5f)),
@@ -161,7 +162,7 @@ private fun tileText(state: AppViewModel, featured: Pair<Challenge, Challenge.St
     val uid = state.uid
     if (featured == null || uid == null) {
         val tally = state.challengeTally().label
-        return "Défier un ami" to ("Mêmes 5 mots. Le plus rapide gagne." + (tally?.let { "\n$it" } ?: ""))
+        return "Défier un ami" to ("Mêmes 5 mots, ou duel en direct. Le plus rapide gagne." + (tally?.let { "\n$it" } ?: ""))
     }
     val (c, status) = featured
     val name = c.theirs(uid).name
@@ -178,7 +179,7 @@ private fun tileText(state: AppViewModel, featured: Pair<Challenge, Challenge.St
 // ---- Sheet: challenge a friend
 
 @Composable
-fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
+fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit, live: (String) -> Unit = { state.liveDuelRequest = it }) {
     val uid = state.uid
     var friends by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -195,7 +196,11 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
         if (sending != null) return
         haptics.selection(); sending = "join"; message = null; focus.clearFocus()
         scope.launch {
-            try { val c = state.joinChallenge(clean); joinCode = ""; play(c) }
+            try {
+                val (challenge, duel) = state.openInvite(clean)
+                joinCode = ""
+                if (duel != null) live("join:$duel") else if (challenge != null) play(challenge)
+            }
             catch (e: Exception) { message = CloudError.message(e); haptics.retry() }
             finally { sending = null }
         }
@@ -225,6 +230,22 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit) {
         if (uid == null) {
             SectionCard(radius = 22.dp, padding = 16.dp) { Text("Connectez-vous à Internet pour défier vos amis.", color = Palette.secondary) }
         } else {
+            // Duel en direct: a random opponent, or a friend with a link; both play at the same moment.
+            Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
+                Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.Bolt, null, Modifier.size(16.dp), tint = Duel.text)
+                        Kicker("Duel en direct", Duel.text)
+                    }
+                    Text("Mêmes 5 mots, au même moment : vous voyez l’autre avancer. Le premier qui finit (+20 s par mot passé) gagne.",
+                        fontSize = 13.sp, color = Palette.secondary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        DuelButton("Au hasard", Modifier.weight(1f).testTag("liveRandom")) { haptics.selection(); live("random") }
+                        DuelButton("Avec un ami", Modifier.weight(1f).testTag("liveLink")) { haptics.selection(); live("link") }
+                    }
+                }
+            }
+            TournamentBox(state) { live("tournament") }
             val open = state.challenges.filter { it.state(uid, now) !is Challenge.State.Over }
             if (open.isNotEmpty()) {
                 Kicker("En cours", Palette.tertiary, Modifier.padding(top = 6.dp))

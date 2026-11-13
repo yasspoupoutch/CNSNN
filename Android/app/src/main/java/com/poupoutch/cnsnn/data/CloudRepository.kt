@@ -11,6 +11,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
@@ -30,10 +31,16 @@ import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.Guesses
 import com.poupoutch.cnsnn.core.LeaderboardEntry
+import com.poupoutch.cnsnn.core.LiveDuel
+import com.poupoutch.cnsnn.core.LiveDuelRules
+import com.poupoutch.cnsnn.core.ServerClock
 import com.poupoutch.cnsnn.core.Progress
 import com.poupoutch.cnsnn.core.ReviewStatus
 import com.poupoutch.cnsnn.core.SecretDaily
 import com.poupoutch.cnsnn.core.SprintRecords
+import com.poupoutch.cnsnn.core.TournamentPlayer
+import com.poupoutch.cnsnn.core.TournamentRules
+import com.poupoutch.cnsnn.core.TournamentRun
 import com.poupoutch.cnsnn.core.Submission
 import com.poupoutch.cnsnn.core.WordEngine
 import kotlinx.coroutines.tasks.await
@@ -176,6 +183,14 @@ class CloudRepository(
         refs += db.collection("friendCodes").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("usernames").whereEqualTo("uid", uid).get(Source.SERVER).await().documents.map { it.reference }
         refs += db.collection("challengeInvites").whereEqualTo("from", uid).get(Source.SERVER).await().documents.map { it.reference }
+        // Live duels, and the place in the waiting line for a random opponent.
+        for (field in listOf("from", "to")) refs += db.collection("duels").whereEqualTo(field, uid).get(Source.SERVER).await().documents.map { it.reference }
+        refs += db.collection("duelQueue").document(uid)
+        // Weekly tournaments since they began: the sign-up and each round's run, deleted without reading.
+        for (week in TournamentRules.weeks(System.currentTimeMillis())) {
+            refs += db.collection("tournaments").document(week).collection("players").document(uid)
+            refs += (1..6).map { db.collection("tournaments").document(week).collection("runs").document("${it}_$uid") }
+        }
         for (collection in listOf("dailyResults", "dailySessions", "reports", "playerReports")) {
             refs += db.collection(collection).whereEqualTo("userId", uid).get(Source.SERVER).await().documents.map { it.reference }
         }
@@ -630,6 +645,182 @@ class CloudRepository(
         }
         return all
     }
+    // ---- Live duels (same documents as the iPhone app, see Firebase/firestore.rules)
+
+    /** What a 6-character code names: a friend challenge or a live duel (same invites, same links). */
+    sealed interface InviteTarget { data class OfChallenge(val id: String) : InviteTarget; data class OfDuel(val id: String) : InviteTarget }
+    suspend fun inviteTarget(code: String): InviteTarget {
+        val doc = db.collection("challengeInvites").document(code).get(Source.SERVER).await()
+        doc.getString("duel")?.let { return InviteTarget.OfDuel(it) }
+        doc.getString("challenge")?.let { return InviteTarget.OfChallenge(it) }
+        throw CloudError(CloudError.Kind.INVITE_NOT_FOUND)
+    }
+    private fun newDuelRef(): DocumentReference {
+        val random = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        return db.collection("duels").document(ChallengeRules.newId(System.currentTimeMillis(), random))
+    }
+    /** Writes, then reads back what the server stamped: the gap tells how far this phone's clock is. */
+    private suspend fun stamped(ref: DocumentReference, field: String, write: () -> Task<*>): Pair<Map<String, Any?>, ServerClock?> {
+        val sent = System.currentTimeMillis()
+        if (!awaitWrite(write())) throw CloudError(CloudError.Kind.OFFLINE)
+        val received = System.currentTimeMillis()
+        val data = ref.get(Source.SERVER).await().data ?: throw CloudError(CloudError.Kind.DUEL_GONE)
+        val clock = (data[field] as? Timestamp)?.let { ServerClock().apply { learn(millis(it), sent, received) } }
+        return data to clock
+    }
+    /** A duel by link: a code to share, the words come once a friend opens it (within 15 min). */
+    suspend fun createLinkDuel(uid: String, username: String, cardIds: List<String>): Pair<LiveDuel, ServerClock?> {
+        val ref = newDuelRef()
+        for (attempt in 1..3) {
+            val code = ChallengeInvite.newCode()
+            val batch = db.batch()
+            batch.set(ref, mapOf("from" to uid, "fromName" to username, "to" to "", "toName" to "", "code" to code, "cardIds" to cardIds,
+                "createdAt" to FieldValue.serverTimestamp()))
+            batch.set(db.collection("challengeInvites").document(code), mapOf("duel" to ref.id, "from" to uid, "createdAt" to FieldValue.serverTimestamp()))
+            val (data, clock) = try { stamped(ref, "createdAt") { batch.commit() } } catch (e: Exception) {
+                if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED && attempt < 3) continue
+                throw e
+            }
+            return (duel(ref.id, data) ?: throw CloudError(CloudError.Kind.OFFLINE)) to clock
+        }
+        throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** Withdraws a link nobody joined (and its code). */
+    suspend fun cancelLinkDuel(duel: LiveDuel) {
+        val batch = db.batch()
+        batch.delete(db.collection("duels").document(duel.id))
+        duel.code?.let { batch.delete(db.collection("challengeInvites").document(it)) }
+        runCatching { awaitWrite(batch.commit()) }
+    }
+    /** Takes the empty place of a duel by link: the words come 5 s later for both. */
+    suspend fun joinDuel(id: String, uid: String, username: String): Pair<LiveDuel, ServerClock?> {
+        val ref = db.collection("duels").document(id)
+        val open = try { duel(id) } catch (e: Exception) {
+            if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED) throw CloudError(CloudError.Kind.INVITE_TAKEN)
+            throw e
+        } ?: throw CloudError(CloudError.Kind.DUEL_GONE)
+        if (open.to.uid == uid) return open to null
+        if (open.from.uid == uid) throw CloudError(CloudError.Kind.INVITE_IS_YOURS)
+        if (!open.isOpen) throw CloudError(CloudError.Kind.INVITE_TAKEN)
+        val (data, clock) = stamped(ref, "readyAt") { ref.update(mapOf("to" to uid, "toName" to username, "readyAt" to FieldValue.serverTimestamp())) }
+        return (duel(id, data) ?: throw CloudError(CloudError.Kind.OFFLINE)) to clock
+    }
+    suspend fun duel(id: String): LiveDuel? = db.collection("duels").document(id).get(Source.SERVER).await().data?.let { duel(id, it) }
+    /** Every change of the duel, the other player's included: one read each. */
+    fun listenDuel(id: String, change: (LiveDuel?) -> Unit): ListenerRegistration =
+        db.collection("duels").document(id).addSnapshotListener { snapshot, _ ->
+            if (snapshot != null) change(snapshot.data?.let { duel(id, it) })
+        }
+    /**
+     * My words behind me so far (the total: a write lost on the way is caught up by the next one).
+     * The 5th is the finish, stamped by the server. Not awaited: Firestore sends them in order.
+     */
+    fun moveInDuel(duel: LiveDuel, uid: String, done: Int, skips: Int) {
+        val side = if (duel.from.uid == uid) "from" else "to"
+        val data = mutableMapOf<String, Any>(side + "Done" to done, side + "Skips" to skips)
+        if (done >= ChallengeRules.WORDS) data[side + "FinishedAt"] = FieldValue.serverTimestamp()
+        db.collection("duels").document(duel.id).update(data)
+    }
+    fun quitDuel(duel: LiveDuel, uid: String) {
+        val side = if (duel.from.uid == uid) "from" else "to"
+        db.collection("duels").document(duel.id).update(side + "Quit", true)
+    }
+    /**
+     * Random opponent, first: someone already waiting in the line (oldest first), taken in one batch
+     * with my own place gone. Null when nobody is there (or everyone was taken just before).
+     */
+    suspend fun takeOpponent(uid: String, username: String, cardIds: List<String>, clock: ServerClock): Pair<LiveDuel, ServerClock?>? {
+        val sinceMs = clock.now() - LiveDuelRules.SEARCH_MS
+        val since = Timestamp(sinceMs / 1000, ((sinceMs % 1000) * 1_000_000).toInt())
+        val places = db.collection("duelQueue").whereGreaterThan("at", since).orderBy("at").limit(10).get(Source.SERVER).await().documents
+        for (place in places) {
+            if (place.id == uid || place.getString("duel") != "") continue
+            val name = place.getString("name") ?: continue
+            val ref = newDuelRef()
+            val batch = db.batch()
+            batch.set(ref, mapOf("from" to uid, "fromName" to username, "to" to place.id, "toName" to name, "random" to true, "cardIds" to cardIds,
+                "createdAt" to FieldValue.serverTimestamp(), "readyAt" to FieldValue.serverTimestamp()))
+            batch.update(place.reference, "duel", ref.id)
+            batch.delete(db.collection("duelQueue").document(uid))
+            val (data, learnt) = try { stamped(ref, "readyAt") { batch.commit() } } catch (e: Exception) {
+                if (CloudError.code(e) == CloudError.Code.PERMISSION_DENIED) continue
+                throw e
+            }
+            return (duel(ref.id, data) ?: continue) to learnt
+        }
+        return null
+    }
+    /** Then, a place in the line, at the server's time: whoever comes next takes me. */
+    suspend fun enterDuelQueue(uid: String, username: String): ServerClock? {
+        val ref = db.collection("duelQueue").document(uid)
+        return stamped(ref, "at") { ref.set(mapOf("name" to username, "at" to FieldValue.serverTimestamp(), "duel" to "")) }.second
+    }
+    /** The duel my place was taken for, as soon as someone takes it. */
+    fun listenDuelQueue(uid: String, taken: (String) -> Unit): ListenerRegistration =
+        db.collection("duelQueue").document(uid).addSnapshotListener { snapshot, _ ->
+            val id = snapshot?.getString("duel")
+            if (!id.isNullOrEmpty()) taken(id)
+        }
+    /** Leaves the line, unless someone took my place in the meantime: then that duel. */
+    suspend fun leaveDuelQueue(uid: String): String? {
+        val ref = db.collection("duelQueue").document(uid)
+        val id = runCatching { ref.get(Source.SERVER).await().getString("duel") }.getOrNull()
+        runCatching { ref.delete().await() }
+        return id?.takeIf { it.isNotEmpty() }
+    }
+
+    // ---- Weekly tournament (Core/Tournament.kt, same documents as the iPhone app)
+
+    private fun tournament(week: String) = db.collection("tournaments").document(week)
+    /** The players signed up for a week (the draw takes the first 64). */
+    suspend fun tournamentPlayers(week: String): List<TournamentPlayer> =
+        tournament(week).collection("players").orderBy("at").limit(200).get(Source.SERVER).await().documents.mapNotNull { doc ->
+            val at = doc.getTimestamp("at") ?: return@mapNotNull null
+            TournamentPlayer(doc.id, doc.getString("name") ?: "Joueur", millis(at))
+        }
+    /** How many have signed up (one read, whatever the number). */
+    suspend fun tournamentCount(week: String): Int = count(tournament(week).collection("players"))
+    suspend fun isSignedUp(week: String, uid: String): Boolean =
+        tournament(week).collection("players").document(uid).get(Source.SERVER).await().exists()
+    suspend fun signUp(week: String, uid: String, username: String) {
+        val ref = tournament(week).collection("players").document(uid)
+        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp())))) throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    suspend fun withdraw(week: String, uid: String) {
+        if (!awaitWrite(tournament(week).collection("players").document(uid).delete())) throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /** The runs of a week from a round on (the earlier ones never change and stay on the phone). */
+    suspend fun tournamentRuns(week: String, fromRound: Int): List<TournamentRun> =
+        tournament(week).collection("runs").whereGreaterThanOrEqualTo("round", fromRound).limit(300).get(Source.SERVER).await()
+            .documents.mapNotNull { it.data?.let(::runOf) }
+    suspend fun tournamentRun(week: String, round: Int, uid: String): TournamentRun? =
+        tournament(week).collection("runs").document("${round}_$uid").get(Source.SERVER).await().data?.let(::runOf)
+    /** Starts my clock for a round (once), then gives its words: drawn by the first player to start. */
+    suspend fun startTournamentRound(week: String, round: Int, uid: String): Triple<TournamentRun, List<String>, ServerClock?> {
+        val runRef = tournament(week).collection("runs").document("${round}_$uid")
+        var run = runRef.get(Source.SERVER).await().data?.let(::runOf)
+        var clock: ServerClock? = null
+        if (run == null) {
+            val (data, learnt) = stamped(runRef, "startedAt") { runRef.set(mapOf("uid" to uid, "round" to round, "startedAt" to FieldValue.serverTimestamp())) }
+            run = runOf(data); clock = learnt
+        }
+        val started = run ?: throw CloudError(CloudError.Kind.OFFLINE)
+        val roundRef = tournament(week).collection("rounds").document("$round")
+        fun ids(d: Map<String, Any?>?) = (d?.get("cardIds") as? List<*>)?.filterIsInstance<String>()
+        ids(roundRef.get(Source.SERVER).await().data)?.let { return Triple(started, it, clock) }
+        try {
+            awaitWrite(roundRef.set(mapOf("cardIds" to TournamentRules.draw(week, round), "at" to FieldValue.serverTimestamp())))
+        } catch (e: Exception) {
+            // Someone else drew them just before.
+            if (CloudError.code(e) != CloudError.Code.PERMISSION_DENIED) throw e
+        }
+        val ids = ids(roundRef.get(Source.SERVER).await().data) ?: throw CloudError(CloudError.Kind.OFFLINE)
+        return Triple(started, ids, clock)
+    }
+    suspend fun finishTournamentRound(week: String, round: Int, uid: String, skips: Int, errors: Int): Boolean =
+        awaitWrite(tournament(week).collection("runs").document("${round}_$uid")
+            .update(mapOf("finishedAt" to FieldValue.serverTimestamp(), "skips" to skips, "errors" to errors)))
+
     /** One read: whether this player has at least one friend to be challenged by. */
     suspend fun hasFriends(uid: String): Boolean =
         !db.collection("users").document(uid).collection("friends").limit(1).get(Source.SERVER).await().isEmpty
@@ -871,6 +1062,27 @@ class CloudRepository(
                 Challenge.Side(from, d["fromName"] as? String ?: "Joueur", ms("fromStartedAt"), ms("fromFinishedAt"), int("fromSkips"), int("fromErrors")),
                 Challenge.Side(to, d["toName"] as? String ?: "Joueur", ms("toStartedAt"), ms("toFinishedAt"), int("toSkips"), int("toErrors")),
                 d["code"] as? String)
+        }
+
+        fun duel(id: String, d: Map<String, Any?>): LiveDuel? {
+            val from = d["from"] as? String ?: return null
+            val to = d["to"] as? String ?: return null
+            val ids = (d["cardIds"] as? List<*>)?.filterIsInstance<String>() ?: return null
+            // A write of ours not yet stamped: the server's time comes with the next snapshot.
+            val created = (d["createdAt"] as? Timestamp)?.let { millis(it) } ?: System.currentTimeMillis()
+            fun ms(key: String) = (d[key] as? Timestamp)?.let { millis(it) }
+            fun int(key: String) = (d[key] as? Number)?.toInt() ?: 0
+            fun side(key: String, uid: String) = LiveDuel.Side(uid, d[key + "Name"] as? String ?: "Joueur", int(key + "Done"), int(key + "Skips"),
+                ms(key + "FinishedAt"), d[key + "Quit"] as? Boolean ?: false)
+            return LiveDuel(id, ids, created, ms("readyAt")?.let { it + LiveDuelRules.COUNTDOWN_MS }, side("from", from), side("to", to), d["code"] as? String)
+        }
+
+        fun runOf(d: Map<String, Any?>): TournamentRun? {
+            val uid = d["uid"] as? String ?: return null
+            val round = (d["round"] as? Number)?.toInt() ?: return null
+            val started = d["startedAt"] as? Timestamp ?: return null
+            return TournamentRun(uid, round, millis(started), (d["finishedAt"] as? Timestamp)?.let { millis(it) },
+                (d["skips"] as? Number)?.toInt() ?: 0, (d["errors"] as? Number)?.toInt() ?: 0)
         }
 
         /** Milliseconds exactly as the rules' `timestamp.toMillis()`. */
