@@ -1,21 +1,28 @@
 import Foundation
 
-/// The Mot du jour is scored on time only, the lower the better: the hint adds one minute, and a lost
-/// day counts ten minutes, the most a day can cost. The week's ranking counts the words found first,
+/// The Mot du jour is scored on time only, the lower the better. Two hints, one after the other: the
+/// word's vowels light up on the keyboard (30 s), then the sentence (30 s more, one minute in all, as the
+/// single hint of older versions). A lost day counts ten minutes, the most a day can cost. The week's ranking counts the words found first,
 /// then their time. Same arithmetic as firestore.rules.
 public enum DailyScore {
+    /// Both hints together, or the sentence alone (older versions offer only that one).
     public static let hintPenaltyMs = 60_000
+    /// The vowels alone.
+    public static let vowelsPenaltyMs = 30_000
     public static let missedMs = 600_000
     /// Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts.
     static let epochOffset = 19_723
 
-    public static func scoreMs(timeMs: Int, usedHint: Bool, correct: Bool) -> Int {
-        correct ? min(timeMs + (usedHint ? hintPenaltyMs : 0), missedMs) : missedMs
+    public static func penaltyMs(usedHint: Bool, usedVowels: Bool) -> Int {
+        usedHint ? hintPenaltyMs : usedVowels ? vowelsPenaltyMs : 0
+    }
+    public static func scoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, correct: Bool) -> Int {
+        correct ? min(timeMs + penaltyMs(usedHint: usedHint, usedVowels: usedVowels), missedMs) : missedMs
     }
     /// Rattrapage: a missed day played later counts in the week with 5 minutes more (same as firestore.rules `catchUpScore`).
     public static let catchUpPenaltyMs = 300_000
-    public static func catchUpScoreMs(timeMs: Int, usedHint: Bool, correct: Bool) -> Int {
-        correct ? min(scoreMs(timeMs: timeMs, usedHint: usedHint, correct: true) + catchUpPenaltyMs, missedMs) : missedMs
+    public static func catchUpScoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, correct: Bool) -> Int {
+        correct ? min(scoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: true) + catchUpPenaltyMs, missedMs) : missedMs
     }
     /// Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`.
     public static func dayIndex(_ day: String) -> Int? { DailySchedule.dayNumber(forKey: day).map { $0 + epochOffset } }

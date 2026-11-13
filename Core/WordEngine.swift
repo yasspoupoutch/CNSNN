@@ -12,6 +12,11 @@ public enum WordEngine {
     public static func consonants(_ value: String) -> String {
         normalize(value).filter { !"AEIOUY".contains($0) }
     }
+    /// The vowels of the word, each once, in alphabetical order: the first hint lights them up on the keyboard.
+    public static func vowels(_ value: String) -> String {
+        let present = Set(normalize(value).filter { "AEIOUY".contains($0) })
+        return String("AEIOUY".filter(present.contains))
+    }
     /// What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
     /// with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants.
     public static func shownConsonants(_ value: String) -> String {

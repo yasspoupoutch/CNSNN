@@ -63,6 +63,7 @@ Sans la clé, un document `admins/{uid}` créé à la main dans la console suffi
 | meta/cards | `updatedAt` : version du catalogue des cartes approuvées | lecture par les joueurs ; un modérateur l’avance en approuvant, refusant ou retirant une carte |
 | dailyPuzzles/{day} | mot du jour secret : consonnes, catégorie, difficulté | outil `tools/daily.mjs` (Admin SDK) ; lecture le jour même et les jours passés |
 | dailyHints/{day} | indice du mot secret | lecture après l’avoir révélé (indice noté dans la session) ou la partie finie |
+| dailyVowels/{day} | voyelles du mot secret (1er indice, +30 s) | lecture après les avoir révélées (`vowelsUsed` dans la session), la phrase révélée ou la partie finie |
 | dailySecrets/{day} | réponse normalisée, mot, indice | lecture une fois sa partie finie, ou le jour passé ; une victoire doit porter cette réponse |
 | dailyChallenges/{day} | mot du jour publié par un modérateur (remplace le planning intégré) | modérateur, difficulté du jour imposée |
 | cards/{MOTNORMALISÉ} | proposition ou carte publiée (avec le pseudo de l’auteur) ; l’identifiant empêche les doublons | proposition pending avec quota (30 s, 10/24 h) ; modération |

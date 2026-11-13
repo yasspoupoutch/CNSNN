@@ -12,6 +12,11 @@ object WordEngine {
             .filter { it in 'A'..'Z' }
     }
     fun consonants(value: String): String = normalize(value).filter { it !in "AEIOUY" }
+    /** The vowels of the word, each once, in alphabetical order: the first hint lights them up on the keyboard. */
+    fun vowels(value: String): String {
+        val present = normalize(value).filter { it in "AEIOUY" }.toSet()
+        return "AEIOUY".filter { it in present }
+    }
     /** What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
      *  with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants. */
     fun shownConsonants(value: String): String {

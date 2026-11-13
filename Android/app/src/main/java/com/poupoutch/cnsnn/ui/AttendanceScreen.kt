@@ -51,7 +51,7 @@ fun AttendanceContent(state: AppViewModel) {
         if (loaded) {
             Summary("Aujourd’hui", days.firstOrNull { it.day == today }?.counts.orEmpty())
             val week = DailySchedule.shift(today, -6)
-            Summary("7 derniers jours", days.filter { it.day >= week }.flatMap { it.counts.entries }.groupBy({ it.key }, { it.value }).mapValues { it.value.sum() })
+            Summary("7 derniers jours (cumul des jours : un joueur venu 3 jours compte 3 fois)", days.filter { it.day >= week }.flatMap { it.counts.entries }.groupBy({ it.key }, { it.value }).mapValues { it.value.sum() })
         }
         Kicker("Par jour", modifier = Modifier.padding(top = 10.dp))
         if (days.isEmpty()) Text(if (loaded) "Aucun chiffre pour l’instant." else "Chargement…", color = Palette.secondary)

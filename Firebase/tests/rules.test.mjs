@@ -25,15 +25,16 @@ function parisKey(date=new Date()){
 }
 function shiftKey(key,days){const d=new Date(`${key}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
 function base(key){const w=new Date(`${key}T12:00:00Z`).getUTCDay();const iso=w===0?7:w;return iso<=2?50:iso<=5?100:150;}
-// Same as Core/GameRules.swift DailyScore: time, +1 min with the hint, 10 min for a lost day (and at most).
-function score(timeMs,usedHint,correct){return correct?Math.min(timeMs+(usedHint?60000:0),600000):600000;}
+// Same as Core/GameRules.swift DailyScore: time, +30 s with the vowels, +1 min with the sentence (vowels
+// included), 10 min for a lost day (and at most).
+function score(timeMs,usedHint,correct,usedVowels=false){return correct?Math.min(timeMs+(usedHint?60000:usedVowels?30000:0),600000):600000;}
 const dayIndex=key=>Math.round(Date.parse(`${key}T00:00:00Z`)/86400000);
 const dailyRank=(key,s,correct)=>dayIndex(key)*1000000+(correct?s:999999);
 const monthIndex=key=>Number(key.slice(0,4))*12+Number(key.slice(5,7))-1;
 const weekIndex=key=>Math.floor((dayIndex(key)+3)/7);
 const weekRank=(w,found,ms)=>w*100000000+found*10000000+(9999999-ms);
 // Rattrapage (same as the rules): 5 minutes more than the day's own score, out of the day's ranking.
-const catchUpScore=(timeMs,usedHint,correct)=>correct?Math.min(score(timeMs,usedHint,true)+300000,600000):600000;
+const catchUpScore=(timeMs,usedHint,correct,usedVowels=false)=>correct?Math.min(score(timeMs,usedHint,true,usedVowels)+300000,600000):600000;
 const hour=3600000;
 // Over everywhere (after UTC-12's midnight): the day can no longer be played on time.
 const dayOverAt=key=>Date.parse(`${key}T00:00:00Z`)+36*hour;
@@ -274,6 +275,44 @@ test('secret daily word: consonants today, hint and answer only when earned',asy
  await assertFails(getDoc(doc(user('bob'),`dailySecrets/${day}`)));
  // The official result still publishes from the finished session.
  await assertSucceeds(publish('alice',await resultFor('alice',day)));
+});
+test('vowels hint: opens only for the player who took it, costs 30 s, cannot be hidden',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const day=parisKey(),old=shiftKey(day,-14);
+ for(const d of [day,old]) await seed(`dailyVowels/${d}`,{vowels:'AO'});
+ const db=user();
+ await assertFails(getDoc(doc(db,`dailyVowels/${day}`)));
+ await assertFails(getDocs(collection(db,'dailyVowels')));
+ await assertFails(setDoc(doc(db,`dailyVowels/${day}`),{vowels:'E'}));
+ await assertSucceeds(getDoc(doc(db,`dailyVowels/${old}`)));
+ await startDaily();
+ await assertFails(getDoc(doc(db,`dailyVowels/${day}`)));
+ const ref=doc(db,`dailySessions/alice_${day}`);
+ await assertFails(updateDoc(ref,{vowelsUsed:false}));
+ await assertFails(updateDoc(ref,{vowelsUsed:true,hintUsed:true}));
+ await assertSucceeds(updateDoc(ref,{vowelsUsed:true}));
+ await assertFails(updateDoc(ref,{vowelsUsed:false}));
+ await assertSucceeds(getDoc(doc(db,`dailyVowels/${day}`)));
+ // The sentence stays closed until asked for.
+ await assertFails(getDoc(doc(db,`dailyHints/${day}`)));
+ await assertFails(getDoc(doc(user('bob'),`dailyVowels/${day}`)));
+ await finishDaily();
+ const r=await resultFor('alice',day);
+ const withVowels={...r,usedVowels:true,scoreMs:score(r.timeMs,false,true,true),rank:dailyRank(day,score(r.timeMs,false,true,true),true)};
+ // Hiding the vowels to dodge the 30 s fails, and so does the wrong price.
+ await assertFails(publish('alice',r));
+ await assertFails(publish('alice',{...withVowels,scoreMs:r.scoreMs,rank:r.rank}));
+ await assertSucceeds(publish('alice',withVowels));
+ // Bob takes the sentence alone (older versions): a minute, as before.
+ await startDaily('bob');
+ const bobRef=doc(user('bob'),`dailySessions/bob_${day}`);
+ await assertSucceeds(updateDoc(bobRef,{hintUsed:true}));
+ await assertSucceeds(getDoc(doc(user('bob'),`dailyVowels/${day}`)));
+ await finishDaily('bob');
+ const b=await resultFor('bob',day);
+ assert.equal(b.scoreMs,score(b.timeMs,true,true));
+ await assertFails(publish('bob',{...b,usedVowels:true}));
+ await assertSucceeds(publish('bob',b));
 });
 test('giving up on a secret daily word needs no answer',async()=>{
  await signUp(); const day=parisKey();

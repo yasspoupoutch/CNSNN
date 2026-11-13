@@ -10,7 +10,12 @@ import CNSNNCore
     /// The caret in the answer (TypedAnswer.cursor): nil at the end.
     var cursor: Int?
     var feedback: String?
+    /// Second hint: the sentence.
     var usedHint = false
+    /// First hint: the word's vowels light up on the keyboard.
+    var usedVowels = false
+    /// The vowels lit on the keyboard (WordEngine.vowels), once the first hint is taken.
+    var vowels: String?
     var result: Attempt?
     var wrongAnswers = 0
     var wrongGuesses: [String] = []
@@ -35,7 +40,7 @@ import CNSNNCore
     private var paused = false
 
     func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, catchUp: String? = nil, state: AppState) {
-        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
+        answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = catchUp
         ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
         if mode == .daily {
@@ -63,7 +68,7 @@ import CNSNNCore
     /// The first-launch tutorial: the Mot du jour page with an example word, nothing recorded or sent.
     func loadTutorial(_ example: Card) {
         guard card?.id != example.id else { return }
-        answer = ""; feedback = nil; result = nil; usedHint = false; wrongAnswers = 0; wrongGuesses = []
+        answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = nil
         ranked = false; pendingOfficial = false; standing = nil; secret = false; checking = false; notice = nil
         card = example; phase = .playing
@@ -111,6 +116,11 @@ import CNSNNCore
                     phase = .playing
                     return
                 }
+                if session.vowelsUsed || session.hintUsed {
+                    // Taken before leaving: lit again (a secret word's vowels come back from the server).
+                    usedVowels = session.vowelsUsed
+                    if secret { vowels = try await cloud.dailyVowels(day: key) } else { vowels = card.map { WordEngine.vowels($0.wordFull) } }
+                }
                 usedHint = session.hintUsed; resumedDaily = true
                 wrongAnswers = session.guesses
                 dailyStart = session.startedAt
@@ -148,10 +158,44 @@ import CNSNNCore
         load(mode: .daily, category: nil, difficulty: nil, catchUp: catchUpDay, state: state)
     }
 
+    /// Indice: first the vowels, then the sentence. A player of an older version who took the sentence
+    /// alone already paid the full minute, so the vowels come with it for free.
     func revealHint(state: AppState) {
+        if usedVowels || usedHint { revealSentence(state: state) } else { revealVowels(state: state) }
+    }
+    /// 0, 1 or 2 hints taken.
+    var hintsTaken: Int { usedHint ? 2 : usedVowels ? 1 : 0 }
+
+    private func revealVowels(state: AppState) {
+        guard !usedVowels, !usedHint, result == nil, !checking, let card else { return }
+        guard ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey else {
+            vowels = WordEngine.vowels(card.wordFull); usedVowels = true; return
+        }
+        guard secret else {
+            vowels = WordEngine.vowels(card.wordFull); usedVowels = true
+            cloud.revealDailyVowels(uid: uid, day: dailyKey); return
+        }
+        // The server opens the vowels only once it has recorded their use.
+        checking = true; notice = nil
+        Task {
+            do {
+                guard let found = try await cloud.revealSecretVowels(uid: uid, day: dailyKey) else {
+                    checking = false; notice = CloudError.offline.errorDescription; return
+                }
+                usedVowels = true; checking = false
+                // A day published before the vowels existed: the sentence comes instead (one minute in all).
+                if found.isEmpty { revealSentence(state: state) } else { vowels = found }
+            } catch {
+                checking = false; notice = CloudError.message(error)
+            }
+        }
+    }
+
+    private func revealSentence(state: AppState) {
         guard !usedHint, result == nil, !checking else { return }
-        guard ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey else { usedHint = true; return }
-        guard secret else { usedHint = true; cloud.revealDailyHint(uid: uid, day: dailyKey); return }
+        let local = card.map { WordEngine.vowels($0.wordFull) }
+        guard ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey else { usedHint = true; vowels = vowels ?? local; return }
+        guard secret else { usedHint = true; vowels = vowels ?? local; cloud.revealDailyHint(uid: uid, day: dailyKey); return }
         // The server opens the hint only once it has recorded its use.
         checking = true; notice = nil
         Task {
@@ -162,6 +206,7 @@ import CNSNNCore
                 }
                 revealed.hint = hint; card = revealed; usedHint = true
                 state.storeDailyWord(revealed, day: dailyKey)
+                if vowels?.isEmpty != false { vowels = try? await cloud.dailyVowels(day: dailyKey) }
             } catch {
                 notice = CloudError.message(error)
             }
@@ -289,6 +334,6 @@ import CNSNNCore
     private func loadStanding(cloud: FirebaseRepository, attempt: Attempt) async {
         // A caught-up day is out of the day's ranking.
         guard let day = attempt.dailyKey, catchUpDay == nil else { return }
-        standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, correct: attempt.correct), correct: attempt.correct)
+        standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: attempt.correct), correct: attempt.correct)
     }
 }

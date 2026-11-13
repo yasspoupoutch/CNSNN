@@ -58,10 +58,11 @@ service cloud.firestore {
   }
   function larger(a, b) { return a > b ? a : b; }
   function smaller(a, b) { return a < b ? a : b; }
-  // The Mot du jour is ranked on time: same rules as Core/GameRules.swift DailyScore. The hint costs
-  // a minute, and a day lost or not played counts 10 minutes (a found word never counts more).
-  function dailyScore(timeMs, usedHint, correct) {
-   return correct ? smaller(timeMs + (usedHint ? 60000 : 0), 600000) : 600000;
+  // The Mot du jour is ranked on time: same rules as Core/GameRules.swift DailyScore. The vowels cost
+  // 30 s, the sentence (alone, or after the vowels) a minute in all, and a day lost or not played counts
+  // 10 minutes (a found word never counts more).
+  function dailyScore(timeMs, usedHint, usedVowels, correct) {
+   return correct ? smaller(timeMs + (usedHint ? 60000 : (usedVowels ? 30000 : 0)), 600000) : 600000;
   }
   // Single-field sort keys, so the rankings need no composite index: the day (days since 1970) then
   // the score, lost days last; the month (year * 12 + month - 1) then the time saved this month.
@@ -69,7 +70,7 @@ service cloud.firestore {
   function dailyRank(day, score, correct) { return dayIndex(day) * 1000000 + (correct ? score : 999999); }
   // Rattrapage: a missed day of the week played later counts in the week's ranking, with 5 minutes
   // more than its time (playing on the day stays better), and stays out of that day's ranking (rank 0).
-  function catchUpScore(timeMs, usedHint, correct) { return correct ? smaller(dailyScore(timeMs, usedHint, true) + 300000, 600000) : 600000; }
+  function catchUpScore(timeMs, usedHint, usedVowels, correct) { return correct ? smaller(dailyScore(timeMs, usedHint, usedVowels, true) + 300000, 600000) : 600000; }
   function monthIndex(day) { let p = day.split('-'); return int(p[0]) * 12 + int(p[1]) - 1; }
   // Weeks run Monday to Sunday: weeks since Monday 1969-12-29 (1970-01-01 was a Thursday).
   function weekIndex(day) { return int((dayIndex(day) + 3) / 7); }
@@ -195,10 +196,12 @@ service cloud.firestore {
     && request.resource.data.cardId is string && request.resource.data.cardId.size() <= 80
     && request.resource.data.startedAt == request.time && request.resource.data.hintUsed == false
     && exists(at('users/' + request.auth.uid));
-   // Reveal the hint once, register a guess, or finish once. Nothing can be rewound.
+   // Reveal each hint once (the vowels, the sentence), register a guess, or finish once. Nothing can be rewound.
    allow update: if owner(resource.data.userId) && !('finishedAt' in resource.data) && (
      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hintUsed'])
       && request.resource.data.hintUsed == true)
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['vowelsUsed'])
+      && request.resource.data.vowelsUsed == true)
      || registersGuess(resource.data, request.resource.data)
      || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finishedAt','correct','wrongAnswers','answer'])
       && request.resource.data.finishedAt == request.time && request.resource.data.correct is bool
@@ -245,7 +248,7 @@ service cloud.firestore {
   function catchUpOpen(day) { return validDayKey(day) && request.time >= dayDate(day) + duration.value(10, 'h') && !weekOver(day); }
 
   // ---- Secret daily words, written only by the publishing tool (Admin SDK).
-  // Consonants: today and past days. Hint: once the player revealed it or finished.
+  // Consonants: today and past days. Vowels and hint: once the player revealed them or finished.
   // Answer: once the player finished, or after the day's week is over (a missed day can be caught up until then).
   match /dailyPuzzles/{day} {
    allow get: if signedIn() && (isToday(day) || dayOver(day));
@@ -254,6 +257,12 @@ service cloud.firestore {
   match /dailyHints/{day} {
    allow get: if signedIn() && (weekOver(day) || admin() || (exists(mySession(day))
     && (get(mySession(day)).data.hintUsed == true || ('finishedAt' in get(mySession(day)).data))));
+   allow list, write: if false;
+  }
+  match /dailyVowels/{day} {
+   allow get: if signedIn() && (weekOver(day) || admin() || (exists(mySession(day))
+    && (get(mySession(day)).data.get('vowelsUsed', false) == true || get(mySession(day)).data.hintUsed == true
+     || ('finishedAt' in get(mySession(day)).data))));
    allow list, write: if false;
   }
   match /dailySecrets/{day} {
@@ -275,16 +284,18 @@ service cloud.firestore {
   }
   function createsResult(id, r, s) {
    let catchUp = s.get('catchUp', false) == true;
-   return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','wrongAnswers','timeMs','scoreMs','rank','startedAt','finishedAt','catchUp'])
+   return r.keys().hasOnly(['userId','username','day','cardId','correct','usedHint','usedVowels','wrongAnswers','timeMs','scoreMs','rank','startedAt','finishedAt','catchUp'])
     && r.get('catchUp', false) == catchUp
     && r.userId == request.auth.uid && id == request.auth.uid + '_' + r.day
     && s.userId == r.userId && s.day == r.day && s.cardId == r.cardId && ('finishedAt' in s)
     && r.startedAt == s.startedAt && r.finishedAt == s.finishedAt
     && r.correct == s.correct && r.usedHint == s.hintUsed && r.wrongAnswers == s.wrongAnswers
+    // Older versions write no usedVowels: absent means not used, on both sides.
+    && r.get('usedVowels', false) == s.get('vowelsUsed', false)
     && r.timeMs == s.finishedAt.toMillis() - s.startedAt.toMillis()
     && (catchUp
-     ? r.scoreMs == catchUpScore(r.timeMs, r.usedHint, r.correct) && r.rank == 0
-     : r.scoreMs == dailyScore(r.timeMs, r.usedHint, r.correct) && r.rank == dailyRank(r.day, r.scoreMs, r.correct))
+     ? r.scoreMs == catchUpScore(r.timeMs, r.usedHint, r.get('usedVowels', false), r.correct) && r.rank == 0
+     : r.scoreMs == dailyScore(r.timeMs, r.usedHint, r.get('usedVowels', false), r.correct) && r.rank == dailyRank(r.day, r.scoreMs, r.correct))
     && r.username == get(at('users/' + request.auth.uid)).data.username
     // Must be tallied in the same batch, so totals and results never diverge.
     && getAfter(at('leaderboard/' + request.auth.uid)).data.lastResult == r.day;

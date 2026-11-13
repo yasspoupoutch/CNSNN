@@ -8,6 +8,13 @@ final class WordEngineTests: XCTestCase {
   XCTAssertEqual(WordEngine.consonants("œuf"),"F")
   XCTAssertEqual(WordEngine.consonants("Penalty"),"PNLT")
  }
+ func testVowelsForTheFirstHint() {
+  XCTAssertEqual(WordEngine.vowels("Amour"),"AOU")
+  XCTAssertEqual(WordEngine.vowels("Éléphant"),"AE")
+  XCTAssertEqual(WordEngine.vowels("œuf"),"EOU")
+  XCTAssertEqual(WordEngine.vowels("Penalty"),"AEY")
+  XCTAssertEqual(WordEngine.vowels("Rythme"),"EY")
+ }
  func testTheBoardSeparatesWords() {
   XCTAssertEqual(WordEngine.shownConsonants("Le Roi Lion"),"L R LN")
   XCTAssertEqual(WordEngine.shownConsonants("Où est Charlie ?"),"– ST CHRL")

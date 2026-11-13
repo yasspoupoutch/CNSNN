@@ -1,6 +1,9 @@
 package com.poupoutch.cnsnn
 
 import android.graphics.Bitmap
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -42,7 +45,20 @@ class StoreScreenshotsTest {
     private fun waitFor(text: String, timeout: Long = 20_000) = rule.waitUntil(timeout) { has(text) }
 
     @Test fun takeStoreScreenshots() {
-        try { takeAll() } catch (e: Throwable) { runCatching { shot("zz-echec") }; throw e }
+        try { takeAll() } catch (e: org.junit.AssumptionViolatedException) { throw e } catch (e: Throwable) {
+            runCatching { shot("zz-echec") }
+            // What the screen showed, readable in the CI log (the picture stays in the artifact).
+            val screen = runCatching {
+                rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().flatMap { root ->
+                    fun walk(n: SemanticsNode): List<String> =
+                        n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { t -> t.text } +
+                        n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
+                        n.children.flatMap { c -> walk(c) }
+                    walk(root)
+                }.joinToString(" | ")
+            }.getOrDefault("?")
+            throw AssertionError("Écran : $screen", e)
+        }
     }
 
     private fun takeAll() {

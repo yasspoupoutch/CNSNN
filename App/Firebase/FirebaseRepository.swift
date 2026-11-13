@@ -66,12 +66,13 @@ struct FriendStanding: Identifiable, Equatable {
     /// Wrong guesses on today's word, when the player has a result.
     var todayWrong: Int? = nil
     var todayHint = false
-    /// Today's time with the hint minute (10 min when lost).
-    var todayScoreMs: Int? { today.map { DailyScore.scoreMs(timeMs: $0.timeMs, usedHint: todayHint, correct: $0.correct) } }
+    var todayVowels = false
+    /// Today's time with the hints (10 min when lost).
+    var todayScoreMs: Int? { today.map { DailyScore.scoreMs(timeMs: $0.timeMs, usedHint: todayHint, usedVowels: todayVowels, correct: $0.correct) } }
 
     static func == (a: FriendStanding, b: FriendStanding) -> Bool {
         a.uid == b.uid && a.username == b.username && a.week == b.week && a.streak == b.streak
-            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct && a.todayHint == b.todayHint
+            && a.today?.timeMs == b.today?.timeMs && a.today?.correct == b.today?.correct && a.todayHint == b.todayHint && a.todayVowels == b.todayVowels
     }
     /// Found today first (fastest first, hint minute included), then the others by the week's ranking.
     static func ordered(_ rows: [FriendStanding]) -> [FriendStanding] {
@@ -93,8 +94,9 @@ struct DailyRank: Identifiable, Equatable {
     let timeMs: Int
     let usedHint: Bool
     var wrongAnswers = 0
-    /// The time that ranks: the hint adds a minute.
-    var scoreMs: Int { DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: true) }
+    var usedVowels = false
+    /// The time that ranks: the vowels add 30 s, the sentence a minute in all.
+    var scoreMs: Int { DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: true) }
 }
 
 /// Where a finished daily result stands among today's players. Suspended players are left out,
@@ -123,6 +125,7 @@ struct DailySessionState {
     let startedAt: Date
     let hintUsed: Bool
     let finished: Bool
+    var vowelsUsed = false
     /// Guesses registered on the server (firestore.rules allows `DailyGuesses.max` a day).
     var guesses = 0
 }
@@ -427,6 +430,19 @@ enum DailyGuesses {
         guard acknowledged, let session = try await dailySession(uid: uid, day: day) else { throw CloudError.offline }
         return session
     }
+    func revealDailyVowels(uid: String, day: String) {
+        sessionRef(uid, day).updateData(["vowelsUsed": true])
+    }
+    /// Records the first hint on the server, then reads the day's vowels (the rules open them only after).
+    /// Nil when the network did not confirm; empty for a day published before the vowels existed.
+    func revealSecretVowels(uid: String, day: String) async throws -> String? {
+        let ref = sessionRef(uid, day)
+        guard try await Self.awaitWrite({ done in ref.updateData(["vowelsUsed": true], completion: done) }) else { return nil }
+        return try await dailyVowels(day: day) ?? ""
+    }
+    func dailyVowels(day: String) async throws -> String? {
+        try await db.collection("dailyVowels").document(day).getDocument().data()?["vowels"] as? String
+    }
     func revealDailyHint(uid: String, day: String) {
         sessionRef(uid, day).updateData(["hintUsed": true])
     }
@@ -472,11 +488,12 @@ enum DailyGuesses {
         guard let s = sessionDoc.data(), let started = s["startedAt"] as? Timestamp, let finished = s["finishedAt"] as? Timestamp,
               let cardID = s["cardId"] as? String else { return nil }
         let correct = s["correct"] as? Bool ?? false, usedHint = s["hintUsed"] as? Bool ?? false, wrong = s["wrongAnswers"] as? Int ?? 0
+        let usedVowels = s["vowelsUsed"] as? Bool ?? false
         let timeMs = Self.millis(finished) - Self.millis(started)
         // A caught-up day counts in the week with 5 minutes more, and stays out of the day's ranking (rank 0).
         let catchUp = s["catchUp"] as? Bool == true
-        let scoreMs = catchUp ? DailyScore.catchUpScoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
-            : DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, correct: correct)
+        let scoreMs = catchUp ? DailyScore.catchUpScoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: correct)
+            : DailyScore.scoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: correct)
         guard let rank = catchUp ? 0 : DailyScore.rank(day: day, scoreMs: scoreMs, correct: correct) else { return nil }
         let profile = try await db.collection("users").document(uid).getDocument(source: .server)
         let username = profile.data()?["username"] as? String ?? "Joueur"
@@ -485,6 +502,7 @@ enum DailyGuesses {
         var result: [String: Any] = ["userId":uid,"username":username,"day":day,"cardId":cardID,"correct":correct,"usedHint":usedHint,
                                      "wrongAnswers":wrong,"timeMs":timeMs,"scoreMs":scoreMs,"rank":rank,"startedAt":started,"finishedAt":finished]
         if catchUp { result["catchUp"] = true }
+        if usedVowels { result["usedVowels"] = true }
         let batch = db.batch()
         batch.setData(result, forDocument: resultRef(uid, day))
         batch.setData(tally, forDocument: db.collection("leaderboard").document(uid))
@@ -598,7 +616,7 @@ enum DailyGuesses {
         let d = doc.data()
         guard let uid = d["userId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }
         return DailyRank(uid: uid, username: d["username"] as? String ?? "Joueur", timeMs: timeMs, usedHint: d["usedHint"] as? Bool ?? false,
-                         wrongAnswers: d["wrongAnswers"] as? Int ?? 0)
+                         wrongAnswers: d["wrongAnswers"] as? Int ?? 0, usedVowels: d["usedVowels"] as? Bool ?? false)
     }
     /// "3e sur 4 aujourd'hui": the rank and count among the players who found the word, like the
     /// day's ranking; "plus rapide que 98 %" counts slower players and those who did not find it.
@@ -719,7 +737,7 @@ enum DailyGuesses {
             let today = data.flatMap { Self.attempt(day: day, $0) }
             rows.append(FriendStanding(uid: player.uid, username: entry?.username ?? player.name, week: entry?.thisWeek(on: day),
                                        streak: entry?.currentStreak() ?? 0, today: today, todayWrong: data?["wrongAnswers"] as? Int,
-                                       todayHint: data?["usedHint"] as? Bool ?? false))
+                                       todayHint: data?["usedHint"] as? Bool ?? false, todayVowels: data?["usedVowels"] as? Bool ?? false))
         }
         return FriendStanding.ordered(rows)
     }
@@ -1236,7 +1254,7 @@ enum DailyGuesses {
     private static func session(day: String, _ d: [String: Any]) -> DailySessionState? {
         guard let cardID = d["cardId"] as? String, let started = d["startedAt"] as? Timestamp else { return nil }
         return DailySessionState(day: day, cardID: cardID, startedAt: started.dateValue(), hintUsed: d["hintUsed"] as? Bool ?? false, finished: d["finishedAt"] != nil,
-                                 guesses: d["guesses"] as? Int ?? 0)
+                                 vowelsUsed: d["vowelsUsed"] as? Bool ?? false, guesses: d["guesses"] as? Int ?? 0)
     }
     private static func attempt(day: String, _ d: [String: Any]) -> Attempt? {
         guard let cardID = d["cardId"] as? String, let timeMs = d["timeMs"] as? Int else { return nil }

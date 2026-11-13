@@ -6,7 +6,7 @@ import CNSNNCore
 struct LeaderboardView: View {
     @Environment(AppState.self) private var state
     enum Board: String, CaseIterable, Identifiable {
-        case today = "Aujourd’hui", week = "Semaine", fastest = "Records", sprint = "Sprint"
+        case today = "Aujourd’hui", week = "Semaine", sprint = "Sprint"
         var id: String { rawValue }
     }
     /// Bumped by the Stats page's pull to refresh.
@@ -19,7 +19,6 @@ struct LeaderboardView: View {
     @State private var seenArrival = 0
     private var today: [DailyRank] { state.rankings.today }
     private var players: [LeaderboardEntry] { state.rankings.players }
-    private var fastest: [LeaderboardEntry] { state.rankings.fastest }
     private var myRank: (rank: Int, players: Int)? { state.rankings.myRank }
     @State private var loading = false
     @State private var failed = false
@@ -162,7 +161,6 @@ struct LeaderboardView: View {
         switch board {
         case .today: "Top 25 des plus rapides du jour"
         case .week: "Top 50 de la semaine"
-        case .fastest: "Top 25 des meilleurs temps"
         case .sprint: "Top 10 du Sprint : le plus de mots en 90 secondes"
         }
     }
@@ -171,7 +169,6 @@ struct LeaderboardView: View {
         switch board {
         case .today: "Personne n’a encore trouvé le mot du jour."
         case .week: "Personne n’a encore joué cette semaine."
-        case .fastest: "Aucun résultat pour le moment."
         case .sprint: "Aucun record pour le moment. Jouez un Sprint pour entrer au classement."
         }
     }
@@ -192,12 +189,11 @@ struct LeaderboardView: View {
         switch board {
         // A day's result keeps the pseudo of when it was played: the current one when known.
         case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.scoreMs),
-                                     detail: Mistakes.text($0.wrongAnswers) + ($0.usedHint ? " · indice +1 min" : "")) }
+                                     detail: Mistakes.text($0.wrongAnswers) + HintCost.detail(usedHint: $0.usedHint, usedVowels: $0.usedVowels)) }
         case .week: players.map { p in
             let week = p.thisWeek() ?? .none
             return Row(id: p.uid, name: p.username, value: Format.clock(week.timeMs), detail: Format.weekDays(week) + " trouvés")
         }
-        case .fastest: fastest.map { Row(id: $0.uid, name: $0.username, value: Format.seconds($0.bestTimeMs)) }
         case .sprint: state.rankings.sprint.enumerated().map { index, record in
             Row(id: record.uid, name: record.username, value: Self.words(record.best), crown: index == 0)
         }
@@ -245,7 +241,6 @@ struct LeaderboardView: View {
             switch board {
             case .today: state.rankings.today = try await cloud.dailyRanking(day: day)
             case .week: state.rankings.players = try await cloud.weekPlayers(day: day)
-            case .fastest: state.rankings.fastest = try await cloud.fastestPlayers()
             case .sprint:
                 let top = try await cloud.sprintTop()
                 state.rankings.sprint = top
@@ -335,7 +330,7 @@ struct FriendsBoard: View {
                                 if mine { Text("vous").scaledFont(11, .semibold).foregroundStyle(Palette.secondary) }
                             }
                             Text((row.week.map { "semaine " + Format.weekDays($0) + " · " + Format.clock($0.timeMs) } ?? "pas joué cette semaine") + (row.streak > 0 ? " · série \(row.streak)" : "")
-                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) + (row.todayHint ? " · indice" : "") : ""))
+                                 + (row.today?.correct == true ? " · " + Mistakes.text(row.todayWrong ?? 0) + (row.todayHint || row.todayVowels ? " · indice" : "") : ""))
                                 .scaledFont(12).foregroundStyle(Palette.tertiary).lineLimit(1)
                             // Friend challenges: "2 victoires · 1 défaite" against this friend.
                             if !mine, let tally = state.challengeTally(friend: row.uid).label {

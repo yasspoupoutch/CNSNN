@@ -15,7 +15,7 @@ struct AttendanceView: View {
             if let today = days.first(where: { $0.day == DailySchedule.key() }) ?? (loaded ? DayUsage(day: DailySchedule.key(), counts: [:]) : nil) {
                 summary("Aujourd’hui", today.counts)
             }
-            if loaded { summary("7 derniers jours", total(days.filter { $0.day >= DailySchedule.key(Date().addingTimeInterval(-6 * 86_400)) })) }
+            if loaded { summary("7 derniers jours (cumul des jours : un joueur venu 3 jours compte 3 fois)", total(days.filter { $0.day >= DailySchedule.key(Date().addingTimeInterval(-6 * 86_400)) })) }
             Section {
                 if days.isEmpty { Text(loaded ? "Aucun chiffre pour l’instant." : "Chargement…").foregroundStyle(.secondary) }
                 ForEach(days) { day in
