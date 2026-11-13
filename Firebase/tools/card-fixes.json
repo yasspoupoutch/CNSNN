@@ -1,0 +1,8 @@
+{
+  "rename": [
+    { "from": "PGB", "wordFull": "Pogba", "hint": "Champion du monde 2018, célèbre pour son dab." }
+  ],
+  "update": [
+    { "id": "IMMARCESCIBLE", "category": "Général" }
+  ]
+}
