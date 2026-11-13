@@ -84,8 +84,8 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Partie terminée"].waitForExistence(timeout: 5))
         app.buttons["Accueil"].tap()
 
-        // The lilac tile opens the challenge sheet (offline here: it says so).
-        let challenge = app.buttons["challengeTile"]
+        // The DUEL card opens the duel sheet (offline here: it says so).
+        let challenge = app.buttons["duelCard"]
         XCTAssertTrue(challenge.waitForExistence(timeout: 5))
         challenge.tap()
         XCTAssertTrue(app.staticTexts["Mêmes 5 mots. Le plus rapide gagne."].waitForExistence(timeout: 5))
@@ -121,7 +121,7 @@ final class CNSNNUITests: XCTestCase {
         let screen = app.windows.firstMatch.frame
         let elements: [(String, XCUIElement)] = [
             ("Bonjour", app.staticTexts["Bonjour,"]), ("Classement", ranking), ("Partager", app.buttons["Partager"]),
-            ("Jouer aussi", app.staticTexts["JOUER AUSSI"]), ("Défier un ami", app.buttons["challengeTile"]),
+            ("Jouer aussi", app.staticTexts["JOUER AUSSI"]), ("Duel", app.buttons["duelCard"]), ("Tournoi", app.buttons["tournamentCard"]),
         ] + ["Classique", "Sprint"].map { title in
             (title, app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title + ".")).firstMatch)
         }

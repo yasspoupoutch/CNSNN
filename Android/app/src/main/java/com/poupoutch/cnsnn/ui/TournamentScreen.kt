@@ -82,37 +82,6 @@ internal object TournamentText {
 
 private fun TournamentBracket.Slot.uid(): String? = (this as? TournamentBracket.Slot.Player)?.player?.uid
 
-/** The tournament block of the "Défier un ami" sheet: sign-up and my match, in short. */
-@Composable
-internal fun TournamentBox(state: AppViewModel, open: () -> Unit) {
-    val store = state.tournament
-    val scope = rememberCoroutineScope()
-    val haptics = rememberHaptics()
-    LaunchedEffect(state.uid) { store.refresh(state) }
-    Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
-        Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.EmojiEvents, null, Modifier.size(16.dp), tint = Palette.accent)
-                Kicker("Tournoi de la semaine", Palette.accent)
-            }
-            Text(summary(store), fontSize = 13.sp, color = Palette.secondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!store.nextMine && store.nextWeek.isNotEmpty())
-                    DuelButton("S’inscrire", Modifier.weight(1f).testTag("tournamentSignUp")) { haptics.selection(); scope.launch { store.signUp(state) } }
-                DuelButton(if (store.currentMine) "Mon match" else "Voir le tableau", Modifier.weight(1f).testTag("tournamentOpen")) { haptics.selection(); open() }
-            }
-            store.message?.let { Text(it, fontSize = 12.sp, color = Palette.red) }
-        }
-    }
-}
-
-private fun summary(store: TournamentStore): String {
-    val deadline = TournamentRules.deadlineMs(store.nextWeek)?.let(TournamentText::day) ?: "lundi 9 h"
-    val count = when (store.nextCount) { 0 -> ""; 1 -> " 1 inscrit pour l’instant."; else -> " ${store.nextCount} inscrits pour l’instant." }
-    if (store.nextMine) return "Vous êtes inscrit au prochain tournoi : il commence $deadline.$count"
-    return "Un match par jour, les mêmes 5 mots pour les deux joueurs, 24 h pour jouer : le plus rapide passe au tour suivant. Inscriptions jusqu’à $deadline.$count"
-}
-
 @Composable
 fun TournamentScreen(state: AppViewModel, play: (Int) -> Unit, close: () -> Unit) {
     val store = state.tournament

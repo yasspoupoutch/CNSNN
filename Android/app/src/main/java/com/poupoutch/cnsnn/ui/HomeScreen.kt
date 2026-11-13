@@ -178,7 +178,10 @@ private fun Modes(state: AppViewModel, openClassic: () -> Unit, playMode: (PlayM
         }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Kicker("Jouer aussi", Palette.tertiary, Modifier.padding(start = 4.dp, top = 4.dp))
-        ChallengeTile(state, openChallenges, playChallenge)
+        // A friend's challenge to play (or mine to finish) stays one tap away; otherwise only the two cards.
+        val featured = state.featuredChallenge()
+        if (featured != null && featured.second != com.poupoutch.cnsnn.core.Challenge.State.Waiting) ChallengeTile(state, openChallenges, playChallenge)
+        DuelTournamentCards(state, openChallenges) { state.liveDuelRequest = "tournament" }
         val columns = if (LocalDensity.current.fontScale > 1.5f) 1 else 2
         tiles.chunked(columns).forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

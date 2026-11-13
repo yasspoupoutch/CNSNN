@@ -2,6 +2,7 @@ package com.poupoutch.cnsnn
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
@@ -70,11 +71,14 @@ class ModesFlowTest {
         rule.waitForIdle()
     }
 
-    /** The lilac tile opens the challenge sheet: rules, friends to challenge, and the invitation. */
+    /** The DUEL card opens the duel sheet; its 48-hour page lists friends to challenge and the invitation. */
     @Test fun challengeTileOpensTheSheet() {
         home()
-        rule.onNodeWithTag("challengeTile").performScrollTo().performClick()
+        rule.onNodeWithTag("duelCard").performScrollTo().performClick()
         waitFor("Mêmes 5 mots. Le plus rapide gagne.")
+        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("laterChallenges")).fetchSemanticsNodes().isNotEmpty() || has("Connectez-vous à Internet", substring = true) }
+        if (has("Connectez-vous à Internet", substring = true)) return
+        rule.onNodeWithTag("laterChallenges").performScrollTo().performClick()
         waitFor("Défier par lien")
         // The friends list loads (earlier tests may leave a signed-in player who already has friends).
         rule.waitUntil(20_000) {

@@ -157,7 +157,7 @@ private fun Waiting(duelVm: LiveDuelViewModel) {
             Spacer(Modifier.width(8.dp))
             Text("En attente de votre ami…", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Duel.soft)
         }
-        Line("Il a 15 minutes pour ouvrir le lien ou taper le code dans « Défier un ami ». Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
+        Line("Il a 15 minutes pour ouvrir le lien ou taper le code dans Duel › Avec un ami. Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
     }
 }
 

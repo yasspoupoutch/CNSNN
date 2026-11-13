@@ -60,7 +60,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import com.poupoutch.cnsnn.core.TournamentRules
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -216,122 +230,218 @@ fun ChallengeSheet(state: AppViewModel, play: (Challenge) -> Unit, live: (String
         state.refreshChallenges()
     }
     val now = nowMs()
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DuelGlyph(40)
-            Column {
-                Kicker("Défi entre amis", Duel.color)
-                Text("Mêmes 5 mots. Le plus rapide gagne.", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Text("Votre chrono démarre dès que vous lancez le défi. Votre ami a 48 h pour jouer ; chaque mot passé ajoute 20 s.",
-            fontSize = 13.sp, color = Palette.secondary)
-        state.challengeTally().label?.let { Text("Votre bilan : $it", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Duel.soft) }
-        if (uid == null) {
-            SectionCard(radius = 22.dp, padding = 16.dp) { Text("Connectez-vous à Internet pour défier vos amis.", color = Palette.secondary) }
-        } else {
-            // Duel en direct: a random opponent, or a friend with a link; both play at the same moment.
-            Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
-                Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.Bolt, null, Modifier.size(16.dp), tint = Duel.text)
-                        Kicker("Duel en direct", Duel.text)
-                    }
-                    Text("Mêmes 5 mots, au même moment : vous voyez l’autre avancer. Le premier qui finit (+20 s par mot passé) gagne.",
-                        fontSize = 13.sp, color = Palette.secondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        DuelButton("Au hasard", Modifier.weight(1f).testTag("liveRandom")) { haptics.selection(); live("random") }
-                        DuelButton("Avec un ami", Modifier.weight(1f).testTag("liveLink")) { haptics.selection(); live("link") }
-                    }
+    // One thing at a time: the duel (random or a friend), then a friend's code, then the challenges over 48 h.
+    var page by rememberSaveable { mutableStateOf("main") }
+    BackHandler(page != "main") { page = "main"; message = null }
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 28.dp).animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        when (page) {
+            "friend" -> {
+                BackTitle("Avec un ami") { page = "main"; message = null }
+                DuelChoice(Icons.AutoMirrored.Filled.Send, "Envoyer un code", "Le duel démarre dès que votre ami le rejoint.", Modifier.padding(top = 6.dp).testTag("liveLink")) {
+                    haptics.selection(); live("link")
                 }
-            }
-            TournamentBox(state) { live("tournament") }
-            val open = state.challenges.filter { it.state(uid, now) !is Challenge.State.Over }
-            if (open.isNotEmpty()) {
-                Kicker("En cours", Palette.tertiary, Modifier.padding(top = 6.dp))
+                Kicker("J’ai reçu un code", Palette.tertiary, Modifier.padding(top = 10.dp))
                 SectionCard(padding = 0.dp, radius = 22.dp) {
-                    open.forEachIndexed { index, c ->
-                        if (index > 0) Divider()
-                        val other = c.theirs(uid)
-                        val status = c.state(uid, now)
-                        val code = c.code
-                        PersonRow(c.opponentName(uid), other.uid, openLine(c, status, uid, now), link = c.isOpen) {
-                            if (status == Challenge.State.YourTurn || status == Challenge.State.Playing)
-                                DuelButton(if (status == Challenge.State.Playing) "Reprendre" else "Jouer") { play(c) }
-                            else if (c.isOpen && code != null) DuelButton("Partager") { Share.plain(context, ChallengeInvite.shareText(code)) }
-                        }
+                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(joinCode, { text -> joinCode = text.uppercase().filter { it in ChallengeInvite.ALPHABET }.take(6) },
+                            Modifier.weight(1f).testTag("joinCode"), singleLine = true,
+                            placeholder = { Text("Code reçu", color = Palette.tertiary) },
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Go),
+                            keyboardActions = KeyboardActions(onGo = { join(joinCode) }),
+                            colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent))
+                        DuelButton("Rejoindre", enabled = joinCode.length == 6 && sending == null, busy = sending == "join") { join(joinCode) }
                     }
                 }
             }
-            SectionCard(Modifier.padding(top = 6.dp), padding = 0.dp, radius = 22.dp) {
-                Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(joinCode, { text -> joinCode = text.uppercase().filter { it in ChallengeInvite.ALPHABET }.take(6) },
-                        Modifier.weight(1f).testTag("joinCode"), singleLine = true,
-                        placeholder = { Text("Code d’un défi reçu", color = Palette.tertiary) },
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, imeAction = ImeAction.Go),
-                        keyboardActions = KeyboardActions(onGo = { join(joinCode) }),
-                        colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent))
-                    DuelButton("Rejoindre", enabled = joinCode.length == 6 && sending == null, busy = sending == "join") { join(joinCode) }
-                }
+            "later" -> {
+                BackTitle("Défi en différé") { page = "main"; message = null }
+                Text("Votre chrono démarre dès que vous lancez le défi. Votre ami a 48 h pour jouer ; chaque mot passé ajoute 20 s.",
+                    fontSize = 13.sp, color = Palette.secondary)
+                state.challengeTally().label?.let { Text("Votre bilan : $it", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Duel.soft) }
+                if (uid != null) LaterChallenges(state, uid, now, friends, loading, sending, { sending = it }, { message = it }, play)
             }
-            Kicker("Défier un ami", Palette.tertiary, Modifier.padding(top = 6.dp))
-            SectionCard(padding = 0.dp, radius = 22.dp) {
-                if (friends.isEmpty()) Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (loading) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Palette.secondary); Spacer(Modifier.width(10.dp)) }
-                    Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou défiez-le par lien ci-dessous.",
-                        fontSize = 14.sp, color = Palette.tertiary)
+            else -> {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DuelGlyph(40)
+                    Column {
+                        Kicker("Duel", Duel.color)
+                        Text("Mêmes 5 mots. Le plus rapide gagne.", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                val names = state.currentNames
-                friends.forEachIndexed { index, (friend, name) ->
-                    // The friend's current pseudo when known (the list keeps the one saved when added).
-                    val shown = names[friend] ?: name
-                    if (index > 0) Divider()
-                    PersonRow(shown, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
-                        DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $shown" }, enabled = sending == null, busy = sending == friend) {
-                            haptics.selection(); sending = friend; message = null
-                            scope.launch {
-                                try { play(state.sendChallenge(friend, name)) }
-                                catch (e: Exception) { message = CloudError.message(e); haptics.retry() }
-                                finally { sending = null }
+                if (uid == null) {
+                    SectionCard(radius = 22.dp, padding = 16.dp) { Text("Connectez-vous à Internet pour défier vos amis.", color = Palette.secondary) }
+                } else {
+                    DuelChoice(Icons.Filled.Shuffle, "Au hasard", "Contre le premier joueur qui cherche aussi un duel.", Modifier.padding(top = 6.dp).testTag("liveRandom")) {
+                        haptics.selection(); live("random")
+                    }
+                    DuelChoice(Icons.Filled.Group, "Avec un ami", "Envoyez-lui un code, ou entrez celui qu’il vous a envoyé.", Modifier.testTag("liveFriend")) {
+                        haptics.selection(); page = "friend"
+                    }
+                    val open = state.challenges.filter { it.state(uid, now) !is Challenge.State.Over }
+                    if (open.isNotEmpty()) {
+                        Kicker("En cours", Palette.tertiary, Modifier.padding(top = 6.dp))
+                        SectionCard(padding = 0.dp, radius = 22.dp) {
+                            open.forEachIndexed { index, c ->
+                                if (index > 0) Divider()
+                                val other = c.theirs(uid)
+                                val status = c.state(uid, now)
+                                val code = c.code
+                                PersonRow(c.opponentName(uid), other.uid, openLine(c, status, uid, now), link = c.isOpen) {
+                                    if (status == Challenge.State.YourTurn || status == Challenge.State.Playing)
+                                        DuelButton(if (status == Challenge.State.Playing) "Reprendre" else "Jouer") { play(c) }
+                                    else if (c.isOpen && code != null) DuelButton("Partager") { Share.plain(context, ChallengeInvite.shareText(code)) }
+                                }
                             }
                         }
                     }
-                }
-            }
-            // For someone who is not a friend yet: play first, then send the link with its code.
-            Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
-                Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. En l’ouvrant, il rejoint le défi et vous devenez amis. Il a 48 h pour vous battre.",
-                        fontSize = 13.sp, color = Palette.secondary)
-                    DuelButton("Défier par lien", Modifier.fillMaxWidth().testTag("openChallenge"), enabled = sending == null, busy = sending == "link") {
-                        haptics.selection(); sending = "link"; message = null
-                        scope.launch {
-                            try { play(state.sendOpenChallenge()) }
-                            catch (e: Exception) { message = CloudError.message(e); haptics.retry() }
-                            finally { sending = null }
-                        }
-                    }
-                }
-            }
-            val done = state.challenges.mapNotNull { c -> c.result(uid, now)?.let { c to it } }.take(5)
-            if (done.isNotEmpty()) {
-                Kicker("Derniers défis", Palette.tertiary, Modifier.padding(top = 6.dp))
-                SectionCard(padding = 0.dp, radius = 22.dp) {
-                    done.forEachIndexed { index, (c, result) ->
-                        if (index > 0) Divider()
-                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (c.isOpen) resultTitle(result) + " · défi par lien" else resultTitle(result) + " contre " + c.theirs(uid).name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                                color = when (result) { Challenge.Result.WON -> Palette.mint; Challenge.Result.LOST -> Palette.red; else -> Palette.secondary },
-                                modifier = Modifier.weight(1f))
-                            Text((c.mine(uid).scoreMs?.let(ChallengeFormat::time) ?: "—") + " / " + (c.theirs(uid).scoreMs?.let(ChallengeFormat::time) ?: "—"),
-                                fontSize = 13.sp, color = Palette.tertiary)
+                    SectionCard(Modifier.padding(top = 10.dp).clickable { haptics.selection(); page = "later" }.testTag("laterChallenges"), padding = 0.dp, radius = 22.dp) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Défi en différé (48 h)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text(state.challengeTally().label ?: "Chacun joue quand il veut, le meilleur chrono gagne.", fontSize = 12.sp, color = Palette.tertiary)
+                            }
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Palette.tertiary)
                         }
                     }
                 }
             }
         }
         message?.let { Text(it, fontSize = 13.sp, color = Palette.red) }
+    }
+}
+
+/** The 48-hour challenges: friends to challenge, the link for someone who is not a friend yet, the last results. */
+@Composable
+private fun LaterChallenges(state: AppViewModel, uid: String, now: Long, friends: List<Pair<String, String>>, loading: Boolean, sending: String?,
+                            setSending: (String?) -> Unit, setMessage: (String?) -> Unit, play: (Challenge) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    Kicker("Défier un ami", Palette.tertiary, Modifier.padding(top = 6.dp))
+    SectionCard(padding = 0.dp, radius = 22.dp) {
+        if (friends.isEmpty()) Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (loading) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Palette.secondary); Spacer(Modifier.width(10.dp)) }
+            Text(if (loading) "Chargement…" else "Ajoutez d’abord un ami avec son code (Stats › Classement › Amis), ou défiez-le par lien ci-dessous.",
+                fontSize = 14.sp, color = Palette.tertiary)
+        }
+        val names = state.currentNames
+        friends.forEachIndexed { index, (friend, name) ->
+            // The friend's current pseudo when known (the list keeps the one saved when added).
+            val shown = names[friend] ?: name
+            if (index > 0) Divider()
+            PersonRow(shown, friend, state.challengeTally(friend).label ?: "Aucun défi pour l’instant", detailColor = Duel.soft.copy(alpha = 0.85f)) {
+                DuelButton("Défier", Modifier.semantics { contentDescription = "Défier $shown" }, enabled = sending == null, busy = sending == friend) {
+                    haptics.selection(); setSending(friend); setMessage(null)
+                    scope.launch {
+                        try { play(state.sendChallenge(friend, name)) }
+                        catch (e: Exception) { setMessage(CloudError.message(e)); haptics.retry() }
+                        finally { setSending(null) }
+                    }
+                }
+            }
+        }
+    }
+    // For someone who is not a friend yet: play first, then send the link with its code.
+    Surface(Modifier.fillMaxWidth().padding(top = 6.dp), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
+        Column(Modifier.background(Duel.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Pas encore amis ? Jouez d’abord, puis envoyez le lien. En l’ouvrant, il rejoint le défi et vous devenez amis. Il a 48 h pour vous battre.",
+                fontSize = 13.sp, color = Palette.secondary)
+            DuelButton("Défier par lien", Modifier.fillMaxWidth().testTag("openChallenge"), enabled = sending == null, busy = sending == "link") {
+                haptics.selection(); setSending("link"); setMessage(null)
+                scope.launch {
+                    try { play(state.sendOpenChallenge()) }
+                    catch (e: Exception) { setMessage(CloudError.message(e)); haptics.retry() }
+                    finally { setSending(null) }
+                }
+            }
+        }
+    }
+    val done = state.challenges.mapNotNull { c -> c.result(uid, now)?.let { c to it } }.take(5)
+    if (done.isNotEmpty()) {
+        Kicker("Derniers défis", Palette.tertiary, Modifier.padding(top = 6.dp))
+        SectionCard(padding = 0.dp, radius = 22.dp) {
+            done.forEachIndexed { index, (c, result) ->
+                if (index > 0) Divider()
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (c.isOpen) resultTitle(result) + " · défi par lien" else resultTitle(result) + " contre " + c.theirs(uid).name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                        color = when (result) { Challenge.Result.WON -> Palette.mint; Challenge.Result.LOST -> Palette.red; else -> Palette.secondary },
+                        modifier = Modifier.weight(1f))
+                    Text((c.mine(uid).scoreMs?.let(ChallengeFormat::time) ?: "—") + " / " + (c.theirs(uid).scoreMs?.let(ChallengeFormat::time) ?: "—"),
+                        fontSize = 13.sp, color = Palette.tertiary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackTitle(title: String, back: () -> Unit) {
+    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(Duel.color.copy(alpha = 0.18f)).clickable(onClick = back), contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Retour", tint = Duel.text)
+        }
+        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+    }
+}
+
+/** A big lilac choice: an icon, a title and one line. */
+@Composable
+private fun DuelChoice(icon: ImageVector, title: String, line: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(onClick, modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = Duel.border) {
+        Row(Modifier.background(Duel.surface).padding(16.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.size(46.dp).background(Duel.color.copy(alpha = 0.22f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(22.dp), tint = Duel.text)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(line, fontSize = 13.sp, color = Duel.soft, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Palette.tertiary)
+        }
+    }
+}
+
+// ---- Home cards
+
+/**
+ * Home: the DUEL and TOURNOI cards, side by side (one under the other when the text is very large).
+ * No read here: the tournament line comes from the calendar, or from what the tournament screen already read.
+ */
+@Composable
+fun DuelTournamentCards(state: AppViewModel, duel: () -> Unit, tournament: () -> Unit) {
+    val store = state.tournament
+    val tournamentLine = when {
+        store.currentMine -> "Votre match de la semaine"
+        else -> {
+            val day = TournamentRules.deadlineMs(TournamentRules.nextWeek(nowMs()))?.let(TournamentText::day) ?: "lundi 9 h"
+            if (store.nextMine) "Inscrit · début $day" else "Inscriptions jusqu’à $day"
+        }
+    }
+    val haptics = rememberHaptics()
+    @Composable fun card(icon: ImageVector, tint: Color, title: String, line: String, tag: String, modifier: Modifier, open: () -> Unit) {
+        Surface({ haptics.selection(); open() }, modifier.testTag(tag), shape = RoundedCornerShape(26.dp), color = Color.Transparent, border = Duel.border) {
+            Column(Modifier.fillMaxSize().background(Duel.surface).padding(horizontal = 16.dp, vertical = 14.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "$title. $line" }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(icon, null, Modifier.size(18.dp), tint = tint)
+                    Text(title.uppercase(), fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                }
+                Text(line, fontSize = 13.sp, color = Duel.soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+    if (LocalDensity.current.fontScale > 1.5f) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.fillMaxWidth(), duel)
+            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.fillMaxWidth(), tournament)
+        }
+    } else {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.weight(1f).fillMaxHeight(), duel)
+            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.weight(1f).fillMaxHeight(), tournament)
+        }
     }
 }
 

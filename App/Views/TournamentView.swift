@@ -22,43 +22,6 @@ enum TournamentText {
     }
 }
 
-/// The tournament block of the "Défier un ami" sheet: sign-up and my match, in short.
-struct TournamentBox: View {
-    @Environment(AppState.self) private var state
-    var open: () -> Void
-
-    var body: some View {
-        let store = state.tournament
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.accent)
-                SectionKicker(text: "Tournoi de la semaine", color: Palette.accent)
-            }
-            Text(summary(store)).scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                if !store.nextMine && !store.nextWeek.isEmpty {
-                    Button { Haptics.selection(); Task { await store.signUp(state: state) } } label: { Label("S’inscrire", systemImage: "plus") }
-                        .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("tournamentSignUp")
-                }
-                Button { Haptics.selection(); open() } label: { Label(store.currentMine ? "Mon match" : "Voir le tableau", systemImage: "trophy") }
-                    .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("tournamentOpen")
-            }
-            if let message = store.message { Text(message).scaledFont(12).foregroundStyle(Palette.red) }
-        }
-        .padding(16).modifier(DuelSurface(radius: 22)).padding(.top, 6)
-        .task(id: state.uid) { await store.refresh(state: state) }
-    }
-
-    private func summary(_ store: TournamentStore) -> String {
-        let deadline = TournamentRules.deadlineMs(week: store.nextWeek).map(TournamentText.day) ?? "lundi 9 h"
-        let count = store.nextCount == 0 ? "" : store.nextCount == 1 ? " 1 inscrit pour l’instant." : " \(store.nextCount) inscrits pour l’instant."
-        if store.nextMine { return "Vous êtes inscrit au prochain tournoi : il commence \(deadline).\(count)" }
-        return "Un match par jour, les mêmes 5 mots pour les deux joueurs, 24 h pour jouer : le plus rapide passe au tour suivant. Inscriptions jusqu’à \(deadline).\(count)"
-    }
-}
-
 struct TournamentView: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss

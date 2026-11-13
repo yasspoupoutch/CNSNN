@@ -28,7 +28,7 @@ struct LiveDuelView: View {
         .environment(\.colorScheme, .dark)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .task {
-            session.myUID = state.uid
+            session.myUID = myUID
             if session.phase == .connecting { await session.begin(state: state) }
         }
         .onDisappear { session.leave(state: state) }
@@ -48,9 +48,11 @@ struct LiveDuelView: View {
         } message: { Text("Quitter maintenant fait perdre le duel.") }
     }
 
-    private var duelState: LiveDuel.State? { session.state(uid: state.uid) }
+    /// Me; the invented duel of the pictures plays offline, without a signed-in player.
+    private var myUID: String? { state.uid ?? (ScreenshotDemo.duelActive ? ScreenshotDemo.uid : nil) }
+    private var duelState: LiveDuel.State? { session.state(uid: myUID) }
     private var opponent: LiveDuel.Side? {
-        guard let uid = state.uid, let duel = session.duel, !duel.isOpen else { return nil }
+        guard let uid = myUID, let duel = session.duel, !duel.isOpen else { return nil }
         return duel.theirs(uid)
     }
 
@@ -127,7 +129,7 @@ struct LiveDuelView: View {
     private func restart(_ start: LiveDuelSession.Start) {
         session.leave(state: state)
         session = LiveDuelSession(start: start)
-        session.myUID = state.uid
+        session.myUID = myUID
         Task { await session.begin(state: state) }
     }
 
@@ -149,14 +151,14 @@ struct LiveDuelView: View {
                 ProgressView().tint(Palette.duelSoft)
                 Text("En attente de votre ami…").scaledFont(14, .semibold).foregroundStyle(Palette.duelSoft)
             }.padding(.top, 24)
-            line("Il a 15 minutes pour ouvrir le lien ou taper le code dans « Défier un ami ». Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
+            line("Il a 15 minutes pour ouvrir le lien ou taper le code dans Duel › Avec un ami. Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
         }
     }
 
     // MARK: The duel
 
     @ViewBuilder private var live: some View {
-        if let duel = session.duel, let uid = state.uid, let game = session.game {
+        if let duel = session.duel, let uid = myUID, let game = session.game {
             switch duel.state(for: uid, now: session.nowMs) {
             case .countdown:
                 let left = max(1, Int(ceil(Double((duel.startMs ?? 0) - session.nowMs) / 1000)))
