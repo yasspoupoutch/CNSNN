@@ -293,14 +293,17 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
 @Composable
 private fun ReminderOffer(state: AppViewModel) {
     val context = LocalContext.current
-    var asking by remember { mutableStateOf(false) }
+    // Kept across rotation and process death: the question is asked only once.
+    var asking by rememberSaveable { mutableStateOf(false) }
     fun turnOn() { state.local.reminderMinutes = Reminders.DEFAULT_MINUTES; state.local.remindersEnabled = true; state.refreshGlance(force = true) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) turnOn() }
     LaunchedEffect(state.reminderPending) {
         if (!state.reminderPending) return@LaunchedEffect
+        delay(800)
+        // Cleared only now: clearing the key before the pause cancelled this effect at once, so the
+        // offer never showed (and was marked as made). Leaving the home page during the pause keeps it pending.
         state.reminderPending = false
         state.local.reminderOffered = true
-        delay(800)
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             permission.launch(Manifest.permission.POST_NOTIFICATIONS)
