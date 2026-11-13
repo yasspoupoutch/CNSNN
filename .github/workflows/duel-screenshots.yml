@@ -3,7 +3,7 @@ name: CNSNN - Captures du duel
 # Lancement manuel : les images du duel en direct sur iPhone et sur Android. Un duel inventé contre Léa
 # se joue tout seul (iPhone : `--duel-demo`, App/State/LiveDuelSession.swift ; Android : départ "demo",
 # LiveDuelViewModel.kt), rien n'est envoyé à Firebase. Les PNG vont sur la branche apercus-duel
-# (dossiers ios/ et android/).
+# (dossiers ios/ et android/). Lancé aussi par un push qui touche ce fichier.
 on:
   workflow_dispatch:
 
