@@ -26,6 +26,8 @@ import CNSNNCore
     var isRestoring = false
     /// Friend challenges sent and received (see Core/Challenge.swift).
     var challenges: [Challenge] = []
+    /// The weekly tournament (sign-ups, bracket), read when it is on screen.
+    let tournament = TournamentStore()
     /// Asks the home page to open the challenge sheet (from the daily result).
     var challengeRequest = 0
     /// Asks Profil to open "Proposer un mot" (from the daily result).
@@ -594,6 +596,20 @@ import CNSNNCore
         ChallengeWatch.setActive(true)
         return challenge
     }
+    /// A code typed or opened from a link: a friend challenge (joined here) or a live duel (joined by
+    /// its own screen, so the 3-2-1 is not missed).
+    enum Invite { case challenge(Challenge), duel(String) }
+    func openInvite(code: String) async throws -> Invite {
+        guard let cloud, uid != nil else { throw CloudError.offline }
+        if isSuspended { throw CloudError.suspended }
+        switch try await cloud.inviteTarget(code: code) {
+        case .duel(let id): return .duel(id)
+        case .challenge: return .challenge(try await joinChallenge(code: code))
+        }
+    }
+    /// A live duel counts as a challenge played in the attendance numbers.
+    func noteLiveDuelPlayed() { notePlayed("challenge") }
+
     /// Whoever joined my challenges by link becomes a friend too, once (remembered on the phone).
     private func befriendJoiners(_ list: [Challenge], uid: String) async {
         guard let cloud else { return }

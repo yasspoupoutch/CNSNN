@@ -40,7 +40,7 @@ struct DuelButtonStyle: ButtonStyle {
     }
 }
 
-private struct DuelGlyph: View {
+struct DuelGlyph: View {
     var size: CGFloat = 46
     var body: some View {
         Image(systemName: "figure.fencing").font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(Palette.duelText)
@@ -115,7 +115,7 @@ struct ChallengeTile: View {
     private func subtitle(_ featured: (challenge: Challenge, state: Challenge.State)?) -> String {
         guard let featured, let uid = state.uid else {
             let tally = state.challengeTally().label
-            return "Mêmes 5 mots. Le plus rapide gagne." + (tally.map { "\n" + $0 } ?? "")
+            return "Mêmes 5 mots, ou duel en direct. Le plus rapide gagne." + (tally.map { "\n" + $0 } ?? "")
         }
         let c = featured.challenge, now = ChallengeClock.nowMs
         switch featured.state {
@@ -134,6 +134,10 @@ struct ChallengeSheet: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
     var play: (Challenge) -> Void
+    /// A live duel: its own screen, once the sheet has closed.
+    var live: (LiveDuelSession.Start) -> Void = { _ in }
+    /// The weekly tournament: its own screen, once the sheet has closed.
+    var tournament: () -> Void = {}
     @State private var friends: [(uid: String, name: String)] = []
     @State private var loading = true
     @State private var sending: String?
@@ -159,6 +163,8 @@ struct ChallengeSheet: View {
                 if state.uid == nil {
                     Text("Connectez-vous à Internet pour défier vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
                 } else {
+                    liveBox
+                    TournamentBox(open: { tournament(); dismiss() })
                     openList
                     joinBox
                     friendList
@@ -274,6 +280,27 @@ struct ChallengeSheet: View {
         .padding(.top, 6)
     }
 
+    /// Duel en direct: a random opponent, or a friend with a link; both play at the same moment.
+    private var liveBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "bolt.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.duelText)
+                SectionKicker(text: "Duel en direct", color: Palette.duelText)
+            }
+            Text("Mêmes 5 mots, au même moment : vous voyez l’autre avancer. Le premier qui finit (+20 s par mot passé) gagne.")
+                .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button { Haptics.selection(); live(.random); dismiss() } label: { Label("Au hasard", systemImage: "shuffle") }
+                    .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("liveRandom")
+                Button { Haptics.selection(); live(.link); dismiss() } label: { Label("Avec un ami", systemImage: "link") }
+                    .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("liveLink")
+            }
+        }
+        .padding(16).modifier(DuelSurface(radius: 22)).padding(.top, 6)
+    }
+
     /// For someone who is not a friend yet: play first, then send the link with its code.
     private var linkBox: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -351,9 +378,11 @@ struct ChallengeSheet: View {
         Task {
             defer { sending = nil }
             do {
-                let challenge = try await state.joinChallenge(code: code)
+                switch try await state.openInvite(code: code) {
+                case .challenge(let challenge): play(challenge)
+                case .duel(let id): live(.join(id))
+                }
                 joinCode = ""
-                play(challenge)
                 dismiss()
             } catch { message = CloudError.message(error); Haptics.retry() }
         }
