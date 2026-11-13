@@ -85,6 +85,8 @@ dependencies {
     // outdated: ask for a current one.
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // Google Play's in-app rating sheet, asked after the 3rd found daily word (like the iPhone).
+    implementation("com.google.android.play:review:2.0.2")
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.10.0")

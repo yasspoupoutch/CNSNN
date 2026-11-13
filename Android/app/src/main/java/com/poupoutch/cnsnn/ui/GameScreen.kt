@@ -103,6 +103,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.poupoutch.cnsnn.BuildConfig
 import com.poupoutch.cnsnn.core.Attempt
 import com.poupoutch.cnsnn.core.Card
 import com.poupoutch.cnsnn.core.CatchUp
@@ -152,12 +153,17 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
     var confirmSkip by remember { mutableStateOf(false) }
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
-    // A found daily word: the 12h reminder is offered once back on the home page.
-    LaunchedEffect(result?.id) { if (mode == GameMode.DAILY && game.catchUpDay == null && result?.correct == true && state.local.reminderOfferDue) state.reminderPending = true }
+    // A found daily word: back on the home page, the 12h reminder first (once), else Google Play's
+    // rating prompt (from the 3rd found daily word, once per version), like the iPhone.
+    LaunchedEffect(result?.id) {
+        if (mode != GameMode.DAILY || game.catchUpDay != null || result?.correct != true) return@LaunchedEffect
+        if (state.local.reminderOfferDue) state.reminderPending = true
+        else if (ReviewPrompt.isDue(state.progress.dailyWins, BuildConfig.VERSION_NAME, state.local.reviewAskedVersion)) state.reviewPending = true
+    }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
+        Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
             TopBar(state, game, mode, close) { reporting = true }
             when (val phase = game.phase) {
                 GameViewModel.Phase.Loading -> Centered {

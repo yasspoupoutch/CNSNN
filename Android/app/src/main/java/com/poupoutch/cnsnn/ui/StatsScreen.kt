@@ -92,7 +92,8 @@ import androidx.compose.foundation.text.KeyboardActions
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(state: AppViewModel) {
-    var page by rememberSaveable { mutableIntStateOf(0) }
+    // Opens on the ranking, like the iPhone (0 = Mes stats, 1 = Classement).
+    var page by rememberSaveable { mutableIntStateOf(1) }
     // "Classement" on the home page.
     var seenRequest by rememberSaveable { mutableIntStateOf(state.leaderboardRequest) }
     LaunchedEffect(state.leaderboardRequest) { if (state.leaderboardRequest != seenRequest) { seenRequest = state.leaderboardRequest; page = 1 } }
@@ -103,9 +104,10 @@ fun StatsScreen(state: AppViewModel) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             ScreenTitle("Statistiques", Modifier.padding(top = 8.dp))
-            SecondaryTabRow(page, containerColor = androidx.compose.ui.graphics.Color.Transparent, divider = {}) {
-                Tab(page == 0, { page = 0 }, text = { Text("Mes stats", fontWeight = FontWeight.SemiBold) })
+            // Classement first, then Mes stats, in the iPhone's order.
+            SecondaryTabRow(1 - page, containerColor = androidx.compose.ui.graphics.Color.Transparent, divider = {}) {
                 Tab(page == 1, { page = 1 }, text = { Text("Classement", fontWeight = FontWeight.SemiBold) })
+                Tab(page == 0, { page = 0 }, text = { Text("Mes stats", fontWeight = FontWeight.SemiBold) })
             }
             if (page == 0) MyStats(state) else Leaderboard(state, refreshToken)
             Spacer(Modifier.height(16.dp))

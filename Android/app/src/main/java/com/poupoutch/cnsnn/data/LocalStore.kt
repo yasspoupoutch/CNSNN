@@ -74,6 +74,11 @@ class LocalStore(context: Context) {
     /** Offered once to every player without the reminder, new ones and those from before 1.2. */
     val reminderOfferDue: Boolean get() = !remindersEnabled && !reminderOffered
 
+    /** The app version (versionName) for which Google Play's rating prompt was last asked: once per version. */
+    var reviewAskedVersion: String?
+        get() = prefs.getString("review.askedVersion", null)
+        set(value) { prefs.edit().putString("review.askedVersion", value).apply() }
+
     var glance: Glance?
         get() = Glance.fromJson(prefs.getString("glance", null))
         set(value) { prefs.edit().putString("glance", value?.toJson()).apply() }

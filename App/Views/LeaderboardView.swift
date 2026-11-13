@@ -51,6 +51,8 @@ struct LeaderboardView: View {
                     Button((hidden.count == 1 ? "1 joueur masqué" : "\(hidden.count) joueurs masqués") + " · Tout afficher") { hiddenPlayers = "" }
                         .scaledFont(13, .semibold).foregroundStyle(Palette.secondary).hitTarget().padding(.horizontal, 4)
                 }
+                // Like Android: says how to reach "Signaler" and "Masquer" (the context menu).
+                Text("Appui long sur un joueur pour le signaler ou le masquer.").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.horizontal, 4)
             }
         }
         .onAppear { arrival += 1 }
