@@ -72,4 +72,10 @@ final class TournamentTests: XCTestCase {
         XCTAssertEqual(TournamentFormat.roundName(6, of: 6), "Finale")
         XCTAssertEqual(TournamentFormat.roundName(1, of: 6), "Tour 1")
     }
+
+    func testWeeksToDeleteWithTheAccount() {
+        let monday16 = TournamentRules.deadlineMs(week: "2026-11-16")!
+        XCTAssertEqual(TournamentRules.weeks(untilMs: monday16 - 1), ["2026-11-09", "2026-11-16"])
+        XCTAssertEqual(TournamentRules.weeks(untilMs: monday16), ["2026-11-09", "2026-11-16", "2026-11-23"])
+    }
 }

@@ -52,6 +52,12 @@ object TournamentRules {
     /** The words of a round, drawn by the first player who starts it (then kept in Firestore). */
     fun draw(week: String, round: Int): List<String> = ChallengeRules.draw(seed("$week#$round"))
 
+    /** Every tournament week from the first one to the one open for sign-ups (to delete an account). */
+    fun weeks(untilMs: Long): List<String> {
+        val first = deadlineMs("2026-11-09") ?: return emptyList()
+        val last = deadlineMs(nextWeek(untilMs)) ?: return emptyList()
+        return (first..last step 7 * DAY_MS).map { civil(Math.floorDiv(it, DAY_MS)) }
+    }
     /** FNV-1a, 64 bits: the same seed on both platforms. */
     fun seed(text: String): ULong {
         var hash = 0xcbf29ce484222325uL

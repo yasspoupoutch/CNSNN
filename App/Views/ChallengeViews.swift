@@ -136,6 +136,8 @@ struct ChallengeSheet: View {
     var play: (Challenge) -> Void
     /// A live duel: its own screen, once the sheet has closed.
     var live: (LiveDuelSession.Start) -> Void = { _ in }
+    /// The weekly tournament: its own screen, once the sheet has closed.
+    var tournament: () -> Void = {}
     @State private var friends: [(uid: String, name: String)] = []
     @State private var loading = true
     @State private var sending: String?
@@ -162,6 +164,7 @@ struct ChallengeSheet: View {
                     Text("Connectez-vous à Internet pour défier vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
                 } else {
                     liveBox
+                    TournamentBox(open: { tournament(); dismiss() })
                     openList
                     joinBox
                     friendList

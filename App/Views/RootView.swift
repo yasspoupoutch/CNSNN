@@ -57,6 +57,8 @@ struct GameRoute: Identifiable {
     var challenge: Challenge? = nil
     /// A live duel: random opponent, link for a friend, or a friend's code.
     var live: LiveDuelSession.Start? = nil
+    /// The weekly tournament's screen.
+    var tournament = false
     /// Rattrapage: a missed daily word of the week, counted with 5 minutes more.
     var catchUpDay: String? = nil
     /// The first-launch tutorial on the Mot du jour page, with an example word.
@@ -126,6 +128,7 @@ struct MainShell: View {
         .fullScreenCover(item: $game, onDismiss: afterGame) { route in
             if let challenge = route.challenge { ChallengeGameView(challenge: challenge) }
             else if let live = route.live { LiveDuelView(start: live) }
+            else if route.tournament { TournamentView() }
             else if let play = route.play { ModeGameView(mode: play) }
             else if route.tutorial {
                 GameView(mode: .daily, tutorial: { play in

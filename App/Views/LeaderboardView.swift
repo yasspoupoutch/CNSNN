@@ -283,7 +283,8 @@ struct FriendsView: View {
             .sheet(isPresented: $showChallenges, onDismiss: {
                 if let route = pending { pending = nil; play(route) }
             }) {
-                ChallengeSheet(play: { pending = GameRoute(mode: .classic, challenge: $0) }, live: { pending = GameRoute(mode: .classic, live: $0) })
+                ChallengeSheet(play: { pending = GameRoute(mode: .classic, challenge: $0) }, live: { pending = GameRoute(mode: .classic, live: $0) },
+                           tournament: { pending = GameRoute(mode: .classic, tournament: true) })
                     .presentationDetents([.large]).presentationDragIndicator(.visible)
                     .presentationBackground(.ultraThinMaterial)
             }

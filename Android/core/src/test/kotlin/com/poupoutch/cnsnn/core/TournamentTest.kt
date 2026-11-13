@@ -76,4 +76,10 @@ class TournamentTest {
         assertEquals("Finale", TournamentFormat.roundName(6, 6))
         assertEquals("Tour 1", TournamentFormat.roundName(1, 6))
     }
+
+    @Test fun weeksToDeleteWithTheAccount() {
+        val monday16 = TournamentRules.deadlineMs("2026-11-16")!!
+        assertEquals(listOf("2026-11-09", "2026-11-16"), TournamentRules.weeks(monday16 - 1))
+        assertEquals(listOf("2026-11-09", "2026-11-16", "2026-11-23"), TournamentRules.weeks(monday16))
+    }
 }

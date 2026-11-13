@@ -26,6 +26,8 @@ import CNSNNCore
     var isRestoring = false
     /// Friend challenges sent and received (see Core/Challenge.swift).
     var challenges: [Challenge] = []
+    /// The weekly tournament (sign-ups, bracket), read when it is on screen.
+    let tournament = TournamentStore()
     /// Asks the home page to open the challenge sheet (from the daily result).
     var challengeRequest = 0
     /// Asks Profil to open "Proposer un mot" (from the daily result).

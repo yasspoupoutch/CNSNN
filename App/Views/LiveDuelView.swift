@@ -223,64 +223,11 @@ struct LiveDuelView: View {
         .animation(reduceMotion ? nil : .snappy, value: done)
     }
 
-    @ViewBuilder private func board(_ game: ChallengeGame) -> some View {
-        if let card = game.card { clue(card, number: game.index + 1) }
-        Spacer(minLength: 8).overlay {
-            ZStack {
-                if showPassed, let passed = session.passed {
-                    Text("C’était : " + passed.uppercased())
-                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
-                        .transition(.opacity)
-                }
-            }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
-            .accessibilityHidden(true)
-        }
-        answerLine
-        Button { Haptics.selection(); session.skip(state: state) } label: {
-            Text("Passer · +20 s").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
-                .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
-        }
-        .buttonStyle(PressStyle()).accessibilityLabel("Passer ce mot, 20 secondes de pénalité").padding(.vertical, 10)
-        LetterKeyboard(press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor, submit: { session.submit(state: state) })
-    }
-
-    private func clue(_ card: Card, number: Int) -> some View {
-        VStack(spacing: 0) {
-            Text("Mot \(number) sur \(ChallengeRules.words)").scaledFont(12).foregroundStyle(Palette.tertiary)
-            let consonants = card.wordNoVowels
-            Text(consonants)
-                .font(Typo.serif(consonants.count > 5 ? 56 : 72)).tracking(3)
-                .lineLimit(1).minimumScaleFactor(0.35).padding(.top, 4)
-                .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
-                .id(card.id)
-                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
-            Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 2)
-            Text("« \(card.hint) »").font(Typo.serifItalic(20)).multilineTextAlignment(.center).lineSpacing(2)
-                .lineLimit(3).minimumScaleFactor(0.7).padding(.horizontal, 10).padding(.top, 10)
-                .id("hint-" + card.id)
-        }
-        .padding(.top, 12)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: card.id)
-    }
-
-    private var answerLine: some View {
-        HStack(spacing: 2) {
-            if session.answer.isEmpty {
-                Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
-            }
-            if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
-            if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
-        }
-        .lineLimit(1).minimumScaleFactor(0.4)
-        .frame(maxWidth: .infinity, minHeight: 52)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
-        .padding(.horizontal, 24)
-        .modifier(Shake(animatableData: shakes))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Votre réponse")
-        .accessibilityValue(session.answer.isEmpty ? "vide" : session.answer)
+    private func board(_ game: ChallengeGame) -> some View {
+        WordsBoard(game: game, answer: session.answer, answerWrong: session.answerWrong, cursor: session.cursor,
+                   passed: session.passed, showPassed: showPassed, shakes: shakes,
+                   press: session.press, delete: session.delete, clear: session.clear, moveCursor: session.moveCursor,
+                   placeCursor: session.placeCursor, skip: { session.skip(state: state) }, submit: { session.submit(state: state) })
     }
 
     // MARK: Result
@@ -331,5 +278,86 @@ struct LiveDuelView: View {
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.fill1))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The 5 words of a duel or a tournament match: the clue, the answer line, "Passer" and the keyboard.
+struct WordsBoard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let game: ChallengeGame
+    let answer: String
+    let answerWrong: Bool
+    let cursor: Int?
+    let passed: String?
+    let showPassed: Bool
+    let shakes: CGFloat
+    let press: (String) -> Void
+    let delete: () -> Void
+    let clear: () -> Void
+    let moveCursor: (Int) -> Void
+    let placeCursor: (Int) -> Void
+    let skip: () -> Void
+    let submit: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let card = game.card { clue(card, number: game.index + 1) }
+            Spacer(minLength: 8).overlay {
+                ZStack {
+                    if showPassed, let passed {
+                        Text("C’était : " + passed.uppercased())
+                            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                            .transition(.opacity)
+                    }
+                }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: showPassed)
+                .accessibilityHidden(true)
+            }
+            answerLine
+            Button { Haptics.selection(); skip() } label: {
+                Text("Passer · +20 s").scaledFont(13, .medium).foregroundStyle(Palette.secondary)
+                    .padding(.horizontal, 16).frame(minHeight: 36).glassCapsule().hitTarget()
+            }
+            .buttonStyle(PressStyle()).accessibilityLabel("Passer ce mot, 20 secondes de pénalité").padding(.vertical, 10)
+            LetterKeyboard(press: press, delete: delete, clear: clear, moveCursor: moveCursor, submit: submit)
+        }
+    }
+
+    private func clue(_ card: Card, number: Int) -> some View {
+        VStack(spacing: 0) {
+            Text("Mot \(number) sur \(ChallengeRules.words)").scaledFont(12).foregroundStyle(Palette.tertiary)
+            let consonants = card.wordNoVowels
+            Text(consonants)
+                .font(Typo.serif(consonants.count > 5 ? 56 : 72)).tracking(3)
+                .lineLimit(1).minimumScaleFactor(0.35).padding(.top, 4)
+                .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
+                .id(card.id)
+                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
+            Text("\(card.category.rawValue) · \(card.difficulty.rawValue)").scaledFont(12).foregroundStyle(Palette.tertiary).padding(.top, 2)
+            Text("« \(card.hint) »").font(Typo.serifItalic(20)).multilineTextAlignment(.center).lineSpacing(2)
+                .lineLimit(3).minimumScaleFactor(0.7).padding(.horizontal, 10).padding(.top, 10)
+                .id("hint-" + card.id)
+        }
+        .padding(.top, 12)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: card.id)
+    }
+
+    private var answerLine: some View {
+        HStack(spacing: 2) {
+            if answer.isEmpty {
+                Text("votre réponse").font(Typo.serifItalic(22)).foregroundStyle(Palette.tertiary)
+            }
+            if !answer.isEmpty { AnswerLetters(answer: answer, wrong: answerWrong, cursor: cursor, place: placeCursor) }
+            if TypedAnswer(text: answer, cursor: cursor).inside == nil { Caret() }
+        }
+        .lineLimit(1).minimumScaleFactor(0.4)
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
+        .padding(.horizontal, 24)
+        .modifier(Shake(animatableData: shakes))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Votre réponse")
+        .accessibilityValue(answer.isEmpty ? "vide" : answer)
     }
 }

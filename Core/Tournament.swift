@@ -49,6 +49,11 @@ public enum TournamentRules {
     /// The words of a round, drawn by the first player who starts it (then kept in Firestore).
     public static func draw(week: String, round: Int) -> [String] { ChallengeRules.draw(seed: seed(week + "#\(round)")) }
 
+    /// Every tournament week from the first one to the one open for sign-ups (to delete an account).
+    public static func weeks(untilMs: Int) -> [String] {
+        guard let first = deadlineMs(week: "2026-11-09"), let last = deadlineMs(week: nextWeek(nowMs: untilMs)) else { return [] }
+        return stride(from: first, through: last, by: 7 * dayMs).map { civil(floorDiv($0, dayMs)) }
+    }
     /// FNV-1a, 64 bits: the same seed on both platforms.
     public static func seed(_ text: String) -> UInt64 {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325

@@ -280,6 +280,11 @@ enum DailyGuesses {
             refs += try await db.collection("duels").whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         }
         refs.append(db.collection("duelQueue").document(uid))
+        // Weekly tournaments since they began: the sign-up and each round's run, deleted without reading.
+        for week in TournamentRules.weeks(untilMs: Int(Date().timeIntervalSince1970 * 1000)) {
+            refs.append(db.collection("tournaments").document(week).collection("players").document(uid))
+            refs += (1...6).map { db.collection("tournaments").document(week).collection("runs").document("\($0)_\(uid)") }
+        }
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId"),
                                     ("challenges", "from"), ("challenges", "to")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
@@ -981,6 +986,74 @@ enum DailyGuesses {
         }
         return LiveDuel(id: id, cardIds: ids, createdMs: created, startMs: ms("readyAt").map { $0 + LiveDuelRules.countdownMs },
                         from: side("from", uid: from), to: side("to", uid: to), code: d["code"] as? String)
+    }
+
+    // MARK: Weekly tournament
+
+    private func tournament(_ week: String) -> DocumentReference { db.collection("tournaments").document(week) }
+    private static var nowMs: Int { Int(Date().timeIntervalSince1970 * 1000) }
+    /// The players signed up for a week (the draw takes the first 64).
+    func tournamentPlayers(week: String) async throws -> [TournamentPlayer] {
+        try await tournament(week).collection("players").order(by: "at").limit(to: 200).getDocuments(source: .server).documents.compactMap { doc in
+            guard let at = doc.data()["at"] as? Timestamp else { return nil }
+            return TournamentPlayer(uid: doc.documentID, name: doc.data()["name"] as? String ?? "Joueur", atMs: Self.millis(at))
+        }
+    }
+    /// How many have signed up (one read, whatever the number).
+    func tournamentCount(week: String) async throws -> Int {
+        try await tournament(week).collection("players").count.getAggregation(source: .server).count.intValue
+    }
+    func isSignedUp(week: String, uid: String) async throws -> Bool {
+        try await tournament(week).collection("players").document(uid).getDocument(source: .server).exists
+    }
+    func signUp(week: String, uid: String, username: String) async throws {
+        let ref = tournament(week).collection("players").document(uid)
+        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+    }
+    func withdraw(week: String, uid: String) async throws {
+        let ref = tournament(week).collection("players").document(uid)
+        guard try await Self.awaitWrite({ done in ref.delete(completion: done) }) else { throw CloudError.offline }
+    }
+    /// The runs of a week from a round on (the earlier ones never change and stay on the phone).
+    func tournamentRuns(week: String, fromRound: Int) async throws -> [TournamentRun] {
+        try await tournament(week).collection("runs").whereField("round", isGreaterThanOrEqualTo: fromRound).limit(to: 300)
+            .getDocuments(source: .server).documents.compactMap { Self.run($0.data()) }
+    }
+    func tournamentRun(week: String, round: Int, uid: String) async throws -> TournamentRun? {
+        try await tournament(week).collection("runs").document("\(round)_\(uid)").getDocument(source: .server).data().flatMap(Self.run)
+    }
+    /// Starts my clock for a round (once), then gives its words: drawn by the first player to start.
+    func startTournamentRound(week: String, round: Int, uid: String) async throws -> (run: TournamentRun, cardIds: [String], clock: ServerClock?) {
+        let runRef = tournament(week).collection("runs").document("\(round)_\(uid)")
+        var run = try await runRef.getDocument(source: .server).data().flatMap(Self.run)
+        var clock: ServerClock?
+        if run == nil {
+            let sent = Self.nowMs
+            guard try await Self.awaitWrite({ done in runRef.setData(["uid": uid, "round": round, "startedAt": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+            run = try await runRef.getDocument(source: .server).data().flatMap(Self.run)
+            if let run { var learnt = ServerClock(); learnt.learn(serverMs: run.startedMs, sentMs: sent, receivedMs: Self.nowMs); clock = learnt }
+        }
+        guard let run else { throw CloudError.offline }
+        let roundRef = tournament(week).collection("rounds").document("\(round)")
+        if let ids = try await roundRef.getDocument(source: .server).data()?["cardIds"] as? [String] { return (run, ids, clock) }
+        do {
+            _ = try await Self.awaitWrite { done in
+                roundRef.setData(["cardIds": TournamentRules.draw(week: week, round: round), "at": FieldValue.serverTimestamp()], completion: done)
+            }
+        } catch where CloudError.code(error) == .permissionDenied {} // Someone else drew them just before.
+        guard let ids = try await roundRef.getDocument(source: .server).data()?["cardIds"] as? [String] else { throw CloudError.offline }
+        return (run, ids, clock)
+    }
+    func finishTournamentRound(week: String, round: Int, uid: String, skips: Int, errors: Int) async throws -> Bool {
+        let ref = tournament(week).collection("runs").document("\(round)_\(uid)")
+        return try await Self.awaitWrite { done in
+            ref.updateData(["finishedAt": FieldValue.serverTimestamp(), "skips": skips, "errors": errors], completion: done)
+        }
+    }
+    nonisolated static func run(_ d: [String: Any]) -> TournamentRun? {
+        guard let uid = d["uid"] as? String, let round = d["round"] as? Int, let started = d["startedAt"] as? Timestamp else { return nil }
+        return TournamentRun(uid: uid, round: round, startedMs: millis(started), finishedMs: (d["finishedAt"] as? Timestamp).map(millis),
+                             skips: d["skips"] as? Int ?? 0, errors: d["errors"] as? Int ?? 0)
     }
 
     // MARK: Cards
