@@ -169,6 +169,12 @@ private fun LaunchScreen(loading: Boolean) {
 @Composable
 private fun AppNavigation(state: AppViewModel) {
     val nav = rememberNavController()
+    // "Duel en direct" from the challenge sheet, once it has closed.
+    LaunchedEffect(state.liveDuelRequest) {
+        val start = state.liveDuelRequest ?: return@LaunchedEffect
+        state.liveDuelRequest = null
+        nav.navigate("live/$start")
+    }
     NavHost(nav, startDestination = "main",
         enterTransition = { slideInHorizontally { it / 3 } + fadeIn() }, exitTransition = { fadeOut() },
         popEnterTransition = { fadeIn() }, popExitTransition = { slideOutHorizontally { it / 3 } + fadeOut() }) {
@@ -191,6 +197,9 @@ private fun AppNavigation(state: AppViewModel) {
         }
         composable("challenge/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             ChallengeScreen(state, entry.arguments?.getString("id") ?: "") { nav.popBackStack() }
+        }
+        composable("live/{start}", arguments = listOf(navArgument("start") { type = NavType.StringType })) { entry ->
+            LiveDuelScreen(state, entry.arguments?.getString("start") ?: "random") { nav.popBackStack() }
         }
         composable("mode/{mode}", arguments = listOf(navArgument("mode") { type = NavType.StringType })) { entry ->
             val mode = PlayMode.of(entry.arguments?.getString("mode")) ?: PlayMode.SPRINT

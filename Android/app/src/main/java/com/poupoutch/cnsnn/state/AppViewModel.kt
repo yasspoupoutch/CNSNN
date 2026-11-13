@@ -665,6 +665,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ChallengeWatch.setActive(getApplication(), true)
         return challenge
     }
+    /**
+     * A code typed or opened from a link: a friend challenge (joined here) or a live duel (joined by
+     * its own screen, so the 3-2-1 is not missed). Gives the challenge, or the duel's id.
+     */
+    suspend fun openInvite(code: String): Pair<Challenge?, String?> {
+        uid ?: throw CloudError(CloudError.Kind.OFFLINE)
+        if (isSuspended) throw CloudError(CloudError.Kind.SUSPENDED)
+        return when (val target = cloud.inviteTarget(code)) {
+            is CloudRepository.InviteTarget.OfDuel -> null to target.id
+            is CloudRepository.InviteTarget.OfChallenge -> joinChallenge(code) to null
+        }
+    }
+    /** A live duel to open ("random", "link" or "join:ID"): the app's navigation takes it. */
+    var liveDuelRequest by mutableStateOf<String?>(null)
+    /** A live duel counts as a challenge played in the attendance numbers. */
+    fun noteLiveDuelPlayed() = notePlayed("challenge")
+
     /** Whoever joined my challenges by link becomes a friend too, once (remembered on the phone). */
     private suspend fun befriendJoiners(list: List<Challenge>, user: String) {
         val done = local.befriended(user).toMutableSet()

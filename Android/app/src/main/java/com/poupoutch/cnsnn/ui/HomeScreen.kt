@@ -157,9 +157,11 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
         val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val scope = rememberCoroutineScope()
         ModalBottomSheet({ challenges = false }, sheetState = sheet, containerColor = Palette.surfaceHigh) {
-            ChallengeSheet(state) { c ->
+            ChallengeSheet(state, { c ->
                 scope.launch { sheet.hide() }.invokeOnCompletion { challenges = false; playChallenge(c.id) }
-            }
+            }, { start ->
+                scope.launch { sheet.hide() }.invokeOnCompletion { challenges = false; state.liveDuelRequest = start }
+            })
         }
     }
 }

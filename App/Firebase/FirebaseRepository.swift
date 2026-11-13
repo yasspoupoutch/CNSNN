@@ -275,6 +275,11 @@ enum DailyGuesses {
         refs += try await db.collection("friendCodes").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("usernames").whereField("uid", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
         refs += try await db.collection("challengeInvites").whereField("from", isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
+        // Live duels, and the place in the waiting line for a random opponent.
+        for field in ["from", "to"] {
+            refs += try await db.collection("duels").whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
+        }
+        refs.append(db.collection("duelQueue").document(uid))
         for (collection, field) in [("dailyResults", "userId"), ("dailySessions", "userId"), ("reports", "userId"), ("playerReports", "userId"),
                                     ("challenges", "from"), ("challenges", "to")] {
             refs += try await db.collection(collection).whereField(field, isEqualTo: uid).getDocuments(source: .server).documents.map(\.reference)
