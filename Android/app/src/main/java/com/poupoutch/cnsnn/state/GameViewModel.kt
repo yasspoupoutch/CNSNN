@@ -41,7 +41,14 @@ class GameViewModel : ViewModel() {
     /** The caret in the answer (TypedAnswer.cursor): null at the end. */
     var cursor by mutableStateOf<Int?>(null); private set
     var feedback by mutableStateOf<String?>(null); private set
+    /** Second hint: the sentence. */
     var usedHint by mutableStateOf(false); private set
+    /** First hint: the word's vowels light up on the keyboard. */
+    var usedVowels by mutableStateOf(false); private set
+    /** The vowels lit on the keyboard (WordEngine.vowels), once the first hint is taken. */
+    var vowels by mutableStateOf<String?>(null); private set
+    /** 0, 1 or 2 hints taken. */
+    val hintsTaken: Int get() = if (usedHint) 2 else if (usedVowels) 1 else 0
     var result by mutableStateOf<Attempt?>(null); private set
     var wrongAnswers by mutableStateOf(0); private set
     val wrongGuesses = mutableStateListOf<String>()
@@ -87,7 +94,7 @@ class GameViewModel : ViewModel() {
     }
 
     private fun load(state: AppViewModel) {
-        answer = ""; feedback = null; result = null; usedHint = false; wrongAnswers = 0; wrongGuesses.clear()
+        answer = ""; feedback = null; result = null; usedHint = false; usedVowels = false; vowels = null; wrongAnswers = 0; wrongGuesses.clear()
         started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null; lastGuess = null
         ranked = false; pendingOfficial = false; standing = null; phase = Phase.Playing; checking = false; notice = null; finishedHere = false
         val catchUp = catchUpDay
@@ -131,7 +138,11 @@ class GameViewModel : ViewModel() {
                     phase = Phase.Playing
                     return
                 }
-                usedHint = session.hintUsed
+                usedHint = session.hintUsed; usedVowels = session.vowelsUsed
+                if (session.vowelsUsed || session.hintUsed) {
+                    // Taken before leaving: lit again (a secret word's vowels come back from the server).
+                    vowels = if (secret) runCatching { cloud.dailyVowels(key) }.getOrNull() else card?.let { WordEngine.vowels(it.word) }
+                }
                 dailyStart = session.startedAt
                 // Every guess counted so far was wrong (a right one ends the game).
                 wrongAnswers = session.guesses; lastGuess = session.guess
@@ -167,13 +178,45 @@ class GameViewModel : ViewModel() {
     fun next(state: AppViewModel) = load(state)
 
     val secret: Boolean get() = card?.id?.let { SecretDaily.day(it) } != null
-    /** The Mot du jour's official time: the hint adds a minute, a lost day counts ten. */
-    fun officialMs(attempt: Attempt): Int = DailyScore.scoreMs(attempt.timeMs, usedHint, attempt.correct)
+    /** The Mot du jour's official time: the vowels add 30 s, the sentence a minute in all, a lost day counts ten. */
+    fun officialMs(attempt: Attempt): Int = DailyScore.scoreMs(attempt.timeMs, usedHint, attempt.correct, usedVowels)
 
+    /**
+     * Indice: first the vowels, then the sentence. A player of an older version who took the sentence
+     * alone already paid the full minute, so the vowels come with it for free.
+     */
     fun revealHint(state: AppViewModel) {
+        if (usedVowels || usedHint) revealSentence(state) else revealVowels(state)
+    }
+
+    private fun localVowels(): String? = card?.word?.takeIf { it.isNotEmpty() }?.let { WordEngine.vowels(it) }
+
+    private fun revealVowels(state: AppViewModel) {
+        if (usedVowels || usedHint || result != null || checking) return
+        val uid = state.uid; val day = dailyKey
+        if (!ranked || uid == null || day == null || !secret) {
+            vowels = localVowels(); usedVowels = true
+            if (ranked && uid != null && day != null) viewModelScope.launch { runCatching { state.cloud.revealSecretVowels(uid, day) } }
+            return
+        }
+        // The server opens the vowels only once it has recorded their use.
+        checking = true; notice = null
+        viewModelScope.launch {
+            try {
+                val found = state.cloud.revealSecretVowels(uid, day)
+                if (found == null) { notice = CloudError.Kind.OFFLINE.message; return@launch }
+                usedVowels = true
+                checking = false
+                // A day published before the vowels existed: the sentence comes instead (one minute in all).
+                if (found.isEmpty()) revealSentence(state) else vowels = found
+            } catch (e: Exception) { notice = CloudError.message(e) } finally { checking = false }
+        }
+    }
+
+    private fun revealSentence(state: AppViewModel) {
         if (usedHint || result != null || checking) return
         val uid = state.uid; val day = dailyKey
-        if (!ranked || uid == null || day == null) { usedHint = true; return }
+        if (!ranked || uid == null || day == null) { usedHint = true; vowels = vowels ?: localVowels(); return }
         // The server opens the hint only once it has recorded its use.
         checking = true; notice = null
         viewModelScope.launch {
@@ -183,6 +226,7 @@ class GameViewModel : ViewModel() {
                 if (hint == null || shown == null) { notice = CloudError.Kind.OFFLINE.message; return@launch }
                 card = shown.copy(hint = hint); usedHint = true
                 state.storeDailyWord(card!!, day)
+                if (vowels.isNullOrEmpty()) vowels = runCatching { state.cloud.dailyVowels(day) }.getOrNull()
             } catch (e: Exception) { notice = CloudError.message(e) } finally { checking = false }
         }
     }

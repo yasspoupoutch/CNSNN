@@ -50,6 +50,13 @@ class GameRulesTest {
     @Test fun dailyScoreIsTimeWithAMinuteForTheHint() {
         assertEquals(12_345, DailyScore.scoreMs(12_345, usedHint = false, correct = true))
         assertEquals(72_345, DailyScore.scoreMs(12_345, usedHint = true, correct = true))
+        // Vowels alone: 30 s; vowels then sentence: one minute in all, as the sentence alone.
+        assertEquals(42_345, DailyScore.scoreMs(12_345, usedHint = false, correct = true, usedVowels = true))
+        assertEquals(72_345, DailyScore.scoreMs(12_345, usedHint = true, correct = true, usedVowels = true))
+        assertEquals(342_345, DailyScore.catchUpScoreMs(12_345, usedHint = false, correct = true, usedVowels = true))
+        assertEquals("EI", WordEngine.vowels("Défilé"))
+        assertEquals("AEOU", WordEngine.vowels("Œuvre à"))
+        assertEquals("", WordEngine.vowels("Rythm".replace("y", "")))
         // Ten minutes at most, and a lost day counts ten minutes.
         assertEquals(600_000, DailyScore.scoreMs(580_000, usedHint = true, correct = true))
         assertEquals(600_000, DailyScore.scoreMs(9_000_000, usedHint = false, correct = true))

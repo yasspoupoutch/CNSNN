@@ -57,7 +57,9 @@ data class DailyRank(val uid: String, val username: String, val timeMs: Int, val
 /** Server state of today's Mot du jour for the signed-in player. */
 data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean,
                         /** Guesses the server has counted, and the last one (normalized). */
-                        val guesses: Int = 0, val guess: String? = null)
+                        val guesses: Int = 0, val guess: String? = null,
+                        /** First hint: the word's vowels lit on the keyboard. */
+                        val vowelsUsed: Boolean = false)
 
 /**
  * Everything the app reads and writes on Firebase. The documents and fields are exactly those of
@@ -244,6 +246,8 @@ class CloudRepository(
         return Card(SecretDaily.cardId(day), "", "", category, difficulty, masked = consonants)
     }
     suspend fun dailyHint(day: String): String? = db.collection("dailyHints").document(day).get().await().getString("hint")
+    /** The day's vowels (WordEngine.vowels), open once the player took the first hint. Null for a day published before they existed. */
+    suspend fun dailyVowels(day: String): String? = db.collection("dailyVowels").document(day).get().await().getString("vowels")
     suspend fun dailySecret(day: String): Card? {
         val d = db.collection("dailySecrets").document(day).get().await()
         val word = d.getString("word") ?: return null
@@ -260,7 +264,7 @@ class CloudRepository(
         val cardId = d.getString("cardId") ?: return null
         val started = d.getTimestamp("startedAt") ?: return null
         return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"),
-            (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"))
+            (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"), d.getBoolean("vowelsUsed") ?: false)
     }
     /**
      * Starts today's clock on the server. Returns only once the server has recorded the start.
@@ -272,6 +276,14 @@ class CloudRepository(
         val ok = awaitWrite(sessionRef(uid, day).set(data))
         if (!ok) throw CloudError(CloudError.Kind.OFFLINE)
         return dailySession(uid, day) ?: throw CloudError(CloudError.Kind.OFFLINE)
+    }
+    /**
+     * Records the first hint on the server, then reads the day's vowels (the rules open them only after).
+     * Null when the network did not confirm; empty for a day published before the vowels existed.
+     */
+    suspend fun revealSecretVowels(uid: String, day: String): String? {
+        if (!awaitWrite(sessionRef(uid, day).update("vowelsUsed", true))) return null
+        return dailyVowels(day) ?: ""
     }
     /** Records the hint on the server first, since the rules open the hint only after that. */
     suspend fun revealSecretHint(uid: String, day: String): String? {
@@ -335,11 +347,12 @@ class CloudRepository(
         val cardId = s.getString("cardId") ?: return null
         val correct = s.getBoolean("correct") ?: false
         val usedHint = s.getBoolean("hintUsed") ?: false
+        val usedVowels = s.getBoolean("vowelsUsed") ?: false
         val wrong = (s.getLong("wrongAnswers") ?: 0).toInt()
         val timeMs = (millis(finished) - millis(started)).toInt()
         // A caught-up day counts with 5 minutes more, and stays out of the day's ranking (rank 0).
         val catchUp = s.getBoolean("catchUp") == true
-        val scoreMs = if (catchUp) DailyScore.catchUpScoreMs(timeMs, usedHint, correct) else DailyScore.scoreMs(timeMs, usedHint, correct)
+        val scoreMs = if (catchUp) DailyScore.catchUpScoreMs(timeMs, usedHint, correct, usedVowels) else DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels)
         val rank = if (catchUp) 0 else DailyScore.rank(day, scoreMs, correct) ?: return null
         val username = db.collection("users").document(uid).get(Source.SERVER).await().getString("username") ?: "Joueur"
         val old = leaderboardEntry(uid, Source.SERVER)
@@ -347,7 +360,9 @@ class CloudRepository(
         val tally = LeaderboardEntry.tally(old, uid, username, day, correct, timeMs, scoreMs, catchUp) + ("updatedAt" to FieldValue.serverTimestamp())
         val result = mapOf("userId" to uid, "username" to username, "day" to day, "cardId" to cardId, "correct" to correct, "usedHint" to usedHint,
             "wrongAnswers" to wrong, "timeMs" to timeMs, "scoreMs" to scoreMs, "rank" to rank, "startedAt" to started, "finishedAt" to finished) +
-            (if (catchUp) mapOf("catchUp" to true) else emptyMap())
+            (if (catchUp) mapOf("catchUp" to true) else emptyMap()) +
+            // Older versions write no usedVowels: the rules read absent as not used.
+            (if (usedVowels) mapOf("usedVowels" to true) else emptyMap())
         val batch = db.batch()
         batch.set(resultRef(uid, day), result)
         batch.set(db.collection("leaderboard").document(uid), tally)
@@ -429,7 +444,7 @@ class CloudRepository(
         val timeMs = d.getLong("timeMs")?.toInt() ?: return null
         val usedHint = d.getBoolean("usedHint") ?: false
         val correct = d.getBoolean("correct") ?: false
-        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct)
+        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct, d.getBoolean("usedVowels") ?: false)
         return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct)
     }
     /**
@@ -529,7 +544,7 @@ class CloudRepository(
             val result = resultRef(player, day).get(Source.SERVER).await()
             val today = result.data?.let { attempt(day, it) }
             val hint = result.getBoolean("usedHint") ?: false
-            val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, hint, it.correct) }
+            val score = today?.let { result.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(it.timeMs, hint, it.correct, result.getBoolean("usedVowels") ?: false) }
             rows += FriendStanding(player, entry?.username ?: name, entry?.thisWeek(day), entry?.currentStreak() ?: 0, today,
                 result.getLong("wrongAnswers")?.toInt(), score, hint)
         }

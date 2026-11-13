@@ -6,12 +6,16 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * The Mot du jour is scored on time only, the lower the better: the hint adds one minute, and a lost
- * (or unplayed) day counts ten minutes, the most a day can cost. Same arithmetic as firestore.rules
+ * The Mot du jour is scored on time only, the lower the better. Two hints, one after the other: the
+ * word's vowels light up on the keyboard (30 s), then the sentence (30 s more, one minute in all, as the
+ * single hint of older versions). A lost (or unplayed) day counts ten minutes, the most a day can cost. Same arithmetic as firestore.rules
  * (`dailyScore`, `dailyRank`, `monthIndex`, `tallyMonth`) and Core/GameRules.swift.
  */
 object DailyScore {
+    /** Both hints together, or the sentence alone (older versions offer only that one). */
     const val HINT_PENALTY_MS = 60_000
+    /** The vowels alone. */
+    const val VOWELS_PENALTY_MS = 30_000
     const val MISSED_MS = 600_000
     /** Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts. */
     const val EPOCH_OFFSET = 19_723
@@ -21,12 +25,14 @@ object DailyScore {
     /** A lost day sorts after every found one. */
     const val LOST_RANK = 999_999
 
-    fun scoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean): Int =
-        if (correct) minOf(timeMs + (if (usedHint) HINT_PENALTY_MS else 0), MISSED_MS) else MISSED_MS
+    fun penaltyMs(usedHint: Boolean, usedVowels: Boolean): Int =
+        if (usedHint) HINT_PENALTY_MS else if (usedVowels) VOWELS_PENALTY_MS else 0
+    fun scoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false): Int =
+        if (correct) minOf(timeMs + penaltyMs(usedHint, usedVowels), MISSED_MS) else MISSED_MS
     /** Rattrapage: a missed day played later counts in the week with 5 minutes more (firestore.rules `catchUpScore`). */
     const val CATCH_UP_PENALTY_MS = 300_000
-    fun catchUpScoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean): Int =
-        if (correct) minOf(scoreMs(timeMs, usedHint, true) + CATCH_UP_PENALTY_MS, MISSED_MS) else MISSED_MS
+    fun catchUpScoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false): Int =
+        if (correct) minOf(scoreMs(timeMs, usedHint, true, usedVowels) + CATCH_UP_PENALTY_MS, MISSED_MS) else MISSED_MS
     /** Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`. */
     fun dayIndex(day: String): Long? = DailySchedule.dayNumber(day)?.let { it.toLong() + EPOCH_OFFSET }
     /** The first rank of a day: every result of that day sorts between base and base + 999 999. */
