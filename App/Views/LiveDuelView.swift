@@ -151,7 +151,7 @@ struct LiveDuelView: View {
                 ProgressView().tint(Palette.duelSoft)
                 Text("En attente de votre ami…").scaledFont(14, .semibold).foregroundStyle(Palette.duelSoft)
             }.padding(.top, 24)
-            line("Il a 15 minutes pour ouvrir le lien ou taper le code dans « Défier un ami ». Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
+            line("Il a 15 minutes pour ouvrir le lien ou taper le code dans Duel › Avec un ami. Gardez cet écran ouvert : le duel démarre dès qu’il arrive.")
         }
     }
 

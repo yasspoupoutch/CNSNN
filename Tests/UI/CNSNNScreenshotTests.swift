@@ -100,8 +100,10 @@ final class CNSNNScreenshotTests: XCTestCase {
         XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
         dismissKeyboardIfNeeded(app)
 
-        let tile = app.buttons["challengeTile"]
+        let tile = app.buttons["duelCard"]
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        app.swipeUp()
+        capture("duel-00-accueil")
         tile.tap()
         let random = app.buttons["liveRandom"]
         XCTAssertTrue(random.waitForExistence(timeout: 5))
@@ -120,11 +122,15 @@ final class CNSNNScreenshotTests: XCTestCase {
 
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
         tile.tap()
+        let friend = app.buttons["liveFriend"]
+        XCTAssertTrue(friend.waitForExistence(timeout: 5))
+        friend.tap()
         let link = app.buttons["liveLink"]
         XCTAssertTrue(link.waitForExistence(timeout: 5))
+        capture("duel-07-ami")
         link.tap()
         XCTAssertTrue(app.staticTexts["Envoyez ce code à un ami"].waitForExistence(timeout: 10))
-        capture("duel-07-lien")
+        capture("duel-08-lien")
     }
 
     /// The App Store preview video: the workflow films the simulator during this test and keeps the

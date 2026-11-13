@@ -58,8 +58,7 @@ struct HomeView: View {
         .sheet(isPresented: $showChallenges, onDismiss: {
             if let route = pending { pending = nil; play(route) }
         }) {
-            ChallengeSheet(play: { pending = GameRoute(mode: .classic, challenge: $0) }, live: { pending = GameRoute(mode: .classic, live: $0) },
-                           tournament: { pending = GameRoute(mode: .classic, tournament: true) })
+            ChallengeSheet(play: { pending = GameRoute(mode: .classic, challenge: $0) }, live: { pending = GameRoute(mode: .classic, live: $0) })
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
                 .presentationBackground(.ultraThinMaterial)
         }
@@ -293,7 +292,11 @@ struct HomeView: View {
         let columns = typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return VStack(alignment: .leading, spacing: 12) {
             SectionKicker(text: "Jouer aussi").padding(.leading, 4).padding(.top, 6)
-            ChallengeTile(open: { showChallenges = true }, play: { play(GameRoute(mode: .classic, challenge: $0)) })
+            // A friend's challenge to play (or mine to finish) stays one tap away; otherwise only the two cards.
+            if let featured = state.featuredChallenge(), featured.state != .waiting {
+                ChallengeTile(open: { showChallenges = true }, play: { play(GameRoute(mode: .classic, challenge: $0)) })
+            }
+            DuelTournamentCards(duel: { showChallenges = true }, tournament: { play(GameRoute(mode: .classic, tournament: true)) })
             LazyVGrid(columns: columns, spacing: 12) {
                 ModeTile(symbol: "infinity", tint: Palette.foreground, title: "Classique", tagline: "Jouez sans limite.",
                          detail: "\(state.progress.correctAnswers) mots trouvés", inProgress: false) {

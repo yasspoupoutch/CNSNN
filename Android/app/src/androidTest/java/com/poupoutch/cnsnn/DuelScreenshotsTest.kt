@@ -55,7 +55,9 @@ class DuelScreenshotsTest {
         waitFor("Bonjour,")
         rule.skipTutorial()
 
-        rule.onNodeWithTag("challengeTile").performScrollTo().performClick()
+        rule.onNodeWithTag("duelCard").performScrollTo()
+        shot("duel-00-accueil")
+        rule.onNodeWithTag("duelCard").performClick()
         rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("liveRandom")).fetchSemanticsNodes().isNotEmpty() }
         shot("duel-01-feuille")
 
@@ -73,9 +75,14 @@ class DuelScreenshotsTest {
         rule.onNodeWithText("Terminer").performClick()
 
         waitFor("Bonjour,")
+        rule.onNodeWithTag("duelCard").performScrollTo().performClick()
+        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("liveFriend")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("liveFriend").performClick()
+        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("liveLink")).fetchSemanticsNodes().isNotEmpty() }
+        shot("duel-07-ami")
         open("demo-link")
         waitFor("Envoyez ce code à un ami")
-        shot("duel-07-lien")
+        shot("duel-08-lien")
     }
 
     private fun shot(name: String, settle: Long = 1_500) {

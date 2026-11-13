@@ -128,6 +128,55 @@ struct ChallengeTile: View {
     }
 }
 
+// MARK: - Home cards
+
+/// Home: the DUEL and TOURNOI cards, side by side (one under the other on the largest text sizes).
+/// No read here: the tournament line comes from the calendar, or from what the tournament screen already read.
+struct DuelTournamentCards: View {
+    @Environment(AppState.self) private var state
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var duel: () -> Void
+    var tournament: () -> Void
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+        layout {
+            card(symbol: "bolt.fill", tint: Palette.duelText, title: "Duel", line: "En direct, au hasard ou avec un ami", id: "duelCard", action: duel)
+            card(symbol: "trophy.fill", tint: Palette.accent, title: "Tournoi", line: tournamentLine, id: "tournamentCard", action: tournament)
+        }.fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var tournamentLine: String {
+        let store = state.tournament
+        if store.currentMine { return "Votre match de la semaine" }
+        let now = Int(Date().timeIntervalSince1970 * 1000)
+        let day = TournamentRules.deadlineMs(week: TournamentRules.nextWeek(nowMs: now)).map(TournamentText.day) ?? "lundi 9 h"
+        if store.nextMine { return "Inscrit · début \(day)" }
+        return "Inscriptions jusqu’à \(day)"
+    }
+
+    private func card(symbol: String, tint: Color, title: String, line: String, id: String, action: @escaping () -> Void) -> some View {
+        Button { Haptics.selection(); action() } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: symbol).font(.system(size: 15, weight: .bold)).foregroundStyle(tint)
+                    Text(title.uppercased()).scaledFont(17, .heavy).tracking(1.2).foregroundStyle(Palette.foreground)
+                }
+                Text(line).scaledFont(13).foregroundStyle(Palette.duelSoft).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .modifier(DuelSurface())
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title + ". " + line)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(id)
+    }
+}
+
 // MARK: - Sheet: challenge a friend
 
 struct ChallengeSheet: View {
@@ -136,8 +185,6 @@ struct ChallengeSheet: View {
     var play: (Challenge) -> Void
     /// A live duel: its own screen, once the sheet has closed.
     var live: (LiveDuelSession.Start) -> Void = { _ in }
-    /// The weekly tournament: its own screen, once the sheet has closed.
-    var tournament: () -> Void = {}
     @State private var friends: [(uid: String, name: String)] = []
     @State private var loading = true
     @State private var sending: String?
@@ -145,34 +192,21 @@ struct ChallengeSheet: View {
     @State private var joinCode = ""
     @FocusState private var joinFocused: Bool
 
+    /// One thing at a time: the duel (random or a friend), then a friend's code, then the challenges over 48 h.
+    enum Page { case main, friend, later }
+    @State private var page: Page = .main
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    DuelGlyph(size: 40)
-                    VStack(alignment: .leading, spacing: 1) {
-                        SectionKicker(text: "Défi entre amis", color: Palette.duel)
-                        Text("Mêmes 5 mots. Le plus rapide gagne.").scaledFont(19, .bold).fixedSize(horizontal: false, vertical: true)
-                    }
-                }.padding(.top, 8)
-                Text("Votre chrono démarre dès que vous lancez le défi. Votre ami a 48 h pour jouer ; chaque mot passé ajoute 20 s.")
-                    .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
-                if let label = state.challengeTally().label {
-                    Text("Votre bilan : " + label).scaledFont(14, .semibold).foregroundStyle(Palette.duelSoft)
-                }
-                if state.uid == nil {
-                    Text("Connectez-vous à Internet pour défier vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
-                } else {
-                    liveBox
-                    TournamentBox(open: { tournament(); dismiss() })
-                    openList
-                    joinBox
-                    friendList
-                    linkBox
-                    finishedList
+                switch page {
+                case .main: mainPage
+                case .friend: friendPage
+                case .later: laterPage
                 }
                 if let message { Text(message).scaledFont(13).foregroundStyle(Palette.red) }
             }.padding(.horizontal, 22).padding(.vertical, 20)
+            .animation(CNSNNTheme.spring, value: page)
         }
         .scrollIndicators(.hidden)
         .task(id: state.uid) { await load() }
@@ -181,6 +215,99 @@ struct ChallengeSheet: View {
             state.inviteCode = nil; joinCode = code; join()
         }
         .environment(\.colorScheme, .dark)
+    }
+
+    @ViewBuilder private var mainPage: some View {
+        HStack(spacing: 12) {
+            DuelGlyph(size: 40)
+            VStack(alignment: .leading, spacing: 1) {
+                SectionKicker(text: "Duel", color: Palette.duel)
+                Text("Mêmes 5 mots. Le plus rapide gagne.").scaledFont(19, .bold).fixedSize(horizontal: false, vertical: true)
+            }
+        }.padding(.top, 8)
+        if state.uid == nil {
+            Text("Connectez-vous à Internet pour défier vos amis.").scaledFont(15).foregroundStyle(Palette.secondary).glassPanel(radius: 22, padding: 16)
+        } else {
+            choice(symbol: "shuffle", title: "Au hasard", line: "Contre le premier joueur qui cherche aussi un duel.", id: "liveRandom") {
+                live(.random); dismiss()
+            }.padding(.top, 6)
+            choice(symbol: "person.2.fill", title: "Avec un ami", line: "Envoyez-lui un code, ou entrez celui qu’il vous a envoyé.", id: "liveFriend") {
+                page = .friend
+            }
+            openList
+            Button { Haptics.selection(); page = .later } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Défi en différé (48 h)").scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
+                        Text(state.challengeTally().label ?? "Chacun joue quand il veut, le meilleur chrono gagne.")
+                            .scaledFont(12).foregroundStyle(Palette.tertiary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.tertiary)
+                }
+                .padding(.horizontal, 16).frame(minHeight: 60).glassPanel(radius: 22, padding: 0)
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }
+            .buttonStyle(PressStyle()).padding(.top, 10)
+            .accessibilityIdentifier("laterChallenges")
+        }
+    }
+
+    @ViewBuilder private var friendPage: some View {
+        back(title: "Avec un ami")
+        choice(symbol: "paperplane.fill", title: "Envoyer un code", line: "Le duel démarre dès que votre ami le rejoint.", id: "liveLink") {
+            live(.link); dismiss()
+        }.padding(.top, 6)
+        SectionKicker(text: "J’ai reçu un code").padding(.top, 10)
+        joinBox
+    }
+
+    @ViewBuilder private var laterPage: some View {
+        back(title: "Défi en différé")
+        Text("Votre chrono démarre dès que vous lancez le défi. Votre ami a 48 h pour jouer ; chaque mot passé ajoute 20 s.")
+            .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+        if let label = state.challengeTally().label {
+            Text("Votre bilan : " + label).scaledFont(14, .semibold).foregroundStyle(Palette.duelSoft)
+        }
+        if state.uid != nil {
+            friendList
+            linkBox
+            finishedList
+        }
+    }
+
+    private func back(title: String) -> some View {
+        HStack(spacing: 10) {
+            Button { Haptics.selection(); page = .main; message = nil } label: {
+                Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.duelText)
+                    .frame(width: 40, height: 40).background(Circle().fill(Palette.duel.opacity(0.18)))
+            }
+            .buttonStyle(PressStyle()).accessibilityLabel("Retour")
+            Text(title).scaledFont(19, .bold).accessibilityAddTraits(.isHeader)
+        }.padding(.top, 8)
+    }
+
+    /// A big lilac choice: an icon, a title and one line.
+    private func choice(symbol: String, title: String, line: String, id: String, action: @escaping () -> Void) -> some View {
+        Button { Haptics.selection(); action() } label: {
+            HStack(spacing: 14) {
+                Image(systemName: symbol).font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.duelText)
+                    .frame(width: 46, height: 46).background(Circle().fill(Palette.duel.opacity(0.22)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).scaledFont(18, .bold).foregroundStyle(Palette.foreground)
+                    Text(line).scaledFont(13).foregroundStyle(Palette.duelSoft).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.tertiary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(DuelSurface(radius: 22))
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(id)
     }
 
     private var openChallenges: [Challenge] {
@@ -277,28 +404,6 @@ struct ChallengeSheet: View {
             .buttonStyle(DuelButtonStyle(height: 38)).disabled(joinCode.count != 6 || sending != nil)
         }
         .padding(.leading, 16).padding(.trailing, 10).frame(minHeight: 60).glassPanel(radius: 22, padding: 0)
-        .padding(.top, 6)
-    }
-
-    /// Duel en direct: a random opponent, or a friend with a link; both play at the same moment.
-    private var liveBox: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.duelText)
-                SectionKicker(text: "Duel en direct", color: Palette.duelText)
-            }
-            Text("Mêmes 5 mots, au même moment : vous voyez l’autre avancer. Le premier qui finit (+20 s par mot passé) gagne.")
-                .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Button { Haptics.selection(); live(.random); dismiss() } label: { Label("Au hasard", systemImage: "shuffle") }
-                    .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("liveRandom")
-                Button { Haptics.selection(); live(.link); dismiss() } label: { Label("Avec un ami", systemImage: "link") }
-                    .buttonStyle(DuelButtonStyle(height: 46)).frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("liveLink")
-            }
-        }
-        .padding(16).modifier(DuelSurface(radius: 22)).padding(.top, 6)
     }
 
     /// For someone who is not a friend yet: play first, then send the link with its code.
