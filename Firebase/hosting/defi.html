@@ -84,8 +84,14 @@
   // be an app's, the app is tried at once (not in Safari, which shows an error when the app is missing).
   const ua = navigator.userAgent;
   const inApp = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|LinkedInApp|Twitter|Pinterest|Line\/|GSA\/|KAKAOTALK/i.test(ua) || !/Safari\//.test(ua);
+  // A link tapped in a page opens the app only when it points to ANOTHER domain than the page. So on an
+  // iPhone this page moves to the project's second address (same site, firebaseapp.com), where « Ouvrir »
+  // is the real https://…web.app link: one tap opens CNSNN, even where cnsnn:// is blocked (Snapchat).
+  const home = 'cnsnn-9ctosy.web.app';
+  if (code && iPhone && location.hostname === home) location.replace('https://cnsnn-9ctosy.firebaseapp.com/d/' + code);
   if (code && iPhone) {
     const open = document.getElementById('open');
+    open.href = 'https://' + home + '/d/' + code;
     open.textContent = 'Ouvrir le défi dans CNSNN';
     open.className = 'button';
     document.getElementById('install').className = 'button ghost';
