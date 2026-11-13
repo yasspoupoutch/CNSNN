@@ -60,10 +60,11 @@ import CNSNNCore
     }
 
     func begin(state: AppState) async {
+        // Pictures only (offline): the invented duel plays on its own.
+        if ScreenshotDemo.duelActive { demo(state: state); return }
         guard let cloud = state.cloud, let uid = state.uid else { phase = .failed(CloudError.offline.errorDescription ?? ""); return }
         if state.isSuspended { phase = .failed(CloudError.suspended.errorDescription ?? ""); return }
         phase = .connecting
-        if ScreenshotDemo.duelActive { demo(state: state); return }
         do {
             switch start {
             case .link:

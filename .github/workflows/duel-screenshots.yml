@@ -254,7 +254,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          disable-animations: false
+          disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           working-directory: Android
           script: ./tools/duel-screenshots.sh ${{ runner.temp }}/shots
