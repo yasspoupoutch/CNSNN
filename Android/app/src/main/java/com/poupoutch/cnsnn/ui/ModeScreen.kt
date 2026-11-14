@@ -370,16 +370,27 @@ private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
 @Composable
 private fun ClueText(card: Card) {
     val reduce = rememberReduceMotion()
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedContent(card, transitionSpec = {
-            if (reduce) fadeIn() togetherWith fadeOut() else (fadeIn(tween(220)) + slideInVertically { it / 8 }) togetherWith fadeOut(tween(120))
-        }, contentKey = { it.id }, label = "card") { shown ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val consonants = shown.wordNoVowels
-                Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 84), letterSpacing = 3.sp, maxLines = 1,
-                    modifier = Modifier.padding(top = 18.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
-                Text("${shown.category.label} · ${shown.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
-                Text("« ${shown.hint} »", style = Type.serifItalic(22), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp, start = 10.dp, end = 10.dp))
+    // The whole clue shows without scrolling, even on a small phone (Galaxy S9): the hint keeps its
+    // room and the consonants take what is left, smaller if need be.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val available = maxHeight
+        val tight = available < 260.dp
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+            AnimatedContent(card, transitionSpec = {
+                if (reduce) fadeIn() togetherWith fadeOut() else (fadeIn(tween(220)) + slideInVertically { it / 8 }) togetherWith fadeOut(tween(120))
+            }, contentKey = { it.id }, label = "card") { shown ->
+                var content by remember { mutableIntStateOf(0) }
+                var letters by remember { mutableIntStateOf(0) }
+                Column(Modifier.onSizeChanged { content = it.height }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    val consonants = shown.wordNoVowels
+                    val base = if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 84
+                    Text(consonants, style = Type.serif(fitConsonants(base, available, if (content == 0 || letters == 0) 0 else content - letters)), letterSpacing = 3.sp, maxLines = 1,
+                        modifier = Modifier.padding(top = if (tight) 8.dp else 18.dp).onSizeChanged { letters = it.height }
+                            .semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
+                    Text("${shown.category.label} · ${shown.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))
+                    Text("« ${shown.hint} »", style = Type.serifItalic(if (tight) 20 else 22), textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = if (tight) 8.dp else 14.dp, start = 10.dp, end = 10.dp))
+                }
             }
         }
     }

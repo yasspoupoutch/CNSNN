@@ -7,9 +7,9 @@ on:
   push:
     branches: ['claude/**']
     paths: ['.github/workflows/android-small-screen.yml', 'Android/tools/small-screen.sh', 'Android/app/src/androidTest/java/com/poupoutch/cnsnn/SmallScreenTest.kt',
-      'Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt']
+      'Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/GameScreen.kt']
   pull_request:
-    paths: ['Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt']
+    paths: ['Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/GameScreen.kt']
   workflow_dispatch:
 
 permissions:

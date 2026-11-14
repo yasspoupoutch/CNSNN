@@ -138,6 +138,62 @@ class SmallScreenTest {
             rule.onNodeWithText(next).performClick()
         }
         waitFor("Partie terminée")
+        rule.onNodeWithText("Accueil").performClick()
+        waitFor("Bonjour,")
+
+        // Sprint and Survie: the consonants, the theme and the whole hint above the answer, card after card.
+        store.clearRun(PlayMode.SPRINT)
+        rule.onNodeWithText("Sprint").performScrollTo().performClick()
+        waitFor("90 secondes")
+        repeat(8) { index ->
+            checkHint("Sprint, carte ${index + 1}")
+            if (index == 0) shot("07-sprint")
+            rule.onNodeWithText("Passer · −5 s").performClick()
+            Thread.sleep(400)
+        }
+        rule.onNodeWithContentDescription("Quitter").performClick()
+        rule.onNodeWithText("Arrêter").performClick()
+        waitFor("Accueil")
+        rule.onNodeWithText("Accueil").performClick()
+        waitFor("Bonjour,")
+
+        store.clearRun(PlayMode.SURVIVAL)
+        rule.onNodeWithText("Survie").performScrollTo().performClick()
+        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("3 vies sur 3")).fetchSemanticsNodes().isNotEmpty() }
+        repeat(3) { index ->
+            checkHint("Survie, carte ${index + 1}")
+            if (index == 0) shot("08-survie")
+            rule.onNodeWithText("Passer · −1 vie").performClick()
+            Thread.sleep(400)
+        }
+        waitFor("Accueil")
+        rule.onNodeWithText("Accueil").performClick()
+        waitFor("Bonjour,")
+
+        // Classique with both hints shown.
+        rule.onNodeWithText("Classique").performScrollTo().performClick()
+        waitFor("Lancer une partie")
+        rule.onNodeWithText("Lancer une partie").performClick()
+        waitFor("votre réponse")
+        rule.onNodeWithText("Indice").performClick()
+        rule.waitForIdle()
+        if (has("Indice 2")) rule.onNodeWithText("Indice 2").performClick()
+        rule.waitUntil(5_000) { has("« ", substring = true) }
+        Thread.sleep(800)
+        checkHint("Classique, indices révélés")
+        shot("09-classique-indice")
+    }
+
+    /** The hint sentence (« … ») and the consonants sit above the answer line, with no scrolling. */
+    private fun checkHint(where: String) {
+        rule.waitForIdle()
+        Thread.sleep(300)
+        val answer = bounds(rule.onNodeWithContentDescription("Votre réponse :", substring = true))
+        val hints = rule.onAllNodes(hasText("« ", substring = true)).fetchSemanticsNodes()
+        assertTrue("$where : pas d’indice à l’écran", hints.isNotEmpty())
+        hints.forEach { assertOnScreen("$where, indice", it.boundsInWindow, answer.top) }
+        val consonants = rule.onAllNodes(hasContentDescription("Consonnes :", substring = true)).fetchSemanticsNodes()
+        assertTrue("$where : consonnes cachées", consonants.any { it.boundsInWindow.height > 20f })
     }
 
     private fun checkClues(round: String) {
