@@ -246,7 +246,13 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     val haptics = rememberHaptics()
     val consonants = card.wordNoVowels
     // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
-    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    // On a small phone the consonants shrink so the hint and the theme fit without scrolling.
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+    val available = maxHeight
+    var content by remember { mutableIntStateOf(0) }
+    var letters by remember { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxWidth().onSizeChanged { content = it.height }, horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.tutorialTarget(TutorialTarget.BOARD), horizontalAlignment = Alignment.CenterHorizontally) {
             val demo = LocalTutorialDemo.current
             if (demo != null) {
@@ -255,8 +261,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     androidx.compose.runtime.key(demo.step, demo.hintShown) { MorphWord(demo.word, demo.from, 80) }
                 }
             } else {
-                Text(consonants, style = Type.serif(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88), letterSpacing = 3.sp, maxLines = 1,
-                    modifier = Modifier.padding(top = 28.dp).semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
+                Text(consonants, style = Type.serif(fitConsonants(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters)),
+                    letterSpacing = 3.sp, maxLines = 1,
+                    modifier = Modifier.padding(top = if (available < 300.dp) 12.dp else 28.dp).onSizeChanged { letters = it.height }.semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
             }
             Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
             AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
@@ -286,6 +293,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                     modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
             }
         }
+    }
+    }
     }
     // 30 s on the Mot du jour without a hint, then 30 s after the vowels: a small bubble points at Indice.
     var hintNudge by remember(card.id) { mutableStateOf(false) }
@@ -639,4 +648,17 @@ private fun HintNudge() {
             drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(0f, 0f); lineTo(size.width, size.height / 2); lineTo(0f, size.height); close() }, color)
         }
     }
+}
+
+/**
+ * The consonants' size on a game board: `base`, or smaller (not under 40 sp) when the rest of the board
+ * (`rest` px: hint, theme, paddings) needs the room, so nothing has to scroll on a small phone.
+ */
+@Composable
+internal fun fitConsonants(base: Int, available: androidx.compose.ui.unit.Dp, rest: Int): Int {
+    if (rest <= 0) return base
+    val density = LocalDensity.current
+    val room = available - with(density) { rest.toDp() } - 12.dp
+    // The serif line takes about 1.2 × its size (line height and font padding), times the font scale.
+    return (room.value / 1.2f / density.fontScale).toInt().coerceIn(40, base)
 }

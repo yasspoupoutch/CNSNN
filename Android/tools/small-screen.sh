@@ -9,7 +9,9 @@ adb shell wm density 480
 adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton || true
 adb shell settings put secure show_ime_with_hard_keyboard 1
 adb shell cmd uimode night yes
-sleep 5
+# A slow emulator can show "Pixel Launcher isn't responding" over the app and steal the keyboard: no such dialogs.
+adb shell settings put global hide_error_dialogs 1
+sleep 20
 # Installed and run by hand: Gradle's connected tests uninstall the app, and its files with it.
 ./gradlew --no-daemon :app:installDebug :app:installDebugAndroidTest
 adb shell am instrument -w -e class com.poupoutch.cnsnn.SmallScreenTest -e smallScreen true \
