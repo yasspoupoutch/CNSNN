@@ -1,0 +1,31 @@
+Écran : 360 × 716 dp
+Case à cocher (sans clavier) : marge 170 dp
+Bouton C’est parti (sans clavier) : marge 92 dp
+Clavier : 303 dp
+Case à cocher (clavier ouvert) : marge 90 dp
+Bouton C’est parti (clavier ouvert) : marge 12 dp
+Champ pseudo (clavier ouvert) : marge 206 dp
+Manche 1, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 1, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 1, un mot trouvé, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 1, un mot trouvé, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 2, indice 1 au-dessus de la réponse : marge 119 dp
+Manche 2, indice 2 au-dessus de la réponse : marge 16 dp
+Manche 3, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 3, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 4, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 4, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 5, indice 1 au-dessus de la réponse : marge 98 dp
+Manche 5, indice 2 au-dessus de la réponse : marge 16 dp
+Sprint, carte 1, indice : marge 12 dp
+Sprint, carte 2, indice : marge 5 dp
+Sprint, carte 3, indice : marge 12 dp
+Sprint, carte 4, indice : marge 5 dp
+Sprint, carte 5, indice : marge 5 dp
+Sprint, carte 6, indice : marge 8 dp
+Sprint, carte 7, indice : marge 8 dp
+Sprint, carte 8, indice : marge 5 dp
+Survie, carte 1, indice : marge 12 dp
+Survie, carte 2, indice : marge 5 dp
+Survie, carte 3, indice : marge 5 dp
+Classique, indices révélés, indice : marge 48 dp
