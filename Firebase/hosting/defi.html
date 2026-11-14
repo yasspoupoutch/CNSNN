@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="/style.css">
 <style>
   .code { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 6px 0 0; }
-  #snap { min-height: 100vh; min-height: 100dvh; padding: 18px 22px 28px; display: flex; flex-direction: column; text-align: center; }
+  #snap { min-height: 100vh; min-height: 100dvh; padding: 30px 22px 28px; display: flex; flex-direction: column; text-align: center; }
   #snap[hidden] { display: none; }
   #snap .arrow { align-self: flex-end; width: 120px; height: 130px; color: var(--gold); margin-right: -6px; }
   #snap .tag { margin-top: 6px; font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--gold); }
@@ -27,7 +27,9 @@
   #snap p { color: var(--muted, #a9adbd); margin: 12px 0 0; font-size: 16px; }
   #snap .or { display: flex; align-items: center; gap: 12px; margin: 34px 0 16px; color: var(--fg, #fff); font-weight: 600; font-size: 17px; }
   #snap .or::before, #snap .or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.16); }
-  #snap > .button { align-self: center; }
+  #snap .button { margin-top: 22px; }
+  #snap #noApp { margin-top: 48px; }
+  #snap .arrow[hidden] { display: none; }
   #snap .then { font-size: 15px; }
   #snap .snapcode { margin-top: auto; padding-top: 30px; }
   #snap .snapcode .code { margin: 2px 0 12px; font-size: clamp(32px, 10vw, 48px); }
@@ -37,15 +39,19 @@
 </head>
 <body>
 <div id="snap" hidden>
-  <svg class="arrow" viewBox="0 0 120 130" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg class="arrow" id="arrow" hidden viewBox="0 0 120 130" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M18 122 C 30 70, 60 40, 104 14"/><path d="M70 12 L 106 12 L 100 46"/>
   </svg>
-  <div class="tag">Vous avez CNSNN ?</div>
-  <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b>.</h1>
-  <p>Le défi s’ouvre directement dans l’appli.</p>
-  <div class="or"><span>Pas encore CNSNN ?</span></div>
-  <a class="button" href="https://apps.apple.com/app/id6823569042">Installer CNSNN, c’est gratuit</a>
-  <p class="then">Puis revenez ici et touchez de nouveau le lien du défi.</p>
+  <div id="inApp" hidden>
+    <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b>.</h1>
+    <p>Avec CNSNN, le défi s’ouvre directement dans l’appli. Sinon, vous pourrez l’installer.</p>
+  </div>
+  <div id="noApp" hidden>
+    <h1>Installez CNSNN pour relever le défi</h1>
+    <p>C’est gratuit, sur l’App Store.</p>
+    <a class="button" href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>
+    <p class="then">Puis revenez ici et touchez de nouveau le lien du défi.</p>
+  </div>
   <div class="snapcode"><div class="small">Code du défi</div><div class="code" id="snapCode"></div>
     <button class="button ghost" id="snapCopy" type="button">Copier le code</button>
     <p class="status" id="snapStatus" role="status"></p></div>
@@ -113,6 +119,13 @@
     document.querySelector('main').hidden = true;
     document.getElementById('snap').hidden = false;
     document.getElementById('snapCode').textContent = code;
+    // Snapchat, Instagram, TikTok, Facebook… name themselves in their identity (checked in Snapchat:
+    // « Snapchat/14.31 »). There: « ⋯ → Ouvrir dans le navigateur », which opens CNSNN on the link, or
+    // this page in Safari when CNSNN is missing. Elsewhere (Safari, WhatsApp…), reaching this page means
+    // CNSNN is not installed: only « Installer ».
+    const inAppBrowser = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|LinkedInApp|Pinterest|Line\/|KAKAOTALK/i.test(navigator.userAgent);
+    document.getElementById(inAppBrowser ? 'inApp' : 'noApp').hidden = false;
+    document.getElementById('arrow').toggleAttribute('hidden', !inAppBrowser);
     // ?ua shows this browser's identity (to learn whether Snapchat & co. can be told apart from Safari).
     if (location.search.includes('ua')) { const ua = document.getElementById('snapUa'); ua.textContent = navigator.userAgent; ua.hidden = false; }
     document.getElementById('snapCopy').addEventListener('click', async () => {
