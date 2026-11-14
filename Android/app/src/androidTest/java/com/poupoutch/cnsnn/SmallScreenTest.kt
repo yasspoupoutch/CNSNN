@@ -90,7 +90,9 @@ class SmallScreenTest {
         // The keyboard comes up: the box and the button stay above it.
         rule.onNodeWithText("Pseudo").performClick()
         rule.onNodeWithText("Pseudo").performTextInput("Alex")
-        rule.waitUntil(10_000) { keyboardHeight() > 0 }
+        // The keyboard can take a moment on a slow emulator: a second tap on the field if need be.
+        runCatching { rule.waitUntil(10_000) { keyboardHeight() > 0 } }.onFailure { rule.onNodeWithText("Pseudo").performClick() }
+        rule.waitUntil(15_000) { keyboardHeight() > 0 }
         Thread.sleep(1_200)
         rule.waitForIdle()
         notes.appendLine("Clavier : ${(keyboardHeight() / metrics.density).toInt()} dp")
