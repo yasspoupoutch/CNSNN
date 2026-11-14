@@ -20,13 +20,18 @@
   #snap { min-height: 100vh; min-height: 100dvh; padding: 18px 22px 28px; display: flex; flex-direction: column; text-align: center; }
   #snap[hidden] { display: none; }
   #snap .arrow { align-self: flex-end; width: 120px; height: 130px; color: var(--gold); margin-right: -6px; }
-  #snap h1 { font-size: clamp(28px, 8.5vw, 38px); line-height: 1.2; margin: 18px 0 0; }
+  #snap .tag { margin-top: 6px; font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--gold); }
+  #snap h1 { font-size: clamp(26px, 7.6vw, 34px); line-height: 1.22; margin: 8px 0 0; }
   #snap h1 b { color: var(--gold); }
   #snap .dots { display: inline-block; padding: 0 10px; border-radius: 12px; background: rgba(255,198,90,.16); color: var(--gold); letter-spacing: .08em; }
-  #snap p { color: var(--muted, #a9adbd); margin: 20px 0 0; font-size: 17px; }
-  #snap .snapcode { margin-top: 34px; }
-  #snap .snapcode .code { margin: 2px 0 12px; }
-  #snap .later { margin-top: auto; padding-top: 40px; font-size: 15px; }
+  #snap p { color: var(--muted, #a9adbd); margin: 12px 0 0; font-size: 16px; }
+  #snap .or { display: flex; align-items: center; gap: 12px; margin: 34px 0 16px; color: var(--fg, #fff); font-weight: 600; font-size: 17px; }
+  #snap .or::before, #snap .or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.16); }
+  #snap > .button { align-self: center; }
+  #snap .then { font-size: 15px; }
+  #snap .snapcode { margin-top: auto; padding-top: 30px; }
+  #snap .snapcode .code { margin: 2px 0 12px; font-size: clamp(32px, 10vw, 48px); }
+  #snap .ua { font-size: 11px; word-break: break-all; }
   .code b { color: var(--duel, #c9a7ff); font-weight: inherit; }
 </style>
 </head>
@@ -35,12 +40,16 @@
   <svg class="arrow" viewBox="0 0 120 130" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M18 122 C 30 70, 60 40, 104 14"/><path d="M70 12 L 106 12 L 100 46"/>
   </svg>
-  <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b><br>pour ouvrir le défi.</h1>
-  <p>CNSNN s’ouvrira directement sur le défi.</p>
+  <div class="tag">Vous avez CNSNN ?</div>
+  <h1>Touchez <span class="dots">⋯</span> en haut,<br>puis <b>«&nbsp;Ouvrir dans le navigateur&nbsp;»</b>.</h1>
+  <p>Le défi s’ouvre directement dans l’appli.</p>
+  <div class="or"><span>Pas encore CNSNN ?</span></div>
+  <a class="button" href="https://apps.apple.com/app/id6823569042">Installer CNSNN, c’est gratuit</a>
+  <p class="then">Puis revenez ici et touchez de nouveau le lien du défi.</p>
   <div class="snapcode"><div class="small">Code du défi</div><div class="code" id="snapCode"></div>
     <button class="button ghost" id="snapCopy" type="button">Copier le code</button>
     <p class="status" id="snapStatus" role="status"></p></div>
-  <p class="later">Pas encore l’application ? <a href="https://apps.apple.com/app/id6823569042">Installer CNSNN</a>, puis revenez toucher le lien.</p>
+  <p class="ua" id="snapUa" hidden></p>
 </div>
 <main>
 <nav><a class="mark" href="/">C<b>O</b>NS<b>O</b>NN<b>E</b></a><a href="/regles">Règles</a><a href="/confidentialite">Confidentialité</a></nav>
@@ -104,6 +113,8 @@
     document.querySelector('main').hidden = true;
     document.getElementById('snap').hidden = false;
     document.getElementById('snapCode').textContent = code;
+    // ?ua shows this browser's identity (to learn whether Snapchat & co. can be told apart from Safari).
+    if (location.search.includes('ua')) { const ua = document.getElementById('snapUa'); ua.textContent = navigator.userAgent; ua.hidden = false; }
     document.getElementById('snapCopy').addEventListener('click', async () => {
       const done = document.getElementById('snapStatus');
       try { await navigator.clipboard.writeText(code); done.className = 'status ok'; done.textContent = 'Code copié.'; }
