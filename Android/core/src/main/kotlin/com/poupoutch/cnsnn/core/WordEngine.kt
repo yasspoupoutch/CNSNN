@@ -17,6 +17,19 @@ object WordEngine {
         val present = normalize(value).filter { it in "AEIOUY" }.toSet()
         return "AEIOUY".filter { it in present }
     }
+    /** The hints after the sentence place the word's vowels one by one, in order (ŒUVRE: OVR, OEVR, OEUVR).
+     *  `letters` counts the vowels; the last one is the word itself, revealed at the end, so the steps stop
+     *  one before (same as Core/WordEngine.swift and Firebase/tools/daily.mjs placedVowels). */
+    data class Placed(val letters: Int, val steps: List<String>)
+    fun placedVowels(value: String): Placed {
+        val letters = normalize(value)
+        val total = letters.count { it in "AEIOUY" }
+        val steps = (1 until total).map { k ->
+            var seen = 0
+            letters.filter { c -> c !in "AEIOUY" || ++seen <= k }
+        }
+        return Placed(maxOf(total, 1), steps)
+    }
     /** What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
      *  with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants. */
     fun shownConsonants(value: String): String {

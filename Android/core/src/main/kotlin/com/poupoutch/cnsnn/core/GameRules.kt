@@ -16,6 +16,11 @@ object DailyScore {
     const val HINT_PENALTY_MS = 60_000
     /** The vowels alone. */
     const val VOWELS_PENALTY_MS = 30_000
+    /** Each vowel placed in the word after the sentence (Mot du jour). */
+    const val LETTER_PENALTY_MS = 30_000
+    /** A word revealed by the last hint: after every found word, before the lost ones (rules' `revealedRank`). */
+    const val REVEALED_FROM = 600_001
+    const val REVEALED_TO = 999_998
     const val MISSED_MS = 600_000
     /** Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts. */
     const val EPOCH_OFFSET = 19_723
@@ -25,20 +30,22 @@ object DailyScore {
     /** A lost day sorts after every found one. */
     const val LOST_RANK = 999_999
 
-    fun penaltyMs(usedHint: Boolean, usedVowels: Boolean): Int =
-        if (usedHint) HINT_PENALTY_MS else if (usedVowels) VOWELS_PENALTY_MS else 0
-    fun scoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false): Int =
-        if (correct) minOf(timeMs + penaltyMs(usedHint, usedVowels), MISSED_MS) else MISSED_MS
+    fun penaltyMs(usedHint: Boolean, usedVowels: Boolean, letters: Int = 0): Int =
+        (if (usedHint) HINT_PENALTY_MS else if (usedVowels) VOWELS_PENALTY_MS else 0) + letters * LETTER_PENALTY_MS
+    fun scoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false, letters: Int = 0): Int =
+        if (correct) minOf(timeMs + penaltyMs(usedHint, usedVowels, letters), MISSED_MS) else MISSED_MS
     /** Rattrapage: a missed day played later counts in the week with 5 minutes more (firestore.rules `catchUpScore`). */
     const val CATCH_UP_PENALTY_MS = 300_000
-    fun catchUpScoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false): Int =
-        if (correct) minOf(scoreMs(timeMs, usedHint, true, usedVowels) + CATCH_UP_PENALTY_MS, MISSED_MS) else MISSED_MS
+    fun catchUpScoreMs(timeMs: Int, usedHint: Boolean, correct: Boolean, usedVowels: Boolean = false, letters: Int = 0): Int =
+        if (correct) minOf(scoreMs(timeMs, usedHint, true, usedVowels, letters) + CATCH_UP_PENALTY_MS, MISSED_MS) else MISSED_MS
     /** Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`. */
     fun dayIndex(day: String): Long? = DailySchedule.dayNumber(day)?.let { it.toLong() + EPOCH_OFFSET }
     /** The first rank of a day: every result of that day sorts between base and base + 999 999. */
     fun dayBase(day: String): Long? = dayIndex(day)?.let { it * DAY_SPAN }
     /** One number per result that sorts the day's results: the day first, then the score (lost last). */
     fun rank(day: String, scoreMs: Int, correct: Boolean): Long? = dayBase(day)?.let { it + if (correct) scoreMs else LOST_RANK }
+    /** A word revealed by the last hint: after every found word, the fastest first. */
+    fun revealedRank(day: String, timeMs: Int): Long? = dayBase(day)?.let { it + REVEALED_FROM + minOf(timeMs, REVEALED_TO - REVEALED_FROM) }
     /** year * 12 + month - 1. */
     fun monthIndex(day: String): Int? {
         val parts = day.split("-").mapNotNull { it.toIntOrNull() }

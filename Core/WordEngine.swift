@@ -17,6 +17,21 @@ public enum WordEngine {
         let present = Set(normalize(value).filter { "AEIOUY".contains($0) })
         return String("AEIOUY".filter(present.contains))
     }
+    /// The hints after the sentence place the word's vowels one by one, in order (ŒUVRE: OVR, OEVR, OEUVR).
+    /// `letters` counts the vowels; the last one is the word itself, revealed at the end, so the steps
+    /// stop one before (same as Firebase/tools/daily.mjs placedVowels).
+    public static func placedVowels(_ value: String) -> (letters: Int, steps: [String]) {
+        let letters = Array(normalize(value))
+        let total = letters.filter { "AEIOUY".contains($0) }.count
+        let steps = total < 2 ? [] : (1..<total).map { k -> String in
+            var seen = 0
+            return String(letters.filter { c in
+                guard "AEIOUY".contains(c) else { return true }
+                seen += 1; return seen <= k
+            })
+        }
+        return (max(total, 1), steps)
+    }
     /// What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
     /// with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants.
     public static func shownConsonants(_ value: String) -> String {

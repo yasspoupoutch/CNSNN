@@ -314,6 +314,66 @@ test('vowels hint: opens only for the player who took it, costs 30 s, cannot be 
  await assertFails(publish('bob',{...b,usedVowels:true}));
  await assertSucceeds(publish('bob',b));
 });
+test('placed vowels: one by one after the sentence, 30 s each, the last reveals the word after the finders',async()=>{
+ await signUp(); await signUp('bob','Bob');
+ const day=parisKey();
+ await seed(`dailyVowels/${day}`,{vowels:'AO',letters:3});
+ await seed(`dailyLetters/${day}_1`,{shown:'CHOCLT'});
+ await seed(`dailyLetters/${day}_2`,{shown:'CHOCOLT'});
+ await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un carré gourmand.',category:'Général',difficulty:'Facile'});
+ const db=user();
+ await startDaily();
+ const ref=doc(db,`dailySessions/alice_${day}`);
+ await assertFails(getDoc(doc(db,`dailyLetters/${day}_1`)));
+ // Not before the sentence, one at a time, never back.
+ await assertFails(updateDoc(ref,{lettersUsed:1}));
+ await assertSucceeds(updateDoc(ref,{vowelsUsed:true}));
+ await assertSucceeds(updateDoc(ref,{hintUsed:true}));
+ await assertFails(updateDoc(ref,{lettersUsed:2}));
+ // Not revealed yet: one vowel still to place.
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0,revealed:true}));
+ await assertSucceeds(updateDoc(ref,{lettersUsed:1}));
+ await assertSucceeds(getDoc(doc(db,`dailyLetters/${day}_1`)));
+ await assertFails(getDoc(doc(db,`dailyLetters/${day}_2`)));
+ await assertFails(getDoc(doc(user('bob'),`dailyLetters/${day}_1`)));
+ await assertFails(getDocs(collection(db,'dailyLetters')));
+ await assertSucceeds(updateDoc(ref,{lettersUsed:2}));
+ await assertSucceeds(getDoc(doc(db,`dailyLetters/${day}_2`)));
+ // The last vowel is the word: no third step, it is revealed by finishing.
+ await assertFails(updateDoc(ref,{lettersUsed:3}));
+ await assertFails(updateDoc(ref,{finishedAt:serverTimestamp(),correct:true,wrongAnswers:0,revealed:true}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0,revealed:true}));
+ await assertSucceeds(getDoc(doc(db,`dailySecrets/${day}`)));
+ const r=await resultFor('alice',day,{usedVowels:true});
+ const revealedRank=dayIndex(day)*1000000+600001+Math.min(r.timeMs,399997);
+ const shown={...r,usedLetters:2,revealed:true,scoreMs:600000,rank:revealedRank};
+ // Hiding the reveal (ranked as lost) or the letters fails.
+ await assertFails(publish('alice',{...r,usedLetters:2}));
+ await assertFails(publish('alice',{...shown,usedLetters:0}));
+ await assertFails(publish('alice',{...shown,rank:dailyRank(day,600000,false)}));
+ await assertSucceeds(publish('alice',shown));
+ // Bob finds the word after one placed vowel: 30 s each for the vowels, the sentence and the letter.
+ await startDaily('bob');
+ const bobRef=doc(user('bob'),`dailySessions/bob_${day}`);
+ await assertSucceeds(updateDoc(bobRef,{vowelsUsed:true}));
+ await assertSucceeds(updateDoc(bobRef,{hintUsed:true}));
+ await assertSucceeds(updateDoc(bobRef,{lettersUsed:1}));
+ await finishDaily('bob');
+ const b=await resultFor('bob',day,{usedVowels:true,usedLetters:1});
+ const bobScore=Math.min(b.timeMs+90000,600000);
+ await assertFails(publish('bob',{...b,scoreMs:Math.min(b.timeMs+60000,600000),rank:dailyRank(day,Math.min(b.timeMs+60000,600000),true)}));
+ await assertSucceeds(publish('bob',{...b,scoreMs:bobScore,rank:dailyRank(day,bobScore,true)}));
+ assert.ok(dailyRank(day,bobScore,true)<revealedRank&&revealedRank<dailyRank(day,600000,false));
+});
+test('a day published before the placed vowels: the word is revealed right after the sentence',async()=>{
+ await signUp(); const day=parisKey();
+ await seed(`dailyVowels/${day}`,{vowels:'AO'});
+ await startDaily();
+ const ref=doc(user(),`dailySessions/alice_${day}`);
+ await assertSucceeds(updateDoc(ref,{hintUsed:true}));
+ await assertFails(updateDoc(ref,{lettersUsed:1}));
+ await assertSucceeds(updateDoc(ref,{finishedAt:serverTimestamp(),correct:false,wrongAnswers:0,revealed:true}));
+});
 test('giving up on a secret daily word needs no answer',async()=>{
  await signUp(); const day=parisKey();
  await seed(`dailySecrets/${day}`,{answer:'CHOCOLAT',word:'Chocolat',hint:'Un carré gourmand.',category:'Général',difficulty:'Facile'});

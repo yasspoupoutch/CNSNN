@@ -314,7 +314,9 @@ private fun Leaderboard(state: AppViewModel, refreshToken: Int) {
     val rows = when (board) {
         // The official time: a hint adds a minute.
         // A day's result keeps the pseudo of when it was played: the current one when known.
-        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(it.scoreMs), Mistakes.text(it.wrongAnswers) + hintDetail(it.usedHint, it.usedVowels)) } }
+        // A word revealed by the last hint comes after every found one, with its own time.
+        Board.TODAY -> state.currentNames.let { names -> today.map { Line(it.uid, names[it.uid] ?: it.username, Format.clock(if (it.revealed) it.timeMs else it.scoreMs),
+            if (it.revealed) "mot révélé" else Mistakes.text(it.wrongAnswers) + hintDetail(it.usedHint, it.usedVowels, it.usedLetters)) } }
         // The most words found this week first, then the lowest total time.
         Board.WEEK -> players.map { p -> val week = p.thisWeek() ?: DailyScore.Week(); Line(p.uid, p.username, Format.clock(week.timeMs), weekDays(week) + " trouvés") }
         Board.SPRINT -> state.rankings.sprint.mapIndexed { index, it -> Line(it.uid, it.username, words(it.best), crown = index == 0) }
@@ -575,10 +577,9 @@ private fun rememberResumeCount(): Int {
     return count
 }
 
-/** The hints a player took on the day: vowels 30 s, sentence 30 s more (a minute alone for older versions). */
-fun hintDetail(usedHint: Boolean, usedVowels: Boolean): String = when {
-    usedHint && usedVowels -> " · indices +1 min"
-    usedHint -> " · indice +1 min"
-    usedVowels -> " · voyelles +30 s"
-    else -> ""
+/** The hints a player took on the day: vowels 30 s, sentence 30 s more (a minute alone for older versions), each placed vowel 30 s. */
+fun hintDetail(usedHint: Boolean, usedVowels: Boolean, letters: Int = 0): String {
+    val ms = DailyScore.penaltyMs(usedHint, usedVowels, letters)
+    if (ms == 0) return ""
+    return (if (letters > 0 || (usedHint && usedVowels)) " · indices " else if (usedHint) " · indice " else " · voyelles ") + hintCost(ms)
 }

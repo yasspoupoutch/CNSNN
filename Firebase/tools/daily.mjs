@@ -36,6 +36,18 @@ export function normalize(value) {
 export const consonants = (value) => normalize(value).replace(/[AEIOUY]/g, '');
 // Same as Core/WordEngine.swift vowels: each vowel of the word once, in alphabetical order (first hint).
 export const vowels = (value) => [...'AEIOUY'].filter((v) => normalize(value).includes(v)).join('');
+// Same as Core/WordEngine.swift placedVowels: the hints after the sentence place the word's vowels one
+// by one, in order (ŒUVRE: OVR, OEVR, OEUVR). The last one is the word itself, revealed at the end.
+export function placedVowels(value) {
+  const letters = [...normalize(value)];
+  const total = letters.filter((c) => 'AEIOUY'.includes(c)).length;
+  const steps = [];
+  for (let k = 1; k < total; k++) {
+    let seen = 0;
+    steps.push(letters.filter((c) => !'AEIOUY'.includes(c) || ++seen <= k).join(''));
+  }
+  return { letters: Math.max(total, 1), steps };
+}
 
 // Same table as Core/GameRules.swift DailySchedule.difficulty and firestore.rules dailyBase.
 export function difficultyOf(day) {
@@ -179,10 +191,16 @@ async function firestore() {
   initializeApp({ credential: applicationDefault(), projectId });
   return getFirestore();
 }
+// The vowels lit on the keyboard, how many vowels the word places, and the word with its first k placed.
+function publishVowels(batch, db, day, word) {
+  const placed = placedVowels(word);
+  batch.set(db.doc(`dailyVowels/${day}`), { vowels: vowels(word), letters: placed.letters });
+  placed.steps.forEach((shown, i) => batch.set(db.doc(`dailyLetters/${day}_${i + 1}`), { shown }));
+}
 function publish(batch, db, d) {
   batch.set(db.doc(`dailyPuzzles/${d.day}`), { consonants: consonants(d.word), category: d.category, difficulty: d.difficulty });
   batch.set(db.doc(`dailyHints/${d.day}`), { hint: d.hint });
-  batch.set(db.doc(`dailyVowels/${d.day}`), { vowels: vowels(d.word) });
+  publishVowels(batch, db, d.day, d.word);
   batch.set(db.doc(`dailySecrets/${d.day}`), { answer: normalize(d.word), word: d.word, hint: d.hint, category: d.category, difficulty: d.difficulty });
 }
 
@@ -208,19 +226,19 @@ async function seed(dry) {
   const pools = Object.values(difficulties).map((level) => `${words.filter((w) => w.difficulty === level).length} ${level.toLowerCase()}s`).join(', ');
   console.log(`${files.length} liste(s), ${words.length} mots gardés : ${pools} (${skipped} doublon(s), ${all.length - single.length} expression(s) de plusieurs mots, ${football} mot(s) de football et ${single.length - football - words.length} mot(s) retiré(s) écartés), ${played.size} déjà joués.`);
   console.log(`${days.length} jours à publier, du ${days[0]?.day} au ${days.at(-1)?.day}, dont ${repeats} mot(s) déjà joué(s).`);
-  // The vowels hint came later: today and the past days (still caught up this week) get theirs from
+  // The vowel hints came later: today and the past days (still caught up this week) get theirs from
   // their secret, without touching anything else of a day someone may be playing.
   const missing = past.docs.filter((d) => typeof d.get('word') === 'string');
-  console.log(`${missing.length} jour(s) déjà publiés reçoivent leurs voyelles.`);
+  console.log(`${missing.length} jour(s) déjà publiés reçoivent leurs voyelles et leurs lettres placées.`);
   if (dry) return;
-  for (let i = 0; i < missing.length; i += 400) {
+  for (let i = 0; i < missing.length; i += 100) {
     const batch = db.batch();
-    for (const d of missing.slice(i, i + 400)) batch.set(db.doc(`dailyVowels/${d.id}`), { vowels: vowels(d.get('word')) });
+    for (const d of missing.slice(i, i + 100)) publishVowels(batch, db, d.id, d.get('word'));
     await batch.commit();
   }
-  for (let i = 0; i < days.length; i += 150) {
+  for (let i = 0; i < days.length; i += 50) {
     const batch = db.batch();
-    for (const d of days.slice(i, i + 150)) publish(batch, db, d);
+    for (const d of days.slice(i, i + 50)) publish(batch, db, d);
     await batch.commit();
   }
   console.log('Mots du jour publiés.');

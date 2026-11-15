@@ -61,13 +61,19 @@ data class SprintRecord(val uid: String, val username: String, val best: Int)
 data class DayUsage(val day: String, val counts: Map<String, Int>)
 /** One line of the day's ranking. `scoreMs` is the official time: the hint minute included, 10 min for a lost day. */
 data class DailyRank(val uid: String, val username: String, val timeMs: Int, val scoreMs: Int, val usedHint: Boolean, val wrongAnswers: Int, val correct: Boolean = true,
-                     val usedVowels: Boolean = false)
+                     val usedVowels: Boolean = false,
+                     /** Vowels placed in the word after the sentence (30 s each). */
+                     val usedLetters: Int = 0,
+                     /** The last hint revealed the word: ranked after every found word, on its time. */
+                     val revealed: Boolean = false)
 /** Server state of today's Mot du jour for the signed-in player. */
 data class DailySession(val day: String, val cardId: String, val startedAt: Instant, val hintUsed: Boolean, val finished: Boolean,
                         /** Guesses the server has counted, and the last one (normalized). */
                         val guesses: Int = 0, val guess: String? = null,
                         /** First hint: the word's vowels lit on the keyboard. */
-                        val vowelsUsed: Boolean = false)
+                        val vowelsUsed: Boolean = false,
+                        /** Vowels placed in the word (hints after the sentence). */
+                        val lettersUsed: Int = 0)
 
 /**
  * Everything the app reads and writes on Firebase. The documents and fields are exactly those of
@@ -280,7 +286,7 @@ class CloudRepository(
         val cardId = d.getString("cardId") ?: return null
         val started = d.getTimestamp("startedAt") ?: return null
         return DailySession(day, cardId, started.toInstant(), d.getBoolean("hintUsed") ?: false, d.contains("finishedAt"),
-            (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"), d.getBoolean("vowelsUsed") ?: false)
+            (d.getLong("guesses") ?: 0).toInt(), d.getString("guess"), d.getBoolean("vowelsUsed") ?: false, (d.getLong("lettersUsed") ?: 0).toInt())
     }
     /**
      * Starts today's clock on the server. Returns only once the server has recorded the start.
@@ -300,6 +306,16 @@ class CloudRepository(
     suspend fun revealSecretVowels(uid: String, day: String): String? {
         if (!awaitWrite(sessionRef(uid, day).update("vowelsUsed", true))) return null
         return dailyVowels(day) ?: ""
+    }
+    /** How many vowels the hints after the sentence place (the last one reveals the word): 1 for a day published before them. */
+    suspend fun dailyLetterCount(day: String): Int =
+        db.collection("dailyVowels").document(day).get().await().getLong("letters")?.toInt() ?: 1
+    /** The word with its first [k] vowels placed (the rules open it once the session counts k). */
+    suspend fun dailyLetters(day: String, k: Int): String? = db.collection("dailyLetters").document("${day}_$k").get().await().getString("shown")
+    /** Records the k-th placed vowel on the server first, then reads the word with it. */
+    suspend fun revealSecretLetter(uid: String, day: String, k: Int): String? {
+        if (!awaitWrite(sessionRef(uid, day).update("lettersUsed", k))) return null
+        return dailyLetters(day, k)
     }
     /** Records the hint on the server first, since the rules open the hint only after that. */
     suspend fun revealSecretHint(uid: String, day: String): String? {
@@ -342,9 +358,11 @@ class CloudRepository(
      * stays queued. A win names the last registered guess (`answer`, normalized) with
      * `wrongAnswers` = guesses - 1; a loss has no answer and `wrongAnswers` = guesses. Anything else is refused.
      */
-    suspend fun finishDaily(uid: String, day: String, correct: Boolean, wrongAnswers: Int, answer: String? = null): Boolean {
+    suspend fun finishDaily(uid: String, day: String, correct: Boolean, wrongAnswers: Int, answer: String? = null, revealed: Boolean = false): Boolean {
         val data = mutableMapOf<String, Any>("finishedAt" to FieldValue.serverTimestamp(), "correct" to correct, "wrongAnswers" to wrongAnswers)
         if (answer != null) data["answer"] = answer
+        // The last hint showed the word (after the sentence and every other placed vowel).
+        if (revealed) data["revealed"] = true
         return awaitWrite(sessionRef(uid, day).update(data))
     }
     suspend fun dailyResult(uid: String, day: String): Pair<Attempt, Int>? {
@@ -364,12 +382,15 @@ class CloudRepository(
         val correct = s.getBoolean("correct") ?: false
         val usedHint = s.getBoolean("hintUsed") ?: false
         val usedVowels = s.getBoolean("vowelsUsed") ?: false
+        val letters = (s.getLong("lettersUsed") ?: 0).toInt()
+        val revealed = s.getBoolean("revealed") == true
         val wrong = (s.getLong("wrongAnswers") ?: 0).toInt()
         val timeMs = (millis(finished) - millis(started)).toInt()
         // A caught-up day counts with 5 minutes more, and stays out of the day's ranking (rank 0).
         val catchUp = s.getBoolean("catchUp") == true
-        val scoreMs = if (catchUp) DailyScore.catchUpScoreMs(timeMs, usedHint, correct, usedVowels) else DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels)
-        val rank = if (catchUp) 0 else DailyScore.rank(day, scoreMs, correct) ?: return null
+        val scoreMs = if (catchUp) DailyScore.catchUpScoreMs(timeMs, usedHint, correct, usedVowels, letters) else DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels, letters)
+        // A word revealed by the last hint ranks after every found word, by time.
+        val rank = if (catchUp) 0 else (if (revealed) DailyScore.revealedRank(day, timeMs) else DailyScore.rank(day, scoreMs, correct)) ?: return null
         val username = db.collection("users").document(uid).get(Source.SERVER).await().getString("username") ?: "Joueur"
         val old = leaderboardEntry(uid, Source.SERVER)
         // The whole line is replaced: an old `points` field goes, as the rules require.
@@ -378,7 +399,9 @@ class CloudRepository(
             "wrongAnswers" to wrong, "timeMs" to timeMs, "scoreMs" to scoreMs, "rank" to rank, "startedAt" to started, "finishedAt" to finished) +
             (if (catchUp) mapOf("catchUp" to true) else emptyMap()) +
             // Older versions write no usedVowels: the rules read absent as not used.
-            (if (usedVowels) mapOf("usedVowels" to true) else emptyMap())
+            (if (usedVowels) mapOf("usedVowels" to true) else emptyMap()) +
+            (if (letters > 0) mapOf("usedLetters" to letters) else emptyMap()) +
+            (if (revealed) mapOf("revealed" to true) else emptyMap())
         val batch = db.batch()
         batch.set(resultRef(uid, day), result)
         batch.set(db.collection("leaderboard").document(uid), tally)
@@ -449,10 +472,10 @@ class CloudRepository(
     /** A few more than needed, so the list stays full once suspended players are left out. */
     private suspend fun visible(query: Query, limit: Int): List<DocumentSnapshot> =
         query.limit(limit + 10L).get().await().documents.filter { it.getBoolean("suspended") != true }.take(limit)
-    /** Today's found words, fastest first (the hint minute included): one range on the single-field `rank`. */
+    /** Today's found words, fastest first (the hints included), then the words revealed by the last hint: one range on the single-field `rank`. */
     suspend fun dailyRanking(day: String, limit: Int = 25): List<DailyRank> {
         val base = DailyScore.dayBase(day) ?: return emptyList()
-        return visible(db.collection("dailyResults").whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.MISSED_MS)
+        return visible(db.collection("dailyResults").whereGreaterThanOrEqualTo("rank", base).whereLessThanOrEqualTo("rank", base + DailyScore.REVEALED_TO)
             .orderBy("rank"), limit).mapNotNull { dailyRank(it) }
     }
     private fun dailyRank(d: DocumentSnapshot): DailyRank? {
@@ -461,8 +484,10 @@ class CloudRepository(
         val usedHint = d.getBoolean("usedHint") ?: false
         val correct = d.getBoolean("correct") ?: false
         val usedVowels = d.getBoolean("usedVowels") ?: false
-        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels)
-        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct, usedVowels)
+        val letters = (d.getLong("usedLetters") ?: 0).toInt()
+        val scoreMs = d.getLong("scoreMs")?.toInt() ?: DailyScore.scoreMs(timeMs, usedHint, correct, usedVowels, letters)
+        return DailyRank(uid, d.getString("username") ?: "Joueur", timeMs, scoreMs, usedHint, (d.getLong("wrongAnswers") ?: 0).toInt(), correct, usedVowels,
+            letters, d.getBoolean("revealed") ?: false)
     }
     /**
      * "3e sur 4 aujourd'hui": my rank and the count among the players who found the word, like the day's

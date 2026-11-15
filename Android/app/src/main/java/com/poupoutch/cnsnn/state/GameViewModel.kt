@@ -47,8 +47,24 @@ class GameViewModel : ViewModel() {
     var usedVowels by mutableStateOf(false); private set
     /** The vowels lit on the keyboard (WordEngine.vowels), once the first hint is taken. */
     var vowels by mutableStateOf<String?>(null); private set
-    /** 0, 1 or 2 hints taken. */
-    val hintsTaken: Int get() = if (usedHint) 2 else if (usedVowels) 1 else 0
+    /** Mot du jour, after the sentence: the vowels placed in the word one by one (30 s each). */
+    var lettersUsed by mutableStateOf(0); private set
+    /** How many vowels a secret word places (the last one reveals it), null until known. */
+    private var letterCount by mutableStateOf<Int?>(null)
+    /** The word with its placed vowels ("OEVR"), shown on the board instead of the consonants. */
+    var placed by mutableStateOf<String?>(null); private set
+    /** The last hint revealed the word: the game ends, ranked after every found word. */
+    var revealedWord by mutableStateOf(false); private set
+    /** 0, 1, 2 hints taken, then one more for each placed vowel. */
+    val hintsTaken: Int get() = if (usedHint) 2 + lettersUsed else if (usedVowels) 1 else 0
+    /** Only the Mot du jour places vowels after the sentence. */
+    private val placesLetters: Boolean get() = mode == GameMode.DAILY && dailyKey != null
+    /** A secret word's count comes from the server; otherwise the word is known here. */
+    private val lettersToPlace: Int? get() = if (secret) letterCount else card?.wordFull?.takeIf { it.isNotEmpty() }?.let { WordEngine.placedVowels(it).letters }
+    /** The next hint shows the whole word and ends the game. */
+    val nextRevealsWord: Boolean get() = usedHint && placesLetters && lettersUsed + 1 >= (lettersToPlace ?: Int.MAX_VALUE)
+    /** Another hint can still be taken. */
+    val hintAvailable: Boolean get() = result == null && (!usedHint || (placesLetters && lettersToPlace != null))
     var result by mutableStateOf<Attempt?>(null); private set
     var wrongAnswers by mutableStateOf(0); private set
     val wrongGuesses = mutableStateListOf<String>()
@@ -95,6 +111,7 @@ class GameViewModel : ViewModel() {
 
     private fun load(state: AppViewModel) {
         answer = ""; feedback = null; result = null; usedHint = false; usedVowels = false; vowels = null; wrongAnswers = 0; wrongGuesses.clear()
+        lettersUsed = 0; letterCount = null; placed = null; revealedWord = false
         started = SystemClock.elapsedRealtime(); elapsedBeforePause = 0; paused = false; dailyKey = null; dailyStart = null; lastGuess = null
         ranked = false; pendingOfficial = false; standing = null; phase = Phase.Playing; checking = false; notice = null; finishedHere = false
         val catchUp = catchUpDay
@@ -143,6 +160,11 @@ class GameViewModel : ViewModel() {
                     // Taken before leaving: lit again (a secret word's vowels come back from the server).
                     vowels = if (secret) runCatching { cloud.dailyVowels(key) }.getOrNull() else card?.let { WordEngine.vowels(it.wordFull) }
                 }
+                if (session.hintUsed) {
+                    // The vowels already placed come back too.
+                    lettersUsed = session.lettersUsed
+                    loadLetters(cloud, key)
+                }
                 dailyStart = session.startedAt
                 // Every guess counted so far was wrong (a right one ends the game).
                 wrongAnswers = session.guesses; lastGuess = session.guess
@@ -179,14 +201,66 @@ class GameViewModel : ViewModel() {
 
     val secret: Boolean get() = card?.id?.let { SecretDaily.day(it) } != null
     /** The Mot du jour's official time: the vowels add 30 s, the sentence a minute in all, a lost day counts ten. */
-    fun officialMs(attempt: Attempt): Int = DailyScore.scoreMs(attempt.timeMs, usedHint, attempt.correct, usedVowels)
+    fun officialMs(attempt: Attempt): Int = DailyScore.scoreMs(attempt.timeMs, usedHint, attempt.correct, usedVowels, lettersUsed)
 
     /**
      * Indice: first the vowels, then the sentence. A player of an older version who took the sentence
      * alone already paid the full minute, so the vowels come with it for free.
      */
     fun revealHint(state: AppViewModel) {
-        if (usedVowels || usedHint) revealSentence(state) else revealVowels(state)
+        if (!usedHint) { if (usedVowels) revealSentence(state) else revealVowels(state); return }
+        if (!placesLetters) return
+        if (lettersUsed + 1 < (lettersToPlace ?: 1)) placeLetter(state) else revealWord(state)
+    }
+
+    /** Reads how many vowels the word places and the word as already placed (after the sentence). */
+    private suspend fun loadLetters(cloud: CloudRepository, day: String) {
+        val known = card?.wordFull?.takeIf { it.isNotEmpty() && !secret }
+        if (known != null) {
+            val local = WordEngine.placedVowels(known)
+            placed = local.steps.getOrNull(lettersUsed - 1)
+            return
+        }
+        letterCount = runCatching { cloud.dailyLetterCount(day) }.getOrNull()
+        if (lettersUsed > 0) placed = runCatching { cloud.dailyLetters(day, lettersUsed) }.getOrNull()
+    }
+    /** One more vowel in its place in the word (30 s). */
+    private fun placeLetter(state: AppViewModel) {
+        if (checking || result != null) return
+        val uid = state.uid; val day = dailyKey ?: return
+        val k = lettersUsed + 1
+        if (!secret) {
+            val steps = card?.wordFull?.let { WordEngine.placedVowels(it).steps } ?: return
+            placed = steps.getOrNull(k - 1) ?: return; lettersUsed = k
+            if (ranked && uid != null) viewModelScope.launch { runCatching { state.cloud.revealSecretLetter(uid, day, k) } }
+            return
+        }
+        if (uid == null) return
+        // The server opens the word with this vowel only once it has recorded the hint.
+        checking = true; notice = null
+        viewModelScope.launch {
+            try {
+                val shown = state.cloud.revealSecretLetter(uid, day, k)
+                if (shown == null) { notice = CloudError.Kind.OFFLINE.message; return@launch }
+                lettersUsed = k; placed = shown
+            } catch (e: Exception) { state.note(e); notice = CloudError.message(e) } finally { checking = false }
+        }
+    }
+    /** The last hint: the word is shown and the game ends, ranked after every found word. */
+    private fun revealWord(state: AppViewModel) {
+        if (checking || result != null) return
+        revealedWord = true; finishedHere = true
+        val uid = state.uid; val day = dailyKey
+        if (!secret || uid == null || day == null) { finish(false, state); return }
+        checking = true; notice = null
+        viewModelScope.launch {
+            try {
+                val ok = runCatching { recordLoss(state.cloud, uid, day) }.getOrDefault(false)
+                if (!ok) { revealedWord = false; notice = CloudError.Kind.OFFLINE.message; return@launch }
+                reveal(state, day)
+                finish(false, state, alreadyFinished = true)
+            } finally { checking = false }
+        }
     }
 
     private fun localVowels(): String? = card?.wordFull?.takeIf { it.isNotEmpty() }?.let { WordEngine.vowels(it) }
@@ -227,6 +301,7 @@ class GameViewModel : ViewModel() {
                 card = shown.copy(hint = hint); usedHint = true
                 state.storeDailyWord(card!!, day)
                 if (vowels.isNullOrEmpty()) vowels = runCatching { state.cloud.dailyVowels(day) }.getOrNull()
+                loadLetters(state.cloud, day)
             } catch (e: Exception) { notice = CloudError.message(e) } finally { checking = false }
         }
     }
@@ -325,12 +400,12 @@ class GameViewModel : ViewModel() {
      * differently (another device, a lost reply), the session is read again and the finish retried once.
      */
     private suspend fun recordLoss(cloud: CloudRepository, uid: String, day: String): Boolean = try {
-        cloud.finishDaily(uid, day, false, wrongAnswers)
+        cloud.finishDaily(uid, day, false, wrongAnswers, revealed = revealedWord)
     } catch (e: Exception) {
         if (CloudError.code(e) != CloudError.Code.PERMISSION_DENIED) throw e
         val session = cloud.dailySession(uid, day) ?: throw e
         if (session.finished) true
-        else { wrongAnswers = session.guesses; cloud.finishDaily(uid, day, false, session.guesses) }
+        else { wrongAnswers = session.guesses; cloud.finishDaily(uid, day, false, session.guesses, revealed = revealedWord) }
     }
     private suspend fun reveal(state: AppViewModel, day: String) {
         runCatching { state.cloud.dailySecret(day) }.getOrNull()?.let { card = it; state.storeDailyWord(it, day) }
