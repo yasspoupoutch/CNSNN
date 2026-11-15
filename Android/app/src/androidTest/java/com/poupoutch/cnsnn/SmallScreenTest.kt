@@ -5,6 +5,16 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.lifecycle.ViewModelProvider
+import com.poupoutch.cnsnn.core.DailySchedule
+import com.poupoutch.cnsnn.state.AppViewModel
+import org.junit.BeforeClass
+import java.net.HttpURLConnection
+import java.net.URL
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -35,6 +45,40 @@ import java.io.File
  */
 @RunWith(AndroidJUnit4::class)
 class SmallScreenTest {
+    companion object {
+        private const val PROJECT = "demo-cnsnn"
+        private const val HOST = "10.0.2.2"
+        private const val DOCS = "http://$HOST:8080/v1/projects/$PROJECT/databases/(default)/documents"
+
+        /** Today's word on the emulators, before the app starts: a public Classique card (never a secret word) with a long hint. */
+        @BeforeClass @JvmStatic fun seedDaily() {
+            if (InstrumentationRegistry.getArguments().getString("smallScreen") != "true") return
+            val day = DailySchedule.key()
+            val difficulty = DailySchedule.difficulty(day)!!.label
+            val hint = "Votre petit toit portatif, que l’on ouvre dès que les nuages menacent."
+            emulator("DELETE", "$DOCS/dailyPuzzles/$day"); emulator("DELETE", "$DOCS/dailyHints/$day"); emulator("DELETE", "$DOCS/dailySecrets/$day")
+            emulator("POST", "$DOCS/dailyPuzzles?documentId=$day", """{"fields":{"consonants":{"stringValue":"PRPL"},"category":{"stringValue":"Objets"},"difficulty":{"stringValue":"$difficulty"}}}""")
+            emulator("POST", "$DOCS/dailyHints?documentId=$day", """{"fields":{"hint":{"stringValue":"$hint"}}}""")
+            emulator("POST", "$DOCS/dailySecrets?documentId=$day", """{"fields":{"answer":{"stringValue":"PARAPLUIE"},"word":{"stringValue":"Parapluie"},"hint":{"stringValue":"$hint"},"category":{"stringValue":"Objets"},"difficulty":{"stringValue":"$difficulty"}}}""")
+        }
+
+        /** Raw emulator call as "owner", which bypasses the security rules on the emulator only. */
+        private fun emulator(method: String, url: String, body: String? = null) {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = method
+            connection.setRequestProperty("Authorization", "Bearer owner")
+            connection.connectTimeout = 20_000; connection.readTimeout = 20_000
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toByteArray()) }
+            }
+            val code = connection.responseCode
+            connection.disconnect()
+            check(method == "DELETE" || code < 300) { "$method $url : $code" }
+        }
+    }
+
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val notes = StringBuilder()
@@ -172,6 +216,37 @@ class SmallScreenTest {
         rule.onNodeWithText("Accueil").performClick()
         waitFor("Bonjour,")
 
+        // A challenge by link: the five words, the progress bar and the hint, all above the answer.
+        rule.onNodeWithTag("duelCard").performScrollTo().performClick()
+        rule.waitUntil(15_000) { rule.onAllNodes(hasTestTag("laterChallenges")).fetchSemanticsNodes().isNotEmpty() }
+        runCatching { rule.onNodeWithTag("laterChallenges").performScrollTo() }
+        rule.onNodeWithTag("laterChallenges").performClick()
+        rule.waitUntil(20_000) { rule.onAllNodes(hasTestTag("openChallenge")).fetchSemanticsNodes().isNotEmpty() }
+        runCatching { rule.onNodeWithTag("openChallenge").performScrollTo() }
+        rule.onNodeWithTag("openChallenge").performClick()
+        waitFor("Passer · +20 s", 20_000)
+        repeat(5) { index ->
+            checkHint("Défi, mot ${index + 1}")
+            if (index == 0) shot("10-defi")
+            rule.onNodeWithText("Passer · +20 s").performClick()
+            Thread.sleep(500)
+        }
+        waitFor("Terminer", 20_000)
+        if (has("Non merci")) rule.onNodeWithText("Non merci").performClick()
+        rule.onNodeWithText("Terminer").performClick()
+        waitFor("Bonjour,")
+
+        // The live duel (an invented one against Léa, as in DuelScreenshotsTest): both tracks on top.
+        rule.activityRule.scenario.onActivity { ViewModelProvider(it)[AppViewModel::class.java].liveDuelRequest = "demo" }
+        waitFor("Passer · +20 s", 20_000)
+        checkHint("Duel, mot 1")
+        shot("11-duel")
+        Thread.sleep(4_500)
+        checkHint("Duel, mot 2")
+        waitFor("Terminer", 30_000)
+        rule.onNodeWithText("Terminer").performClick()
+        waitFor("Bonjour,")
+
         // Classique with both hints shown.
         rule.onNodeWithText("Classique").performScrollTo().performClick()
         waitFor("Lancer une partie")
@@ -184,6 +259,21 @@ class SmallScreenTest {
         Thread.sleep(800)
         checkHint("Classique, indices révélés")
         shot("09-classique-indice")
+        rule.onNodeWithContentDescription("Fermer").performClick()
+        waitFor("Bonjour,")
+
+        // Today's word (a public card seeded on the emulators, with a long hint), both hints shown.
+        val play = rule.onNode((hasText("Jouer") or hasText("Reprendre")) and !isSelectable() and hasClickAction())
+        runCatching { play.performScrollTo() }
+        play.performClick()
+        waitFor("Valider", 20_000)
+        rule.onNodeWithText("Indice", substring = true).performClick()
+        rule.waitForIdle()
+        if (has("Indice 2", substring = true)) rule.onNodeWithText("Indice 2", substring = true).performClick()
+        rule.waitUntil(5_000) { has("« ", substring = true) }
+        Thread.sleep(800)
+        checkHint("Mot du jour, indices révélés")
+        shot("12-mot-du-jour-indice")
     }
 
     /** The hint sentence (« … ») and the consonants sit above the answer line, with no scrolling. */
