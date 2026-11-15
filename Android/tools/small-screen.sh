@@ -14,6 +14,8 @@ adb shell settings put global hide_error_dialogs 1
 sleep 20
 # Installed and run by hand: Gradle's connected tests uninstall the app, and its files with it.
 ./gradlew --no-daemon :app:installDebug :app:installDebugAndroidTest
+# The notifications request after a challenge would open the system dialog over the app.
+adb shell pm grant com.poupoutch.cnsnn android.permission.POST_NOTIFICATIONS || true
 adb shell am instrument -w -e class com.poupoutch.cnsnn.SmallScreenTest -e smallScreen true \
   com.poupoutch.cnsnn.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/instrument.log"
 for name in $(adb shell run-as com.poupoutch.cnsnn ls files/shots 2>/dev/null | tr -d "\r" || true); do
