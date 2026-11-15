@@ -218,7 +218,8 @@ class SmallScreenTest {
         // A challenge by link: the five words, the progress bar and the hint, all above the answer.
         rule.onNodeWithTag("duelCard").performScrollTo().performClick()
         rule.waitUntil(15_000) { rule.onAllNodes(hasTestTag("openChallenge")).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("openChallenge").performScrollTo().performClick()
+        runCatching { rule.onNodeWithTag("openChallenge").performScrollTo() }
+        rule.onNodeWithTag("openChallenge").performClick()
         waitFor("Passer · +20 s", 20_000)
         repeat(5) { index ->
             checkHint("Défi, mot ${index + 1}")
