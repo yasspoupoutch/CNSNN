@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isSelectable
@@ -60,6 +61,13 @@ class SmallScreenTest {
             emulator("POST", "$DOCS/dailyPuzzles?documentId=$day", """{"fields":{"consonants":{"stringValue":"PRPL"},"category":{"stringValue":"Objets"},"difficulty":{"stringValue":"$difficulty"}}}""")
             emulator("POST", "$DOCS/dailyHints?documentId=$day", """{"fields":{"hint":{"stringValue":"$hint"}}}""")
             emulator("POST", "$DOCS/dailySecrets?documentId=$day", """{"fields":{"answer":{"stringValue":"PARAPLUIE"},"word":{"stringValue":"Parapluie"},"hint":{"stringValue":"$hint"},"category":{"stringValue":"Objets"},"difficulty":{"stringValue":"$difficulty"}}}""")
+            // The vowels hint and the vowels placed one by one (PARAPLUIE: 5 vowels, the last one reveals the word).
+            emulator("DELETE", "$DOCS/dailyVowels/$day")
+            emulator("POST", "$DOCS/dailyVowels?documentId=$day", """{"fields":{"vowels":{"stringValue":"AEIU"},"letters":{"integerValue":"5"}}}""")
+            listOf("PARPL", "PARAPL", "PARAPLU", "PARAPLUI").forEachIndexed { i, shown ->
+                emulator("DELETE", "$DOCS/dailyLetters/${day}_${i + 1}")
+                emulator("POST", "$DOCS/dailyLetters?documentId=${day}_${i + 1}", """{"fields":{"shown":{"stringValue":"$shown"}}}""")
+            }
         }
 
         /** Raw emulator call as "owner", which bypasses the security rules on the emulator only. */
@@ -268,12 +276,38 @@ class SmallScreenTest {
         play.performClick()
         waitFor("Valider", 20_000)
         rule.onNodeWithText("Indice", substring = true).performClick()
-        rule.waitForIdle()
-        if (has("Indice 2", substring = true)) rule.onNodeWithText("Indice 2", substring = true).performClick()
+        // First hint: the vowels light up, and the line under the board says so.
+        rule.waitUntil(5_000) { has("Les voyelles du mot s’allument", substring = true) }
+        Thread.sleep(800)
+        shot("13-mot-du-jour-voyelles")
+        rule.onNodeWithText("Indice 2", substring = true).performClick()
         rule.waitUntil(5_000) { has("« ", substring = true) }
         Thread.sleep(800)
         checkHint("Mot du jour, indices révélés")
         shot("12-mot-du-jour-indice")
+        // Then each Lettre places the next vowel in the word.
+        rule.waitUntil(5_000) { has("Lettre", substring = true) }
+        rule.onNodeWithText("Lettre", substring = true).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Lettres : P, A, R, P, L", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Lettre", substring = true).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Lettres : P, A, R, A, P, L", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        Thread.sleep(800)
+        checkHint("Mot du jour, deux lettres placées")
+        shot("14-mot-du-jour-lettres")
+        repeat(2) {
+            rule.onNodeWithText("Lettre", substring = true).performClick()
+            rule.waitForIdle(); Thread.sleep(1_500)
+        }
+        // The last one shows the word, after a confirmation, and ends the game.
+        rule.waitUntil(5_000) { has("Afficher le mot", substring = true) }
+        Thread.sleep(500)
+        shot("15-mot-du-jour-derniere-lettre")
+        rule.onNodeWithText("Afficher le mot", substring = true).performClick()
+        rule.waitUntil(5_000) { has("Continuer") }
+        rule.onAllNodes(hasText("Afficher le mot")).onLast().performClick()
+        rule.waitUntil(20_000) { has("Voici le mot du jour.") }
+        Thread.sleep(2_500)
+        shot("16-mot-du-jour-revele")
     }
 
     /** The hint sentence (« … ») and the consonants sit above the answer line, with no scrolling. */
