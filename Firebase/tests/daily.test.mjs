@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { normalize, consonants, vowels, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
+import { normalize, consonants, vowels, placedVowels, difficultyOf, schedule, encrypt, decrypt, validate, parseList, combine, singleWord, limitFootball, parseChanges, applyChanges } from '../tools/daily.mjs';
 
 const list = parseList([
  'F\tGénéral\tBonbon\tUne douceur sucrée.', 'F\tAnimaux\tŒuf\tUn indice assez long.',
@@ -77,4 +77,10 @@ test('vowels for the first hint: each once, alphabetical, same as WordEngine.vow
   assert.equal(vowels('œuf'), 'EOU');
   assert.equal(vowels('Penalty'), 'AEY');
   assert.equal(vowels('Rythme'), 'EY');
+});
+
+test('placed vowels: one by one in order, the last one is the word (same as WordEngine.placedVowels)', () => {
+  assert.deepEqual(placedVowels('Œuvre'), { letters: 4, steps: ['OVR', 'OEVR', 'OEUVR'] });
+  assert.deepEqual(placedVowels('Éléphant'), { letters: 3, steps: ['ELPHNT', 'ELEPHNT'] });
+  assert.deepEqual(placedVowels('Bus'), { letters: 1, steps: [] });
 });

@@ -375,4 +375,19 @@ class TypedAnswerTest {
         assertEquals("ABC", typed.insert("C").text)
         assertEquals(40, TypedAnswer("A".repeat(40)).insert("B").text.length)
     }
+
+    /** Same vectors as Firebase/tests/daily.test.mjs and Tests/Core/WordEngineTests.swift. */
+    @Test fun placedVowels() {
+        assertEquals(WordEngine.Placed(4, listOf("OVR", "OEVR", "OEUVR")), WordEngine.placedVowels("Œuvre"))
+        assertEquals(listOf("ELPHNT", "ELEPHNT"), WordEngine.placedVowels("Éléphant").steps)
+        assertEquals(WordEngine.Placed(1, emptyList()), WordEngine.placedVowels("Bus"))
+    }
+    @Test fun placedVowelsCostAndRevealedRank() {
+        assertEquals(220_000, DailyScore.scoreMs(100_000, usedHint = true, correct = true, usedVowels = true, letters = 2))
+        assertEquals(600_000, DailyScore.scoreMs(590_000, usedHint = true, correct = true, usedVowels = true, letters = 3))
+        val found = DailyScore.rank("2026-11-15", 600_000, true)!!
+        val revealed = DailyScore.revealedRank("2026-11-15", 5_000)!!
+        val lost = DailyScore.rank("2026-11-15", 600_000, false)!!
+        assertTrue(found < revealed && revealed < lost)
+    }
 }

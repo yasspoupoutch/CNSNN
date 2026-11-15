@@ -78,4 +78,21 @@ final class WordEngineTests: XCTestCase {
         full.insert("B")
         XCTAssertEqual(full.text.count, 40)
     }
+
+    /// Same vectors as Firebase/tests/daily.test.mjs placedVowels.
+    func testPlacedVowelsOneByOneInOrder() {
+        XCTAssertEqual(WordEngine.placedVowels("Œuvre").letters, 4)
+        XCTAssertEqual(WordEngine.placedVowels("Œuvre").steps, ["OVR", "OEVR", "OEUVR"])
+        XCTAssertEqual(WordEngine.placedVowels("Éléphant").steps, ["ELPHNT", "ELEPHNT"])
+        XCTAssertEqual(WordEngine.placedVowels("Bus").letters, 1)
+        XCTAssertEqual(WordEngine.placedVowels("Bus").steps, [])
+    }
+    func testPlacedVowelsCostThirtySecondsEachAndRevealedRanksAfterFound() {
+        XCTAssertEqual(DailyScore.scoreMs(timeMs: 100_000, usedHint: true, usedVowels: true, letters: 2, correct: true), 220_000)
+        XCTAssertEqual(DailyScore.scoreMs(timeMs: 590_000, usedHint: true, usedVowels: true, letters: 3, correct: true), 600_000)
+        let found = DailyScore.rank(day: "2026-11-15", scoreMs: 600_000, correct: true)!
+        let revealed = DailyScore.revealedRank(day: "2026-11-15", timeMs: 5_000)!
+        let lost = DailyScore.rank(day: "2026-11-15", scoreMs: 600_000, correct: false)!
+        XCTAssertTrue(found < revealed && revealed < lost)
+    }
 }

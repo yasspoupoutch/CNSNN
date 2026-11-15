@@ -1,34 +1,44 @@
 import Foundation
 
-/// The Mot du jour is scored on time only, the lower the better. Two hints, one after the other: the
+/// The Mot du jour is scored on time only, the lower the better. Hints, one after the other: the
 /// word's vowels light up on the keyboard (30 s), then the sentence (30 s more, one minute in all, as the
-/// single hint of older versions). A lost day counts ten minutes, the most a day can cost. The week's ranking counts the words found first,
+/// single hint of older versions), then the vowels placed in the word one by one (30 s each), the last
+/// one revealing the word: a revealed word ranks after every found one. A lost day counts ten minutes, the most a day can cost. The week's ranking counts the words found first,
 /// then their time. Same arithmetic as firestore.rules.
 public enum DailyScore {
     /// Both hints together, or the sentence alone (older versions offer only that one).
     public static let hintPenaltyMs = 60_000
     /// The vowels alone.
     public static let vowelsPenaltyMs = 30_000
+    /// Each vowel placed in the word.
+    public static let letterPenaltyMs = 30_000
     public static let missedMs = 600_000
     /// Days from 1970-01-01 to 2024-01-01, where DailySchedule.dayNumber starts.
     static let epochOffset = 19_723
 
-    public static func penaltyMs(usedHint: Bool, usedVowels: Bool) -> Int {
-        usedHint ? hintPenaltyMs : usedVowels ? vowelsPenaltyMs : 0
+    public static func penaltyMs(usedHint: Bool, usedVowels: Bool, letters: Int = 0) -> Int {
+        (usedHint ? hintPenaltyMs : usedVowels ? vowelsPenaltyMs : 0) + letters * letterPenaltyMs
     }
-    public static func scoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, correct: Bool) -> Int {
-        correct ? min(timeMs + penaltyMs(usedHint: usedHint, usedVowels: usedVowels), missedMs) : missedMs
+    public static func scoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, letters: Int = 0, correct: Bool) -> Int {
+        correct ? min(timeMs + penaltyMs(usedHint: usedHint, usedVowels: usedVowels, letters: letters), missedMs) : missedMs
     }
     /// Rattrapage: a missed day played later counts in the week with 5 minutes more (same as firestore.rules `catchUpScore`).
     public static let catchUpPenaltyMs = 300_000
-    public static func catchUpScoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, correct: Bool) -> Int {
-        correct ? min(scoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: true) + catchUpPenaltyMs, missedMs) : missedMs
+    public static func catchUpScoreMs(timeMs: Int, usedHint: Bool, usedVowels: Bool = false, letters: Int = 0, correct: Bool) -> Int {
+        correct ? min(scoreMs(timeMs: timeMs, usedHint: usedHint, usedVowels: usedVowels, letters: letters, correct: true) + catchUpPenaltyMs, missedMs) : missedMs
     }
     /// Days since 1970 for a yyyy-MM-dd key, as the rules' `dayIndex`.
     public static func dayIndex(_ day: String) -> Int? { DailySchedule.dayNumber(forKey: day).map { $0 + epochOffset } }
     /// One number per result that sorts the day's results: the day first, then the score (lost last).
     public static func rank(day: String, scoreMs: Int, correct: Bool) -> Int? {
         dayIndex(day).map { $0 * 1_000_000 + (correct ? scoreMs : 999_999) }
+    }
+    /// A word revealed by the last hint: after every found word, before the lost ones, the fastest first
+    /// (the rules' `revealedRank`).
+    public static let revealedFrom = 600_001
+    public static let revealedTo = 999_998
+    public static func revealedRank(day: String, timeMs: Int) -> Int? {
+        dayIndex(day).map { $0 * 1_000_000 + revealedFrom + min(timeMs, revealedTo - revealedFrom) }
     }
     public static func dayBase(_ day: String) -> Int? { dayIndex(day).map { $0 * 1_000_000 } }
     public static func monthIndex(_ day: String) -> Int? {

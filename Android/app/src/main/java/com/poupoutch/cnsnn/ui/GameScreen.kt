@@ -151,6 +151,8 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
     }
     BackHandler(onBack = close)
     var confirmSkip by remember { mutableStateOf(false) }
+    /** The last hint of the Mot du jour shows the word and ends the game: asked once. */
+    var confirmReveal by remember { mutableStateOf(false) }
     var reporting by remember { mutableStateOf(false) }
     val result = game.result
     // A found daily word: back on the home page, the 12h reminder first (once), else Google Play's
@@ -180,7 +182,7 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
                 }
                 GameViewModel.Phase.Playing -> {
                     val card = game.card
-                    if (card != null) Board(state, game, card, mode) { confirmSkip = true }
+                    if (card != null) Board(state, game, card, mode, revealWord = { confirmReveal = true }) { confirmSkip = true }
                     else if (result == null) Centered {
                         Icon(Icons.Outlined.Inventory2, null, Modifier.size(44.dp), tint = Palette.secondary)
                         Text("Aucune carte", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 16.dp))
@@ -199,6 +201,7 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
             result?.let {
                 ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && game.hintsTaken == 0, game.standing,
                     game.pendingOfficial, game.ranked, game.usedHint, game.usedVowels, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
+                    letters = game.lettersUsed, revealedWord = game.revealedWord,
                     next = { game.next(state) }, close = close)
             }
         }
@@ -208,6 +211,11 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         confirmButton = { TextButton({ confirmSkip = false; game.giveUp(state) }) { Text("Révéler le mot", color = Palette.red) } },
         dismissButton = { TextButton({ confirmSkip = false }) { Text("Continuer") } },
         title = { Text("Révéler le mot et terminer cette carte ?") })
+    if (confirmReveal) AlertDialog({ confirmReveal = false },
+        confirmButton = { TextButton({ confirmReveal = false; game.revealHint(state) }) { Text("Afficher le mot") } },
+        dismissButton = { TextButton({ confirmReveal = false }) { Text("Continuer") } },
+        title = { Text("Afficher le mot ?") },
+        text = { Text("La partie se termine et vous serez classé après ceux qui l’ont trouvé.") })
     if (reporting) ReportDialog(state, game.card) { reporting = false }
 }
 
@@ -242,7 +250,7 @@ private fun TopBar(state: AppViewModel, game: GameViewModel, mode: GameMode, clo
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewModel, game: GameViewModel, card: Card, mode: GameMode, skip: () -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewModel, game: GameViewModel, card: Card, mode: GameMode, revealWord: () -> Unit = {}, skip: () -> Unit) {
     val haptics = rememberHaptics()
     val consonants = card.wordNoVowels
     // The clue area scrolls on its own: the answer, the buttons and the keyboard always stay in view.
@@ -260,6 +268,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 Box(Modifier.padding(top = 28.dp).heightIn(min = 96.dp), contentAlignment = Alignment.Center) {
                     androidx.compose.runtime.key(demo.step, demo.hintShown) { MorphWord(demo.word, demo.from, 80) }
                 }
+            } else if (game.placed != null) {
+                // The hints after the sentence: the word's vowels, in gold, take their places one by one.
+                val placed = game.placed!!
+                Text(highlighted(placed), style = Type.serif(fitConsonants(if (placed.length > 9) 52 else if (placed.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters)),
+                    letterSpacing = 3.sp, maxLines = 1,
+                    modifier = Modifier.padding(top = if (available < 300.dp) 12.dp else 28.dp).onSizeChanged { letters = it.height }.semantics { contentDescription = "Lettres : " + WordEngine.spoken(placed) })
             } else {
                 Text(consonants, style = Type.serif(fitConsonants(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters)),
                     letterSpacing = 3.sp, maxLines = 1,
@@ -284,10 +298,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             val line = when {
                 game.checking -> "Vérification…"
                 game.notice != null -> game.notice!!
+                game.usedVowels && !game.usedHint -> VOWELS_LIT
                 game.catchUpDay != null -> "Rattrapage : compte dans la semaine avec 5 min en plus."
                 else -> null
             }
-            if (line != null) Text(line, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+            if (line != null) Text(line, fontSize = 12.sp, color = if (game.notice != null) Palette.secondary else if (line == VOWELS_LIT) Palette.accent else Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
             AnimatedVisibility(game.remainingText != null, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
                 Text(game.remainingText ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
@@ -296,12 +311,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
     }
     }
     }
-    // 30 s on the Mot du jour without a hint, then 30 s after the vowels: a small bubble points at Indice.
+    // 30 s on the Mot du jour without a hint, then 30 s after each hint: a small bubble points at Indice.
     var hintNudge by remember(card.id) { mutableStateOf(false) }
-    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id, game.usedVowels) {
+    if (mode == GameMode.DAILY && LocalTutorialDemo.current == null) LaunchedEffect(card.id, game.hintsTaken, game.hintAvailable) {
         hintNudge = false
-        val from = if (game.usedVowels) game.elapsedMs else 0
-        while (!game.usedHint && game.result == null) {
+        val from = if (game.hintsTaken > 0) game.elapsedMs else 0
+        while (game.hintAvailable && game.result == null) {
             if (game.elapsedMs - from >= 30_000) { hintNudge = true; break }
             delay(1_000)
         }
@@ -311,16 +326,26 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             // After 30 s without a hint, a small bubble on its left points at it (no room above,
             // under the answer); the buttons slide right to make room.
-            AnimatedVisibility(hintNudge && !game.usedHint && game.result == null, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+            AnimatedVisibility(hintNudge && game.hintAvailable && game.result == null, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
                 HintNudge()
             }
-            AssistChip({ haptics.selection(); game.revealHint(state) }, {
-                // Indice 1 lights the word's vowels, Indice 2 shows the sentence: 30 s each on the Mot du jour, free in Classique.
-                Text(when (game.hintsTaken) { 0 -> "Indice"; 1 -> "Indice 2"; else -> "Indices révélés" } + if (!game.usedHint && game.ranked) "  +30 s" else "")
-            }, Modifier.tutorialTarget(TutorialTarget.HINT), enabled = !game.usedHint && game.result == null && !game.checking, shape = RoundedCornerShape(50),
+            AssistChip({ haptics.selection(); if (game.nextRevealsWord) revealWord() else game.revealHint(state) }, {
+                // Indice 1 lights the word's vowels, Indice 2 shows the sentence, then (Mot du jour) each Lettre places the next
+                // vowel in the word, the last one showing the word: 30 s each on the Mot du jour, free in Classique.
+                val title = when {
+                    !game.hintAvailable -> "Indices révélés"
+                    game.nextRevealsWord -> "Afficher le mot"
+                    game.usedHint -> "Lettre"
+                    game.hintsTaken == 0 -> "Indice"
+                    else -> "Indice 2"
+                }
+                Text(title + if (game.hintAvailable && !game.nextRevealsWord && game.ranked) "  +30 s" else "")
+            }, Modifier.tutorialTarget(TutorialTarget.HINT), enabled = game.hintAvailable && !game.checking, shape = RoundedCornerShape(50),
                 colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1))
-            AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
-                colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))
+            // The Mot du jour has no Passer: the hints lead everyone to the word.
+            if (mode != GameMode.DAILY || LocalTutorialDemo.current != null)
+                AssistChip(skip, { Text("Passer") }, enabled = game.result == null && !game.checking, shape = RoundedCornerShape(50),
+                    colors = AssistChipDefaults.assistChipColors(containerColor = Palette.fill1, labelColor = Palette.secondary))
         }
     }
     LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, submit = { game.submit(state) }, enabled = game.result == null && !game.checking,
@@ -481,12 +506,13 @@ private fun Key(text: String, vowel: Boolean, width: Dp, height: Dp, enabled: Bo
 
 @Composable
 private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode: GameMode, firstTry: Boolean, standing: DailyStanding?,
-                        pending: Boolean, ranked: Boolean, usedHint: Boolean, usedVowels: Boolean, wrongAnswers: Int, officialMs: Int, catchUp: Boolean, next: () -> Unit, close: () -> Unit) {
+                        pending: Boolean, ranked: Boolean, usedHint: Boolean, usedVowels: Boolean, wrongAnswers: Int, officialMs: Int, catchUp: Boolean,
+                        letters: Int = 0, revealedWord: Boolean = false, next: () -> Unit, close: () -> Unit) {
     val context = LocalContext.current
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
         Column(Modifier.padding(horizontal = 22.dp, vertical = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(when { !result.correct -> "Pas cette fois…"; firstTry -> "Du premier coup, sans indice."; else -> "Trouvé en ${Format.clock(result.timeMs)}." },
+            Text(when { revealedWord -> "Voici le mot du jour."; !result.correct -> "Pas cette fois…"; firstTry -> "Du premier coup, sans indice."; else -> "Trouvé en ${Format.clock(result.timeMs)}." },
                 style = Type.serifItalic(24), color = if (result.correct) Palette.mint else Palette.red)
             if (card != null) {
                 VowelReveal(card.wordFull.uppercase(), result.correct, Modifier.padding(top = 10.dp))
@@ -495,12 +521,15 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
             Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (catchUp) {
                     // Counted: the real time, the hints (30 s each), then 5 minutes more.
-                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct, usedVowels)), "compté", Modifier.weight(1f))
-                    ResultTile(when { usedHint -> "+1 min"; usedVowels -> "+30 s"; else -> "non" }, if (usedHint && usedVowels) "indices" else "indice", Modifier.weight(1f))
+                    ResultTile(Format.clock(DailyScore.catchUpScoreMs(result.timeMs, usedHint, result.correct, usedVowels, letters)), "compté", Modifier.weight(1f))
+                    val penalty = DailyScore.penaltyMs(usedHint, usedVowels, letters)
+                    ResultTile(if (penalty == 0) "non" else hintCost(penalty), if ((usedHint && usedVowels) || letters > 0) "indices" else "indice", Modifier.weight(1f))
                     ResultTile("${CatchUp.toPlay(state.catchUpDays())}", "à rattraper", Modifier.weight(1f))
                 } else if (mode == GameMode.DAILY) {
                     // The official time: the hints add 30 s each, a lost day counts ten.
-                    ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint && usedVowels -> "avec indices"; usedHint || usedVowels -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
+                    // Shown by the last hint: classed after the found words, on its own time.
+                    if (revealedWord) ResultTile(Format.clock(result.timeMs), "mot révélé", Modifier.weight(1f))
+                    else ResultTile(Format.clock(officialMs), when { !result.correct -> "compté"; usedHint && usedVowels -> "avec indices"; usedHint || usedVowels -> "avec indice"; else -> "temps" }, Modifier.weight(1f))
                     ResultTile("$wrongAnswers", if (wrongAnswers > 1) "erreurs" else "erreur", Modifier.weight(1f))
                     ResultTile("${state.streak}", "jours de série", Modifier.weight(1f))
                 } else {
@@ -661,4 +690,12 @@ internal fun fitConsonants(base: Int, available: androidx.compose.ui.unit.Dp, re
     val room = available - with(density) { rest.toDp() } - 12.dp
     // The serif line takes about 1.2 × its size (line height and font padding), times the font scale.
     return (room.value / 1.2f / density.fontScale).toInt().coerceIn(40, base)
+}
+
+/** Under the board once the first hint is taken (Mot du jour). */
+private const val VOWELS_LIT = "Les voyelles du mot s’allument sur le clavier"
+/** "+30 s", "+1 min", "+1 min 30 s". */
+fun hintCost(ms: Int): String {
+    val minutes = ms / 60_000; val seconds = ms % 60_000 / 1000
+    return if (minutes == 0) "+$seconds s" else if (seconds == 0) "+$minutes min" else "+$minutes min $seconds s"
 }

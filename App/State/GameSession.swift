@@ -16,6 +16,14 @@ import CNSNNCore
     var usedVowels = false
     /// The vowels lit on the keyboard (WordEngine.vowels), once the first hint is taken.
     var vowels: String?
+    /// Mot du jour, after the sentence: the vowels placed in the word one by one (30 s each).
+    var lettersUsed = 0
+    /// How many vowels the word places; the last one reveals the word (nil until known).
+    var letterCount: Int?
+    /// The word with its placed vowels ("OEVR"), shown on the board instead of the consonants.
+    var placed: String?
+    /// The last hint revealed the word: the game ends, ranked after every found word.
+    var revealedWord = false
     var result: Attempt?
     var wrongAnswers = 0
     var wrongGuesses: [String] = []
@@ -41,6 +49,7 @@ import CNSNNCore
 
     func load(mode: GameMode, category: CNSNNCore.Category?, difficulty: Difficulty?, catchUp: String? = nil, state: AppState) {
         answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
+        lettersUsed = 0; letterCount = nil; placed = nil; revealedWord = false
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = catchUp
         ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
         if mode == .daily {
@@ -69,6 +78,7 @@ import CNSNNCore
     func loadTutorial(_ example: Card) {
         guard card?.id != example.id else { return }
         answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
+        lettersUsed = 0; letterCount = nil; placed = nil; revealedWord = false
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = nil
         ranked = false; pendingOfficial = false; standing = nil; secret = false; checking = false; notice = nil
         card = example; phase = .playing
@@ -122,6 +132,11 @@ import CNSNNCore
                     if secret { vowels = try await cloud.dailyVowels(day: key) } else { vowels = card.map { WordEngine.vowels($0.wordFull) } }
                 }
                 usedHint = session.hintUsed; resumedDaily = true
+                if session.hintUsed {
+                    // The vowels already placed come back too.
+                    lettersUsed = session.lettersUsed
+                    await loadLetters(cloud: cloud, day: key)
+                }
                 wrongAnswers = session.guesses
                 dailyStart = session.startedAt
                 if let local = state.progress.attempts.first(where: { $0.dailyKey == key }) {
@@ -158,13 +173,76 @@ import CNSNNCore
         load(mode: .daily, category: nil, difficulty: nil, catchUp: catchUpDay, state: state)
     }
 
-    /// Indice: first the vowels, then the sentence. A player of an older version who took the sentence
+    /// Indice: first the vowels, then the sentence, then (Mot du jour) the vowels placed in the word one
+    /// by one, the last one revealing the word. A player of an older version who took the sentence
     /// alone already paid the full minute, so the vowels come with it for free.
     func revealHint(state: AppState) {
-        if usedVowels || usedHint { revealSentence(state: state) } else { revealVowels(state: state) }
+        if !usedHint { if usedVowels { revealSentence(state: state) } else { revealVowels(state: state) }; return }
+        guard placesLetters else { return }
+        if lettersUsed + 1 < (lettersToPlace ?? 1) { placeLetter(state: state) } else { revealWord(state: state) }
     }
-    /// 0, 1 or 2 hints taken.
-    var hintsTaken: Int { usedHint ? 2 : usedVowels ? 1 : 0 }
+    /// 0, 1, 2 hints taken, then one more for each placed vowel.
+    var hintsTaken: Int { usedHint ? 2 + lettersUsed : usedVowels ? 1 : 0 }
+    /// Only the Mot du jour places vowels after the sentence.
+    var placesLetters: Bool { dailyKey != nil }
+    /// The next hint shows the whole word and ends the game.
+    var nextRevealsWord: Bool { usedHint && placesLetters && lettersUsed + 1 >= (lettersToPlace ?? .max) }
+    /// Another hint can still be taken.
+    var hintAvailable: Bool { result == nil && (!usedHint || (placesLetters && lettersToPlace != nil)) }
+    /// A secret word's count comes from the server; otherwise the word is known here.
+    private var lettersToPlace: Int? { secret ? letterCount : card.map { WordEngine.placedVowels($0.wordFull).letters } }
+
+    /// Reads how many vowels the word places and the word as already placed (after the sentence).
+    private func loadLetters(cloud: FirebaseRepository?, day: String) async {
+        if !secret, let card {
+            let local = WordEngine.placedVowels(card.wordFull)
+            letterCount = local.letters
+            placed = lettersUsed > 0 && lettersUsed <= local.steps.count ? local.steps[lettersUsed - 1] : nil
+            return
+        }
+        guard let cloud else { return }
+        letterCount = try? await cloud.dailyLetterCount(day: day)
+        if lettersUsed > 0 { placed = try? await cloud.dailyLetters(day: day, k: lettersUsed) }
+    }
+    /// One more vowel in its place in the word (30 s).
+    private func placeLetter(state: AppState) {
+        guard !checking, result == nil, let dailyKey else { return }
+        let k = lettersUsed + 1
+        guard ranked, let cloud = state.cloud, let uid = state.uid else {
+            if let card { let steps = WordEngine.placedVowels(card.wordFull).steps; if k <= steps.count { placed = steps[k - 1]; lettersUsed = k } }
+            return
+        }
+        guard secret else {
+            if let card { let steps = WordEngine.placedVowels(card.wordFull).steps; if k <= steps.count { placed = steps[k - 1]; lettersUsed = k } }
+            cloud.revealDailyLetter(uid: uid, day: dailyKey, k: k); return
+        }
+        // The server opens the word with this vowel only once it has recorded the hint.
+        checking = true; notice = nil
+        Task {
+            defer { checking = false }
+            do {
+                guard let shown = try await cloud.revealSecretLetter(uid: uid, day: dailyKey, k: k) else {
+                    notice = CloudError.offline.errorDescription; return
+                }
+                lettersUsed = k; placed = shown
+            } catch {
+                state.note(error); notice = CloudError.message(error)
+            }
+        }
+    }
+    /// The last hint: the word is shown and the game ends, ranked after every found word.
+    private func revealWord(state: AppState) {
+        guard !checking, result == nil else { return }
+        revealedWord = true
+        guard secret, let cloud = state.cloud, let uid = state.uid, let dailyKey else {
+            finish(correct: false, mode: .daily, state: state); return
+        }
+        checking = true; notice = nil
+        Task {
+            defer { checking = false }
+            if !(await giveUp(cloud: cloud, uid: uid, day: dailyKey, state: state, revealed: true)) { revealedWord = false }
+        }
+    }
 
     private func revealVowels(state: AppState) {
         guard !usedVowels, !usedHint, result == nil, !checking, let card else { return }
@@ -207,6 +285,7 @@ import CNSNNCore
                 revealed.hint = hint; card = revealed; usedHint = true
                 state.storeDailyWord(revealed, day: dailyKey)
                 if vowels?.isEmpty != false { vowels = try? await cloud.dailyVowels(day: dailyKey) }
+                await loadLetters(cloud: cloud, day: dailyKey)
             } catch {
                 notice = CloudError.message(error)
             }
@@ -277,12 +356,13 @@ import CNSNNCore
     }
     /// Records the loss on the server with the errors it counted, then reveals the word.
     /// Returns false if the server could not be reached.
-    @discardableResult private func giveUp(cloud: FirebaseRepository, uid: String, day: String, state: AppState) async -> Bool {
-        var confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers)) == true
+    /// `revealed`: the last hint showed the word (ranked after the found words) rather than a loss.
+    @discardableResult private func giveUp(cloud: FirebaseRepository, uid: String, day: String, state: AppState, revealed: Bool = false) async -> Bool {
+        var confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers, revealed: revealed)) == true
         if !confirmed, let session = try? await cloud.dailySession(uid: uid, day: day), !session.finished {
             // This iPhone's count was off (a guess sent from elsewhere): use the server's.
             wrongAnswers = session.guesses
-            confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers)) == true
+            confirmed = (try? await cloud.finishDaily(uid: uid, day: day, correct: false, wrongAnswers: wrongAnswers, revealed: revealed)) == true
         }
         guard confirmed else { notice = CloudError.offline.errorDescription; return false }
         await reveal(cloud: cloud, day: day, state: state)
@@ -320,7 +400,7 @@ import CNSNNCore
     /// Stamps the finish on the server, then shows the server's time instead of the local ones.
     private func makeOfficial(cloud: FirebaseRepository, uid: String, day: String, correct: Bool, state: AppState, finished: Bool = false) async {
         do {
-            if !finished { guard try await cloud.finishDaily(uid: uid, day: day, correct: correct, wrongAnswers: wrongAnswers) else { return } }
+            if !finished { guard try await cloud.finishDaily(uid: uid, day: day, correct: correct, wrongAnswers: wrongAnswers, revealed: revealedWord) else { return } }
             guard let official = try await cloud.publishDailyResult(uid: uid, day: day) else { return }
             state.recordOfficial(official)
             if let current = result { var shown = official; shown.id = current.id; result = shown }
@@ -334,6 +414,6 @@ import CNSNNCore
     private func loadStanding(cloud: FirebaseRepository, attempt: Attempt) async {
         // A caught-up day is out of the day's ranking.
         guard let day = attempt.dailyKey, catchUpDay == nil else { return }
-        standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, usedVowels: usedVowels, correct: attempt.correct), correct: attempt.correct)
+        standing = try? await cloud.standing(day: day, scoreMs: DailyScore.scoreMs(timeMs: attempt.timeMs, usedHint: usedHint, usedVowels: usedVowels, letters: lettersUsed, correct: attempt.correct), correct: attempt.correct)
     }
 }

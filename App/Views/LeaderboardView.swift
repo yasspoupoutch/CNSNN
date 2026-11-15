@@ -188,8 +188,9 @@ struct LeaderboardView: View {
     private var allRows: [Row] {
         switch board {
         // A day's result keeps the pseudo of when it was played: the current one when known.
-        case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.scoreMs),
-                                     detail: Mistakes.text($0.wrongAnswers) + HintCost.detail(usedHint: $0.usedHint, usedVowels: $0.usedVowels)) }
+        // A word revealed by the last hint comes after every found one, with its own time.
+        case .today: today.map { Row(id: $0.uid, name: names[$0.uid] ?? $0.username, value: Format.clock($0.revealed ? $0.timeMs : $0.scoreMs),
+                                     detail: $0.revealed ? "mot révélé" : Mistakes.text($0.wrongAnswers) + HintCost.detail(usedHint: $0.usedHint, usedVowels: $0.usedVowels, letters: $0.usedLetters)) }
         case .week: players.map { p in
             let week = p.thisWeek() ?? .none
             return Row(id: p.uid, name: p.username, value: Format.clock(week.timeMs), detail: Format.weekDays(week) + " trouvés")
