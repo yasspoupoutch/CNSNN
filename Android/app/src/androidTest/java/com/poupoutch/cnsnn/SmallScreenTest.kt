@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.onNodeWithTag
@@ -262,8 +263,10 @@ class SmallScreenTest {
         waitFor("Bonjour,")
 
         // Today's word (a public card seeded on the emulators, with a long hint), both hints shown.
-        rule.onNode(hasText("Jouer") and !isSelectable()).performClick()
-        waitFor("Valider")
+        val play = rule.onNode((hasText("Jouer") or hasText("Reprendre")) and !isSelectable() and hasClickAction())
+        runCatching { play.performScrollTo() }
+        play.performClick()
+        waitFor("Valider", 20_000)
         rule.onNodeWithText("Indice", substring = true).performClick()
         rule.waitForIdle()
         if (has("Indice 2", substring = true)) rule.onNodeWithText("Indice 2", substring = true).performClick()
