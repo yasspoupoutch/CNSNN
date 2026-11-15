@@ -318,7 +318,9 @@ class SmallScreenTest {
         val hints = rule.onAllNodes(hasText("« ", substring = true)).fetchSemanticsNodes()
         assertTrue("$where : pas d’indice à l’écran", hints.isNotEmpty())
         hints.forEach { assertOnScreen("$where, indice", it.boundsInWindow, answer.top) }
-        val consonants = rule.onAllNodes(hasContentDescription("Consonnes :", substring = true)).fetchSemanticsNodes()
+        // The consonants, or the word with its placed vowels once the hints place them.
+        val consonants = rule.onAllNodes(hasContentDescription("Consonnes :", substring = true)).fetchSemanticsNodes() +
+            rule.onAllNodes(hasContentDescription("Lettres :", substring = true)).fetchSemanticsNodes()
         assertTrue("$where : consonnes cachées", consonants.any { it.boundsInWindow.height > 20f })
     }
 
