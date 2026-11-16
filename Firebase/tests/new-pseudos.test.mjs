@@ -7,7 +7,7 @@ import { initializeTestEnvironment, assertFails } from '@firebase/rules-unit-tes
 import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 
 const PROJECT = 'demo-cnsnn-pseudos';
-let env, server, sent = [], run, message;
+let env, server, sent = [], run, message, parisTime;
 
 before(async () => {
   env = await initializeTestEnvironment({ projectId: PROJECT, firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
@@ -18,7 +18,7 @@ before(async () => {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   process.env.NTFY_URL = `http://127.0.0.1:${server.address().port}/`;
-  ({ run, message } = await import('../tools/new-pseudos.mjs'));
+  ({ run, message, parisTime } = await import('../tools/new-pseudos.mjs'));
 });
 after(async () => { await env?.cleanup(); server?.close(); });
 beforeEach(async () => { await env.clearFirestore(); sent = []; });
@@ -40,8 +40,9 @@ test('announces only the pseudos created since the last check, then moves the ch
   assert.equal(sent.length, 1);
   assert.equal(sent[0].topic, 'sujet-test');
   assert.equal(sent[0].title, 'CNSNN : 2 nouveaux pseudos');
-  assert.match(sent[0].message, /Bilou \(lun\. 13:20\)/);
+  assert.match(sent[0].message, /Bilou \(lundi 13 h 20\)/);
   assert.match(sent[0].message, /Total : 3 joueurs/);
+  assert.match(sent[0].message, /Vérifié lundi 15 h 00 \(heure française\)/);
 
   // Next run: nothing new, nothing sent.
   const again = await run(opts({ now: now + 120 * 60_000 }));
@@ -85,6 +86,11 @@ test('players cannot read or write the check time', async () => {
   const db = env.authenticatedContext('alice').firestore();
   await assertFails(getDoc(doc(db, 'ops/newPseudos')));
   await assertFails(setDoc(doc(db, 'ops/newPseudos'), { lastCheck: at(0) }));
+});
+
+test('times are in French time, summer and winter', () => {
+  assert.equal(parisTime('2026-11-16T23:05:00Z'), 'mardi 00 h 05');
+  assert.equal(parisTime('2026-07-01T10:30:00Z'), 'mercredi 12 h 30');
 });
 
 test('message lists at most 30 pseudos', () => {
