@@ -1,0 +1,51 @@
+name: CNSNN - Alerte nouveaux pseudos
+
+# Every 2 hours: a push notification (ntfy app) listing the players who chose a pseudo since the
+# last check, nothing if none. About 1 billed minute per run (~360 min a month of the 2,000 free),
+# about 50 Firestore reads a day. Pseudos never appear in the logs, only in the notification.
+# A pull request touching it runs a dry check (reads only, sends nothing). Manual run: "test"
+# sends a notification even with no new pseudo, to check the phone receives it.
+on:
+  schedule:
+    - cron: '23 */2 * * *'
+  pull_request:
+    paths: ['Firebase/tools/new-pseudos.mjs', '.github/workflows/new-pseudos.yml']
+  workflow_dispatch:
+    inputs:
+      test:
+        description: Envoyer une notification d'essai même sans nouveau pseudo
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-new-pseudos
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    name: Nouveaux pseudos
+    # The secrets are only given to runs of this repository (never to a fork's pull request).
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: Firebase/tools/new-pseudos.mjs
+          sparse-checkout-cone-mode: false
+      - name: Chercher les nouveaux pseudos et prévenir
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then echo '::error::Le secret FIREBASE_SERVICE_ACCOUNT est absent.'; exit 1; fi
+          if [ -z "$NTFY_TOPIC" ]; then echo '::warning::Le secret NTFY_TOPIC est absent : rien ne sera envoyé.'; fi
+          mode=''
+          if [ "${{ github.event_name }}" = pull_request ]; then mode=--dry-run; fi
+          if [ "${{ inputs.test }}" = true ]; then mode=--test; fi
+          node Firebase/tools/new-pseudos.mjs $mode
