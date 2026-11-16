@@ -47,16 +47,20 @@ async function firestore(token, path, init = {}) {
 }
 
 // Pure helpers, tested in new-pseudos.test.mjs.
+// French time, e.g. "lundi 14 h 05".
 export function parisTime(iso) {
-  return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+  return `${parts.weekday} ${parts.hour} h ${parts.minute}`;
 }
 
-export function message(pseudos, total) {
+export function message(pseudos, total, checkedAt) {
   const n = pseudos.length;
   const title = n === 0 ? 'CNSNN : aucun nouveau pseudo' : n === 1 ? 'CNSNN : 1 nouveau pseudo' : `CNSNN : ${n} nouveaux pseudos`;
   const lines = pseudos.slice(0, 30).map((p) => `• ${p.pseudo} (${parisTime(p.createdAt)})`);
   if (n > 30) lines.push(`… et ${n - 30} autres`);
   if (total != null) lines.push(`Total : ${total} joueur${total > 1 ? "s" : ""} avec un pseudo`);
+  if (checkedAt) lines.push(`Vérifié ${parisTime(checkedAt)} (heure française)`);
   return { title, body: lines.join('\n') || 'Rien de nouveau.' };
 }
 
@@ -116,7 +120,7 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
 
   let sent = false;
   if ((pseudos.length || test) && topic) {
-    const { title, body } = message(pseudos, total);
+    const { title, body } = message(pseudos, total, new Date(now).toISOString());
     const res = await fetch(NTFY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
