@@ -76,6 +76,9 @@ test('without a topic nothing is sent', async () => {
   const r = await run(opts({ topic: undefined }));
   assert.equal(r.pseudos.length, 1);
   assert.equal(sent.length, 0);
+  // Kept for when the topic is set.
+  assert.equal((await run(opts())).pseudos[0].pseudo, 'Solo');
+  assert.equal(sent.length, 1);
 });
 
 test('players cannot read or write the check time', async () => {

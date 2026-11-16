@@ -125,8 +125,10 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
     if (!res.ok) throw new Error(`ntfy a refusé : ${res.status}`);
     sent = true;
     console.log('Notification envoyée.');
-  } else if (pseudos.length && !topic) {
-    console.log('::warning::Le secret NTFY_TOPIC est absent : aucune notification envoyée.');
+  } else if (!topic) {
+    // Not saved, so these pseudos are announced once the topic is set.
+    console.log('::warning::Le secret NTFY_TOPIC est absent : rien envoyé, rien enregistré.');
+    return { pseudos, total, sent };
   }
 
   // Saved after sending, so a failed send is retried next time (at worst a pseudo is announced twice).
