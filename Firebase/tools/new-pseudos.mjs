@@ -8,6 +8,10 @@
 //   env FIREBASE_SERVICE_ACCOUNT (JSON), NTFY_TOPIC (secret topic name; without it nothing is sent)
 //   --dry-run  reads only: no save, no notification (pull request check)
 //   --test     always sends a notification, even with no new pseudo
+//   --daily    the scheduled daily summary: sent once per French day, even with no new pseudo (so a
+//              silent day shows the alert still works). GitHub often skips scheduled runs, so the
+//              workflow tries several times in the evening; the tries after the first one that ran
+//              only read the state (1 read) and stop.
 import { createSign } from 'node:crypto';
 
 const PROJECT = 'cnsnn-9ctosy';
@@ -54,6 +58,11 @@ export function parisTime(iso) {
   return `${parts.weekday} ${parts.hour} h ${parts.minute}`;
 }
 
+// French calendar day, e.g. "2026-11-17", to send the daily summary once a day.
+export function parisDay(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(ms));
+}
+
 export function message(pseudos, total, checkedAt) {
   const n = pseudos.length;
   const title = n === 0 ? 'CNSNN : aucun nouveau pseudo' : n === 1 ? 'CNSNN : 1 nouveau pseudo' : `CNSNN : ${n} nouveaux pseudos`;
@@ -65,7 +74,7 @@ export function message(pseudos, total, checkedAt) {
 }
 
 // Returns what happened; throws on a Firestore or ntfy error (the run then fails and GitHub emails).
-export async function run({ dryRun = false, test = false, topic = process.env.NTFY_TOPIC?.trim(), project = PROJECT, now = Date.now() } = {}) {
+export async function run({ dryRun = false, test = false, daily = false, topic = process.env.NTFY_TOPIC?.trim(), project = PROJECT, now = Date.now() } = {}) {
   let token = 'owner';
   DOCS = docsUrl(project);
   if (!emulator) {
@@ -82,6 +91,12 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
   const state = await firestore(token, `/${STATE}`);
   const first = !state;
   const since = state?.fields?.lastCheck?.timestampValue ?? new Date(now - 24 * 3600_000).toISOString();
+  const day = parisDay(now);
+  if (daily && state?.fields?.lastSentDay?.stringValue === day) {
+    console.log(`Résumé du jour déjà envoyé (${day}) : rien à faire.`);
+    return { pseudos: [], total: null, sent: false, skipped: true };
+  }
+  const always = test || daily;
 
   const rows = await firestore(token, ':runQuery', {
     method: 'POST',
@@ -102,7 +117,7 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
   }));
 
   let total = null;
-  if (pseudos.length || test) {
+  if (pseudos.length || always) {
     const agg = await firestore(token, ':runAggregationQuery', {
       method: 'POST',
       body: JSON.stringify({ structuredAggregationQuery: {
@@ -119,7 +134,7 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
   if (dryRun) { console.log('Essai à blanc : rien enregistré, rien envoyé.'); return { pseudos, total, sent: false }; }
 
   let sent = false;
-  if ((pseudos.length || test) && topic) {
+  if ((pseudos.length || always) && topic) {
     const { title, body } = message(pseudos, total, new Date(now).toISOString());
     const res = await fetch(NTFY_URL, {
       method: 'POST',
@@ -136,9 +151,11 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
   }
 
   // Saved after sending, so a failed send is retried next time (at worst a pseudo is announced twice).
-  await firestore(token, `/${STATE}?updateMask.fieldPaths=lastCheck`, {
+  const fields = { lastCheck: { timestampValue: until } };
+  if (daily) fields.lastSentDay = { stringValue: day };
+  await firestore(token, `/${STATE}?${Object.keys(fields).map((f) => `updateMask.fieldPaths=${f}`).join('&')}`, {
     method: 'PATCH',
-    body: JSON.stringify({ fields: { lastCheck: { timestampValue: until } } }),
+    body: JSON.stringify({ fields }),
   });
   if (first) console.log('Première vérification : heure enregistrée.');
   return { pseudos, total, sent };
@@ -146,7 +163,7 @@ export async function run({ dryRun = false, test = false, topic = process.env.NT
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    await run({ dryRun: process.argv.includes('--dry-run'), test: process.argv.includes('--test') });
+    await run({ dryRun: process.argv.includes('--dry-run'), test: process.argv.includes('--test'), daily: process.argv.includes('--daily') });
   } catch (e) {
     console.error(e.message);
     process.exit(1);
