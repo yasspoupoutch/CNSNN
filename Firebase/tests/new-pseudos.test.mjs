@@ -7,7 +7,7 @@ import { initializeTestEnvironment, assertFails } from '@firebase/rules-unit-tes
 import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 
 const PROJECT = 'demo-cnsnn-pseudos';
-let env, server, sent = [], run, message, parisTime;
+let env, server, sent = [], run, message, parisTime, parisDay;
 
 before(async () => {
   env = await initializeTestEnvironment({ projectId: PROJECT, firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
@@ -18,7 +18,7 @@ before(async () => {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   process.env.NTFY_URL = `http://127.0.0.1:${server.address().port}/`;
-  ({ run, message, parisTime } = await import('../tools/new-pseudos.mjs'));
+  ({ run, message, parisTime, parisDay } = await import('../tools/new-pseudos.mjs'));
 });
 after(async () => { await env?.cleanup(); server?.close(); });
 beforeEach(async () => { await env.clearFirestore(); sent = []; });
@@ -80,6 +80,32 @@ test('without a topic nothing is sent', async () => {
   // Kept for when the topic is set.
   assert.equal((await run(opts())).pseudos[0].pseudo, 'Solo');
   assert.equal(sent.length, 1);
+});
+
+test('daily summary: sent once per French day, even with nothing new; later tries stop', async () => {
+  await player('g', 'Ancien', -300);
+  await lastCheck(-120);
+  const first = await run(opts({ daily: true }));
+  assert.equal(first.sent, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].title, 'CNSNN : aucun nouveau pseudo');
+  assert.match(sent[0].message, /Total : 1 joueur avec/);
+
+  // A later try the same evening: a new pseudo appeared, but it waits for tomorrow's summary.
+  await player('h', 'Lisou', 10);
+  const later = await run(opts({ daily: true, now: now + 30 * 60_000 }));
+  assert.equal(later.skipped, true);
+  assert.equal(sent.length, 1);
+
+  const tomorrow = await run(opts({ daily: true, now: now + 24 * 3600_000 }));
+  assert.deepEqual(tomorrow.pseudos.map((p) => p.pseudo), ['Lisou']);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].title, 'CNSNN : 1 nouveau pseudo');
+});
+
+test('French day changes at midnight Paris time', () => {
+  assert.equal(parisDay(Date.parse('2026-11-16T22:59:00Z')), '2026-11-16');
+  assert.equal(parisDay(Date.parse('2026-11-16T23:01:00Z')), '2026-11-17');
 });
 
 test('players cannot read or write the check time', async () => {
