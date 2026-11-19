@@ -9,6 +9,7 @@ name: CNSNN - Google Play
 #     et publiées aussi sur la branche store-screenshots, dossier android/.
 #   - test_ferme : l'AAB signé en version brouillon du test fermé ; Yasin l'envoie en examen depuis la
 #     Play Console.
+#   - production : pareil, mais en version brouillon du canal production (seulement depuis main).
 # Un push sur une branche claude/** qui touche ces fichiers ne fait que verifier et les captures.
 on:
   push:
@@ -22,6 +23,10 @@ on:
         default: true
       test_ferme:
         description: Envoyer l'appli dans le test fermé (brouillon)
+        type: boolean
+        default: false
+      production:
+        description: Envoyer l'appli en production (brouillon, depuis main)
         type: boolean
         default: false
 
@@ -182,9 +187,9 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs fiche "$RUNNER_TEMP/shots"
 
   test-ferme:
-    name: Envoyer l'appli dans le test fermé
+    name: Envoyer l'appli (test fermé ou production)
     needs: [verifier, fiche]
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.test_ferme && needs.verifier.result == 'success' && needs.fiche.result != 'failure'
+    if: always() && github.event_name == 'workflow_dispatch' && (inputs.test_ferme || (inputs.production && github.ref == 'refs/heads/main')) && needs.verifier.result == 'success' && needs.fiche.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -218,12 +223,13 @@ jobs:
           export CNSNN_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))
           ./gradlew --no-daemon :core:test :app:bundleRelease
           rm -f "$RUNNER_TEMP/release.p12"
-      - name: Envoyer l'AAB dans le test fermé (brouillon)
+      - name: Envoyer l'AAB (brouillon)
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          CANAL: ${{ (inputs.production && github.ref == 'refs/heads/main') && 'production' || 'test-ferme' }}
         working-directory: .
         run: |
           set -euo pipefail
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
           trap 'rm -f "$RUNNER_TEMP/sa.json"' EXIT
-          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs test-ferme Android/app/build/outputs/bundle/release/app-release.aab
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node Store/google-play/play.mjs "$CANAL" Android/app/build/outputs/bundle/release/app-release.aab

@@ -2,6 +2,7 @@
 //   node play.mjs verifier             access check: account, API, app
 //   node play.mjs fiche <captures>     texts, icon, banner and phone screenshots of the fr-FR listing
 //   node play.mjs test-ferme <aab>     the AAB as a draft release of the closed test (track "alpha")
+//   node play.mjs production <aab>     the AAB as a draft release of production (Yasin sends it for review)
 // No dependency: Node 22 (fetch, crypto). Nothing is printed from the key.
 import { createSign } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -121,21 +122,24 @@ async function fiche(shots) {
   console.log('Fiche fr-FR envoyée : titre, descriptions, icône, bannière et captures.');
 }
 
-async function testFerme(aab) {
+async function testFerme(aab, track = 'alpha') {
   await edit(async (id) => {
     const bundle = await call('POST', `${upload}/edits/${id}/bundles?uploadType=media`, readFileSync(aab), 'application/octet-stream');
     console.log(`AAB envoyé : version ${bundle.versionCode}`);
     // An app never published only takes draft releases: Yasin sends it for review from the Play Console.
-    await call('PUT', `${api}/edits/${id}/tracks/alpha`, {
-      track: 'alpha',
-      releases: [{ name: listing.releaseName, versionCodes: [String(bundle.versionCode)], status: 'draft', releaseNotes: [{ language: 'fr-FR', text: listing.releaseNotes }] }],
+    const production = track === 'production';
+    await call('PUT', `${api}/edits/${id}/tracks/${track}`, {
+      track,
+      releases: [{ name: production ? listing.productionName : listing.releaseName, versionCodes: [String(bundle.versionCode)], status: 'draft',
+        releaseNotes: [{ language: 'fr-FR', text: production ? listing.productionNotes : listing.releaseNotes }] }],
     });
   });
-  console.log('Version brouillon créée dans le test fermé (canal alpha).');
+  console.log(track === 'production' ? 'Version brouillon créée en production.' : 'Version brouillon créée dans le test fermé (canal alpha).');
 }
 
 const [action, arg] = process.argv.slice(2);
 if (action === 'verifier') await verifier();
 else if (action === 'fiche') await fiche(arg);
 else if (action === 'test-ferme') await testFerme(arg);
+else if (action === 'production') await testFerme(arg, 'production');
 else throw new Error(`Action inconnue : ${action}`);
