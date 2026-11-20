@@ -57,8 +57,8 @@ class GameViewModel : ViewModel() {
     var revealedWord by mutableStateOf(false); private set
     /** 0, 1, 2 hints taken, then one more for each placed vowel. */
     val hintsTaken: Int get() = if (usedHint) 2 + lettersUsed else if (usedVowels) 1 else 0
-    /** Only the Mot du jour places vowels after the sentence. */
-    private val placesLetters: Boolean get() = mode == GameMode.DAILY && dailyKey != null
+    /** The Mot du jour and Classique place vowels after the sentence (not the tutorial). */
+    private val placesLetters: Boolean get() = (mode == GameMode.DAILY && dailyKey != null) || mode == GameMode.CLASSIC
     /** A secret word's count comes from the server; otherwise the word is known here. */
     private val lettersToPlace: Int? get() = if (secret) letterCount else card?.wordFull?.takeIf { it.isNotEmpty() }?.let { WordEngine.placedVowels(it).letters }
     /** The next hint shows the whole word and ends the game. */
@@ -226,16 +226,16 @@ class GameViewModel : ViewModel() {
     }
     /** One more vowel in its place in the word (30 s). */
     private fun placeLetter(state: AppViewModel) {
-        if (checking || result != null) return
-        val uid = state.uid; val day = dailyKey ?: return
+        if (checking || result != null || !placesLetters) return
+        val uid = state.uid; val day = dailyKey
         val k = lettersUsed + 1
         if (!secret) {
             val steps = card?.wordFull?.let { WordEngine.placedVowels(it).steps } ?: return
             placed = steps.getOrNull(k - 1) ?: return; lettersUsed = k
-            if (ranked && uid != null) viewModelScope.launch { runCatching { state.cloud.revealSecretLetter(uid, day, k) } }
+            if (ranked && uid != null && day != null) viewModelScope.launch { runCatching { state.cloud.revealSecretLetter(uid, day, k) } }
             return
         }
-        if (uid == null) return
+        if (uid == null || day == null) return
         // The server opens the word with this vowel only once it has recorded the hint.
         checking = true; notice = null
         viewModelScope.launch {

@@ -148,6 +148,20 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(identifier: "Toutes").element(boundBy: 1).isSelected)
         launch.tap()
         XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+
+        // Classique hints: the vowels, the sentence, then the vowels placed one by one; the last one shows the word.
+        func hint(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch }
+        hint("Indice").tap()
+        XCTAssertTrue(hint("Indice 2").waitForExistence(timeout: 3))
+        hint("Indice 2").tap()
+        var placed = 0
+        while placed < 10, hint("Lettre").waitForExistence(timeout: 2) { hint("Lettre").tap(); placed += 1 }
+        XCTAssertTrue(hint("Afficher le mot").waitForExistence(timeout: 3))
+        hint("Afficher le mot").tap()
+        let confirm = app.sheets.buttons["Afficher le mot"].exists ? app.sheets.buttons["Afficher le mot"] : app.buttons.matching(identifier: "Afficher le mot").element(boundBy: 1)
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
+        XCTAssertTrue(app.staticTexts["Voici le mot."].waitForExistence(timeout: 5))
     }
 
     /// First-launch tutorial: the daily card and its Jouer button (tapped through the spotlight), then TR:

@@ -122,6 +122,9 @@ class SmallScreenTest {
         assertTrue("$what est caché (bas ${rect.bottom}, visible jusqu’à $bottom)", rect.top >= 0f && rect.bottom <= bottom + 1f)
     }
 
+    /** Wrong answers typed in the Mot du jour, shown crossed out under the hint. */
+    private val WRONG = listOf("DITE", "DRIGE", "DKJFJD")
+
     @Test fun everythingFitsWithoutScrolling() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("smallScreen") == "true")
         File(context.filesDir, "shots").deleteRecursively()
@@ -275,6 +278,14 @@ class SmallScreenTest {
         runCatching { play.performScrollTo() }
         play.performClick()
         waitFor("Valider", 20_000)
+        // Three wrong answers stay in the game, crossed out: they must not be cut off by the hints.
+        WRONG.forEach { word ->
+            word.forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
+            rule.onNodeWithText("Valider").performClick()
+            rule.waitUntil(10_000) { has(word) }
+            // The server takes one guess per second.
+            Thread.sleep(1_500)
+        }
         rule.onNodeWithText("Indice", substring = true).performClick()
         // First hint: the vowels light up, and the line under the board says so.
         rule.waitUntil(5_000) { has("Les voyelles du mot s’allument", substring = true) }
@@ -322,6 +333,10 @@ class SmallScreenTest {
         val consonants = rule.onAllNodes(hasContentDescription("Consonnes :", substring = true)).fetchSemanticsNodes() +
             rule.onAllNodes(hasContentDescription("Lettres :", substring = true)).fetchSemanticsNodes()
         assertTrue("$where : consonnes cachées", consonants.any { it.boundsInWindow.height > 20f })
+        // The wrong answers (Mot du jour) are whole, above the answer.
+        WRONG.forEach { word ->
+            rule.onAllNodes(hasText(word)).fetchSemanticsNodes().forEach { assertOnScreen("$where, mot raté $word", it.boundsInWindow, answer.top) }
+        }
     }
 
     private fun checkClues(round: String) {

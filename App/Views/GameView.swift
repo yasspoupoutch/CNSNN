@@ -95,7 +95,7 @@ struct GameView: View {
         .confirmationDialog("Révéler le mot et terminer cette carte ?", isPresented: $confirmSkip, titleVisibility: .visible) {
             Button("Révéler le mot", role: .destructive) { finishedHere = true; session.finish(correct: false, mode: mode, state: state) }
         }
-        .confirmationDialog("Afficher le mot ? La partie se termine et vous serez classé après ceux qui l’ont trouvé.", isPresented: $confirmReveal, titleVisibility: .visible) {
+        .confirmationDialog(mode == .daily ? "Afficher le mot ? La partie se termine et vous serez classé après ceux qui l’ont trouvé." : "Afficher le mot ? Il comptera comme non trouvé.", isPresented: $confirmReveal, titleVisibility: .visible) {
             Button("Afficher le mot") { finishedHere = true; session.revealHint(state: state) }
         }
     }
@@ -162,7 +162,7 @@ struct GameView: View {
             }
             Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
             if session.usedHint {
-                Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
+                Text("« \(card.hint) »").font(Typo.serifItalic(20)).multilineTextAlignment(.center).lineSpacing(2)
                     .padding(.horizontal, 10).padding(.top, 22)
                     .transition(.opacity.combined(with: .offset(y: 8)))
             }
@@ -502,7 +502,7 @@ private struct ResultSheet: View {
     }
 
     private var kicker: String {
-        if revealedWord { return "Voici le mot du jour." }
+        if revealedWord { return mode == .daily ? "Voici le mot du jour." : "Voici le mot." }
         guard result.correct else { return "Pas cette fois…" }
         return firstTry ? "Du premier coup, sans indice." : "Trouvé en \(Format.clock(result.timeMs))."
     }
