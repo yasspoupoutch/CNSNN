@@ -20,7 +20,7 @@ android {
         targetSdk = 36
         // Google Play builds pass their own number (google-play.yml), always above the CI builds.
         versionCode = (System.getenv("CNSNN_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
-        versionName = "1.4"
+        versionName = "1.4.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The instrumented tests talk to the Firebase emulators instead of production.
         buildConfigField("String", "EMULATOR_HOST", "\"${System.getenv("CNSNN_EMULATOR_HOST") ?: ""}\"")
