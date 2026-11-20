@@ -123,8 +123,8 @@ extension View {
     static func key() { keyGenerator.impactOccurred(intensity: 0.55); keyGenerator.prepare() }
 }
 
-/// A short bright "gling" when a live duel finds its opponent. Made in code (no sound file), the same
-/// two notes as on Android (DuelSound.kt). Ambient: silent with the ring/silent switch, mixed with music.
+/// A short "match found" chime when a live duel finds its opponent. Made in code (no sound file), the same
+/// notes as on Android (DuelSound.kt). Ambient: silent with the ring/silent switch, mixed with music.
 @MainActor enum DuelSound {
     private static var player: AVAudioPlayer?
     static func found() {
@@ -134,20 +134,23 @@ extension View {
         player.play()
         Self.player = player
     }
-    /// 0.6 s, 44.1 kHz mono 16 bits: E6 then B6 a moment later, each fading out like a small bell.
+    /// 1.1 s, 44.1 kHz mono 16 bits: a quick rising arpeggio (G5 C6 E6 G6) landing on a bright G6 + C7
+    /// chord that rings out, like the "game found" sounds of online games (an original sound).
+    static let notes: [(freq: Double, start: Double, decay: Double)] = [
+        (783.99, 0, 0.10), (1046.5, 0.07, 0.10), (1318.5, 0.14, 0.10), (1567.98, 0.21, 0.12), (2093.0, 0.30, 0.38), (1567.98, 0.30, 0.38),
+    ]
     static func wav() -> Data {
-        let rate = 44_100, count = rate * 6 / 10
+        let rate = 44_100, count = rate * 11 / 10
         var samples = [Int16](repeating: 0, count: count)
         for i in 0..<count {
             let t = Double(i) / Double(rate)
-            func bell(_ freq: Double, _ start: Double) -> Double {
-                let u = t - start
-                guard u >= 0 else { return 0 }
-                let attack = min(1, u / 0.004)
-                return attack * exp(-u / 0.16) * (sin(2 * .pi * freq * u) + 0.25 * sin(4 * .pi * freq * u))
+            var v = 0.0
+            for note in notes where t >= note.start {
+                let u = t - note.start
+                let w = 2 * Double.pi * note.freq * u
+                v += min(1, u / 0.003) * exp(-u / note.decay) * (sin(w) + 0.3 * sin(2 * w) + 0.1 * sin(3 * w))
             }
-            let v = 0.32 * (bell(1318.5, 0) + bell(1975.5, 0.09))
-            samples[i] = Int16(max(-1, min(1, v)) * 32_000)
+            samples[i] = Int16(max(-1, min(1, v * 0.33)) * 32_000)
         }
         var data = Data()
         func put(_ text: String) { data.append(contentsOf: Array(text.utf8)) }

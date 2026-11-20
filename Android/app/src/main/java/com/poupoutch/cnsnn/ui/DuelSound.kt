@@ -11,7 +11,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * A short bright "gling" when a live duel finds its opponent. Made in code (no sound file), the same two
+ * A short "match found" chime when a live duel finds its opponent. Made in code (no sound file), the same
  * notes as on the iPhone (DuelSound in Theme.swift). Silent when the phone is on vibrate or silent.
  */
 object DuelSound {
@@ -41,19 +41,23 @@ object DuelSound {
         }
     }
 
-    /** 0.6 s, mono 16 bits: E6 then B6 a moment later, each fading out like a small bell. */
+    /** 1.1 s, mono 16 bits: a quick rising arpeggio (G5 C6 E6 G6) landing on a bright G6 + C7 chord that
+     *  rings out, like the "game found" sounds of online games (an original sound). Same as the iPhone. */
+    private val notes = listOf(Triple(783.99, 0.0, 0.10), Triple(1046.5, 0.07, 0.10), Triple(1318.5, 0.14, 0.10),
+        Triple(1567.98, 0.21, 0.12), Triple(2093.0, 0.30, 0.38), Triple(1567.98, 0.30, 0.38))
+
     fun samples(): ShortArray {
-        val count = RATE * 6 / 10
+        val count = RATE * 11 / 10
         return ShortArray(count) { i ->
             val t = i.toDouble() / RATE
-            fun bell(freq: Double, start: Double): Double {
+            var v = 0.0
+            for ((freq, start, decay) in notes) {
+                if (t < start) continue
                 val u = t - start
-                if (u < 0) return 0.0
-                val attack = min(1.0, u / 0.004)
-                return attack * exp(-u / 0.16) * (sin(2 * PI * freq * u) + 0.25 * sin(4 * PI * freq * u))
+                val w = 2 * PI * freq * u
+                v += min(1.0, u / 0.003) * exp(-u / decay) * (sin(w) + 0.3 * sin(2 * w) + 0.1 * sin(3 * w))
             }
-            val v = 0.32 * (bell(1318.5, 0.0) + bell(1975.5, 0.09))
-            (v.coerceIn(-1.0, 1.0) * 32_000).toInt().toShort()
+            (( v * 0.33).coerceIn(-1.0, 1.0) * 32_000).toInt().toShort()
         }
     }
 }
