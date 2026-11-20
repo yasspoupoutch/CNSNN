@@ -249,6 +249,9 @@ class SmallScreenTest {
 
         // The live duel (an invented one against Léa, as in DuelScreenshotsTest): both tracks on top.
         rule.activityRule.scenario.onActivity { ViewModelProvider(it)[AppViewModel::class.java].liveDuelRequest = "demo" }
+        // The 3-2-1 counts down (it used to stay on 5 until the words came).
+        waitFor("Duel contre", 20_000)
+        rule.waitUntil(6_000) { has("3") || has("2") }
         waitFor("Passer · +20 s", 20_000)
         checkHint("Duel, mot 1")
         shot("11-duel")

@@ -243,6 +243,7 @@ fun TournamentPlayScreen(state: AppViewModel, round: Int, close: () -> Unit) {
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(250); tick++ } }
     tick
+    val now = vm.nowMs // read here: inside Centered { } it would not move (that part is skipped)
     val leave = { if (vm.phase == TournamentPlayViewModel.Phase.Playing) confirmQuit = true else close() }
     BackHandler(onBack = leave)
     LaunchedEffect(vm.mistakeTick) { if (vm.mistakeTick > 0) haptics.retry() }
@@ -265,7 +266,7 @@ fun TournamentPlayScreen(state: AppViewModel, round: Int, close: () -> Unit) {
                     Icon(Icons.Filled.EmojiEvents, null, Modifier.size(54.dp), tint = Palette.accent)
                     Text("Prêt pour votre match ?", fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
                     Line("5 mots, une seule partie. Le chrono démarre dès que vous appuyez et continue même si vous quittez. Chaque mot passé ajoute 20 s.")
-                    if (vm.nowMs < vm.endMs) DuelButton("C’est parti", Modifier.padding(top = 24.dp).testTag("tournamentGo")) { haptics.selection(); vm.start(state) }
+                    if (now < vm.endMs) DuelButton("C’est parti", Modifier.padding(top = 24.dp).testTag("tournamentGo")) { haptics.selection(); vm.start(state) }
                     else Line("Ce tour est terminé.")
                 }
                 TournamentPlayViewModel.Phase.Starting -> Centered { CircularProgressIndicator(color = Palette.secondary) }

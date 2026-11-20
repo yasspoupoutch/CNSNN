@@ -72,9 +72,13 @@ fun LiveDuelScreen(state: AppViewModel, start: String, close: () -> Unit) {
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(250); tick++ } }
     tick
+    // Read here and passed down: a part of the screen whose inputs did not change is skipped, so a clock read
+    // inside it would stay frozen (the 3-2-1 stuck on 5).
+    val now = duelVm.nowMs
+    val wallNow = System.currentTimeMillis()
     val uid = state.uid
     val duel = duelVm.duel
-    val duelState = if (duel != null && uid != null && duelVm.phase == LiveDuelViewModel.Phase.Live) duel.state(uid, duelVm.nowMs) else null
+    val duelState = if (duel != null && uid != null && duelVm.phase == LiveDuelViewModel.Phase.Live) duel.state(uid, now) else null
     val leave = {
         if (duelState == LiveDuel.State.Countdown || duelState == LiveDuel.State.Playing) confirmQuit = true
         else { duelVm.leave(state); close() }
@@ -101,7 +105,7 @@ fun LiveDuelScreen(state: AppViewModel, start: String, close: () -> Unit) {
             when (val phase = duelVm.phase) {
                 LiveDuelViewModel.Phase.Connecting -> Centered { CircularProgressIndicator(color = Palette.secondary); Line("Connexion…") }
                 is LiveDuelViewModel.Phase.Searching -> Centered {
-                    val left = (LiveDuelRules.SEARCH_MS - (System.currentTimeMillis() - phase.sinceMs)).coerceAtLeast(0)
+                    val left = (LiveDuelRules.SEARCH_MS - (wallNow - phase.sinceMs)).coerceAtLeast(0)
                     DuelGlyph(72)
                     Text("Recherche d’un adversaire…", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 18.dp))
                     Text(ChallengeFormat.time(left), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Duel.soft, modifier = Modifier.padding(top = 6.dp))
@@ -115,7 +119,7 @@ fun LiveDuelScreen(state: AppViewModel, start: String, close: () -> Unit) {
                     TonalButton("Inviter un ami par lien", Modifier.padding(top = 10.dp)) { haptics.selection(); duelVm.restart("link", state) }
                 }
                 LiveDuelViewModel.Phase.Waiting -> Waiting(duelVm)
-                LiveDuelViewModel.Phase.Live -> if (duel != null && uid != null && duelState != null) Live(state, duelVm, duel, uid, duelState, close)
+                LiveDuelViewModel.Phase.Live -> if (duel != null && uid != null && duelState != null) Live(state, duelVm, duel, uid, duelState, now, close)
                     else Centered { CircularProgressIndicator(color = Palette.secondary) }
                 is LiveDuelViewModel.Phase.Failed -> Centered {
                     Text(phase.message, textAlign = TextAlign.Center, color = Palette.secondary, modifier = Modifier.padding(horizontal = 20.dp))
@@ -162,12 +166,12 @@ private fun Waiting(duelVm: LiveDuelViewModel) {
 }
 
 @Composable
-private fun ColumnScope.Live(state: AppViewModel, duelVm: LiveDuelViewModel, duel: LiveDuel, uid: String, duelState: LiveDuel.State, close: () -> Unit) {
+private fun ColumnScope.Live(state: AppViewModel, duelVm: LiveDuelViewModel, duel: LiveDuel, uid: String, duelState: LiveDuel.State, now: Long, close: () -> Unit) {
     duelVm.version // The core game is a plain object: re-read after every move.
     val game = duelVm.game ?: return
     when (duelState) {
         LiveDuel.State.Countdown -> Centered {
-            val left = (((duel.startMs ?: 0) - duelVm.nowMs + 999) / 1000).coerceIn(1, 5)
+            val left = (((duel.startMs ?: 0) - now + 999) / 1000).coerceIn(1, 5)
             Text("Duel contre", fontSize = 15.sp, color = Palette.secondary)
             Text(duel.theirs(uid).name, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
             Text("$left", fontSize = 120.sp, fontWeight = FontWeight.Black, color = Duel.text, modifier = Modifier.padding(top = 20.dp))
@@ -191,8 +195,8 @@ private fun ColumnScope.Live(state: AppViewModel, duelVm: LiveDuelViewModel, due
             Tracks(duel, uid, game)
             Centered {
                 Text("Votre temps", fontSize = 14.sp, color = Palette.tertiary)
-                Text(ChallengeFormat.time(duel.scoreMs(duel.mine(uid)) ?: game.scoreMs(duelVm.elapsedMs)), fontSize = 60.sp, fontWeight = FontWeight.Black)
-                val left = duel.leftToBeatMs(uid, duelVm.nowMs) ?: 0
+                Text(ChallengeFormat.time(duel.scoreMs(duel.mine(uid)) ?: game.scoreMs(duel.startMs?.let { (now - it).coerceAtLeast(0) } ?: 0)), fontSize = 60.sp, fontWeight = FontWeight.Black)
+                val left = duel.leftToBeatMs(uid, now) ?: 0
                 Line("${duel.theirs(uid).name} doit finir en moins de ${ChallengeFormat.time(left)} pour vous battre.")
             }
         }
