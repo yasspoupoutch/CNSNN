@@ -281,7 +281,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             }
             Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
             AnimatedVisibility(game.usedHint, enter = fadeIn() + slideInVertically { it / 3 }) {
-                Text("« ${card.hint} »", style = Type.serifItalic(24), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
+                Text("« ${card.hint} »", style = Type.serifItalic(19), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp, start = 10.dp, end = 10.dp))
             }
         }
         FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {

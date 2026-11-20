@@ -162,7 +162,7 @@ struct GameView: View {
             }
             Rectangle().fill(Palette.tertiary).frame(width: 36, height: 1.5).padding(.top, 22)
             if session.usedHint {
-                Text("« \(card.hint) »").font(Typo.serifItalic(25)).multilineTextAlignment(.center).lineSpacing(2)
+                Text("« \(card.hint) »").font(Typo.serifItalic(20)).multilineTextAlignment(.center).lineSpacing(2)
                     .padding(.horizontal, 10).padding(.top, 22)
                     .transition(.opacity.combined(with: .offset(y: 8)))
             }
