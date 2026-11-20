@@ -283,6 +283,8 @@ class SmallScreenTest {
             word.forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
             rule.onNodeWithText("Valider").performClick()
             rule.waitUntil(10_000) { has(word) }
+            // The server takes one guess per second.
+            Thread.sleep(1_500)
         }
         rule.onNodeWithText("Indice", substring = true).performClick()
         // First hint: the vowels light up, and the line under the board says so.
