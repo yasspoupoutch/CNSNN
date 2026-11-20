@@ -40,6 +40,9 @@ import CNSNNCore
     /// Why the last check could not reach the server (network), shown under the board.
     var notice: String?
     private var dailyKey: String?
+    /// Classique places the vowels one by one too (not the tutorial, Sprint or Survie).
+    private var classicLetters = false
+    private var mode: GameMode = .classic
     /// Rattrapage: a missed daily word of the week, played later and counted in the week (see CatchUp).
     private(set) var catchUpDay: String?
     private var dailyStart: Date?
@@ -51,6 +54,7 @@ import CNSNNCore
         answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
         lettersUsed = 0; letterCount = nil; placed = nil; revealedWord = false
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = catchUp
+        self.mode = mode; classicLetters = mode == .classic
         ranked = false; pendingOfficial = false; standing = nil; phase = .playing; secret = false; checking = false; notice = nil
         if mode == .daily {
             let key = catchUp ?? DailySchedule.key(); dailyKey = key
@@ -80,6 +84,7 @@ import CNSNNCore
         answer = ""; feedback = nil; result = nil; usedHint = false; usedVowels = false; vowels = nil; wrongAnswers = 0; wrongGuesses = []
         lettersUsed = 0; letterCount = nil; placed = nil; revealedWord = false
         start = .now; elapsedBeforePause = .zero; paused = false; dailyKey = nil; dailyStart = nil; catchUpDay = nil
+        mode = .daily; classicLetters = false
         ranked = false; pendingOfficial = false; standing = nil; secret = false; checking = false; notice = nil
         card = example; phase = .playing
     }
@@ -183,8 +188,8 @@ import CNSNNCore
     }
     /// 0, 1, 2 hints taken, then one more for each placed vowel.
     var hintsTaken: Int { usedHint ? 2 + lettersUsed : usedVowels ? 1 : 0 }
-    /// Only the Mot du jour places vowels after the sentence.
-    var placesLetters: Bool { dailyKey != nil }
+    /// The Mot du jour and Classique place vowels after the sentence.
+    var placesLetters: Bool { dailyKey != nil || classicLetters }
     /// The next hint shows the whole word and ends the game.
     var nextRevealsWord: Bool { usedHint && placesLetters && lettersUsed + 1 >= (lettersToPlace ?? .max) }
     /// Another hint can still be taken.
@@ -206,9 +211,9 @@ import CNSNNCore
     }
     /// One more vowel in its place in the word (30 s).
     private func placeLetter(state: AppState) {
-        guard !checking, result == nil, let dailyKey else { return }
+        guard !checking, result == nil, placesLetters else { return }
         let k = lettersUsed + 1
-        guard ranked, let cloud = state.cloud, let uid = state.uid else {
+        guard ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey else {
             if let card { let steps = WordEngine.placedVowels(card.wordFull).steps; if k <= steps.count { placed = steps[k - 1]; lettersUsed = k } }
             return
         }
@@ -235,7 +240,7 @@ import CNSNNCore
         guard !checking, result == nil else { return }
         revealedWord = true
         guard secret, let cloud = state.cloud, let uid = state.uid, let dailyKey else {
-            finish(correct: false, mode: .daily, state: state); return
+            finish(correct: false, mode: mode, state: state); return
         }
         checking = true; notice = nil
         Task {

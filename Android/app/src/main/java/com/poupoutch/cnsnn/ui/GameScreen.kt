@@ -212,10 +212,10 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         dismissButton = { TextButton({ confirmSkip = false }) { Text("Continuer") } },
         title = { Text("Révéler le mot et terminer cette carte ?") })
     if (confirmReveal) AlertDialog({ confirmReveal = false },
-        confirmButton = { TextButton({ confirmReveal = false; game.revealHint(state) }) { Text("Afficher le mot") } },
+        confirmButton = { TextButton({ confirmReveal = false; game.revealHint(state) }, Modifier.testTag("confirmReveal")) { Text("Afficher le mot") } },
         dismissButton = { TextButton({ confirmReveal = false }) { Text("Continuer") } },
         title = { Text("Afficher le mot ?") },
-        text = { Text("La partie se termine et vous serez classé après ceux qui l’ont trouvé.") })
+        text = { Text(if (mode == GameMode.DAILY) "La partie se termine et vous serez classé après ceux qui l’ont trouvé." else "Il comptera comme non trouvé.") })
     if (reporting) ReportDialog(state, game.card) { reporting = false }
 }
 
@@ -512,7 +512,7 @@ private fun ResultSheet(state: AppViewModel, result: Attempt, card: Card?, mode:
     Surface(Modifier.fillMaxWidth().padding(horizontal = 8.dp).navigationBarsPadding().padding(bottom = 8.dp), shape = RoundedCornerShape(40.dp),
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
         Column(Modifier.padding(horizontal = 22.dp, vertical = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(when { revealedWord -> "Voici le mot du jour."; !result.correct -> "Pas cette fois…"; firstTry -> "Du premier coup, sans indice."; else -> "Trouvé en ${Format.clock(result.timeMs)}." },
+            Text(when { revealedWord -> if (mode == GameMode.DAILY) "Voici le mot du jour." else "Voici le mot."; !result.correct -> "Pas cette fois…"; firstTry -> "Du premier coup, sans indice."; else -> "Trouvé en ${Format.clock(result.timeMs)}." },
                 style = Type.serifItalic(24), color = if (result.correct) Palette.mint else Palette.red)
             if (card != null) {
                 VowelReveal(card.wordFull.uppercase(), result.correct, Modifier.padding(top = 10.dp))

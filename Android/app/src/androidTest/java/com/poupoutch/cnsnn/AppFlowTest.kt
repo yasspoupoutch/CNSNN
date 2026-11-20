@@ -54,8 +54,20 @@ class AppFlowTest {
         rule.onNodeWithContentDescription("Q").performClick()
         rule.onNodeWithText("Valider").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("XQ")).fetchSemanticsNodes().isNotEmpty() }
-        // Hint, then give up: the result sheet shows the word.
+        // Hints: the vowels, the sentence, then the vowels placed one by one; the last one shows the word.
         rule.onNodeWithText("Indice").performClick()
+        rule.onNodeWithText("Indice 2").performClick()
+        var placed = 0
+        while (rule.onAllNodes(hasText("Lettre")).fetchSemanticsNodes().isNotEmpty() && placed < 10) {
+            rule.onNodeWithText("Lettre").performClick(); placed++
+        }
+        rule.onNodeWithText("Afficher le mot").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Il comptera comme non trouvé.")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("confirmReveal").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Voici le mot.")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Mot suivant").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Voici le mot.")).fetchSemanticsNodes().isEmpty() }
+        // Give up: the result sheet shows the word.
         rule.onNodeWithText("Passer").performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Révéler le mot")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Révéler le mot").performClick()
