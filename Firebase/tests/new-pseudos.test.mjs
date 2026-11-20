@@ -43,6 +43,7 @@ test('announces only the pseudos created since the last check, then moves the ch
   assert.match(sent[0].message, /Bilou \(lundi 13 h 20\)/);
   assert.match(sent[0].message, /Total : 3 joueurs/);
   assert.match(sent[0].message, /Vérifié lundi 15 h 00 \(heure française\)/);
+  assert.match(sent[0].message, /Derniers inscrits : Sara \(lundi 16\/11 14 h 30\), Bilou \(lundi 16\/11 13 h 20\), Ancien/);
 
   // Next run: nothing new, nothing sent.
   const again = await run(opts({ now: now + 120 * 60_000 }));
