@@ -86,6 +86,8 @@ fun LiveDuelScreen(state: AppViewModel, start: String, close: () -> Unit) {
     BackHandler(onBack = leave)
     LaunchedEffect(duelVm.mistakeTick) { if (duelVm.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(duelVm.successTick) { if (duelVm.successTick > 0) haptics.success() }
+    val context = LocalContext.current
+    LaunchedEffect(duelVm.foundTick) { if (duelVm.foundTick > 0) DuelSound.found(context) }
     val opponent = if (duel != null && uid != null && !duel.isOpen) duel.theirs(uid) else null
 
     Box(Modifier.fillMaxSize()) {

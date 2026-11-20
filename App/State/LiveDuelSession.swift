@@ -210,6 +210,8 @@ import CNSNNCore
         if fresh.isOpen { phase = .waiting; return }
         phase = .live
         if game == nil, let cards = ChallengeRules.cards(fresh.cardIds) {
+            // Someone was found (or the friend arrived): a little chime before the 3-2-1.
+            if fresh.startMs.map({ nowMs < $0 }) ?? true { DuelSound.found() }
             game = ChallengeGame(cards: cards)
             if !counted { counted = true; state.noteLiveDuelPlayed() }
         }
