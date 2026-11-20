@@ -307,6 +307,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
                 Text(game.remainingText ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 6.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp))
             }
+        } else if (game.result == null && game.usedVowels && !game.usedHint) {
+            // Classique: the same line after the first hint.
+            Text(VOWELS_LIT, fontSize = 12.sp, color = Palette.accent, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
         }
     }
     }

@@ -194,6 +194,9 @@ struct GameView: View {
                     Text("Rattrapage : compte dans la semaine avec 5 min en plus.").foregroundStyle(Palette.tertiary)
                 }
             }.scaledFont(12).padding(.top, 6)
+        } else if session.result == nil && session.usedVowels && !session.usedHint {
+            // Classique: the same line after the first hint.
+            Text("Les voyelles du mot s’allument sur le clavier").foregroundStyle(Palette.accent).scaledFont(12).padding(.top, 6)
         }
         Spacer(minLength: 12)
         answerLine

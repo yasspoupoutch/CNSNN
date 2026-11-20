@@ -56,6 +56,7 @@ class AppFlowTest {
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("XQ")).fetchSemanticsNodes().isNotEmpty() }
         // Hints: the vowels, the sentence, then the vowels placed one by one; the last one shows the word.
         rule.onNodeWithText("Indice").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("Les voyelles du mot s’allument", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Indice 2").performClick()
         var placed = 0
         while (rule.onAllNodes(hasText("Lettre")).fetchSemanticsNodes().isNotEmpty() && placed < 10) {
