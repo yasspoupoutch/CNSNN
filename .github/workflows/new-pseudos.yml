@@ -1,19 +1,21 @@
 name: CNSNN - Alerte nouveaux pseudos
 
-# Once a day, in the evening: a push notification (ntfy app) listing the players who chose a pseudo
+# Once a day, in the morning: a push notification (ntfy app) listing the players who chose a pseudo
 # since the last one, or saying there was none. GitHub often skips scheduled runs (on 16-17 Nov only
-# 2 of 8 two-hourly runs happened), so it tries 5 times (20 h 17 to 23 h 17 in winter, French time);
+# 2 of 8 two-hourly runs happened) and delays them by hours (the evening tries of 18-19 Nov only ran
+# around 2-3 h at night), so it tries 5 times in the morning (7 h 07 to 10 h 07 in winter, French
+# time) and even a late run lands during the day;
 # the first try that runs sends, the others see it is done and stop (1 Firestore read). At most
 # ~150 billed minutes a month of the 2,000 free, a few Firestore reads a day. Pseudos never appear in the logs, only in the notification.
 # A pull request touching it runs a dry check (reads only, sends nothing). Manual run: "test"
 # sends a notification even with no new pseudo, to check the phone receives it.
 on:
   schedule:
-    - cron: '17 19 * * *'
-    - cron: '47 19 * * *'
-    - cron: '17 20 * * *'
-    - cron: '17 21 * * *'
-    - cron: '17 22 * * *'
+    - cron: '7 6 * * *'
+    - cron: '37 6 * * *'
+    - cron: '7 7 * * *'
+    - cron: '7 8 * * *'
+    - cron: '7 9 * * *'
   pull_request:
     paths: ['Firebase/tools/new-pseudos.mjs', '.github/workflows/new-pseudos.yml']
   workflow_dispatch:

@@ -10,7 +10,7 @@
 //   --test     always sends a notification, even with no new pseudo
 //   --daily    the scheduled daily summary: sent once per French day, even with no new pseudo (so a
 //              silent day shows the alert still works). GitHub often skips scheduled runs, so the
-//              workflow tries several times in the evening; the tries after the first one that ran
+//              workflow tries several times in the morning; the tries after the first one that ran
 //              only read the state (1 read) and stop.
 import { createSign } from 'node:crypto';
 
