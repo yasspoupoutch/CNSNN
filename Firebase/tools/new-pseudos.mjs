@@ -1,7 +1,7 @@
 // Push notification (ntfy app) when new players chose a pseudo since the last check.
 // No dependency (Firestore REST API + node:crypto), so the scheduled run stays short and free.
 // Firestore cost per run: 1 read for the last check time, 1 read per new pseudo (at least 1),
-// about 1 read for the total count, 1 write to save the check time. About 50 reads a day.
+// about 1 read for the total count, 3 reads for the last players, 1 write to save the check time. About 50 reads a day.
 // Pseudos are never printed in the logs (the repository can become public), only sent to ntfy.
 //
 // Usage: node new-pseudos.mjs [--dry-run] [--test]
@@ -63,12 +63,22 @@ export function parisDay(ms) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(ms));
 }
 
-export function message(pseudos, total, checkedAt) {
+// Date and time in French time, e.g. "jeudi 19/11 02 h 16".
+export function parisDate(iso) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+  return `${parts.weekday} ${parts.day}/${parts.month} ${parts.hour} h ${parts.minute}`;
+}
+
+// latest: the last players who chose a pseudo, repeated in every message, so a notification the
+// phone missed (ntfy keeps them only 12 h) never loses a name.
+export function message(pseudos, total, checkedAt, latest = []) {
   const n = pseudos.length;
   const title = n === 0 ? 'CNSNN : aucun nouveau pseudo' : n === 1 ? 'CNSNN : 1 nouveau pseudo' : `CNSNN : ${n} nouveaux pseudos`;
   const lines = pseudos.slice(0, 30).map((p) => `• ${p.pseudo} (${parisTime(p.createdAt)})`);
   if (n > 30) lines.push(`… et ${n - 30} autres`);
   if (total != null) lines.push(`Total : ${total} joueur${total > 1 ? "s" : ""} avec un pseudo`);
+  if (latest.length) lines.push(`Derniers inscrits : ${latest.map((p) => `${p.pseudo} (${parisDate(p.createdAt)})`).join(', ')}`);
   if (checkedAt) lines.push(`Vérifié ${parisTime(checkedAt)} (heure française)`);
   return { title, body: lines.join('\n') || 'Rien de nouveau.' };
 }
@@ -135,7 +145,20 @@ export async function run({ dryRun = false, test = false, daily = false, topic =
 
   let sent = false;
   if ((pseudos.length || always) && topic) {
-    const { title, body } = message(pseudos, total, new Date(now).toISOString());
+    const recent = await firestore(token, ':runQuery', {
+      method: 'POST',
+      body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: 'users' }],
+        select: { fields: [{ fieldPath: 'username' }, { fieldPath: 'createdAt' }] },
+        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+        limit: 3,
+      } }),
+    });
+    const latest = recent.filter((r) => r.document).map((r) => ({
+      pseudo: r.document.fields?.username?.stringValue ?? '?',
+      createdAt: r.document.fields?.createdAt?.timestampValue,
+    }));
+    const { title, body } = message(pseudos, total, new Date(now).toISOString(), latest);
     const res = await fetch(NTFY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
