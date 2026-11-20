@@ -152,6 +152,7 @@ final class CNSNNUITests: XCTestCase {
         // Classique hints: the vowels, the sentence, then the vowels placed one by one; the last one shows the word.
         func hint(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch }
         hint("Indice").tap()
+        XCTAssertTrue(app.staticTexts["Les voyelles du mot s’allument sur le clavier"].waitForExistence(timeout: 3))
         XCTAssertTrue(hint("Indice 2").waitForExistence(timeout: 3))
         hint("Indice 2").tap()
         var placed = 0
