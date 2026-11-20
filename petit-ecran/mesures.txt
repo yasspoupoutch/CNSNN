@@ -1,0 +1,46 @@
+Écran : 360 × 716 dp
+Case à cocher (sans clavier) : marge 170 dp
+Bouton C’est parti (sans clavier) : marge 92 dp
+Clavier : 303 dp
+Case à cocher (clavier ouvert) : marge 90 dp
+Bouton C’est parti (clavier ouvert) : marge 12 dp
+Champ pseudo (clavier ouvert) : marge 206 dp
+Manche 1, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 1, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 1, un mot trouvé, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 1, un mot trouvé, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 2, indice 1 au-dessus de la réponse : marge 119 dp
+Manche 2, indice 2 au-dessus de la réponse : marge 16 dp
+Manche 3, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 3, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 4, indice 1 au-dessus de la réponse : marge 97 dp
+Manche 4, indice 2 au-dessus de la réponse : marge 15 dp
+Manche 5, indice 1 au-dessus de la réponse : marge 98 dp
+Manche 5, indice 2 au-dessus de la réponse : marge 16 dp
+Sprint, carte 1, indice : marge 12 dp
+Sprint, carte 2, indice : marge 5 dp
+Sprint, carte 3, indice : marge 12 dp
+Sprint, carte 4, indice : marge 5 dp
+Sprint, carte 5, indice : marge 5 dp
+Sprint, carte 6, indice : marge 8 dp
+Sprint, carte 7, indice : marge 8 dp
+Sprint, carte 8, indice : marge 5 dp
+Survie, carte 1, indice : marge 12 dp
+Survie, carte 2, indice : marge 5 dp
+Survie, carte 3, indice : marge 5 dp
+Défi, mot 1, indice : marge 16 dp
+Défi, mot 2, indice : marge 41 dp
+Défi, mot 3, indice : marge 57 dp
+Défi, mot 4, indice : marge 40 dp
+Défi, mot 5, indice : marge 16 dp
+Duel, mot 1, indice : marge 7 dp
+Duel, mot 2, indice : marge 7 dp
+Classique, indices révélés, indice : marge 80 dp
+Mot du jour, indices révélés, indice : marge 81 dp
+Mot du jour, indices révélés, mot raté DITE : marge 39 dp
+Mot du jour, indices révélés, mot raté DRIGE : marge 39 dp
+Mot du jour, indices révélés, mot raté DKJFJD : marge 39 dp
+Mot du jour, deux lettres placées, indice : marge 88 dp
+Mot du jour, deux lettres placées, mot raté DITE : marge 46 dp
+Mot du jour, deux lettres placées, mot raté DRIGE : marge 46 dp
+Mot du jour, deux lettres placées, mot raté DKJFJD : marge 46 dp
