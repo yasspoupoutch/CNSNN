@@ -1,6 +1,7 @@
 import SwiftUI
 import CNSNNCore
 import UIKit
+import AVFoundation
 
 /// Design tokens from the Claude Design "CNSNN — Liquid Glass" prototype (dark theme).
 enum Palette {
@@ -120,6 +121,20 @@ extension View {
     static func retry() { softGenerator.impactOccurred(); softGenerator.prepare() }
     /// Letter keys: a very light tap, like the system keyboard.
     static func key() { keyGenerator.impactOccurred(intensity: 0.55); keyGenerator.prepare() }
+}
+
+/// The "match found" sound of a live duel (App/Resources/duel-found.m4a, the same file as Android's
+/// res/raw/duel_found.m4a): a rising pad, four quick notes and a "gling". Ambient: silent with the
+/// ring/silent switch, mixed with music.
+@MainActor enum DuelSound {
+    private static var player: AVAudioPlayer?
+    static func found() {
+        guard let url = Bundle.main.url(forResource: "duel-found", withExtension: "m4a") else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        player.play()
+        Self.player = player
+    }
 }
 
 enum Vowels {

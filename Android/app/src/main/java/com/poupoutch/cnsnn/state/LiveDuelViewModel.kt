@@ -45,6 +45,9 @@ class LiveDuelViewModel : ViewModel() {
     var phase by mutableStateOf<Phase>(Phase.Connecting); private set
     var duel by mutableStateOf<LiveDuel?>(null); private set
     var game: ChallengeGame? = null; private set
+    /** Goes up when the opponent arrives (the screen plays DuelSound). */
+    var foundTick by mutableIntStateOf(0)
+        private set
     val clock = ServerClock()
     var answer by mutableStateOf("")
     var answerWrong by mutableStateOf(false); private set
@@ -219,6 +222,8 @@ class LiveDuelViewModel : ViewModel() {
         if (fresh.isOpen) { phase = Phase.Waiting; return }
         phase = Phase.Live
         if (game == null) ChallengeRules.cards(fresh.cardIds)?.let {
+            // Someone was found (or the friend arrived): the screen plays a little chime before the 3-2-1.
+            if (fresh.startMs?.let { nowMs < it } != false) foundTick++
             game = ChallengeGame(it); version++
             if (!counted) { counted = true; state.noteLiveDuelPlayed() }
         }
