@@ -1,0 +1,27 @@
+
+com.poupoutch.cnsnn.DuelScreenshotsTest:
+Error in takeDuelScreenshots(com.poupoutch.cnsnn.DuelScreenshotsTest):
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 20000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.waitFor(DuelScreenshotsTest.kt:38)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.waitFor$default(DuelScreenshotsTest.kt:38)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.takeAll(DuelScreenshotsTest.kt:55)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.takeDuelScreenshots(DuelScreenshotsTest.kt:43)
+
+
+Time: 41.66
+There was 1 failure:
+1) takeDuelScreenshots(com.poupoutch.cnsnn.DuelScreenshotsTest)
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 20000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.waitFor(DuelScreenshotsTest.kt:38)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.waitFor$default(DuelScreenshotsTest.kt:38)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.takeAll(DuelScreenshotsTest.kt:55)
+	at com.poupoutch.cnsnn.DuelScreenshotsTest.takeDuelScreenshots(DuelScreenshotsTest.kt:43)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
