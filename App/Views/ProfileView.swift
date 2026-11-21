@@ -53,6 +53,7 @@ struct ProfileView: View {
                     Text(AppState.suspendedText).scaledFont(14).foregroundStyle(Palette.red).glassPanel(radius: 24, padding: 18)
                 }
                 ReminderSettings()
+                AdMeasurementSettings()
                 VStack(spacing: 0) {
                     Button { state.tutorialRequest += 1 } label: { row("Revoir le tutoriel", symbol: "questionmark.circle") }
                         .accessibilityIdentifier("profile.tutorial")
@@ -99,6 +100,25 @@ struct ProfileView: View {
             Spacer()
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.tertiary)
         }.padding(.horizontal, 18).frame(minHeight: 58).contentShape(Rectangle())
+    }
+}
+/// Profil switch for the ads measurement asked on the first screen (see AdMeasurement).
+struct AdMeasurementSettings: View {
+    @AppStorage(AdMeasurement.key) private var answer: Bool?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Toggle(isOn: Binding(get: { answer == true }, set: { AdMeasurement.set($0) })) {
+                HStack(spacing: 14) {
+                    Image(systemName: "megaphone").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.secondary).frame(width: 24)
+                    Text("Mesure des publicités").scaledFont(16, .semibold).foregroundStyle(Palette.foreground)
+                }
+            }
+            .tint(Palette.mint).padding(.horizontal, 18).frame(minHeight: 58)
+            .accessibilityIdentifier("profile.adMeasurement")
+            Text("Statistiques anonymes envoyées à Google pour savoir si nos pubs amènent de nouveaux joueurs. Ni pseudo, ni email, ni identifiant publicitaire.")
+                .font(.footnote).foregroundStyle(Palette.tertiary).padding(.horizontal, 18).padding(.bottom, 14)
+        }
+        .glassPanel(radius: 24, padding: 0)
     }
 }
 /// Daily Mot du jour reminder: a local notification at the chosen time, nothing sent by a server.
@@ -277,7 +297,8 @@ struct PrivacyView: View {
         ("Ce que nous enregistrons", "Votre pseudo, vos parties (mots du jour, temps, indices, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter."),
         ("Ce qui est public", "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché."),
         ("Statistiques anonymes", "L’app compte, chaque jour, combien de téléphones l’ont ouverte et combien de parties ont été jouées dans chaque mode. Ces totaux ne contiennent ni pseudo, ni identifiant, ni appareil : personne ne peut savoir qui a joué."),
-        ("Où sont les données", "Sur les serveurs Firebase de Google (Authentication et Cloud Firestore), et sur votre iPhone. Aucune publicité, aucun traceur, aucune revente de données."),
+        ("Mesure des publicités (si vous l’acceptez)", "CNSNN fait un peu de publicité sur Google. Si vous dites oui (au premier lancement ou dans Profil), Google Analytics for Firebase envoie des statistiques anonymes d’utilisation (ouverture de l’app, durée des sessions, modèle d’iPhone, pays) pour savoir si ces pubs amènent de nouveaux joueurs. Ni pseudo, ni email, ni identifiant publicitaire, aucune pub personnalisée. Vous pouvez dire non ou changer d’avis à tout moment."),
+        ("Où sont les données", "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et, si vous l’acceptez, Analytics), et sur votre iPhone. Aucune publicité dans l’app, aucun suivi entre apps, aucune revente de données."),
         ("Notifications et widget", "Le rappel du mot du jour et le widget sont calculés sur votre iPhone : rien n’est envoyé par un serveur."),
         ("Supprimer vos données", "Profil > Mon compte > Supprimer mon compte efface votre profil, vos résultats, votre place au classement, vos amis, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom."),
         ("Nous contacter", "Pour toute question ou demande sur vos données : " + Support.email + "."),

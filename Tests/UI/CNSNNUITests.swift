@@ -31,6 +31,37 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout:5))
     }
 
+    /// New install: the ads measurement question once (nothing sent before "Oui"), then the switch in Profil.
+    @MainActor func testAdMeasurementQuestionAndProfileSwitch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--ask-ads"]
+        app.launch()
+        let alert = app.alerts["Aider CNSNN à se faire connaître ?"]
+        XCTAssertTrue(alert.waitForExistence(timeout:8))
+        alert.buttons["Non merci"].tap()
+        XCTAssertFalse(alert.waitForExistence(timeout:2))
+        app.buttons["Continuer"].tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout:5))
+        field.tap();field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+        XCTAssertTrue(app.buttons["Profil"].waitForExistence(timeout:5))
+        app.buttons["Profil"].tap()
+        let toggle = app.switches["profile.adMeasurement"]
+        for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertTrue(toggle.waitForExistence(timeout:5))
+        XCTAssertEqual(toggle.value as? String, "0")
+        // The switch itself sits at the right end of the row.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        // Asked once only: a relaunch goes straight to the game.
+        app.terminate()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        XCTAssertFalse(app.alerts["Aider CNSNN à se faire connaître ?"].waitForExistence(timeout:3))
+    }
+
     /// Survie, Sprint and Double sens from the home page: lives lost, a Sprint stopped, rounds skipped, results and records.
     @MainActor func testModesFromHome() {
         let app = XCUIApplication()
