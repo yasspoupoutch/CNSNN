@@ -83,6 +83,7 @@ import com.poupoutch.cnsnn.core.CommunityRules
 import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
+import androidx.compose.material.icons.outlined.Campaign
 import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.launch
@@ -127,6 +128,7 @@ fun ProfileScreen(state: AppViewModel) {
         }
         if (state.isSuspended) SectionCard(radius = 24.dp) { Text(AppViewModel.SUSPENDED_TEXT, color = Palette.red, fontSize = 14.sp) }
         ReminderSettings(state)
+        AdMeasurementSettings()
         SectionCard(padding = 0.dp, radius = 24.dp) {
             NavRow("Revoir le tutoriel", Icons.AutoMirrored.Outlined.HelpOutline) { state.tutorialRequest++ }
             Divider()
@@ -195,6 +197,24 @@ fun FullScreen(title: String, close: () -> Unit, content: @Composable () -> Unit
                 content()
             }
         }
+    }
+}
+
+/** The answer to the ad measurement question, changeable at any time (ads/AdMeasurement.kt). */
+@Composable
+private fun AdMeasurementSettings() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(com.poupoutch.cnsnn.ads.AdMeasurement.isOn(context)) }
+    SectionCard(padding = 0.dp, radius = 24.dp) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Campaign, null, tint = Palette.secondary)
+            Text("Mesure des publicités", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 14.dp))
+            Switch(on, { value -> on = value; com.poupoutch.cnsnn.ads.AdMeasurement.set(context, value) },
+                Modifier.testTag("profile.adMeasurement"),
+                colors = SwitchDefaults.colors(checkedTrackColor = Palette.mint, checkedThumbColor = Palette.ink))
+        }
+        Text("Prévient Meta (Facebook, Instagram) quand l’app est installée et ouverte, pour savoir si nos publicités amènent des joueurs. Ni pseudo, ni email.",
+            fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp))
     }
 }
 
@@ -329,7 +349,8 @@ private fun PrivacyContent() {
         "Ce que nous enregistrons" to "Votre pseudo, vos parties (mots du jour, temps, séries), vos propositions de cartes, vos signalements et vos amis ajoutés par code. Si vous créez un compte, votre adresse email sert uniquement à vous connecter.",
         "Ce qui est public" to "Votre pseudo et vos résultats officiels apparaissent dans les classements. Les cartes que vous proposez ne montrent pas votre nom aux autres joueurs. Votre email n’est jamais affiché.",
         "Statistiques anonymes" to "L’app compte, chaque jour, combien de téléphones l’ont ouverte et combien de parties ont été jouées dans chaque mode. Ces totaux ne contiennent ni pseudo, ni identifiant, ni appareil : personne ne peut savoir qui a joué.",
-        "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et Crashlytics), et sur votre téléphone. Aucune publicité, aucun traceur, aucune revente de données.",
+        "Mesure des publicités (si vous l’acceptez)" to "CNSNN fait de la publicité sur Facebook et Instagram. Si vous répondez oui à la question du premier lancement (ou dans Profil > Mesure des publicités), l’app prévient Meta quand elle est installée et ouverte, avec l’identifiant publicitaire du téléphone, pour savoir si ces publicités amènent des joueurs. Ni pseudo, ni email, ni contenu de vos parties. Si vous répondez non, rien n’est envoyé à Meta.",
+        "Où sont les données" to "Sur les serveurs Firebase de Google (Authentication, Cloud Firestore et Crashlytics), et sur votre téléphone. Meta seulement si vous acceptez la mesure des publicités. Aucune publicité dans l’app, aucune revente de données.",
         "Rapports de plantage" to "Si l’application plante, un rapport technique (modèle et version du téléphone, version de l’app, détail de l’erreur) est envoyé à Firebase Crashlytics pour corriger le problème. Il ne contient ni votre pseudo ni votre email et ne sert jamais à la publicité ni au suivi.",
         "Notifications et widget" to "Le rappel du mot du jour et le widget sont calculés sur votre téléphone : rien n’est envoyé par un serveur.",
         "Supprimer vos données" to "Profil > Mon compte > Supprimer mon compte efface votre profil, vos résultats, votre place au classement, vos amis, vos signalements et vos propositions non publiées. Les cartes déjà publiées restent dans le jeu, sans votre nom.",

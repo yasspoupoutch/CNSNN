@@ -20,7 +20,7 @@ android {
         targetSdk = 36
         // Google Play builds pass their own number (google-play.yml), always above the CI builds.
         versionCode = (System.getenv("CNSNN_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
-        versionName = "1.4.1"
+        versionName = "1.4.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The instrumented tests talk to the Firebase emulators instead of production.
         buildConfigField("String", "EMULATOR_HOST", "\"${System.getenv("CNSNN_EMULATOR_HOST") ?: ""}\"")
@@ -67,6 +67,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-crashlytics")
+    // Meta ads measurement, only after the player's yes (ads/AdMeasurement.kt).
+    implementation("com.facebook.android:facebook-core:19.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 

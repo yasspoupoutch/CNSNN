@@ -327,6 +327,16 @@ private fun OnboardingScreen(state: AppViewModel) {
     }, label = "onboarding") { page ->
         if (page == 0) Rules { step = 1 } else Pseudo(state) { step = 0 }
     }
+    // New players only, once: may the app tell Meta that its ads brought a player? (ads/AdMeasurement.kt)
+    val context = LocalContext.current
+    var askAds by rememberSaveable { mutableStateOf(com.poupoutch.cnsnn.ads.AdMeasurement.shouldAsk(context)) }
+    if (askAds) {
+        fun answer(on: Boolean) { com.poupoutch.cnsnn.ads.AdMeasurement.set(context, on); askAds = false }
+        AlertDialog(onDismissRequest = {}, title = { Text(com.poupoutch.cnsnn.ads.AdMeasurement.TITLE) },
+            text = { Text(com.poupoutch.cnsnn.ads.AdMeasurement.QUESTION) },
+            confirmButton = { TextButton({ answer(true) }) { Text("Oui, d’accord") } },
+            dismissButton = { TextButton({ answer(false) }) { Text("Non merci") } })
+    }
 }
 
 @Composable

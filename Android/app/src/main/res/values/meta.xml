@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Meta (Facebook) app used only to measure Meta ads, after the player's yes (see ads/AdMeasurement.kt).
+     Meta says these two values are meant to be embedded in the app: they are not secrets. -->
+<resources>
+    <string name="facebook_app_id" translatable="false">1527091305908814</string>
+    <string name="facebook_client_token" translatable="false">a51d17bf738997a4bc17090e80b1c816</string>
+</resources>
