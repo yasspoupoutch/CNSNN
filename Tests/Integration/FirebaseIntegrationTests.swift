@@ -8,9 +8,17 @@ import CNSNNCore
     private let project = "demo-cnsnn"
     private var repo: FirebaseRepository!
 
+    /// Firebase is configured once, outside any Swift task: since 1.4.2 FirebaseApp.configure also starts
+    /// Analytics, whose start-up must not run inside the async setUp below (the test runner crashed with
+    /// "freed pointer was not the last allocation").
+    override class func setUp() {
+        super.setUp()
+        guard ProcessInfo.processInfo.environment["CNSNN_EMULATOR"] == "1" else { return }
+        MainActor.assumeIsolated { FirebaseRepository.configureForEmulator(projectID: "demo-cnsnn") }
+    }
+
     override func setUp() async throws {
         guard ProcessInfo.processInfo.environment["CNSNN_EMULATOR"] == "1" else { throw XCTSkip("Émulateurs Firebase non lancés.") }
-        FirebaseRepository.configureForEmulator(projectID: project)
         repo = FirebaseRepository()
         try? repo.signOut()
         try await emulator("DELETE", "http://127.0.0.1:8080/emulator/v1/projects/\(project)/databases/(default)/documents")

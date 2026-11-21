@@ -18,4 +18,10 @@
 <key>UIBackgroundModes</key><array><string>fetch</string></array>
 <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>cnsnn.invite</string><key>CFBundleURLSchemes</key><array><string>cnsnn</string></array></dict></array>
 <key>BGTaskSchedulerPermittedIdentifiers</key><array><string>cnsnn.challenges</string></array>
+<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key><false/>
+<key>GOOGLE_ANALYTICS_IDFV_COLLECTION_ENABLED</key><false/>
+<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key><false/>
+<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_ANALYTICS_STORAGE</key><false/>
+<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE</key><false/>
+<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA</key><false/>
 </dict></plist>

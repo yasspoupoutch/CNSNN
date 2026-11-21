@@ -6,7 +6,9 @@ import CNSNNCore
     @Environment(\.scenePhase) private var scenePhase
     init() {
         // Configure Firebase first so AppState can see a signed-in user on the very first frame.
-        if !RuntimeFlags.isTesting { FirebaseRepository.configureIfPresent() }
+        if !RuntimeFlags.isTesting { FirebaseRepository.configureIfPresent(); AdMeasurement.apply() }
+        // UI test of the ads question: start as a fresh install.
+        if ProcessInfo.processInfo.arguments.contains("--ask-ads") { UserDefaults.standard.removeObject(forKey: AdMeasurement.key) }
         _state = State(initialValue: AppState())
     }
     var body: some Scene {

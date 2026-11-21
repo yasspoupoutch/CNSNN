@@ -7,12 +7,20 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The opening wordmark stays until its vowels have slid in, then gives way to the app.
     @State private var introDone = RuntimeFlags.isTesting
+    @AppStorage(AdMeasurement.key) private var adAnswer: Bool?
     var body: some View {
         ZStack {
             AmbientBackground()
             if !introDone || state.isRestoring { LaunchView(loading: introDone).transition(.opacity) }
             else if !state.progress.username.isEmpty { MainShell().transition(.opacity) }
-            else { OnboardingView().readableWidth().transition(.opacity) }
+            else {
+                OnboardingView().readableWidth().transition(.opacity)
+                    // New players only, once: may CNSNN's ads be measured (Google Ads)? Nothing is sent before "Oui".
+                    .alert("Aider CNSNN à se faire connaître ?", isPresented: Binding(get: { adAnswer == nil && AdMeasurement.shouldAsk }, set: { _ in })) {
+                        Button("Oui, d’accord") { AdMeasurement.set(true) }
+                        Button("Non merci", role: .cancel) { AdMeasurement.set(false) }
+                    } message: { Text(AdMeasurement.question) }
+            }
         }
         .animation(.easeInOut(duration: 0.35), value: introDone)
         .animation(CNSNNTheme.ease, value: state.progress.username.isEmpty)
