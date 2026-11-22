@@ -16,8 +16,8 @@ const users = (await db.collection('users').select('username').get()).docs.filte
 let shown = 0;
 for (const u of users) {
   const progress = await db.doc(`users/${u.id}/private/progress`).get();
-  let modes;
-  try { modes = JSON.parse(progress.get('json') ?? '{}')?.modes; } catch { continue; }
+  let modes, saved;
+  try { saved = JSON.parse(progress.get('json') ?? '{}'); modes = saved?.modes; } catch { continue; }
   const sprint = modes?.sprint;
   const own = sprint?.best?.words ?? 0;
   const line = records.get(u.id);
@@ -28,6 +28,7 @@ for (const u of users) {
   const run = (await db.doc(`sprintRuns/${u.id}`).get()).get('startedAt');
   console.log(`${u.get('username')} : record sur le téléphone ${own}, au classement ${line?.best ?? 'aucun'}`
     + ` | ligne du ${paris(line?.at)}${line && line.at?.isEqual?.(line.startedAt) ? ' (importée)' : ''}`
+    + ` | pseudo du téléphone ${saved?.username === u.get('username') ? 'identique' : 'DIFFÉRENT (le classement refuse alors tout envoi)'}`
     + ` | parties Sprint par appareil : ${games || '-'} | dernière partie lancée ${paris(run)} | progression du ${paris(progress.get('updatedAt'))}`);
 }
 console.log(`${shown} joueur(s) avec un record Sprint plus haut que sa ligne du classement, sur ${users.length} pseudos et ${records.size} lignes.`);
