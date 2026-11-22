@@ -103,7 +103,10 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
     // The Sprint clock never stops: back in the app, a Sprint whose time ran out ends at once.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) game.tick(state) }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) game.tick(state)
+            if (event == Lifecycle.Event.ON_STOP) game.leaveApp(state)
+        }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
     if (mode == PlayMode.SPRINT) LaunchedEffect(Unit) {

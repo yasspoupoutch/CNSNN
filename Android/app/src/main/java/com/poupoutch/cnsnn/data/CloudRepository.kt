@@ -448,7 +448,8 @@ class CloudRepository(
         val startedAt = db.collection("sprintRuns").document(uid).get(Source.SERVER).await().getTimestamp("startedAt") ?: return false
         val ref = db.collection("sprintRecords").document(uid)
         val old = ref.get(Source.SERVER).await()
-        if (found <= (old.getLong("best") ?: 0L) || old.getTimestamp("startedAt") == startedAt) return false
+        // The same game may raise its line: its score is saved when the app leaves the screen, then at the end.
+        if (found <= (old.getLong("best") ?: 0L)) return false
         ref.set(mapOf("uid" to uid, "username" to username, "best" to found, "rank" to SprintRecords.rank(found, millis(startedAt)),
             "startedAt" to startedAt, "at" to FieldValue.serverTimestamp())).await()
         return true

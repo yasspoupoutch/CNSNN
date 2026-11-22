@@ -57,6 +57,8 @@ class ModeViewModel : ViewModel() {
     private var start = SystemClock.elapsedRealtime()
     private var baseMs = 0
     private var recorded = false
+    /** Sprint: the score already sent to the ranking during this game (when the app left the screen). */
+    private var publishedFound = 0
     private var loaded = false
 
     val elapsedMs: Int get() = baseMs + (SystemClock.elapsedRealtime() - start).toInt()
@@ -70,7 +72,7 @@ class ModeViewModel : ViewModel() {
 
     /** Picks up the saved game of this mode, or starts a new one. */
     fun begin(state: AppViewModel) {
-        answer = ""; answerWrong = false; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false
+        answer = ""; answerWrong = false; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false; publishedFound = 0
         previous = state.progress.records(mode)
         val run = if (mode != PlayMode.SPRINT) state.local.loadRun(mode) else null
         if (run != null && !run.finished) {
@@ -162,6 +164,18 @@ class ModeViewModel : ViewModel() {
         afterMove(state)
     }
 
+    /**
+     * Sprint: the app leaves the screen. Its clock keeps running and it may be closed while away, so the
+     * score so far goes on the ranking now, while the game is still recent enough for the server
+     * (otherwise a game ended in the background kept its record on the phone only).
+     */
+    fun leaveApp(state: AppViewModel) {
+        val game = sprint ?: return
+        if (mode != PlayMode.SPRINT || game.finished || game.found <= publishedFound) return
+        publishedFound = game.found
+        state.publishSprint(game.found)
+    }
+
     /** Ends the game now and counts it. */
     fun quit(state: AppViewModel) {
         if (finished) return
@@ -192,7 +206,7 @@ class ModeViewModel : ViewModel() {
         when (mode) {
             PlayMode.SPRINT -> sprint?.let {
                 beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode)
-                state.publishSprint(it.found)
+                if (it.found > publishedFound) state.publishSprint(it.found)
             }
             PlayMode.SURVIVAL -> survival?.let { beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode) }
             PlayMode.DUO -> duo?.let { beaten = state.recordMode(mode, it.best(now), it.add); state.local.remember(it.duos.map { d -> d.id }, mode) }

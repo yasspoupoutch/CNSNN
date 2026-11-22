@@ -583,7 +583,8 @@ enum DailyGuesses {
         guard let startedAt = run.data()?["startedAt"] as? Timestamp else { return false }
         let ref = db.collection("sprintRecords").document(uid)
         let old = try await ref.getDocument(source: .server).data()
-        guard found > (old?["best"] as? Int ?? 0), (old?["startedAt"] as? Timestamp) != startedAt else { return false }
+        // The same game may raise its line: its score is saved when the app leaves the screen, then at the end.
+        guard found > (old?["best"] as? Int ?? 0) else { return false }
         try await ref.setData(["uid": uid, "username": username, "best": found, "rank": SprintRecords.rank(best: found, startedAtMs: Self.millis(startedAt)),
                                "startedAt": startedAt, "at": FieldValue.serverTimestamp()])
         return true

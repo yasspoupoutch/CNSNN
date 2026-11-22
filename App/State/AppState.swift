@@ -509,7 +509,10 @@ import CNSNNCore
     func publishSprint(found: Int) {
         guard let cloud, let uid, !isSuspended, !isServerFull, found > 0 else { return }
         let name = progress.username.isEmpty ? "Joueur" : progress.username
+        // Also called as the app leaves the screen: iOS gives it a few seconds to reach the server.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "sprint", expirationHandler: nil)
         Task {
+            defer { UIApplication.shared.endBackgroundTask(background) }
             guard (try? await cloud.publishSprint(uid: uid, username: name, found: found)) == true else { return }
             rankings.readAt["sprint"] = nil; rankings.readAt["sprintLeader"] = nil
             await refreshSprintLeader()

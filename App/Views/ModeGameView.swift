@@ -46,7 +46,10 @@ struct ModeGameView: View {
                 session.tick(state: state)
             }
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { session.tick(state: state) } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { session.tick(state: state) }
+            if phase == .background { session.leaveApp(state: state) }
+        }
         .onChange(of: session.mistakeTick) { _, _ in
             withAnimation(reduceMotion ? nil : .linear(duration: 0.42)) { shakes += 1 }
             AccessibilityNotification.Announcement("Ce n’est pas le mot").post()
