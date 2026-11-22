@@ -39,9 +39,20 @@ object WordEngine {
     }
     /** The board read aloud: letters apart, words apart. */
     fun spoken(shown: String): String = shown.split(" ").joinToString(" ; ") { it.toList().joinToString(", ") }
+    /** Other correct spellings of a card's word, with the same consonants so the board stays true
+     *  (CLMR is « calmar » and « calamar »). Keys and values are normalized; same table in Core/WordEngine.swift. */
+    val variants: Map<String, List<String>> = mapOf(
+        "CALMAR" to listOf("CALAMAR"),
+        "OIGNON" to listOf("OGNON"),
+        "SOUPEALOIGNON" to listOf("SOUPEALOGNON"),
+        "SHAMPOING" to listOf("SHAMPOOING"),
+        "CACAHUETE" to listOf("CACAHOUETE"),
+        "IGLOO" to listOf("IGLOU"),
+    )
     fun matches(answer: String, word: String): Boolean {
         val normalized = normalize(answer)
-        return normalized.isNotEmpty() && normalized == normalize(word)
+        val expected = normalize(word)
+        return normalized.isNotEmpty() && (normalized == expected || variants[expected].orEmpty().contains(normalized))
     }
     fun validWord(word: String): Boolean = normalize(word).length in 3..40 && consonants(word).isNotEmpty()
     /** A letter shown in gold: A E I O U Y with or without accents, and Œ Æ. */
