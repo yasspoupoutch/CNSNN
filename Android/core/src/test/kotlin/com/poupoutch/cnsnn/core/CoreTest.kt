@@ -35,7 +35,7 @@ class WordEngineTest {
         assertTrue(WordEngine.matches("calmar", "Calmar"))
         assertFalse(WordEngine.matches("calamar", "Calamar géant"))
         WordEngine.variants.forEach { (word, others) ->
-            others.forEach { assertEquals(WordEngine.consonants(word), WordEngine.consonants(it), it) }
+            others.forEach { assertEquals(it, WordEngine.consonants(word), WordEngine.consonants(it)) }
         }
     }
     @Test fun vowels() {
