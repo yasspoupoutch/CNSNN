@@ -57,7 +57,16 @@ class DuelScreenshotsTest {
 
         rule.onNodeWithTag("duelCard").performScrollTo()
         shot("duel-00-accueil")
-        rule.onNodeWithTag("duelCard").performClick()
+
+        // The weekly tournament (an invented one, TournamentDemo): my match of the day, then the bracket.
+        scenario.onActivity { val vm = ViewModelProvider(it)[AppViewModel::class.java]; vm.tournament.showDemo(vm.uid!!, "Camille"); vm.liveDuelRequest = "tournament" }
+        rule.waitUntil(15_000) { rule.onAllNodes(hasText("Si vous gagnez", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        shot("duel-10-tournoi")
+        rule.onAllNodes(hasText("Match 1", substring = true))[1].performScrollTo()
+        shot("duel-11-tableau")
+        scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        waitFor("Bonjour,")
+        rule.onNodeWithTag("duelCard").performScrollTo().performClick()
         rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("liveRandom")).fetchSemanticsNodes().isNotEmpty() }
         shot("duel-01-feuille")
 

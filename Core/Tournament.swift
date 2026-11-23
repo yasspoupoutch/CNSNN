@@ -8,6 +8,11 @@ import Foundation
 
 public enum TournamentRules {
     public static let maxPlayers = 64
+    /// From this tournament on, everyone plays every round: neighbours meet, and with an odd number the
+    /// last match is played by 3 (the fastest goes through). Before: a full bracket of 2, 4, 8… with byes.
+    /// A date, not a version: every phone must draw the same bracket.
+    public static let everyonePlaysFrom = "2026-12-07"
+    public static func everyonePlays(week: String) -> Bool { week >= everyonePlaysFrom }
     public static let dayMs = 86_400_000
     /// Sign-ups close, and the first round opens, on Monday at 08:00 UTC.
     public static let startHourMs = 8 * 3_600_000
@@ -34,17 +39,24 @@ public enum TournamentRules {
     /// Round r (from 1) is open for 24 hours, the first one from the Monday deadline.
     public static func roundStartMs(week: String, round: Int) -> Int? { deadlineMs(week: week).map { $0 + (round - 1) * dayMs } }
     public static func roundEndMs(week: String, round: Int) -> Int? { deadlineMs(week: week).map { $0 + round * dayMs } }
-    /// 2 players: 1 round (the final); up to 64: 6 rounds.
-    public static func rounds(players: Int) -> Int {
+    /// 2 players: 1 round (the final); up to 64: 6 rounds. Everyone playing (from `everyonePlaysFrom`):
+    /// 3 players, one match of 3; 10 players, 5 matches, then 2 (one of 3), then the final.
+    public static func rounds(players: Int, week: String = "") -> Int {
+        let count = min(players, maxPlayers)
+        guard count >= 2 else { return 0 }
         var size = 1, rounds = 0
-        while size < min(players, maxPlayers) { size *= 2; rounds += 1 }
-        return players < 2 ? 0 : rounds
+        if everyonePlays(week: week) {
+            while size * 2 <= count { size *= 2; rounds += 1 }
+        } else {
+            while size < count { size *= 2; rounds += 1 }
+        }
+        return rounds
     }
     /// The round open at this moment, if any.
     public static func round(week: String, players: Int, nowMs: Int) -> Int? {
         guard let start = deadlineMs(week: week), nowMs >= start else { return nil }
         let round = (nowMs - start) / dayMs + 1
-        return round <= rounds(players: players) ? round : nil
+        return round <= rounds(players: players, week: week) ? round : nil
     }
     /// The words of a round, drawn by the first player who starts it (then kept in Firestore).
     public static func draw(week: String, round: Int) -> [String] { ChallengeRules.draw(seed: seed(week + "#\(round)")) }
@@ -119,11 +131,24 @@ public struct TournamentBracket: Sendable, Equatable {
     public struct Match: Sendable, Equatable {
         public var a: Slot
         public var b: Slot
+        /// A third player when the round has an odd number of players: the fastest of the three goes through.
+        public var c: Slot?
         /// Decided: who goes through (nil when nobody does).
         public var decided = false
         public var winner: TournamentPlayer?
-        public func has(_ uid: String) -> Bool { a.player?.uid == uid || b.player?.uid == uid }
+        /// For each slot (a, b, then c), the match of the round before it comes from (empty in round 1).
+        public var from: [Int] = []
+        public init(a: Slot, b: Slot, c: Slot? = nil, from: [Int] = []) { self.a = a; self.b = b; self.c = c; self.from = from }
+        public var slots: [Slot] { c.map { [a, b, $0] } ?? [a, b] }
+        public func has(_ uid: String) -> Bool { slots.contains { $0.player?.uid == uid } }
         public func opponent(of uid: String) -> Slot { a.player?.uid == uid ? b : a }
+        /// The others of my match (one, or two in a match of 3).
+        public func opponents(of uid: String) -> [Slot] {
+            guard let index = slots.firstIndex(where: { $0.player?.uid == uid }) else { return slots }
+            var others = slots; others.remove(at: index); return others
+        }
+        /// Where the slot at this position comes from, as a previous-round match index.
+        public func source(_ position: Int) -> Int? { position < from.count ? from[position] : nil }
     }
 
     public let week: String
@@ -140,21 +165,41 @@ public struct TournamentBracket: Sendable, Equatable {
             for i in stride(from: entrants.count - 1, to: 0, by: -1) { entrants.swapAt(i, random.int(i + 1)) }
         }
         players = entrants
-        let total = TournamentRules.rounds(players: entrants.count)
+        let total = TournamentRules.rounds(players: entrants.count, week: week)
         guard total > 0 else { return }
+        var byKey: [String: TournamentRun] = [:]
+        for run in runs { byKey["\(run.round)_\(run.uid)"] = run }
+        if TournamentRules.everyonePlays(week: week) {
+            // Everyone plays every round: neighbours meet; with an odd number, the last match is played by 3.
+            var slots: [Slot] = entrants.map { .player($0) }
+            for round in 1...total {
+                let end = TournamentRules.roundEndMs(week: week, round: round) ?? 0
+                let count = slots.count / 2
+                var matches: [Match] = (0..<count).map { i in
+                    var match = Match(a: slots[2 * i], b: slots[2 * i + 1], from: round > 1 ? [2 * i, 2 * i + 1] : [])
+                    if i == count - 1, slots.count % 2 == 1 {
+                        match.c = slots[2 * i + 2]
+                        if round > 1 { match.from.append(2 * i + 2) }
+                    }
+                    return match
+                }
+                matches = matches.map { Self.decide($0, round: round, end: end, now: nowMs, runs: byKey) }
+                rounds.append(matches)
+                slots = matches.map(Self.next)
+            }
+            return
+        }
         let half = (1 << total) / 2
         var current: [Match] = (0..<half).map { k in
             Match(a: .player(entrants[k]), b: k + half < entrants.count ? .player(entrants[k + half]) : .empty)
         }
-        var byKey: [String: TournamentRun] = [:]
-        for run in runs { byKey["\(run.round)_\(run.uid)"] = run }
         for round in 1...total {
             let end = TournamentRules.roundEndMs(week: week, round: round) ?? 0
             current = current.map { Self.decide($0, round: round, end: end, now: nowMs, runs: byKey) }
             rounds.append(current)
             guard round < total else { break }
             current = stride(from: 0, to: current.count, by: 2).map { k in
-                Match(a: Self.next(current[k]), b: Self.next(current[k + 1]))
+                Match(a: Self.next(current[k]), b: Self.next(current[k + 1]), from: [k, k + 1])
             }
         }
     }
@@ -166,26 +211,18 @@ public struct TournamentBracket: Sendable, Equatable {
 
     private static func decide(_ match: Match, round: Int, end: Int, now: Int, runs: [String: TournamentRun]) -> Match {
         var m = match
-        switch (m.a, m.b) {
-        case (.pending, _), (_, .pending): return m
-        case (.empty, .empty): m.decided = true
-        case (.player(let p), .empty), (.empty, .player(let p)): m.decided = true; m.winner = p
-        case (.player(let a), .player(let b)):
-            func score(_ p: TournamentPlayer) -> TournamentRun? {
-                guard let run = runs["\(round)_\(p.uid)"], let finished = run.finishedMs, finished <= end, run.scoreMs != nil else { return nil }
-                return run
-            }
-            let ra = score(a), rb = score(b)
-            // Both finished: no need to wait for the end of the day.
-            guard (ra != nil && rb != nil) || now >= end else { return m }
-            m.decided = true
-            switch (ra, rb) {
-            case let (x?, y?): m.winner = Self.better(x, y) ? a : b
-            case (_?, nil): m.winner = a
-            case (nil, _?): m.winner = b
-            case (nil, nil): m.winner = nil
-            }
+        if m.slots.contains(.pending) { return m }
+        let players = m.slots.compactMap(\.player)
+        // Nobody, or one player alone: decided at once.
+        guard players.count >= 2 else { m.decided = true; m.winner = players.first; return m }
+        let scored = players.compactMap { p -> (TournamentPlayer, TournamentRun)? in
+            guard let run = runs["\(round)_\(p.uid)"], let finished = run.finishedMs, finished <= end, run.scoreMs != nil else { return nil }
+            return (p, run)
         }
+        // Everyone finished: no need to wait for the end of the day.
+        guard scored.count == players.count || now >= end else { return m }
+        m.decided = true
+        m.winner = scored.min { Self.better($0.1, $1.1) }?.0
         return m
     }
     /// Best time, then fewer errors, then the first one to finish.
@@ -195,6 +232,12 @@ public struct TournamentBracket: Sendable, Equatable {
         if x.errors != y.errors { return x.errors < y.errors }
         if x.finishedMs != y.finishedMs { return (x.finishedMs ?? .max) < (y.finishedMs ?? .max) }
         return x.uid < y.uid
+    }
+
+    /// The match of the next round that match `index` of `round` leads to, and the positions of the others in it.
+    public func following(round: Int, index: Int) -> (match: Match, others: [Int])? {
+        guard round < rounds.count, let match = rounds[round].first(where: { $0.from.contains(index) }) else { return nil }
+        return (match, match.from.indices.filter { match.from[$0] != index })
     }
 
     /// The champion, once the final is decided.
@@ -227,6 +270,23 @@ public struct TournamentBracket: Sendable, Equatable {
 }
 
 public enum TournamentFormat {
+    /// A slot's name: the player, "personne", or where it comes from: "Gagnant de Léa / Sam", or
+    /// "Gagnant du match 3" while that match is not known yet either.
+    public static func slotName(_ bracket: TournamentBracket, round: Int, match: TournamentBracket.Match, position: Int) -> String {
+        let slots = match.slots
+        guard position < slots.count else { return "" }
+        switch slots[position] {
+        case .player(let p): return p.name
+        case .empty: return "personne"
+        case .pending:
+            guard round > 1, round - 2 < bracket.rounds.count, let source = match.source(position),
+                  source < bracket.rounds[round - 2].count else { return "à venir" }
+            let before = bracket.rounds[round - 2][source]
+            let names = before.slots.compactMap { $0.player?.name }
+            return names.count == before.slots.count ? "Gagnant de " + names.joined(separator: " / ") : "Gagnant du match \(source + 1)"
+        }
+    }
+
     /// "Finale", "Demi-finales", "Quarts de finale", "8es de finale", or "Tour 1".
     public static func roundName(_ round: Int, of total: Int) -> String {
         switch total - round {
@@ -237,5 +297,32 @@ public enum TournamentFormat {
         case 4: return "16es de finale"
         default: return "Tour \(round)"
         }
+    }
+}
+
+/// Pictures only (screenshots): an invented tournament of 10, the second day under way. Round 1 is over
+/// (I won mine), my match of the day is still to play, the others show who has played and who has not yet.
+public enum TournamentDemo {
+    public static let week = TournamentRules.everyonePlaysFrom
+    public static func make(me: String, name: String) -> (players: [TournamentPlayer], runs: [TournamentRun], nowMs: Int) {
+        let begin = TournamentRules.deadlineMs(week: week) ?? 0
+        let names = ["Léa", "Sam", "Nadji", "Inès", "Hugo", "Maya", "Yanis", "Zoé", "Tom"]
+        let players = [TournamentPlayer(uid: me, name: name, atMs: begin - 100_000)]
+            + names.enumerated().map { TournamentPlayer(uid: "demo-t\($0.offset)", name: $0.element, atMs: begin - 90_000 + $0.offset) }
+        let order = TournamentBracket(week: week, signedUp: players, runs: [], nowMs: begin).players
+        var runs = order.enumerated().map { index, p in
+            TournamentRun(uid: p.uid, round: 1, startedMs: begin + 3_600_000, finishedMs: begin + 3_600_000 + (p.uid == me ? 24_000 : 31_000 + index * 2_300),
+                          skips: index % 4 == 3 ? 1 : 0, errors: index % 3)
+        }
+        let now = begin + TournamentRules.dayMs + 5 * 3_600_000
+        let bracket = TournamentBracket(week: week, signedUp: players, runs: runs, nowMs: now)
+        for match in bracket.rounds.count > 1 ? bracket.rounds[1] : [] where !match.has(me) {
+            let present = match.slots.compactMap(\.player)
+            if let first = present.first {
+                runs.append(TournamentRun(uid: first.uid, round: 2, startedMs: now - 3_000_000, finishedMs: now - 2_960_000))
+            }
+            if present.count > 1 { runs.append(TournamentRun(uid: present[1].uid, round: 2, startedMs: now - 20_000)) }
+        }
+        return (players, runs, now)
     }
 }

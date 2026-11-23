@@ -20,6 +20,8 @@ enum TournamentText {
         case .pending: "à venir"
         }
     }
+    /// "Gagnant de Léa / Sam" in a sentence: "le gagnant de Léa / Sam".
+    static func lower(_ name: String) -> String { name.hasPrefix("Gagnant") ? "le g" + name.dropFirst() : name }
 }
 
 struct TournamentView: View {
@@ -74,7 +76,7 @@ struct TournamentView: View {
     // MARK: My match
 
     @ViewBuilder private func mine(_ store: TournamentStore) -> some View {
-        if let uid = state.uid, store.currentLoaded, store.currentMine {
+        if let uid = state.uid ?? store.demoUID, store.currentLoaded, store.currentMine {
             let bracket = store.bracket
             let total = bracket.rounds.count
             VStack(alignment: .leading, spacing: 10) {
@@ -102,17 +104,21 @@ struct TournamentView: View {
     }
 
     @ViewBuilder private func matchCard(_ store: TournamentStore, uid: String, round: Int, match: TournamentBracket.Match, total: Int) -> some View {
-        let other = match.opponent(of: uid)
+        let bracket = store.bracket
+        let others = match.opponents(of: uid).compactMap { $0.player?.name }
+        let other = others.isEmpty ? "personne" : others.joined(separator: " et ")
         let end = TournamentRules.roundEndMs(week: store.currentWeek, round: round) ?? 0
         let run = store.run(round: round, uid: uid)
-        Text("Contre " + TournamentText.name(other)).scaledFont(19, .bold)
+        Text("Contre " + other).scaledFont(19, .bold)
+        if others.count > 1 {
+            Text("Match à 3 : le plus rapide des trois passe.").scaledFont(13, .semibold).foregroundStyle(Palette.duelSoft)
+        }
         if match.decided {
             Text(match.winner?.uid == uid ? "Gagné ! Le tour suivant ouvre \(TournamentText.day(end))." : "Perdu…")
                 .scaledFont(15, .semibold).foregroundStyle(match.winner?.uid == uid ? Palette.mint : Palette.red)
-            times(store, round: round, match: match)
         } else if let score = run?.scoreMs {
             Text("Votre temps : " + ChallengeFormat.time(score)).scaledFont(15, .semibold)
-            Text("Résultat dès que \(TournamentText.name(other)) a joué, au plus tard \(TournamentText.day(end)).")
+            Text("Résultat dès que \(other) \(others.count > 1 ? "ont" : "a") joué, au plus tard \(TournamentText.day(end)).")
                 .scaledFont(13).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
         } else {
             Text(run == nil
@@ -123,13 +129,14 @@ struct TournamentView: View {
                 .buttonStyle(DuelButtonStyle(height: 50)).frame(maxWidth: .infinity)
                 .accessibilityIdentifier("tournamentPlay")
         }
-    }
-
-    private func times(_ store: TournamentStore, round: Int, match: TournamentBracket.Match) -> some View {
-        let a = match.a.player.flatMap { store.run(round: round, uid: $0.uid)?.scoreMs }
-        let b = match.b.player.flatMap { store.run(round: round, uid: $0.uid)?.scoreMs }
-        return Text("\(TournamentText.name(match.a)) \(a.map(ChallengeFormat.time) ?? "—") · \(TournamentText.name(match.b)) \(b.map(ChallengeFormat.time) ?? "—")")
-            .scaledFont(13).monospacedDigit().foregroundStyle(Palette.secondary)
+        // What comes next: "Si vous gagnez : contre le gagnant de Léa / Sam".
+        if match.winner == nil || match.winner?.uid == uid,
+           let index = bracket.rounds[round - 1].firstIndex(of: match),
+           let next = bracket.following(round: round, index: index) {
+            let names = next.others.map { TournamentFormat.slotName(bracket, round: round + 1, match: next.match, position: $0) }
+            Text((match.decided ? "Prochain match : contre " : "Si vous gagnez : contre ") + names.map(TournamentText.lower).joined(separator: " et "))
+                .scaledFont(13, .semibold).foregroundStyle(Palette.duelText).fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     // MARK: Next week
@@ -166,18 +173,19 @@ struct TournamentView: View {
                 if let champion = bracket.champion {
                     Text("Champion : " + champion.name + " 🏆").scaledFont(17, .bold).foregroundStyle(Palette.accent)
                 }
-                ForEach(Array(bracket.rounds.enumerated()).reversed(), id: \.offset) { index, matches in
+                Text("Résultats au fil de la journée : les temps s’affichent quand le match est fini.")
+                    .scaledFont(12).foregroundStyle(Palette.tertiary).fixedSize(horizontal: false, vertical: true)
+                ForEach(Array(bracket.rounds.enumerated()), id: \.offset) { index, matches in
                     let round = index + 1
-                    if (TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0) <= store.nowMs || round == 1 {
-                        SectionKicker(text: TournamentFormat.roundName(round, of: total)).padding(.top, 6)
-                        VStack(spacing: 0) {
-                            ForEach(Array(matches.enumerated()), id: \.offset) { k, match in
-                                if k > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
-                                row(store, round: round, match: match)
-                            }
+                    SectionKicker(text: TournamentFormat.roundName(round, of: total) + " · " + TournamentText.day(TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0))
+                        .padding(.top, 6)
+                    VStack(spacing: 0) {
+                        ForEach(Array(matches.enumerated()), id: \.offset) { k, match in
+                            if k > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
+                            matchRow(store, bracket: bracket, round: round, number: k + 1, match: match)
                         }
-                        .glassPanel(radius: 20, padding: 0)
                     }
+                    .glassPanel(radius: 20, padding: 0)
                 }
             }
         } else if store.loading {
@@ -185,27 +193,44 @@ struct TournamentView: View {
         }
     }
 
-    private func row(_ store: TournamentStore, round: Int, match: TournamentBracket.Match) -> some View {
-        HStack(spacing: 8) {
-            side(store, round: round, slot: match.a, match: match, alignment: .leading)
-            Text("vs").scaledFont(11).foregroundStyle(Palette.tertiary)
-            side(store, round: round, slot: match.b, match: match, alignment: .trailing)
+    /// One match of the bracket: each player on a line, with where it stands. Decided: the winner in bold
+    /// with a tick, the others struck through, and every time. Under way: who has played, who has not yet.
+    private func matchRow(_ store: TournamentStore, bracket: TournamentBracket, round: Int, number: Int, match: TournamentBracket.Match) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Match \(number)" + (match.slots.count == 3 ? " · à 3" : "")).scaledFont(11, .semibold).foregroundStyle(Palette.tertiary)
+            ForEach(Array(match.slots.enumerated()), id: \.offset) { position, slot in
+                slotLine(store, bracket: bracket, round: round, match: match, position: position, slot: slot)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
-    private func side(_ store: TournamentStore, round: Int, slot: TournamentBracket.Slot, match: TournamentBracket.Match, alignment: HorizontalAlignment) -> some View {
-        let won = match.decided && slot.player != nil && match.winner?.uid == slot.player?.uid
-        let mine = slot.player?.uid == state.uid
-        // Times are shown once the match is decided, so nobody knows the time to beat.
-        let time = match.decided ? slot.player.flatMap { store.run(round: round, uid: $0.uid)?.scoreMs }.map(ChallengeFormat.time) : nil
-        return VStack(alignment: alignment, spacing: 1) {
-            Text(TournamentText.name(slot)).scaledFont(14, won || mine ? .bold : .regular)
-                .foregroundStyle(slot.player == nil ? Palette.tertiary : match.decided && !won ? Palette.tertiary : mine ? Palette.duelText : Palette.foreground)
-                .lineLimit(1)
-            if let time { Text(time).scaledFont(11).monospacedDigit().foregroundStyle(Palette.tertiary) }
+
+    private func slotLine(_ store: TournamentStore, bracket: TournamentBracket, round: Int, match: TournamentBracket.Match, position: Int, slot: TournamentBracket.Slot) -> some View {
+        let player = slot.player
+        let won = match.decided && player != nil && match.winner?.uid == player?.uid
+        let lost = match.decided && player != nil && !won
+        let mine = player?.uid == (state.uid ?? store.demoUID)
+        let run = player.flatMap { store.run(round: round, uid: $0.uid) }
+        let status: String = {
+            guard player != nil else { return "" }
+            if match.decided { return run?.scoreMs.map(ChallengeFormat.time) ?? "pas joué" }
+            if (TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0) > store.nowMs { return "" }
+            if run?.finishedMs != nil { return "a joué ✓" }
+            return run != nil ? "en train de jouer" : "pas encore joué"
+        }()
+        return HStack(spacing: 8) {
+            Text(TournamentFormat.slotName(bracket, round: round, match: match, position: position))
+                .scaledFont(14, won || mine ? .bold : .regular)
+                .strikethrough(lost, color: Palette.tertiary)
+                .foregroundStyle(player == nil ? Palette.tertiary : lost ? Palette.tertiary : won ? Palette.mint : mine ? Palette.duelText : Palette.foreground)
+                .lineLimit(1).minimumScaleFactor(0.85)
+            if won { Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.mint) }
+            Spacer(minLength: 6)
+            Text(status).scaledFont(12).monospacedDigit()
+                .foregroundStyle(status == "a joué ✓" ? Palette.mint : Palette.tertiary)
         }
-        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
     }
 }
 

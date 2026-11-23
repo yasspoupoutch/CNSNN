@@ -23,12 +23,23 @@ import CNSNNCore
     /// The last round whose runs can no longer change (its 24 hours were over when they were read).
     private var settled = 0
 
-    var nowMs: Int { Int(Date().timeIntervalSince1970 * 1000) }
+    /// Pictures only (`--duel-demo`): an invented tournament (TournamentDemo), never read from the server.
+    private(set) var demoUID: String?
+    private var demoNowMs: Int?
+    private func showDemo(me: String, name: String) {
+        let data = TournamentDemo.make(me: me, name: name)
+        demoUID = me; uid = me; demoNowMs = data.nowMs
+        currentWeek = TournamentDemo.week; current = data.players; currentLoaded = true; currentMine = true; runs = data.runs
+        nextWeek = TournamentRules.nextWeek(nowMs: data.nowMs); nextCount = 4; nextMine = false
+    }
+
+    var nowMs: Int { demoNowMs ?? Int(Date().timeIntervalSince1970 * 1000) }
     var bracket: TournamentBracket { TournamentBracket(week: currentWeek, signedUp: current, runs: runs, nowMs: nowMs) }
     var deadline: Date? { TournamentRules.deadlineMs(week: nextWeek).map { Date(timeIntervalSince1970: Double($0) / 1000) } }
 
     /// The light look: next week's sign-ups and whether I play this week.
     func refresh(state: AppState, force: Bool = false) async {
+        if ScreenshotDemo.duelActive { if demoUID == nil { showDemo(me: ScreenshotDemo.uid, name: state.progress.username) }; return }
         guard let cloud = state.cloud, let uid = state.uid else { return }
         let now = nowMs
         let next = TournamentRules.nextWeek(nowMs: now), week = TournamentRules.currentWeek(nowMs: now)
@@ -49,6 +60,7 @@ import CNSNNCore
 
     /// The week under way: its players (once: they no longer change) and the runs still moving.
     func loadBracket(state: AppState, force: Bool = false) async {
+        if demoUID != nil { return }
         guard let cloud = state.cloud else { return }
         if !force, let runsReadAt, Date().timeIntervalSince(runsReadAt) < 60 { return }
         do {
@@ -58,7 +70,7 @@ import CNSNNCore
                 if let uid { currentMine = current.contains { $0.uid == uid } }
             }
             let now = nowMs
-            let total = TournamentRules.rounds(players: min(current.count, TournamentRules.maxPlayers))
+            let total = TournamentRules.rounds(players: current.count, week: currentWeek)
             guard total > 0, let start = TournamentRules.deadlineMs(week: currentWeek), now >= start else { return }
             let from = settled + 1
             guard from <= total else { return }

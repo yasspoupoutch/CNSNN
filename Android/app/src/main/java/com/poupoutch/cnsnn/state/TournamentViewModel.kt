@@ -11,6 +11,7 @@ import com.poupoutch.cnsnn.core.ChallengeGame
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.ServerClock
 import com.poupoutch.cnsnn.core.TournamentBracket
+import com.poupoutch.cnsnn.core.TournamentDemo
 import com.poupoutch.cnsnn.core.TournamentPlayer
 import com.poupoutch.cnsnn.core.TournamentRules
 import com.poupoutch.cnsnn.core.TournamentRun
@@ -41,11 +42,22 @@ class TournamentStore {
     /** The last round whose runs can no longer change (its 24 hours were over when they were read). */
     private var settled = 0
 
-    val nowMs: Long get() = System.currentTimeMillis()
+    /** Pictures only: an invented tournament ([TournamentDemo]), never read from or sent to the server. */
+    var demo = false; private set
+    private var demoNowMs: Long? = null
+    fun showDemo(me: String, name: String) {
+        val data = TournamentDemo.make(me, name)
+        demo = true; uid = me; demoNowMs = data.nowMs
+        currentWeek = TournamentDemo.WEEK; current = data.players; currentLoaded = true; currentMine = true; runs = data.runs
+        nextWeek = TournamentRules.nextWeek(data.nowMs); nextCount = 4; nextMine = false
+    }
+
+    val nowMs: Long get() = demoNowMs ?: System.currentTimeMillis()
     fun bracket(): TournamentBracket = TournamentBracket(currentWeek, current, runs, nowMs)
 
     /** The light look: next week's sign-ups and whether I play this week. */
     suspend fun refresh(state: AppViewModel, force: Boolean = false) {
+        if (demo) return
         val me = state.uid ?: return
         val now = nowMs
         val next = TournamentRules.nextWeek(now)
@@ -69,6 +81,7 @@ class TournamentStore {
 
     /** The week under way: its players (once: they no longer change) and the runs still moving. */
     suspend fun loadBracket(state: AppViewModel, force: Boolean = false) {
+        if (demo) return
         if (!force && nowMs - runsReadAt < 60_000) return
         try {
             if (!currentLoaded) {
@@ -77,7 +90,7 @@ class TournamentStore {
                 uid?.let { me -> currentMine = current.any { it.uid == me } }
             }
             val now = nowMs
-            val total = TournamentRules.rounds(minOf(current.size, TournamentRules.MAX_PLAYERS))
+            val total = TournamentRules.rounds(current.size, currentWeek)
             val start = TournamentRules.deadlineMs(currentWeek) ?: return
             if (total == 0 || now < start) return
             val from = settled + 1

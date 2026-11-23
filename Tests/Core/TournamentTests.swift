@@ -65,6 +65,47 @@ final class TournamentTests: XCTestCase {
         XCTAssertEqual(end.standing(of: "x", nowMs: start + day), .out)
     }
 
+    func testEveryonePlaysEveryRoundFromDecember() {
+        let later = "2026-12-07"
+        let begin = TournamentRules.deadlineMs(week: later)!
+        XCTAssertTrue(TournamentRules.everyonePlays(week: later))
+        XCTAssertFalse(TournamentRules.everyonePlays(week: week))
+        XCTAssertEqual([0, 1, 2, 3, 4, 7, 10, 64, 200].map { TournamentRules.rounds(players: $0, week: later) }, [0, 0, 1, 1, 2, 2, 3, 6, 6])
+        // 10 players: 5 matches, then 2 (the last one by 3), then the final. Nobody alone.
+        let bracket = TournamentBracket(week: later, signedUp: players(10), runs: [], nowMs: begin)
+        XCTAssertEqual(bracket.rounds.map(\.count), [5, 2, 1])
+        XCTAssertTrue(bracket.rounds[0].allSatisfy { $0.c == nil && $0.slots.allSatisfy { $0.player != nil } && !$0.decided })
+        let semis = bracket.rounds[1]
+        XCTAssertEqual(semis[0].from, [0, 1])
+        XCTAssertEqual(semis[1].from, [2, 3, 4])
+        XCTAssertEqual(semis[1].c, .pending)
+        let order = bracket.players
+        XCTAssertEqual(TournamentFormat.slotName(bracket, round: 2, match: semis[0], position: 1), "Gagnant de \(order[2].name) / \(order[3].name)")
+        XCTAssertEqual(TournamentFormat.slotName(bracket, round: 3, match: bracket.rounds[2][0], position: 0), "Gagnant du match 1")
+        let next = bracket.following(round: 1, index: 4)
+        XCTAssertEqual(next?.match, semis[1])
+        XCTAssertEqual(next?.others, [0, 1])
+        // Round 1 finished: the fastest of each match goes on, in the same order.
+        let runs = (0..<10).map { TournamentRun(uid: order[$0].uid, round: 1, startedMs: begin + 1_000, finishedMs: begin + 30_000 + $0 * 1_000) }
+        let after = TournamentBracket(week: later, signedUp: players(10), runs: runs, nowMs: begin + 100_000)
+        XCTAssertEqual(after.rounds[0].map(\.winner), [order[0], order[2], order[4], order[6], order[8]])
+        let three = after.rounds[1][1]
+        XCTAssertEqual(three.slots, [order[4], order[6], order[8]].map { .player($0) })
+        XCTAssertEqual(three.opponents(of: order[6].uid).count, 2)
+        // The match of 3: the fastest goes through, the two others are out.
+        let second = runs + [TournamentRun(uid: order[4].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 50_000),
+                             TournamentRun(uid: order[6].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 20_000),
+                             TournamentRun(uid: order[8].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 40_000)]
+        let later2 = TournamentBracket(week: later, signedUp: players(10), runs: second, nowMs: begin + day + 60_000)
+        XCTAssertEqual(later2.rounds[1][1].winner, order[6])
+        XCTAssertEqual(later2.standing(of: order[8].uid, nowMs: begin + day + 60_000), .eliminated(round: 2))
+        XCTAssertEqual(later2.rounds[2][0].b, .player(order[6]))
+        // 3 players: one match of 3, which is the final.
+        let small = TournamentBracket(week: later, signedUp: players(3), runs: [], nowMs: begin)
+        XCTAssertEqual(small.rounds.count, 1)
+        XCTAssertEqual(small.rounds[0][0].slots.count, 3)
+    }
+
     func testOnlyTheFirst64() {
         let bracket = TournamentBracket(week: week, signedUp: players(70), runs: [], nowMs: start)
         XCTAssertEqual(bracket.players.count, 64)
