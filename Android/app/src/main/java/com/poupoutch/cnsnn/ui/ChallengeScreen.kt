@@ -453,7 +453,7 @@ fun DuelTournamentCards(state: AppViewModel, duel: () -> Unit, tournament: () ->
                     color = if (play) Palette.foreground else Duel.soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (foot != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Icon(CrownIcon, null, Modifier.size(12.dp), tint = Palette.accent)
-                    Text(foot, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(foot, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
                 }
             }
         }

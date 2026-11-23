@@ -206,7 +206,9 @@ struct TournamentTree: View {
         let layout = TournamentLayout(bracket, height: { Double(Self.height($0)) }, gap: Double(Self.gap))
         let total = bracket.rounds.count
         let width = Self.x(layout.columns) - Self.columnGap + Self.margin
-        let top = Self.header + Self.trophy
+        // Room for the round names, and for the trophy when the final sits too high for it.
+        let finalTop = layout.node(round: total, index: 0).map { CGFloat($0.y - $0.height / 2) } ?? 0
+        let top = Self.header + max(0, Self.trophy - finalTop)
         let height = top + CGFloat(layout.height) + 8
         let target = me.flatMap { uid in layout.nodes.last { bracket.rounds[$0.round - 1][$0.index].has(uid) } }
             ?? layout.node(round: total, index: 0)

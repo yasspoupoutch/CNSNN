@@ -70,10 +70,13 @@ class TournamentStore {
         if (!force && next == nextWeek && now - readAt < 60_000) return
         loading = true
         try {
-            nextWeek = next
-            nextMine = state.cloud.isSignedUp(next, me)
-            nextCount = state.cloud.tournamentCount(next)
-            if (!currentLoaded) currentMine = state.cloud.isSignedUp(week, me)
+            // Read first, then set: the pictures' invented tournament may have arrived meanwhile.
+            val mine = state.cloud.isSignedUp(next, me)
+            val count = state.cloud.tournamentCount(next)
+            val playing = if (!currentLoaded) state.cloud.isSignedUp(week, me) else currentMine
+            if (demo) return
+            nextWeek = next; nextMine = mine; nextCount = count
+            if (!currentLoaded) currentMine = playing
             readAt = now
             if (currentMine || currentLoaded) loadBracket(state, force)
         } catch (e: Exception) {
@@ -88,7 +91,9 @@ class TournamentStore {
         if (!force && nowMs - runsReadAt < 60_000) return
         try {
             if (!currentLoaded) {
-                current = state.cloud.tournamentPlayers(currentWeek)
+                val players = state.cloud.tournamentPlayers(currentWeek)
+                if (demo) return
+                current = players
                 currentLoaded = true
                 uid?.let { me -> currentMine = current.any { it.uid == me } }
             }
@@ -99,6 +104,7 @@ class TournamentStore {
             val from = settled + 1
             if (from > total) return
             val fresh = state.cloud.tournamentRuns(currentWeek, from)
+            if (demo) return
             runs = runs.filter { it.round < from } + fresh
             runsReadAt = now
             settled = maxOf(settled, (1..total).lastOrNull { (TournamentRules.roundEndMs(currentWeek, it) ?: Long.MAX_VALUE) <= now } ?: 0)

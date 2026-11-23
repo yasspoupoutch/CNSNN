@@ -264,7 +264,9 @@ private fun TournamentTree(store: TournamentStore, bracket: TournamentBracket, m
     val layout = remember(bracket) { TournamentLayout(bracket, { Tree.height(it).value.toDouble() }, Tree.gap.value.toDouble()) }
     val total = bracket.rounds.size
     val width = Tree.x(layout.columns) - Tree.columnGap + Tree.margin
-    val top = Tree.header + Tree.trophy
+    // Room for the round names, and for the trophy when the final sits too high for it.
+    val finalTop = layout.node(total, 0)?.let { (it.y - it.height / 2).dp } ?: 0.dp
+    val top = Tree.header + maxOf(0.dp, Tree.trophy - finalTop)
     val height = top + layout.height.dp + 8.dp
     val scroll = rememberScrollState()
     val density = LocalDensity.current
