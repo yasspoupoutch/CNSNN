@@ -27,6 +27,10 @@ on:
         description: "Avec week_check : un jour de la semaine voulue (AAAA-MM-JJ), vide = cette semaine"
         type: string
         default: ''
+      day_ranking:
+        description: "Classement du mot du jour d'un jour (AAAA-MM-JJ), lecture seule"
+        type: string
+        default: ''
       players:
         description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
         type: boolean
@@ -150,7 +154,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.card_fixes == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.card_fixes == 'voir' || inputs.week_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.card_fixes == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.card_fixes == 'voir' || inputs.week_check || inputs.day_ranking != '' || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -236,6 +240,11 @@ jobs:
         env:
           WEEK_DAY: ${{ inputs.week_day }}
         run: node tools/week.mjs
+      - name: Classement du mot du jour d'un jour
+        if: ${{ inputs.day_ranking != '' }}
+        env:
+          DAY: ${{ inputs.day_ranking }}
+        run: node tools/day.mjs
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
