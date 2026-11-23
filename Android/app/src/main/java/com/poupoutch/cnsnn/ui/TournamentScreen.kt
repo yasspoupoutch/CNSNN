@@ -38,7 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -246,12 +245,13 @@ private fun SlotLine(store: TournamentStore, bracket: TournamentBracket, round: 
         else -> "pas encore joué"
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(TournamentFormat.slotName(bracket, round, match, position), fontSize = 14.sp, fontWeight = if (won || mine) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
-            textDecoration = if (lost) TextDecoration.LineThrough else null,
-            color = when { id == null || lost -> Palette.tertiary; won -> Palette.mint; mine -> Duel.text; else -> Palette.foreground })
-        if (won) Icon(Icons.Filled.CheckCircle, null, Modifier.size(15.dp), tint = Palette.mint)
-        Spacer(Modifier.weight(1f))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(TournamentFormat.slotName(bracket, round, match, position), fontSize = 14.sp, fontWeight = if (won || mine) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                textDecoration = if (lost) TextDecoration.LineThrough else null,
+                color = when { id == null || lost -> Palette.tertiary; won -> Palette.mint; mine -> Duel.text; else -> Palette.foreground })
+            if (won) Icon(Icons.Filled.CheckCircle, null, Modifier.size(15.dp), tint = Palette.mint)
+        }
         Text(status, fontSize = 12.sp, color = if (status == "a joué ✓") Palette.mint else Palette.tertiary)
     }
 }
