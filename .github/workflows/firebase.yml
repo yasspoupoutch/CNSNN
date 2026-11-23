@@ -45,6 +45,10 @@ on:
         description: "Sprint : joueurs dont le record du téléphone dépasse sa ligne du classement"
         type: boolean
         default: false
+      sprint_copy:
+        description: "Sprint : recopier au classement le record du téléphone d'un joueur sans ligne (pseudo, accord de Yasin)"
+        type: string
+        default: ''
       account_check:
         description: "Vérifier un compte par son e-mail (existe ?, connexion, pseudo ; l'e-mail n'est pas affiché)"
         type: string
@@ -150,7 +154,7 @@ jobs:
     name: Publier sur Firebase
     needs: rules-tests
     # Writes only from main. Printing the public key, the usage counts or encrypted lists is harmless, so they also run on a branch.
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.card_fixes == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.card_fixes == 'voir' || inputs.week_check || inputs.sprint_check || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && ((github.ref == 'refs/heads/main' && (inputs.deploy || inputs.admin_uid != '' || inputs.delete_users != '' || inputs.daily_seed || inputs.daily_change == 'appliquer' || inputs.auth_email == 'appliquer' || inputs.card_fixes == 'appliquer' || inputs.android_app || inputs.site)) || inputs.daily_public_key || inputs.daily_change == 'voir' || inputs.daily_change == 'liste' || inputs.usage || inputs.players || inputs.proposals || inputs.card_fixes == 'voir' || inputs.week_check || inputs.sprint_check || inputs.sprint_copy != '' || inputs.account_check != '' || inputs.auth_email == 'voir')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -237,6 +241,11 @@ jobs:
       - name: Records Sprint absents du classement
         if: ${{ inputs.sprint_check }}
         run: node tools/sprint-check.mjs
+      - name: Recopier un record Sprint au classement
+        if: ${{ inputs.sprint_copy != '' }}
+        env:
+          PSEUDO: ${{ inputs.sprint_copy }}
+        run: node tools/sprint-copy.mjs "$PSEUDO"
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
         run: node tools/android-app.mjs
