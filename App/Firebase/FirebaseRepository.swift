@@ -1040,6 +1040,16 @@ enum DailyGuesses {
                         from: side("from", uid: from), to: side("to", uid: to), code: d["code"] as? String)
     }
 
+    // MARK: Crowns
+
+    /// Last week's number 1 and the last tournament's winner (written by Firebase/tools/champions.mjs). One read.
+    func champions() async throws -> Champions {
+        let d = try await db.collection("meta").document("champions").getDocument().data() ?? [:]
+        return Champions(weekMonday: d["weekMonday"] as? String ?? "", weekUid: d["weekUid"] as? String ?? "", weekName: d["weekName"] as? String ?? "",
+                         tournamentWeek: d["tournamentWeek"] as? String ?? "", tournamentUid: d["tournamentUid"] as? String ?? "",
+                         tournamentName: d["tournamentName"] as? String ?? "")
+    }
+
     // MARK: Weekly tournament
 
     private func tournament(_ week: String) -> DocumentReference { db.collection("tournaments").document(week) }

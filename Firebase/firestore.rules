@@ -428,6 +428,12 @@ service cloud.firestore {
   function sprintRank(best, startedAt) { return best * 10000000000000 + (9999999999999 - startedAt.toMillis()); }
 
   // ---- Version of the approved card catalogue: the app downloads the cards again only when it moved.
+  // The crowns on the home screen (last week's number 1, the last tournament's winner): written by
+  // tools/champions.mjs with the service account, read by every player.
+  match /meta/champions {
+   allow get: if signedIn();
+   allow write: if false;
+  }
   match /meta/cards {
    allow get: if signedIn();
    allow write: if admin() && request.resource.data.keys().hasOnly(['updatedAt']) && request.resource.data.updatedAt == request.time;

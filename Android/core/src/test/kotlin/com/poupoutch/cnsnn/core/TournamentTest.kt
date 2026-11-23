@@ -110,6 +110,53 @@ class TournamentTest {
         assertEquals(3, small.rounds[0][0].slots.size)
     }
 
+    @Test fun drawnLikeAFootballBracket() {
+        val later = "2026-12-07"
+        val begin = TournamentRules.deadlineMs(later)!!
+        // 10 players: matches 1-2 on the left, 3-5 on the right, the final in the middle.
+        val layout = TournamentLayout(TournamentBracket(later, players(10), emptyList(), begin), { if (it == 3) 84.0 else 60.0 }, 10.0)
+        assertEquals(5, layout.columns)
+        assertEquals(200.0, layout.height, 0.01)
+        assertEquals(8, layout.nodes.size)
+        fun at(r: Int, i: Int) = layout.node(r, i)!!
+        assertEquals(TournamentLayout.Side.Left, at(1, 0).side); assertEquals(0, at(1, 0).column); assertEquals(65.0, at(1, 0).y, 0.01)
+        assertEquals(135.0, at(1, 1).y, 0.01)
+        assertEquals(TournamentLayout.Side.Right, at(1, 2).side); assertEquals(4, at(1, 4).column); assertEquals(30.0, at(1, 2).y, 0.01)
+        assertEquals(1, at(2, 0).column); assertEquals(100.0, at(2, 0).y, 0.01)
+        assertEquals(3, at(2, 1).column); assertEquals(100.0, at(2, 1).y, 0.01); assertEquals(84.0, at(2, 1).height, 0.01)
+        assertEquals(TournamentLayout.Side.Center, at(3, 0).side); assertEquals(2, at(3, 0).column); assertEquals(100.0, at(3, 0).y, 0.01)
+        // 64 players: 16 first matches each side, 11 columns. 2 players: the final alone.
+        val big = TournamentLayout(TournamentBracket(later, players(64), emptyList(), begin), { 60.0 }, 10.0)
+        assertEquals(11, big.columns); assertEquals(63, big.nodes.size)
+        assertEquals(16, big.nodes.count { it.round == 1 && it.side == TournamentLayout.Side.Left })
+        val two = TournamentLayout(TournamentBracket(later, players(2), emptyList(), begin), { 60.0 }, 10.0)
+        assertEquals(1, two.columns); assertEquals(1, two.nodes.size)
+        // The old format (byes) draws too.
+        assertEquals(15, TournamentLayout(TournamentBracket(week, players(10), emptyList(), start), { 60.0 }, 10.0).nodes.size)
+    }
+
+    @Test fun remindersForTheTournament() {
+        val demo = TournamentDemo.make("me", "Camille")
+        val bracket = TournamentBracket(TournamentDemo.WEEK, demo.players, demo.runs, demo.nowMs)
+        val begin = TournamentRules.deadlineMs(TournamentDemo.WEEK)!!
+        val next = TournamentRules.nextWeek(demo.nowMs)
+        val plan = TournamentReminders.plan(next, true, bracket, "me", demo.runs, demo.nowMs) { "demain" }
+        assertEquals(listOf("start", "late", "round3"), plan.map { it.id })
+        assertEquals(TournamentRules.deadlineMs(next), plan[0].atMs)
+        assertEquals(begin + day + TournamentReminders.EVENING_AFTER_MS, plan[1].atMs)
+        assertEquals("Finale du tournoi", plan[2].title)
+        // Played and won: no evening reminder, the final is sure.
+        val won = demo.runs + bracket.rounds[1][0].slots.mapNotNull { (it as? TournamentBracket.Slot.Player)?.player }.map {
+            TournamentRun(it.uid, 2, demo.nowMs - 10_000, demo.nowMs - 10_000 + if (it.uid == "me") 20_000 else 40_000)
+        }
+        val later = demo.nowMs + 60_000
+        val after = TournamentReminders.plan(next, false, TournamentBracket(TournamentDemo.WEEK, demo.players, won, later), "me", won, later) { "" }
+        assertEquals(listOf("round3"), after.map { it.id })
+        assertEquals("Qualifié : finale", after[0].title)
+        // Out: nothing about this week.
+        assertEquals(emptyList<TournamentReminders.Alert>(), TournamentReminders.plan(next, false, bracket, "nobody", demo.runs, demo.nowMs) { "" })
+    }
+
     @Test fun demoForThePictures() {
         val demo = TournamentDemo.make("me", "Camille")
         val bracket = TournamentBracket(TournamentDemo.WEEK, demo.players, demo.runs, demo.nowMs)

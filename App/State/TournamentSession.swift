@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 import CNSNNCore
 
 /// The weekly tournament as this phone knows it (Core/Tournament.swift): next week's sign-ups (a count
@@ -56,6 +57,7 @@ import CNSNNCore
             readAt = Date()
             if currentMine || currentLoaded { await loadBracket(state: state, force: force) }
         } catch { message = CloudError.message(error) }
+        TournamentAlarms.update(self)
     }
 
     /// The week under way: its players (once: they no longer change) and the runs still moving.
@@ -78,6 +80,7 @@ import CNSNNCore
             runs = runs.filter { $0.round < from } + fresh
             runsReadAt = Date()
             settled = max(settled, (1...total).last { (TournamentRules.roundEndMs(week: currentWeek, round: $0) ?? .max) <= now } ?? 0)
+            TournamentAlarms.update(self)
         } catch { message = CloudError.message(error) }
     }
 
@@ -87,6 +90,9 @@ import CNSNNCore
         do {
             try await cloud.signUp(week: nextWeek, uid: uid, username: state.progress.username)
             nextMine = true; nextCount += 1; message = nil
+            // Signing up is the moment to offer the reminders of the tournament (start, each round).
+            await TournamentAlarms.ask()
+            TournamentAlarms.update(self)
         } catch { message = CloudError.message(error) }
     }
     func withdraw(state: AppState) async {
@@ -94,6 +100,7 @@ import CNSNNCore
         do {
             try await cloud.withdraw(week: nextWeek, uid: uid)
             nextMine = false; nextCount = max(0, nextCount - 1); message = nil
+            TournamentAlarms.update(self)
         } catch { message = CloudError.message(error) }
     }
 
@@ -101,8 +108,49 @@ import CNSNNCore
     func note(_ run: TournamentRun) {
         runs.removeAll { $0.round == run.round && $0.uid == run.uid }
         runs.append(run)
+        TournamentAlarms.update(self)
     }
     func run(round: Int, uid: String) -> TournamentRun? { runs.first { $0.round == round && $0.uid == uid } }
+}
+
+/// The tournament's notifications on this phone (TournamentReminders): the start, each round while I am
+/// in, an evening reminder when my match is not played yet. Set again whenever the tournament is read.
+@MainActor enum TournamentAlarms {
+    private static let prefix = "cnsnn.tournament."
+    private static var last: [TournamentReminders.Alert]?
+
+    static func update(_ store: TournamentStore) {
+        guard !RuntimeFlags.isTesting else { return }
+        let now = store.nowMs
+        let alerts = TournamentReminders.plan(nextWeek: store.nextWeek, nextMine: store.nextMine, bracket: store.currentLoaded ? store.bracket : nil,
+                                              uid: store.uid, runs: store.runs, nowMs: now, day: TournamentText.day)
+        guard alerts != last else { return }
+        last = alerts
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let old = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
+            center.removePendingNotificationRequests(withIdentifiers: old)
+            let status = await center.notificationSettings().authorizationStatus
+            guard [.authorized, .provisional, .ephemeral].contains(status) else { return }
+            for alert in alerts {
+                let content = UNMutableNotificationContent()
+                content.title = alert.title
+                content.body = alert.body
+                content.sound = .default
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, Double(alert.atMs - now) / 1000), repeats: false)
+                try? await center.add(UNNotificationRequest(identifier: prefix + alert.id, content: content, trigger: trigger))
+            }
+        }
+    }
+    /// Apple's question, only if never asked.
+    static func ask() async {
+        guard !RuntimeFlags.isTesting else { return }
+        let center = UNUserNotificationCenter.current()
+        if await center.notificationSettings().authorizationStatus == .notDetermined {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            last = nil
+        }
+    }
 }
 
 /// One tournament match on screen: my clock starts on the server when I begin, the 5 words of the round,

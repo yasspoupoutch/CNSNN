@@ -1,5 +1,11 @@
 package com.poupoutch.cnsnn.ui
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import com.poupoutch.cnsnn.core.TournamentBracket
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -407,43 +413,96 @@ private fun DuelChoice(icon: ImageVector, title: String, line: String, modifier:
 
 /**
  * Home: the DUEL and TOURNOI cards, side by side (one under the other when the text is very large).
- * No read here: the tournament line comes from the calendar, or from what the tournament screen already read.
+ * The TOURNOI card says where I stand (a gold "À jouer" when my match is open and not played yet) and
+ * wears the crown of the last tournament's winner.
  */
 @Composable
 fun DuelTournamentCards(state: AppViewModel, duel: () -> Unit, tournament: () -> Unit) {
     val store = state.tournament
-    val tournamentLine = when {
-        store.currentMine -> "Votre match de la semaine"
-        else -> {
-            val day = TournamentRules.deadlineMs(TournamentRules.nextWeek(nowMs()))?.let(TournamentText::day) ?: "lundi 9 h"
-            if (store.nextMine) "Inscrit · début $day" else "Inscriptions jusqu’à $day"
-        }
-    }
+    val (tournamentLine, toPlay) = tournamentStatus(state)
+    val crown = state.champions?.tournamentCrown(store.nowMs)
+    val me = state.uid
+    val crowned = crown != null && crown.first == me
+    val footer = crown?.let { if (crowned) "Vainqueur du dernier tournoi" else "Vainqueur : ${it.second}" }
     val haptics = rememberHaptics()
-    @Composable fun card(icon: ImageVector, tint: Color, title: String, line: String, tag: String, modifier: Modifier, open: () -> Unit) {
-        Surface({ haptics.selection(); open() }, modifier.testTag(tag), shape = RoundedCornerShape(26.dp), color = Color.Transparent, border = Duel.border) {
+    val pulse = if (toPlay && !isTesting()) {
+        rememberInfiniteTransition(label = "toPlay").animateFloat(1f, 0.4f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "pulse").value
+    } else 1f
+    @Composable fun card(icon: ImageVector, tint: Color, title: String, line: String, tag: String, modifier: Modifier, play: Boolean, crownMe: Boolean,
+                         foot: String?, open: () -> Unit) {
+        val shape = RoundedCornerShape(26.dp)
+        Surface({ haptics.selection(); open() }, modifier.testTag(tag), shape = shape, color = Color.Transparent,
+            border = if (play) BorderStroke(1.5.dp, Palette.accent.copy(alpha = 0.45f + 0.5f * pulse)) else Duel.border) {
             Column(Modifier.fillMaxSize().background(Duel.surface).padding(horizontal = 16.dp, vertical = 14.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "$title. $line" }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                .semantics(mergeDescendants = true) { contentDescription = title + (if (play) ". À jouer" else "") + ". $line" + (foot?.let { ". $it" } ?: "") },
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(icon, null, Modifier.size(18.dp), tint = tint)
-                    Text(title.uppercase(), fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                    Text(title.uppercase(), fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                    if (crownMe) Icon(CrownIcon, null, Modifier.size(20.dp), tint = Palette.accent)
                 }
-                Text(line, fontSize = 13.sp, color = Duel.soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (play) {
+                    Row(Modifier.background(Brush.verticalGradient(listOf(Palette.accentTop, Palette.accentBottom)), RoundedCornerShape(11.dp))
+                        .heightIn(min = 22.dp).padding(horizontal = 9.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(6.dp).background(Palette.onAccent.copy(alpha = 0.35f + 0.65f * pulse), CircleShape))
+                        Text("À JOUER", fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, color = Palette.onAccent)
+                    }
+                }
+                Text(line, fontSize = 13.sp, fontWeight = if (play) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (play) Palette.foreground else Duel.soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (foot != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Icon(CrownIcon, null, Modifier.size(12.dp), tint = Palette.accent)
+                    Text(foot, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
     if (LocalDensity.current.fontScale > 1.5f) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.fillMaxWidth(), duel)
-            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.fillMaxWidth(), tournament)
+            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.fillMaxWidth(), false, false, null, duel)
+            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.fillMaxWidth(), toPlay, crowned, footer, tournament)
         }
     } else {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.weight(1f).fillMaxHeight(), duel)
-            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.weight(1f).fillMaxHeight(), tournament)
+            card(Icons.Filled.Bolt, Duel.text, "Duel", "En direct, au hasard ou avec un ami", "duelCard", Modifier.weight(1f).fillMaxHeight(), false, false, null, duel)
+            card(Icons.Filled.EmojiEvents, Palette.accent, "Tournoi", tournamentLine, "tournamentCard", Modifier.weight(1f).fillMaxHeight(), toPlay, crowned, footer, tournament)
         }
     }
 }
+
+/** Where I stand: my match to play, played, through, out; otherwise the sign-ups. */
+private fun tournamentStatus(state: AppViewModel): Pair<String, Boolean> {
+    val store = state.tournament
+    val now = store.nowMs
+    val uid = state.uid
+    if (store.currentMine && store.currentLoaded && uid != null) {
+        val bracket = store.bracket()
+        val week = store.currentWeek
+        when (val standing = bracket.standing(uid, now)) {
+            is TournamentBracket.Standing.InMatch -> {
+                val round = standing.round
+                val end = TournamentRules.roundEndMs(week, round) ?: 0
+                return if (!standing.match.decided) {
+                    if (store.run(round, uid)?.finishedMs == null) "Votre match est ouvert jusqu’à ${TournamentText.day(end)}" to true
+                    else "Match joué · résultat au plus tard ${TournamentText.day(end)}" to false
+                } else if (round == bracket.rounds.size) "Champion de la semaine !" to false
+                else "Qualifié ! Prochain match ${TournamentText.day(end)}" to false
+            }
+            is TournamentBracket.Standing.Through ->
+                return "Qualifié · prochain match ${TournamentText.day(TournamentRules.roundStartMs(week, standing.round + 1) ?: 0)}" to false
+            is TournamentBracket.Standing.Eliminated ->
+                return (if (store.nextMine) "Éliminé · inscrit au prochain" else "Éliminé · revanche au prochain tournoi") to false
+            TournamentBracket.Standing.Champion -> return "Champion de la semaine !" to false
+            TournamentBracket.Standing.Out -> {}
+        }
+    } else if (store.currentMine) return "Votre match de la semaine" to false
+    val day = TournamentRules.deadlineMs(TournamentRules.nextWeek(now))?.let(TournamentText::day) ?: "lundi 9 h"
+    return (if (store.nextMine) "Inscrit · début $day" else "Inscriptions jusqu’à $day") to false
+}
+
+/** Under instrumentation (the pictures, the tests): no endless animation. */
+private fun isTesting(): Boolean = runCatching { Class.forName("androidx.test.espresso.Espresso"); true }.getOrDefault(false)
 
 @Composable
 private fun PersonRow(name: String, id: String, detail: String, detailColor: Color = Palette.tertiary, link: Boolean = false, action: @Composable () -> Unit) {

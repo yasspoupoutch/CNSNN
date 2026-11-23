@@ -280,6 +280,120 @@ object TournamentFormat {
 }
 
 /**
+ * The tournament's local notifications (no server): the start of a tournament I signed up for, each round
+ * while I am still in (sure when I am through, a "come and see" otherwise), and an evening reminder when my
+ * match of the day is not played yet. Worked out again each time the app reads it. Same as Tournament.swift.
+ */
+object TournamentReminders {
+    data class Alert(val id: String, val atMs: Long, val title: String, val body: String)
+    /** 19:00 UTC, 20 h in Paris in winter: 11 hours after a round opens. */
+    const val EVENING_AFTER_MS = 11 * 3_600_000L
+
+    fun plan(nextWeek: String, nextMine: Boolean, bracket: TournamentBracket?, uid: String?, runs: List<TournamentRun>,
+             nowMs: Long, day: (Long) -> String): List<Alert> {
+        val alerts = mutableListOf<Alert>()
+        val start = TournamentRules.deadlineMs(nextWeek)
+        if (nextMine && start != null && start > nowMs) {
+            alerts += Alert("start", start, "Le tournoi commence !", "Votre premier match est ouvert : 24 h pour le jouer, quand vous voulez.")
+        }
+        if (bracket == null || uid == null || bracket.players.none { it.uid == uid }) return alerts
+        val week = bracket.week
+        val total = bracket.rounds.size
+        var from: Int? = null
+        var sure: Int? = null
+        when (val standing = bracket.standing(uid, nowMs)) {
+            is TournamentBracket.Standing.InMatch -> {
+                val round = standing.round
+                if (!standing.match.decided) {
+                    val played = runs.any { it.round == round && it.uid == uid && it.finishedMs != null }
+                    val begin = TournamentRules.roundStartMs(week, round)
+                    val end = TournamentRules.roundEndMs(week, round)
+                    if (!played && begin != null && end != null) {
+                        listOf(begin + EVENING_AFTER_MS, end - 2 * 3_600_000L).firstOrNull { it > nowMs && it > begin }?.let {
+                            alerts += Alert("late", it, "Votre match du tournoi vous attend",
+                                "Il vous reste jusqu’à ${day(end)} pour le jouer. Ne laissez pas filer votre place !")
+                        }
+                    }
+                } else sure = round + 1
+                from = round + 1
+            }
+            is TournamentBracket.Standing.Through -> { sure = standing.round + 1; from = standing.round + 1 }
+            else -> {}
+        }
+        val first = from
+        if (first != null && first <= total) {
+            for (round in first..total) {
+                val at = TournamentRules.roundStartMs(week, round) ?: continue
+                if (at <= nowMs) continue
+                val name = TournamentFormat.roundName(round, total)
+                alerts += if (round == sure) Alert("round$round", at, "Qualifié : " + name.lowercase(), "Votre match est ouvert : 24 h pour le jouer. Bonne chance !")
+                    else Alert("round$round", at, "$name du tournoi", "Le tour commence. Êtes-vous qualifié ? Venez voir votre match.")
+            }
+        }
+        return alerts
+    }
+}
+
+/**
+ * The bracket drawn like a football one: the first rounds on the left and on the right, the final in the
+ * middle. The left half is what leads to the final's first player, the right half the others.
+ * Positions in dp: [Node.column] from 0 (far left) to `columns - 1`, [Node.y] the centre of the match.
+ */
+class TournamentLayout(bracket: TournamentBracket, height: (Int) -> Double, gap: Double) {
+    enum class Side { Left, Center, Right }
+    data class Node(val round: Int, val index: Int, val side: Side, val column: Int, val y: Double, val height: Double)
+
+    var nodes: List<Node> = emptyList(); private set
+    var columns = 0; private set
+    var height = 0.0; private set
+
+    init {
+        val rounds = bracket.rounds
+        val total = rounds.size
+        val final = rounds.lastOrNull()?.firstOrNull()
+        if (total > 0 && final != null) {
+            columns = 2 * total - 1
+            if (total == 1) {
+                val h = height(final.slots.size)
+                nodes = listOf(Node(1, 0, Side.Center, 0, h / 2, h))
+                this.height = h
+            } else {
+                val placed = mutableListOf<Node>()
+                val cursor = doubleArrayOf(0.0, 0.0)
+                fun place(round: Int, index: Int, side: Side): Double {
+                    val match = rounds[round - 1][index]
+                    val h = height(match.slots.size)
+                    val column = if (side == Side.Left) round - 1 else 2 * (total - 1) - (round - 1)
+                    val c = if (side == Side.Left) 0 else 1
+                    val y: Double
+                    if (round == 1 || match.from.isEmpty()) {
+                        y = cursor[c] + h / 2
+                        cursor[c] += h + gap
+                    } else {
+                        val ys = match.from.map { place(round - 1, it, side) }
+                        y = (ys.first() + ys.last()) / 2
+                    }
+                    placed += Node(round, index, side, column, y, h)
+                    return y
+                }
+                final.from.take(1).forEach { place(total - 1, it, Side.Left) }
+                final.from.drop(1).forEach { place(total - 1, it, Side.Right) }
+                val leftHeight = maxOf(0.0, cursor[0] - gap)
+                val rightHeight = maxOf(0.0, cursor[1] - gap)
+                val finalHeight = height(final.slots.size)
+                val full = maxOf(leftHeight, rightHeight, finalHeight)
+                // The shorter half is centred against the taller one.
+                nodes = placed.map { it.copy(y = it.y + (full - if (it.side == Side.Left) leftHeight else rightHeight) / 2) } +
+                    Node(total, 0, Side.Center, total - 1, full / 2, finalHeight)
+                this.height = full
+            }
+        }
+    }
+
+    fun node(round: Int, index: Int): Node? = nodes.firstOrNull { it.round == round && it.index == index }
+}
+
+/**
  * Pictures only (screenshots): an invented tournament of 10, the second day under way. Round 1 is over
  * (I won mine), my match of the day is still to play, the others show who has played and who has not yet.
  */

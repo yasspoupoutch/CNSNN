@@ -60,6 +60,11 @@ class LocalStore(context: Context) {
         get() = prefs.getBoolean("tutorial.seen", false)
         set(value) { prefs.edit().putBoolean("tutorial.seen", value).apply() }
 
+    /** The crowns of the home page, kept so they show at once. */
+    var champions: Champions?
+        get() = Champions.decode(prefs.getString("champions", null))
+        set(value) { prefs.edit().putString("champions", value?.encode()).apply() }
+
     var remindersEnabled: Boolean
         get() = prefs.getBoolean("reminders.enabled", false)
         set(value) { prefs.edit().putBoolean("reminders.enabled", value).apply() }

@@ -102,6 +102,9 @@ final class CNSNNScreenshotTests: XCTestCase {
 
         let tile = app.buttons["duelCard"]
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        // The crowns: last week's number 1 on the daily card, the last tournament's winner on TOURNOI.
+        XCTAssertTrue(app.descendants(matching: .any)["weekCrown"].firstMatch.waitForExistence(timeout: 10))
+        capture("duel-09-couronne")
         app.swipeUp()
         capture("duel-00-accueil")
 

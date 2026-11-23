@@ -165,71 +165,189 @@ struct TournamentView: View {
     @ViewBuilder private func bracket(_ store: TournamentStore) -> some View {
         if store.currentLoaded {
             let bracket = store.bracket
-            let total = bracket.rounds.count
             if bracket.players.count < 2 {
                 Text(bracket.players.isEmpty ? "Pas de tournoi cette semaine : inscrivez-vous au prochain !" : "Un seul inscrit cette semaine : pas de tournoi. Rendez-vous au prochain !")
                     .scaledFont(14).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
-                if let champion = bracket.champion {
-                    Text("Champion : " + champion.name + " 🏆").scaledFont(17, .bold).foregroundStyle(Palette.accent)
-                }
                 Text("Résultats au fil de la journée : les temps s’affichent quand le match est fini.")
                     .scaledFont(12).foregroundStyle(Palette.tertiary).fixedSize(horizontal: false, vertical: true)
-                ForEach(Array(bracket.rounds.enumerated()), id: \.offset) { index, matches in
-                    let round = index + 1
-                    SectionKicker(text: TournamentFormat.roundName(round, of: total) + " · " + TournamentText.day(TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0))
-                        .padding(.top, 6)
-                    VStack(spacing: 0) {
-                        ForEach(Array(matches.enumerated()), id: \.offset) { k, match in
-                            if k > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
-                            matchRow(store, bracket: bracket, round: round, number: k + 1, match: match)
-                        }
-                    }
-                    .glassPanel(radius: 20, padding: 0)
-                }
+                TournamentTree(bracket: bracket, store: store, me: state.uid ?? store.demoUID)
+                    .padding(.horizontal, -20)
             }
         } else if store.loading {
             ProgressView().tint(Palette.secondary).frame(maxWidth: .infinity)
         }
     }
 
-    /// One match of the bracket: each player on a line, with where it stands. Decided: the winner in bold
-    /// with a tick, the others struck through, and every time. Under way: who has played, who has not yet.
-    private func matchRow(_ store: TournamentStore, bracket: TournamentBracket, round: Int, number: Int, match: TournamentBracket.Match) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Match \(number)" + (match.slots.count == 3 ? " · à 3" : "")).scaledFont(11, .semibold).foregroundStyle(Palette.tertiary)
-            ForEach(Array(match.slots.enumerated()), id: \.offset) { position, slot in
-                slotLine(store, bracket: bracket, round: round, match: match, position: position, slot: slot)
+}
+
+/// The bracket drawn like a football one (TournamentLayout): the first rounds on both sides, the final
+/// in the middle under the trophy, lines from each match to the next. It scrolls sideways and opens on
+/// my match. Each player: the winner in mint with a tick, the others struck through, the times once a
+/// match is over; during the day, a tick for who has played and "en jeu" for who is playing.
+struct TournamentTree: View {
+    let bracket: TournamentBracket
+    let store: TournamentStore
+    let me: String?
+
+    static let cardWidth: CGFloat = 136
+    static let columnGap: CGFloat = 28
+    static let slotHeight: CGFloat = 26
+    static let pad: CGFloat = 7
+    static let gap: CGFloat = 14
+    static let header: CGFloat = 34
+    static let trophy: CGFloat = 78
+    static let margin: CGFloat = 20
+
+    static func height(_ slots: Int) -> CGFloat { pad * 2 + CGFloat(slots) * slotHeight }
+    static func x(_ column: Int) -> CGFloat { margin + CGFloat(column) * (cardWidth + columnGap) }
+
+    var body: some View {
+        let layout = TournamentLayout(bracket, height: { Double(Self.height($0)) }, gap: Double(Self.gap))
+        let total = bracket.rounds.count
+        let width = Self.x(layout.columns) - Self.columnGap + Self.margin
+        let top = Self.header + Self.trophy
+        let height = top + CGFloat(layout.height) + 8
+        let target = me.flatMap { uid in layout.nodes.last { bracket.rounds[$0.round - 1][$0.index].has(uid) } }
+            ?? layout.node(round: total, index: 0)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                ZStack(alignment: .topLeading) {
+                    lines(layout, top: top).frame(width: width, height: height)
+                    ForEach(0..<layout.columns, id: \.self) { column in
+                        let round = column < total ? column + 1 : layout.columns - column
+                        Text(Self.shortName(round, of: total).uppercased())
+                            .scaledFont(11, .bold).tracking(1.1)
+                            .foregroundStyle(round == total ? Palette.accent : Palette.tertiary)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .frame(width: Self.cardWidth)
+                            .padding(.leading, Self.x(column)).padding(.top, 8)
+                    }
+                    if let final = layout.node(round: total, index: 0) {
+                        trophy(bracket.champion)
+                            .frame(width: Self.cardWidth, height: Self.trophy - 8)
+                            .padding(.leading, Self.x(final.column))
+                            .padding(.top, top + CGFloat(final.y) - CGFloat(final.height) / 2 - Self.trophy + 4)
+                    }
+                    ForEach(Array(layout.nodes.enumerated()), id: \.offset) { _, node in
+                        card(bracket.rounds[node.round - 1][node.index], round: node.round, final: node.round == total)
+                            .frame(width: Self.cardWidth, height: CGFloat(node.height))
+                            .id("r\(node.round)m\(node.index)")
+                            .padding(.leading, Self.x(node.column))
+                            .padding(.top, top + CGFloat(node.y) - CGFloat(node.height) / 2)
+                    }
+                }
+                .frame(width: width, height: height, alignment: .topLeading)
+            }
+            .scrollIndicators(.hidden)
+            .onAppear {
+                guard let target else { return }
+                DispatchQueue.main.async { proxy.scrollTo("r\(target.round)m\(target.index)", anchor: .center) }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("tournamentTree")
+    }
+
+    /// "Finale", "Demies", "Quarts", "8es", "16es", "Tour 1".
+    static func shortName(_ round: Int, of total: Int) -> String {
+        switch total - round {
+        case 0: "Finale"
+        case 1: "Demies"
+        case 2: "Quarts"
+        case 3: "8es"
+        case 4: "16es"
+        default: "Tour \(round)"
+        }
+    }
+
+    /// The trophy above the final: the champion's crown and name once it is won.
+    private func trophy(_ champion: TournamentPlayer?) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: champion == nil ? "trophy.fill" : "crown.fill")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom))
+                .shadow(color: Palette.accent.opacity(0.55), radius: 10)
+            Text(champion?.name ?? "Vainqueur ?").scaledFont(13, .bold)
+                .foregroundStyle(champion == nil ? Palette.tertiary : Palette.accent).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(champion.map { "Champion : " + $0.name } ?? "Le vainqueur n’est pas encore connu")
+    }
+
+    /// The lines from each match to the next one: into the slot its winner takes, lit once it is known.
+    private func lines(_ layout: TournamentLayout, top: CGFloat) -> some View {
+        Canvas { context, _ in
+            for node in layout.nodes where node.round > 1 {
+                let match = bracket.rounds[node.round - 1][node.index]
+                let parentTop = top + CGFloat(node.y) - CGFloat(node.height) / 2
+                for (position, source) in match.from.enumerated() {
+                    guard let child = layout.node(round: node.round - 1, index: source) else { continue }
+                    let fromLeft = node.side == .left || (node.side == .center && child.side == .left)
+                    let childEdge = fromLeft ? Self.x(child.column) + Self.cardWidth : Self.x(child.column)
+                    let parentEdge = fromLeft ? Self.x(node.column) : Self.x(node.column) + Self.cardWidth
+                    let mid = (childEdge + parentEdge) / 2
+                    let childY = top + CGFloat(child.y)
+                    let slotY = parentTop + Self.pad + Self.slotHeight * (CGFloat(position) + 0.5)
+                    var path = Path()
+                    path.move(to: CGPoint(x: childEdge, y: childY))
+                    path.addLine(to: CGPoint(x: mid, y: childY))
+                    path.addLine(to: CGPoint(x: mid, y: slotY))
+                    path.addLine(to: CGPoint(x: parentEdge, y: slotY))
+                    let before = bracket.rounds[node.round - 2][source]
+                    let lit = before.decided && before.winner != nil
+                    context.stroke(path, with: .color(lit ? Palette.mint.opacity(0.75) : Color.white.opacity(0.16)),
+                                   style: StrokeStyle(lineWidth: lit ? 2 : 1.5, lineCap: .round, lineJoin: .round))
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func card(_ match: TournamentBracket.Match, round: Int, final: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let mine = me.map(match.has) ?? false
+        return VStack(spacing: 0) {
+            ForEach(Array(match.slots.enumerated()), id: \.offset) { _, slot in
+                slotLine(match, round: round, slot: slot).frame(height: Self.slotHeight)
+            }
+        }
+        .padding(.vertical, Self.pad).padding(.horizontal, 10)
+        .background(shape.fill(LinearGradient(colors: [Palette.duel.opacity(mine ? 0.34 : 0.2), Color.white.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+        .background(shape.fill(Palette.surface.opacity(0.92)))
+        .overlay(shape.strokeBorder(final ? Palette.accent.opacity(0.8) : mine ? Palette.duelText.opacity(0.9) : Color.white.opacity(0.12), lineWidth: final || mine ? 1.5 : 1))
+        .shadow(color: final ? Palette.accent.opacity(0.25) : .clear, radius: 10)
         .accessibilityElement(children: .combine)
     }
 
-    private func slotLine(_ store: TournamentStore, bracket: TournamentBracket, round: Int, match: TournamentBracket.Match, position: Int, slot: TournamentBracket.Slot) -> some View {
+    private func slotLine(_ match: TournamentBracket.Match, round: Int, slot: TournamentBracket.Slot) -> some View {
         let player = slot.player
         let won = match.decided && player != nil && match.winner?.uid == player?.uid
         let lost = match.decided && player != nil && !won
-        let mine = player?.uid == (state.uid ?? store.demoUID)
+        let mine = player != nil && player?.uid == me
         let run = player.flatMap { store.run(round: round, uid: $0.uid) }
+        let opened = (TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0) <= store.nowMs
         let status: String = {
             guard player != nil else { return "" }
-            if match.decided { return run?.scoreMs.map(ChallengeFormat.time) ?? "pas joué" }
-            if (TournamentRules.roundStartMs(week: store.currentWeek, round: round) ?? 0) > store.nowMs { return "" }
-            if run?.finishedMs != nil { return "a joué ✓" }
-            return run != nil ? "en train de jouer" : "pas encore joué"
+            if match.decided { return run?.scoreMs.map(ChallengeFormat.time) ?? "—" }
+            guard opened else { return "" }
+            if run?.finishedMs != nil { return "✓" }
+            return run != nil ? "en jeu" : ""
         }()
-        return HStack(spacing: 8) {
-            Text(TournamentFormat.slotName(bracket, round: round, match: match, position: position))
-                .scaledFont(14, won || mine ? .bold : .regular)
+        let name: String = switch slot {
+        case .player(let p): p.name
+        case .empty: "personne"
+        case .pending: "…"
+        }
+        return HStack(spacing: 4) {
+            Text(name)
+                .scaledFont(13, won || mine ? .bold : .medium)
                 .strikethrough(lost, color: Palette.tertiary)
-                .foregroundStyle(player == nil ? Palette.tertiary : lost ? Palette.tertiary : won ? Palette.mint : mine ? Palette.duelText : Palette.foreground)
-                .lineLimit(1).minimumScaleFactor(0.85)
-            if won { Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.mint) }
-            Spacer(minLength: 6)
-            Text(status).scaledFont(12).monospacedDigit()
-                .foregroundStyle(status == "a joué ✓" ? Palette.mint : Palette.tertiary)
+                .foregroundStyle(player == nil || lost ? Palette.tertiary : won ? Palette.mint : mine ? Palette.duelText : Palette.foreground)
+                .lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 2)
+            if won { Image(systemName: "checkmark.circle.fill").font(.system(size: 11)).foregroundStyle(Palette.mint) }
+            Text(status).scaledFont(11, status == "✓" ? .bold : .regular).monospacedDigit()
+                .foregroundStyle(status == "✓" ? Palette.mint : Palette.tertiary).lineLimit(1).fixedSize()
         }
     }
 }

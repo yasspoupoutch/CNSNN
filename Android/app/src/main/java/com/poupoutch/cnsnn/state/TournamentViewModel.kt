@@ -26,7 +26,9 @@ import kotlinx.coroutines.launch
  * runs from the round not yet settled. Read only when the tournament is on screen, at most once a minute.
  */
 class TournamentStore {
-    private var uid: String? = null
+    var uid: String? = null; private set
+    /** Called after each read or change: the app sets the tournament's notifications again from it. */
+    var changed: () -> Unit = {}
     var nextWeek by mutableStateOf(""); private set
     var nextCount by mutableIntStateOf(0); private set
     var nextMine by mutableStateOf(false); private set
@@ -77,6 +79,7 @@ class TournamentStore {
         } catch (e: Exception) {
             message = CloudError.message(e)
         } finally { loading = false }
+        changed()
     }
 
     /** The week under way: its players (once: they no longer change) and the runs still moving. */
@@ -99,6 +102,7 @@ class TournamentStore {
             runs = runs.filter { it.round < from } + fresh
             runsReadAt = now
             settled = maxOf(settled, (1..total).lastOrNull { (TournamentRules.roundEndMs(currentWeek, it) ?: Long.MAX_VALUE) <= now } ?: 0)
+            changed()
         } catch (e: Exception) {
             message = CloudError.message(e)
         }
@@ -111,6 +115,7 @@ class TournamentStore {
         try {
             state.cloud.signUp(nextWeek, me, state.progress.username)
             nextMine = true; nextCount += 1; message = null
+            changed()
         } catch (e: Exception) { message = CloudError.message(e) }
     }
     suspend fun withdraw(state: AppViewModel) {
@@ -119,11 +124,12 @@ class TournamentStore {
         try {
             state.cloud.withdraw(nextWeek, me)
             nextMine = false; nextCount = maxOf(0, nextCount - 1); message = null
+            changed()
         } catch (e: Exception) { message = CloudError.message(e) }
     }
 
     /** My run of a round, just finished: no need to read everything again. */
-    fun note(run: TournamentRun) { runs = runs.filterNot { it.round == run.round && it.uid == run.uid } + run }
+    fun note(run: TournamentRun) { runs = runs.filterNot { it.round == run.round && it.uid == run.uid } + run; changed() }
     fun run(round: Int, uid: String): TournamentRun? = runs.firstOrNull { it.round == round && it.uid == uid }
 }
 

@@ -1,5 +1,7 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.core.TournamentDemo
+import com.poupoutch.cnsnn.core.DailySchedule
 import android.graphics.Bitmap
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -55,14 +57,24 @@ class DuelScreenshotsTest {
         waitFor("Bonjour,")
         rule.skipTutorial()
 
+        // The weekly tournament (an invented one, TournamentDemo) and the crowns: Camille won last week and
+        // the last tournament, and her match of the day is still to play.
+        scenario.onActivity {
+            val vm = ViewModelProvider(it)[AppViewModel::class.java]
+            vm.tournament.showDemo(vm.uid!!, "Camille")
+            val lastWeek = java.time.LocalDate.parse(DailySchedule.key()).minusDays(7).toString()
+            vm.showChampions(com.poupoutch.cnsnn.data.Champions(lastWeek, vm.uid!!, "Camille", TournamentDemo.WEEK, vm.uid!!, "Camille"))
+        }
+        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("weekCrown")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("weekCrown").performScrollTo()
+        shot("duel-09-couronne")
         rule.onNodeWithTag("duelCard").performScrollTo()
         shot("duel-00-accueil")
 
-        // The weekly tournament (an invented one, TournamentDemo): my match of the day, then the bracket.
-        scenario.onActivity { val vm = ViewModelProvider(it)[AppViewModel::class.java]; vm.tournament.showDemo(vm.uid!!, "Camille"); vm.liveDuelRequest = "tournament" }
+        scenario.onActivity { ViewModelProvider(it)[AppViewModel::class.java].liveDuelRequest = "tournament" }
         rule.waitUntil(15_000) { rule.onAllNodes(hasText("Si vous gagnez", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         shot("duel-10-tournoi")
-        rule.onAllNodes(hasText("Match 1", substring = true))[1].performScrollTo()
+        rule.onNodeWithTag("tournamentTree").performScrollTo()
         shot("duel-11-tableau")
         scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitFor("Bonjour,")

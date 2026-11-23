@@ -1,0 +1,45 @@
+name: CNSNN - Couronnes
+
+# Every morning: the crowns on the home screen (tools/champions.mjs), last week's number 1 of the Mot
+# du jour and the winner of the last tournament, written to meta/champions. GitHub often skips or delays
+# scheduled runs, so it tries 4 times (7 h 03 to 10 h 03 in winter, French time); a try with nothing new
+# costs a few reads. A pull request touching it runs a dry check (reads only).
+on:
+  schedule:
+    - cron: '3 6 * * *'
+    - cron: '33 6 * * *'
+    - cron: '3 7 * * *'
+    - cron: '3 9 * * *'
+  pull_request:
+    paths: ['Firebase/tools/champions.mjs', '.github/workflows/champions.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-champions
+  cancel-in-progress: false
+
+jobs:
+  crowns:
+    name: Couronnes
+    # The secrets are only given to runs of this repository (never to a fork's pull request).
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: Firebase/tools/champions.mjs
+          sparse-checkout-cone-mode: false
+      - name: Mettre à jour les couronnes
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then echo '::error::Le secret FIREBASE_SERVICE_ACCOUNT est absent.'; exit 1; fi
+          mode=''
+          if [ "${{ github.event_name }}" = pull_request ]; then mode=--dry-run; fi
+          node Firebase/tools/champions.mjs $mode

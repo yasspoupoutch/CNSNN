@@ -300,6 +300,125 @@ public enum TournamentFormat {
     }
 }
 
+/// The tournament's local notifications (no server): the start of a tournament I signed up for, each
+/// round while I am still in (sure when I am through, a "come and see" otherwise), and an evening
+/// reminder when my match of the day is not played yet. Worked out again each time the app reads it.
+public enum TournamentReminders {
+    public struct Alert: Equatable, Sendable {
+        public let id: String
+        public let atMs: Int
+        public let title: String
+        public let body: String
+    }
+    /// 19:00 UTC, 20 h in Paris in winter: 11 hours after a round opens.
+    public static let eveningAfterMs = 11 * 3_600_000
+
+    /// `day` writes a moment for people ("mardi 9 h").
+    public static func plan(nextWeek: String, nextMine: Bool, bracket: TournamentBracket?, uid: String?, runs: [TournamentRun],
+                            nowMs: Int, day: (Int) -> String) -> [Alert] {
+        var alerts: [Alert] = []
+        if nextMine, let start = TournamentRules.deadlineMs(week: nextWeek), start > nowMs {
+            alerts.append(Alert(id: "start", atMs: start, title: "Le tournoi commence !",
+                                body: "Votre premier match est ouvert : 24 h pour le jouer, quand vous voulez."))
+        }
+        guard let bracket, let uid, bracket.players.contains(where: { $0.uid == uid }) else { return alerts }
+        let week = bracket.week, total = bracket.rounds.count
+        var from: Int?, sure: Int?
+        switch bracket.standing(of: uid, nowMs: nowMs) {
+        case .match(let round, let match):
+            if !match.decided {
+                let played = runs.contains { $0.round == round && $0.uid == uid && $0.finishedMs != nil }
+                if !played, let start = TournamentRules.roundStartMs(week: week, round: round), let end = TournamentRules.roundEndMs(week: week, round: round),
+                   let at = [start + eveningAfterMs, end - 2 * 3_600_000].first(where: { $0 > nowMs && $0 > start }) {
+                    alerts.append(Alert(id: "late", atMs: at, title: "Votre match du tournoi vous attend",
+                                        body: "Il vous reste jusqu’à \(day(end)) pour le jouer. Ne laissez pas filer votre place !"))
+                }
+            } else {
+                sure = round + 1
+            }
+            from = round + 1
+        case .through(let round):
+            sure = round + 1; from = round + 1
+        default:
+            break
+        }
+        if let from, from <= total {
+            for round in from...total {
+                guard let at = TournamentRules.roundStartMs(week: week, round: round), at > nowMs else { continue }
+                let name = TournamentFormat.roundName(round, of: total)
+                alerts.append(round == sure
+                    ? Alert(id: "round\(round)", atMs: at, title: "Qualifié : " + name.lowercased(), body: "Votre match est ouvert : 24 h pour le jouer. Bonne chance !")
+                    : Alert(id: "round\(round)", atMs: at, title: name + " du tournoi", body: "Le tour commence. Êtes-vous qualifié ? Venez voir votre match."))
+            }
+        }
+        return alerts
+    }
+}
+
+/// The bracket drawn like a football one: the first rounds on the left and on the right, the final in
+/// the middle. The left half is what leads to the final's first player, the right half the others.
+/// Positions in points: `column` from 0 (far left) to `columns - 1`, `y` the centre of the match.
+public struct TournamentLayout: Sendable, Equatable {
+    public enum Side: Sendable, Equatable { case left, center, right }
+    public struct Node: Sendable, Equatable {
+        public let round: Int
+        public let index: Int
+        public let side: Side
+        public let column: Int
+        public var y: Double
+        public let height: Double
+    }
+    public private(set) var nodes: [Node] = []
+    public private(set) var columns = 0
+    public private(set) var height = 0.0
+
+    /// `height(slots)`: a match card's height for 2 or 3 players; `gap`: between two first-round cards.
+    public init(_ bracket: TournamentBracket, height: (Int) -> Double, gap: Double) {
+        let rounds = bracket.rounds
+        let total = rounds.count
+        guard total > 0, let final = rounds[total - 1].first else { return }
+        columns = 2 * total - 1
+        if total == 1 {
+            let h = height(final.slots.count)
+            nodes = [Node(round: 1, index: 0, side: .center, column: 0, y: h / 2, height: h)]
+            self.height = h
+            return
+        }
+        var placed: [Node] = []
+        func place(_ round: Int, _ index: Int, _ side: Side, _ cursor: inout Double) -> Double {
+            let match = rounds[round - 1][index]
+            let h = height(match.slots.count)
+            let column = side == .left ? round - 1 : 2 * (total - 1) - (round - 1)
+            var y: Double
+            if round == 1 || match.from.isEmpty {
+                y = cursor + h / 2
+                cursor += h + gap
+            } else {
+                let ys = match.from.map { place(round - 1, $0, side, &cursor) }
+                y = ((ys.first ?? 0) + (ys.last ?? 0)) / 2
+            }
+            placed.append(Node(round: round, index: index, side: side, column: column, y: y, height: h))
+            return y
+        }
+        var left = 0.0, right = 0.0
+        _ = final.from.prefix(1).map { place(total - 1, $0, .left, &left) }
+        _ = final.from.dropFirst().map { place(total - 1, $0, .right, &right) }
+        let leftHeight = max(0, left - gap), rightHeight = max(0, right - gap)
+        let finalHeight = height(final.slots.count)
+        let full = max(leftHeight, rightHeight, finalHeight)
+        // The shorter half is centred against the taller one.
+        nodes = placed.map { node in
+            var moved = node
+            moved.y += (full - (node.side == .left ? leftHeight : rightHeight)) / 2
+            return moved
+        }
+        nodes.append(Node(round: total, index: 0, side: .center, column: total - 1, y: full / 2, height: finalHeight))
+        self.height = full
+    }
+
+    public func node(round: Int, index: Int) -> Node? { nodes.first { $0.round == round && $0.index == index } }
+}
+
 /// Pictures only (screenshots): an invented tournament of 10, the second day under way. Round 1 is over
 /// (I won mine), my match of the day is still to play, the others show who has played and who has not yet.
 public enum TournamentDemo {

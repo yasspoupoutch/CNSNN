@@ -59,6 +59,7 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/daily_widget" />
         </receiver>
         <receiver android:name=".reminders.ReminderReceiver" android:exported="false" />
+        <receiver android:name=".reminders.TournamentReceiver" android:exported="false" />
         <receiver android:name=".reminders.RescheduleReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

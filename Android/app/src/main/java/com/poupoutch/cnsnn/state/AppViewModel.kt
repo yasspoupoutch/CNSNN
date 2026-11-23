@@ -570,6 +570,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         rankings = rankings.copy(sprintLeader = top.firstOrNull(), readAt = rankings.readAt + ("sprintLeader" to System.currentTimeMillis()))
     }
     fun refreshSprintLeaderSoon() { viewModelScope.launch { refreshSprintLeader() } }
+
+    /** The crowns of the home page: read again every 6 hours (pictures: set by the test). */
+    var champions by mutableStateOf(local.champions)
+    private var championsReadAt = 0L
+    suspend fun refreshChampions() {
+        if (uid == null || isServerFull || System.currentTimeMillis() - championsReadAt < 6 * 3_600_000L) return
+        val read = runCatching { cloud.champions() }.getOrNull() ?: return
+        champions = read; championsReadAt = System.currentTimeMillis(); local.champions = read
+    }
+    /** Pictures only: the crowns shown without reading them. */
+    fun showChampions(value: com.poupoutch.cnsnn.data.Champions) { champions = value; championsReadAt = Long.MAX_VALUE / 2 }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
     /** A new friend: the friends ranking is read again next time it shows. */
@@ -682,7 +693,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** A live duel to open ("random", "link" or "join:ID"), or "tournament": the app's navigation takes it. */
     var liveDuelRequest by mutableStateOf<String?>(null)
     /** The weekly tournament (sign-ups, bracket), read when it is on screen. */
-    val tournament = TournamentStore()
+    val tournament = TournamentStore().also { store ->
+        store.changed = { if (!store.demo) com.poupoutch.cnsnn.reminders.TournamentAlarms.update(getApplication(), store) }
+    }
     /** A live duel counts as a challenge played in the attendance numbers. */
     fun noteLiveDuelPlayed() = notePlayed("challenge")
 

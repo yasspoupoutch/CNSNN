@@ -119,4 +119,25 @@ final class TournamentTests: XCTestCase {
         XCTAssertEqual(TournamentRules.weeks(untilMs: monday16 - 1), ["2026-11-09", "2026-11-16"])
         XCTAssertEqual(TournamentRules.weeks(untilMs: monday16), ["2026-11-09", "2026-11-16", "2026-11-23"])
     }
+
+    func testDrawnLikeAFootballBracketWithReminders() {
+        let later = TournamentRules.everyonePlaysFrom
+        let begin = TournamentRules.deadlineMs(week: later)!
+        let layout = TournamentLayout(TournamentBracket(week: later, signedUp: players(10), runs: [], nowMs: begin), height: { $0 == 3 ? 84 : 60 }, gap: 10)
+        XCTAssertEqual(layout.columns, 5)
+        XCTAssertEqual(layout.height, 200, accuracy: 0.01)
+        XCTAssertEqual(layout.nodes.count, 8)
+        XCTAssertEqual(layout.node(round: 1, index: 0)?.y ?? 0, 65, accuracy: 0.01)
+        XCTAssertEqual(layout.node(round: 1, index: 4)?.column, 4)
+        XCTAssertEqual(layout.node(round: 2, index: 1)?.y ?? 0, 100, accuracy: 0.01)
+        XCTAssertEqual(layout.node(round: 3, index: 0)?.side, .center)
+        XCTAssertEqual(layout.node(round: 3, index: 0)?.column, 2)
+
+        let demo = TournamentDemo.make(me: "me", name: "Camille")
+        let bracket = TournamentBracket(week: TournamentDemo.week, signedUp: demo.players, runs: demo.runs, nowMs: demo.nowMs)
+        let next = TournamentRules.nextWeek(nowMs: demo.nowMs)
+        let plan = TournamentReminders.plan(nextWeek: next, nextMine: true, bracket: bracket, uid: "me", runs: demo.runs, nowMs: demo.nowMs) { _ in "demain" }
+        XCTAssertEqual(plan.map(\.id), ["start", "late", "round3"])
+        XCTAssertEqual(plan[2].title, "Finale du tournoi")
+    }
 }
