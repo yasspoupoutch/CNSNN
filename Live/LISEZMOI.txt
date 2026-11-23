@@ -1,0 +1,14 @@
+CNSNN Live : le jeu des consonnes pour tes lives TikTok
+=======================================================
+
+1. Double-clique sur « Lancer CNSNN Live.bat ».
+   Une fenêtre noire s'ouvre (laisse-la ouverte), puis la fenêtre du jeu.
+   Si Windows affiche « Windows a protégé votre ordinateur » :
+   clique « Informations complémentaires » puis « Exécuter quand même ».
+2. Clique au milieu du jeu pour lancer la voix.
+3. Pour essayer sans live : bouge la souris, choisis « Mode essai » dans les réglages.
+4. Pendant le live : laisse « Vrais commentaires du live ». Le jeu trouve ton live tout seul.
+
+Le programme lit seulement les commentaires publics de ton live.
+Il ne demande pas ton mot de passe et n'écrit jamais rien sur TikTok.
+Pour arrêter : ferme la fenêtre noire.

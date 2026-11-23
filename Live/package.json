@@ -1,0 +1,7 @@
+{
+  "name": "cnsnn-live",
+  "private": true,
+  "type": "module",
+  "description": "Jeu CNSNN pour les lives TikTok : consonnes, voix, premier qui trouve en commentaire, classement.",
+  "dependencies": { "tiktok-live-connector": "2.5.0", "ws": "8.18.3" }
+}

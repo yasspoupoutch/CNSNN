@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNSNN Live</title>
+<style>
+@font-face { font-family: "Fraunces"; font-weight: 900; src: url(data:font/ttf;base64,{{FRAUNCES}}) format("truetype"); }
+@font-face { font-family: "Serif"; font-style: normal; src: url(data:font/ttf;base64,{{SERIF}}) format("truetype"); }
+@font-face { font-family: "Serif"; font-style: italic; src: url(data:font/ttf;base64,{{SERIF_IT}}) format("truetype"); }
+:root { --fg: #f4f5f8; --fg2: rgba(244,245,248,.72); --fg3: rgba(244,245,248,.5); --gold: #ffc65a; --gold-top: #ffd673; --gold-bot: #f6b84d;
+  --mint: #5ae6c6; --red: #ff8785; --b: rgba(255,255,255,.14); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+/* The live is drawn on a fixed 1080 x 1920 portrait canvas, scaled to fit the window. */
+#stage { position: absolute; left: 50%; top: 50%; width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; background: #06070c; }
+.bg { position: absolute; inset: 0; background: linear-gradient(#121426, #06070c 62%); }
+.blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: .55; }
+.b1 { width: 1240px; height: 1240px; left: -480px; top: -520px; background: #593ec7; animation: f1 18s ease-in-out infinite alternate; }
+.b2 { width: 1080px; height: 1080px; right: -480px; bottom: 240px; background: #007d86; animation: f2 21s ease-in-out infinite alternate; }
+@keyframes f1 { to { transform: translate(220px, 280px) scale(1.15); } }
+@keyframes f2 { to { transform: translate(-220px, -240px) scale(.9); } }
+.glass { background: linear-gradient(rgba(40,42,54,.5), rgba(20,21,28,.72)); border: 2px solid var(--b); border-radius: 48px; }
+.abs { position: absolute; left: 0; right: 0; text-align: center; }
+
+.top { position: absolute; top: 128px; left: 88px; right: 88px; display: flex; align-items: center; justify-content: space-between; }
+.mark { font-family: "Fraunces", Georgia, serif; font-weight: 900; font-size: 64px; letter-spacing: .02em; line-height: 1; }
+.mark b { color: var(--gold); font-weight: 900; }
+.voice { font-size: 22px; color: var(--fg3); margin-top: 10px; }
+.icon { width: 132px; height: 132px; border-radius: 30px; position: relative; overflow: hidden; flex: none;
+  background: radial-gradient(circle at 22% 18%, #4a33a3 0, transparent 55%), radial-gradient(circle at 85% 85%, #006670 0, transparent 55%),
+  radial-gradient(circle at 15% 90%, #3a1430 0, transparent 45%), #0c0d18; box-shadow: 0 18px 50px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.1); }
+.icon i { position: absolute; left: 25%; top: 31%; font: 900 normal 61px/0 "Fraunces", Georgia, serif; color: #f3f4f8; }
+.icon u { position: absolute; left: 60%; top: 63%; width: 18%; height: 4.5%; border-radius: 9px; background: linear-gradient(#ffd673, #f6b84d); box-shadow: 0 0 12px rgba(255,198,90,.75); }
+
+#round { top: 330px; color: var(--fg3); font-size: 30px; font-weight: 700; letter-spacing: .05em; }
+#word { top: 380px; font-family: "Serif", Georgia, serif; font-size: 200px; line-height: 1.1; letter-spacing: .06em; white-space: nowrap; padding: 0 60px; }
+#word.win { color: var(--mint); animation: pop .6s ease both; }
+#word.miss { color: var(--gold); }
+@keyframes pop { 40% { transform: scale(1.08); } }
+.rule { position: absolute; top: 640px; left: 494px; width: 92px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.15); }
+#hint { top: 676px; padding: 0 90px; font-family: "Serif", Georgia, serif; font-style: italic; font-size: 64px; line-height: 1.15; }
+#extra { top: 846px; font-size: 34px; font-weight: 700; color: var(--fg2); letter-spacing: .08em; min-height: 44px; }
+#extra b { color: var(--gold); }
+#ask { top: 916px; color: var(--gold); font-weight: 800; font-size: 32px; letter-spacing: .06em; }
+.timer { position: absolute; top: 976px; left: 240px; right: 240px; height: 16px; border-radius: 16px; background: rgba(255,255,255,.1); overflow: hidden; }
+#bar { height: 100%; width: 100%; border-radius: 16px; background: linear-gradient(90deg, var(--gold-top), var(--gold-bot)); transition: width 1s linear; }
+#bar.low { background: var(--red); }
+#secs { top: 1004px; color: var(--fg3); font-size: 28px; font-variant-numeric: tabular-nums; }
+
+#win { position: absolute; top: 1066px; left: 80px; right: 80px; padding: 26px 36px; display: flex; gap: 28px; align-items: center;
+  border-color: rgba(90,230,198,.5); opacity: 0; transform: translateY(20px) scale(.97); transition: opacity .35s, transform .45s cubic-bezier(.2,.9,.25,1); }
+#win.on { opacity: 1; transform: none; }
+#win.nobody { border-color: rgba(255,198,90,.45); }
+.av { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 40px; flex: none;
+  background: linear-gradient(135deg, #ff8785, #593ec7); background-size: cover; background-position: center; }
+#winName { color: var(--mint); font-size: 40px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 600px; }
+#win.nobody #winName { color: var(--gold); }
+#winSub { color: var(--fg2); font-size: 28px; margin-top: 4px; }
+#winPts { margin-left: auto; font-weight: 800; font-size: 46px; color: var(--gold); }
+
+#board { position: absolute; top: 1250px; left: 80px; right: 190px; padding: 28px 34px 16px; transition: box-shadow .4s, border-color .4s; }
+#board.spot { border-color: rgba(255,198,90,.6); box-shadow: 0 0 60px rgba(255,198,90,.25); }
+#board h3 { margin: 0 0 12px; font-size: 26px; letter-spacing: .1em; color: var(--fg3); font-weight: 700; display: flex; justify-content: space-between; }
+.row { display: flex; align-items: center; gap: 20px; padding: 10px 0; font-size: 32px; border-top: 2px solid rgba(255,255,255,.06); }
+.row:first-of-type { border-top: 0; }
+.row .n { width: 40px; color: var(--fg3); font-weight: 700; }
+.row .p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+.row .s { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.row.g .n, .row.g .s { color: var(--gold); }
+.row.new { animation: flash 1.2s ease; }
+@keyframes flash { 0% { background: rgba(90,230,198,.25); } 100% { background: transparent; } }
+.empty { color: var(--fg3); font-size: 28px; padding: 10px 0 14px; font-family: "Serif", Georgia, serif; font-style: italic; }
+
+/* Bottom third is covered by TikTok's comments and buttons: only the demo feed goes there. */
+#feed { position: absolute; left: 40px; bottom: 170px; width: 640px; font-size: 28px; display: none; }
+#feed.on { display: block; }
+#feed p { margin: 10px 0 0; background: rgba(0,0,0,.35); display: table; padding: 8px 20px; border-radius: 28px; }
+#feed b { color: rgba(255,255,255,.6); font-weight: 600; margin-right: 12px; }
+#demoTag { position: absolute; left: 40px; bottom: 100px; font-size: 24px; color: var(--gold); display: none; font-weight: 700; letter-spacing: .06em; }
+#demoTag.on { display: block; }
+
+/* Control panel: outside the 9:16 canvas when the window is wide, and it hides itself after a few seconds. */
+#panel { position: fixed; top: 12px; right: 12px; width: 330px; max-height: calc(100% - 24px); overflow: auto; padding: 16px; border-radius: 18px;
+  background: rgba(18,19,28,.94); border: 1px solid var(--b); font-size: 14px; z-index: 9; transition: opacity .3s; }
+#panel.hide { opacity: 0; pointer-events: none; }
+#panel h4 { margin: 0 0 6px; font-size: 15px; }
+#panel label { display: block; margin: 10px 0 4px; color: var(--fg2); }
+#panel input, #panel select, #panel button { width: 100%; font: inherit; color: var(--fg); background: rgba(255,255,255,.07); border: 1px solid var(--b);
+  border-radius: 10px; padding: 8px 10px; }
+#panel button { cursor: pointer; margin-top: 8px; font-weight: 600; }
+#panel button.main { background: linear-gradient(var(--gold-top), var(--gold-bot)); color: #1a1406; border: 0; }
+#panel .st { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); color: var(--fg2); line-height: 1.4; }
+#panel .st b.ok { color: var(--mint); } #panel .st b.ko { color: var(--red); }
+#panel small { color: var(--fg3); display: block; margin-top: 8px; line-height: 1.4; }
+#start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); z-index: 10; cursor: pointer; }
+#start div { padding: 26px 40px; border-radius: 999px; background: linear-gradient(var(--gold-top), var(--gold-bot)); color: #1a1406; font-weight: 800; font-size: 22px; }
+#start[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"><div class="blob b1"></div><div class="blob b2"></div></div>
+  <div class="top">
+    <div><div class="mark">C<b>O</b>NS<b>O</b>NN<b>E</b></div><div class="voice">Jeu en direct · voix de synthèse</div></div>
+    <div class="icon"><i>C</i><u></u></div>
+  </div>
+  <div class="abs" id="round">PRÊT ?</div>
+  <div class="abs" id="word">CNSNN</div>
+  <div class="rule"></div>
+  <div class="abs" id="hint">Retrouve le mot caché sans ses voyelles</div>
+  <div class="abs" id="extra"></div>
+  <div class="abs" id="ask">ÉCRIS LE MOT EN COMMENTAIRE</div>
+  <div class="timer"><div id="bar"></div></div>
+  <div class="abs" id="secs"></div>
+  <div class="glass" id="win"><div class="av" id="winAv"></div><div><div id="winName"></div><div id="winSub"></div></div><div id="winPts"></div></div>
+  <div class="glass" id="board"><h3><span>CLASSEMENT DU LIVE</span><span id="players"></span></h3><div id="rows"></div></div>
+  <div id="feed"></div>
+  <div id="demoTag">MODE ESSAI · FAUX COMMENTAIRES</div>
+</div>
+
+<div id="start"><div>▶ Cliquer pour lancer le jeu (et la voix)</div></div>
+
+<div id="panel">
+  <h4>CNSNN Live · réglages</h4>
+  <div class="st" id="status">Connexion…</div>
+  <label for="user">Ton compte TikTok</label>
+  <input id="user" value="jeucnsnn" autocomplete="off">
+  <button class="main" id="connect">Lire les commentaires de mon live</button>
+  <label for="mode">Commentaires</label>
+  <select id="mode"><option value="live">Vrais commentaires du live</option><option value="demo">Mode essai (faux commentaires)</option></select>
+  <label for="dur">Temps par mot</label>
+  <select id="dur"><option value="30">30 s</option><option value="45" selected>45 s</option><option value="60">60 s</option></select>
+  <label for="voiceSel">Voix</label>
+  <select id="voiceSel"></select>
+  <label for="test">Tester un commentaire</label>
+  <input id="test" placeholder="Écris un mot puis Entrée" autocomplete="off">
+  <button id="skip">Passer au mot suivant</button>
+  <button id="reset">Remettre le classement à zéro</button>
+  <small>Ce panneau se cache tout seul quand la souris ne bouge plus. Dans LIVE Studio, capture seulement la partie verticale du jeu.</small>
+</div>
+
+<script>
+const WORDS = {{WORDS}};
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem('cnsnnLive.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('cnsnnLive.' + k, JSON.stringify(v)); } catch {} } };
+
+// ---- Words: same rules as the app (Core/WordEngine.swift): Y is a vowel, Œ/Æ expand, accents fold.
+const norm = s => s.replace(/œ/g, 'oe').replace(/Œ/g, 'OE').replace(/æ/g, 'ae').replace(/Æ/g, 'AE')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+const cons = s => norm(s).replace(/[AEIOUY]/g, '');
+const shown = w => { const parts = w.split(/[\s\-‐‑–—'’]+/).filter(p => norm(p)); return parts.length > 1 ? parts.map(p => cons(p) || '–').join(' ') : cons(w); };
+const vowelsOf = w => [...new Set(norm(w).replace(/[^AEIOUY]/g, ''))].sort().join(' ');
+const words = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').split(/[^a-z]+/).filter(Boolean);
+// A comment wins when it contains the answer as whole words ("c'est papillon !" counts, "papillons" does not, "file" never matches "île").
+function isAnswer(comment, answer) {
+  const c = words(comment), a = words(answer);
+  if (!a.length) return false;
+  if (c.join('') === a.join('')) return true;
+  for (let i = 0; i + a.length <= c.length; i++) if (a.every((t, j) => c[i + j] === t)) return true;
+  return false;
+}
+
+// ---- Names read aloud and shown: no links, no insults, short.
+const BAD = /(pute|salop|encul|connard|connass|batard|bâtard|nique|niqu|fdp|pd\b|tapette|negr|nègre|bougnoul|youpin|bite|couille|chatte|sexe|porn|hitler|nazi)/i;
+function cleanName(user) {
+  const pick = [user.nickname, user.uniqueId].map(n => String(n || '').replace(/https?:\S+|www\.\S+/gi, '').replace(/[^\p{L}\p{N}._ -]/gu, '').replace(/\s+/g, ' ').replace(/ ?_ ?/g, '_').trim()).find(n => n && !BAD.test(n));
+  return (pick || 'Joueur mystère').slice(0, 22);
+}
+const spokenName = n => n.replace(/[._-]+/g, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim() || 'toi';
+
+// ---- Voice (free, built into the browser).
+let voice = null;
+function loadVoices() {
+  const list = speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('fr'));
+  const saved = store.get('voice', '');
+  const sel = $('voiceSel'); sel.innerHTML = '';
+  list.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name; sel.appendChild(o); });
+  const rank = v => (v.name === saved ? 100 : 0) + (/google|natural|neural|online/i.test(v.name) ? 10 : 0) + (/fr-FR/i.test(v.lang) ? 5 : 0) + (/amélie|thomas|denise|henri|audrey/i.test(v.name) ? 3 : 0);
+  voice = list.sort((a, b) => rank(b) - rank(a))[0] || null;
+  if (voice) sel.value = voice.name; else sel.innerHTML = '<option>Aucune voix française trouvée</option>';
+}
+speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+$('voiceSel').onchange = e => { voice = speechSynthesis.getVoices().find(v => v.name === e.target.value) || voice; store.set('voice', voice && voice.name); say('Voici ma voix.'); };
+function say(text, { interrupt = false } = {}) {
+  if (interrupt) speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'fr-FR'; if (voice) u.voice = voice; u.rate = 1.02; u.pitch = 1;
+  speechSynthesis.speak(u);
+}
+const spell = s => s.split(' ').map(w => w === '–' ? 'un mot sans consonne' : w.split('').join(', ')).join(' ; ');
+
+// ---- Game state.
+let scores = store.get('scores', {});   // uniqueId -> { name, pts, avatar }
+let roundNo = store.get('round', 0);
+let deck = [], current = null, phase = 'idle', t0 = 0, tick = null, nextTimer = null, lastLeader = null;
+const dur = () => +$('dur').value;
+$('dur').value = String(store.get('dur', 45)); $('dur').onchange = () => store.set('dur', dur());
+
+function draw() {
+  if (!deck.length) {
+    const easy = WORDS.filter(w => w[0] === 'F'), mid = WORDS.filter(w => w[0] === 'M');
+    deck = [...easy, ...mid].sort(() => Math.random() - .5);
+  }
+  const recent = store.get('recent', []);
+  let w; do { w = deck.pop(); } while (deck.length && recent.includes(w[2]));
+  store.set('recent', [...recent, w[2]].slice(-300));
+  return { diff: w[0], cat: w[1], word: w[2], hint: w[3] };
+}
+
+function newRound() {
+  clearTimeout(nextTimer);
+  current = draw(); roundNo++; store.set('round', roundNo);
+  phase = 'play'; t0 = Date.now();
+  $('round').textContent = `MOT ${roundNo} · ${current.cat.toUpperCase()} · 1ᵉʳ QUI TROUVE GAGNE`;
+  $('word').className = 'abs'; $('word').textContent = shown(current.word); fit();
+  $('hint').textContent = current.hint; $('extra').innerHTML = ''; $('ask').style.visibility = 'visible';
+  $('win').className = 'glass';
+  $('bar').style.transition = 'none'; $('bar').style.width = '100%'; $('bar').className = '';
+  requestAnimationFrame(() => { $('bar').style.transition = 'width 1s linear'; });
+  const parts = shown(current.word).split(' ').length;
+  say(`Mot numéro ${roundNo}. ${parts > 1 ? parts + ' mots. ' : ''}Consonnes : ${spell(shown(current.word))}. Indice : ${current.hint}`, { interrupt: true });
+  if (demo.on) demo.round();
+  clearInterval(tick); tick = setInterval(step, 250); step();
+}
+
+function step() {
+  if (phase !== 'play') return;
+  const el = (Date.now() - t0) / 1000, d = dur(), left = Math.max(0, Math.ceil(d - el));
+  $('bar').style.width = (100 * Math.max(0, d - el) / d) + '%';
+  $('bar').className = left <= 10 ? 'low' : '';
+  $('secs').textContent = `0:${String(left).padStart(2, '0')}`;
+  if (el >= d * .5 && !current.v) { current.v = true; $('extra').innerHTML = `VOYELLES : <b>${vowelsOf(current.word)}</b>`; say(`Coup de pouce : les voyelles sont ${vowelsOf(current.word).split(' ').join(', ')}.`); }
+  if (el >= d * .78 && !current.f) { current.f = true; const first = norm(current.word)[0]; $('extra').innerHTML += ` · COMMENCE PAR <b>${first}</b>`; say(`Ça commence par ${first}.`); }
+  if (el >= d) endRound(null);
+}
+
+function points(el) { const d = dur(); return el < d * .5 ? 30 : el < d * .78 ? 20 : 10; }
+
+function onComment(c) {
+  if (demo.on && c.source !== 'demo' && c.source !== 'test') return;
+  if (!demo.on && c.source === 'demo') return;
+  if (phase !== 'play' || !current || !c.comment) return;
+  if (!isAnswer(c.comment, current.word)) return;
+  const el = (Date.now() - t0) / 1000;
+  endRound({ id: c.user.uniqueId || c.user.nickname || 'anonyme', name: cleanName(c.user), avatar: c.user.avatar || '', el, pts: points(el) });
+}
+
+function endRound(w) {
+  phase = 'done'; clearInterval(tick); $('secs').textContent = '';
+  $('word').textContent = current.word.toUpperCase(); fit();
+  $('ask').style.visibility = 'hidden';
+  if (w) {
+    const s = scores[w.id] || { name: w.name, pts: 0, avatar: w.avatar };
+    s.name = w.name; s.avatar = w.avatar || s.avatar; s.pts += w.pts; scores[w.id] = s; store.set('scores', scores);
+    $('word').className = 'abs win';
+    $('win').className = 'glass on';
+    setAvatar(w.name, s.avatar);
+    $('winName').textContent = `Bravo ${w.name} !`;
+    $('winSub').textContent = `${current.word.toUpperCase()} · trouvé en ${Math.max(1, Math.round(w.el))} s`;
+    $('winPts').textContent = `+${w.pts}`;
+    renderBoard(w.id);
+    const rank = sorted().findIndex(([id]) => id === w.id) + 1;
+    say(`Bravo ${spokenName(w.name)} ! C'était ${current.word}. Plus ${w.pts} points.${rank === 1 && lastLeader !== w.id ? ' Et tu passes en tête !' : ''}`, { interrupt: true });
+    lastLeader = sorted()[0][0];
+  } else {
+    $('word').className = 'abs miss';
+    $('win').className = 'glass on nobody';
+    setAvatar('?', '');
+    $('winName').textContent = 'Personne cette fois !'; $('winSub').textContent = `C'était ${current.word.toUpperCase()}`; $('winPts').textContent = '';
+    say(`Temps écoulé ! C'était ${current.word}.`, { interrupt: true });
+  }
+  let pause = 7000;
+  if (roundNo % 8 === 0 && sorted().length) { pause = 12000; setTimeout(recap, 3500); }
+  else if (roundNo % 5 === 0) setTimeout(() => say('Si tu viens d\'arriver : écris le mot en commentaire, le premier qui trouve gagne des points.'), 3500);
+  nextTimer = setTimeout(newRound, pause);
+}
+
+function recap() {
+  const top = sorted().slice(0, 3);
+  $('board').classList.add('spot'); setTimeout(() => $('board').classList.remove('spot'), 7000);
+  const names = top.map(([, s], i) => `${['en tête', 'deuxième', 'troisième'][i]}, ${spokenName(s.name)} avec ${s.pts} points`).join(' ; ');
+  say(`Point classement : ${names}.`);
+}
+
+function setAvatar(name, url) {
+  const a = $('winAv'); a.textContent = url ? '' : (name[0] || '?').toUpperCase();
+  a.style.backgroundImage = url ? `url("${url.replace(/"/g, '')}")` : '';
+}
+const sorted = () => Object.entries(scores).sort((a, b) => b[1].pts - a[1].pts);
+function renderBoard(flash) {
+  const all = sorted(), top = all.slice(0, 5);
+  $('players').textContent = all.length ? `${all.length} joueur${all.length > 1 ? 's' : ''}` : '';
+  $('rows').innerHTML = top.length ? '' : '<div class="empty">Le premier qui trouve un mot entre ici !</div>';
+  top.forEach(([id, s], i) => {
+    const r = document.createElement('div'); r.className = 'row' + (i === 0 ? ' g' : '') + (id === flash ? ' new' : '');
+    r.innerHTML = `<span class="n">${i + 1}</span><span class="p"></span><span class="s">${s.pts}</span>`;
+    r.querySelector('.p').textContent = s.name; $('rows').appendChild(r);
+  });
+}
+
+// Long answers shrink to fit the width.
+function fit() { const el = $('word'); el.style.fontSize = '200px'; let s = 200; while (el.scrollWidth > 1080 && s > 70) { s -= 10; el.style.fontSize = s + 'px'; } }
+
+// ---- Demo: fake viewers so the game can be tried without going live.
+const demo = {
+  on: false, timers: [],
+  names: ['Léa_92', 'Momo.bzh', 'sofia.lit', 'K3vin', 'nina.mots', 'Lucas_75', 'Inès', 'tom.jeux', 'Camille', 'yanis.06'],
+  start() { this.on = true; $('feed').classList.add('on'); $('demoTag').classList.add('on'); },
+  stop() { this.on = false; this.timers.forEach(clearTimeout); $('feed').classList.remove('on'); $('demoTag').classList.remove('on'); },
+  round() {
+    this.timers.forEach(clearTimeout); this.timers = [];
+    const d = dur() * 1000, finds = Math.random() < .8, at = finds ? 4000 + Math.random() * (d - 8000) : d + 1;
+    for (let t = 1500; t < Math.min(at, d); t += 1500 + Math.random() * 2500) {
+      const other = WORDS[Math.floor(Math.random() * WORDS.length)][2];
+      this.timers.push(setTimeout(() => this.say(other.toLowerCase()), t));
+    }
+    if (finds) this.timers.push(setTimeout(() => this.say(current.word.toLowerCase() + (Math.random() < .3 ? ' !' : '')), at));
+  },
+  say(text) {
+    const n = this.names[Math.floor(Math.random() * this.names.length)];
+    const p = document.createElement('p'); p.innerHTML = '<b></b><span></span>'; p.querySelector('b').textContent = n; p.querySelector('span').textContent = text;
+    $('feed').appendChild(p); while ($('feed').children.length > 4) $('feed').firstChild.remove();
+    onComment({ source: 'demo', user: { uniqueId: n, nickname: n }, comment: text });
+  }
+};
+
+// ---- Real comments: the small program (serveur) reads the live chat and passes each comment here.
+let ws = null, wsUp = false, liveState = 'Pas connecté';
+function status() {
+  const st = $('status');
+  if (location.protocol === 'file:') { st.innerHTML = 'Ouvert sans le programme : seul le <b class="ok">mode essai</b> marche.'; return; }
+  st.innerHTML = (wsUp ? '<b class="ok">●</b> Programme lancé' : '<b class="ko">●</b> Programme arrêté') + '<br>' + liveState;
+}
+function openWs() {
+  if (location.protocol === 'file:') { status(); return; }
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { wsUp = true; status(); };
+  ws.onclose = () => { wsUp = false; status(); setTimeout(openWs, 2000); };
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.type === 'chat') onComment({ source: 'live', user: m.user || {}, comment: m.comment });
+    if (m.type === 'state') { liveState = m.text; status(); }
+  };
+}
+$('connect').onclick = () => {
+  const u = $('user').value.replace(/^@/, '').trim(); store.set('user', u);
+  if (ws && wsUp) { ws.send(JSON.stringify({ type: 'connect', user: u })); liveState = 'Connexion au live de @' + u + '…'; }
+  else liveState = 'Lance d\'abord le programme CNSNN Live.';
+  status();
+};
+$('user').value = store.get('user', 'jeucnsnn');
+$('mode').value = store.get('mode', location.protocol === 'file:' ? 'demo' : 'live');
+$('mode').onchange = () => { store.set('mode', $('mode').value); $('mode').value === 'demo' ? demo.start() : demo.stop(); };
+$('test').onkeydown = e => { if (e.key === 'Enter' && e.target.value.trim()) { onComment({ source: 'test', user: { uniqueId: 'test', nickname: 'Test' }, comment: e.target.value }); e.target.value = ''; } };
+$('skip').onclick = () => { if (phase === 'play') endRound(null); else newRound(); };
+$('reset').onclick = () => { if (confirm('Remettre le classement à zéro ?')) { scores = {}; roundNo = 0; lastLeader = null; store.set('scores', scores); store.set('round', 0); renderBoard(); } };
+
+// ---- Layout and panel auto-hide.
+function scale() {
+  const s = Math.min(innerWidth / 1080, innerHeight / 1920);
+  $('stage').style.transform = `scale(${s}) translate(-50%, -50%)`;
+}
+addEventListener('resize', scale); scale();
+let idle; function wake() { $('panel').classList.remove('hide'); clearTimeout(idle); idle = setTimeout(() => { if (!$('panel').contains(document.activeElement)) $('panel').classList.add('hide'); }, 4000); }
+addEventListener('mousemove', wake); addEventListener('keydown', wake); wake();
+
+renderBoard(); status(); openWs();
+if ($('mode').value === 'demo') demo.start();
+$('start').onclick = () => { $('start').hidden = true; say('C\'est parti ! Retrouve le mot grâce à ses consonnes.', { interrupt: true }); nextTimer = setTimeout(newRound, 3500); };
+if (new URLSearchParams(location.search).has('auto')) { $('start').hidden = true; newRound(); }
+</script>
+</body>
+</html>
