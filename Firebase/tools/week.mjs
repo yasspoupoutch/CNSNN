@@ -8,7 +8,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 initializeApp({ credential: applicationDefault(), projectId: 'cnsnn-9ctosy' });
 const db = getFirestore();
 
-const today = process.argv[2] || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+const today = process.argv[2] || process.env.WEEK_DAY || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 const dayIndex = (key) => Math.floor(Date.parse(key + 'T00:00:00Z') / 86400000);
 const week = Math.floor((dayIndex(today) + 3) / 7);
 const monday = new Date((week * 7 - 3) * 86400000).toISOString().slice(0, 10);
@@ -41,3 +41,20 @@ for (const [uid, u] of byUser) {
   console.log(`- ${u.name} : ${u.days.length} jour(s) joué(s) (${u.days.sort().join(', ')}), ${u.found} trouvé(s), ${u.catchUp} rattrapage(s) ; ligne : lastResult ${b?.lastResult ?? '—'}, week ${b?.week ?? '—'}/${b?.weekPlayed ?? '—'} joués, monthPlayed ${b?.monthPlayed ?? '—'} → ${why}`);
 }
 console.log(missing ? `${missing} joueur(s) absent(s).` : 'Personne ne manque.');
+
+// Full ranking of the week rebuilt from its results (same order as the app: words found, then total
+// time of the found days; suspended players left out). Works for a past week too, whose leaderboard
+// fields are overwritten as soon as a player plays the next week.
+const fmt = (ms) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const rows = new Map();
+for (const r of results) {
+  const uid = r.get('userId');
+  if (board.get(uid)?.suspended === true) continue;
+  const row = rows.get(uid) ?? { name: board.get(uid)?.username ?? r.get('username'), found: 0, played: 0, ms: 0 };
+  row.played++;
+  if (r.get('correct')) { row.found++; row.ms += r.get('scoreMs') ?? 0; }
+  rows.set(uid, row);
+}
+const sorted = [...rows.values()].sort((a, b) => b.found - a.found || a.ms - b.ms);
+console.log(`\nClassement complet de la semaine du ${monday} au ${sunday} :`);
+sorted.forEach((x, i) => console.log(`${i + 1}. ${x.name} — ${x.found}/7 jours · ${fmt(x.ms)} (${x.played} joué(s))`));

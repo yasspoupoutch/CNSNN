@@ -23,6 +23,10 @@ on:
         description: "Classement de la semaine : qui a joué mais n'y apparaît pas, et pourquoi"
         type: boolean
         default: false
+      week_day:
+        description: "Avec week_check : un jour de la semaine voulue (AAAA-MM-JJ), vide = cette semaine"
+        type: string
+        default: ''
       players:
         description: Liste des joueurs avec un pseudo, même sans partie (chiffrée)
         type: boolean
@@ -229,6 +233,8 @@ jobs:
         run: node tools/account-check.mjs
       - name: Joueurs absents du classement de la semaine
         if: ${{ inputs.week_check }}
+        env:
+          WEEK_DAY: ${{ inputs.week_day }}
         run: node tools/week.mjs
       - name: Enregistrer l'application Android
         if: ${{ inputs.android_app && github.ref == 'refs/heads/main' }}
