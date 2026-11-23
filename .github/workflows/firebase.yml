@@ -46,7 +46,7 @@ on:
         type: boolean
         default: false
       sprint_copy:
-        description: "Sprint : mettre au classement le record du téléphone s.il est plus haut (un pseudo, ou « tous »)"
+        description: "Sprint : mettre au classement le record du téléphone s'il est plus haut (un pseudo, ou « tous »)"
         type: string
         default: ''
       account_check:
