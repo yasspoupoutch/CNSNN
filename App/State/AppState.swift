@@ -32,6 +32,8 @@ import CNSNNCore
     var challengeRequest = 0
     /// Asks Profil to open "Proposer un mot" (from the daily result).
     var proposeRequest = 0
+    /// "Choisir mon pseudo" on the home screen: Profil opens the pseudo box.
+    var renameRequest = 0
     /// Shows the first-launch tutorial again (Profil).
     var tutorialRequest = 0
     /// The code of a challenge link the app was opened with, waiting for the challenge sheet to join it.
@@ -98,23 +100,22 @@ import CNSNNCore
 
     // MARK: Session
 
-    func start(username: String) async {
+    /// First launch: no question, the player plays at once under an automatic pseudo ("Joueur4821"),
+    /// which they can change in Profil (the community rules are accepted then).
+    func start() async {
         guard !isBusy else { return }
-        let name = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (2...20).contains(name.count) else { error = "Choisissez un pseudo de 2 à 20 caractères."; return }
-        guard NameFilter.isAllowed(name) else { error = AppState.refusedName; return }
         isBusy = true
         defer { isBusy = false }
+        var name = NameFilter.automatic()
+        if let chosen = RuntimeFlags.testPseudo { name = chosen; progress.rulesVersion = CommunityRules.version }
         if let cloud {
             do {
                 let profile = try await cloud.bootstrap(username: name, rulesVersion: progress.rulesVersion)
                 try activate(profile, preservingGuest: true)
-            } catch let error as CloudError where [.usernameTaken, .usernameInvalid].contains(error) {
-                self.error = CloudError.message(error); return
-            } catch where CloudError.code(error) == .serverFull {
-                // The free quota is used up for today: enter as a guest, the account is made at the next launch.
+            } catch {
+                // Offline, or the free quota used up for today: play as a guest, the account is made at the next launch.
                 note(error)
-            } catch { self.error = "Connexion impossible : " + CloudError.message(error); return }
+            }
         }
         if uid == nil { progress.username = name }
         // Interface tests: today's word already found, the longest one and in hours, to check the home card fits.
@@ -295,7 +296,10 @@ import CNSNNCore
     // MARK: Community rules
 
     /// The player has a pseudo but has not accepted the current community rules yet.
-    var needsRulesAcceptance: Bool { !progress.username.isEmpty && (progress.rulesVersion ?? 0) < CommunityRules.version }
+    /// A player with the automatic pseudo has written nothing others can see: they accept the rules
+    /// when they choose a pseudo or propose a word (Profil), not at launch.
+    var needsRulesAcceptance: Bool { !progress.username.isEmpty && !NameFilter.isAutomatic(progress.username) && !rulesAccepted }
+    var rulesAccepted: Bool { (progress.rulesVersion ?? 0) >= CommunityRules.version }
     func acceptRules() {
         progress.rulesVersion = CommunityRules.version
         persist()

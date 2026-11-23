@@ -44,6 +44,15 @@ class NameFilterTest {
     @Test fun ordinaryPseudosStay() {
         for (name in listOf("Monique", "Computer", "Nazim", "Constance", "Pedro", "Yasin", "Poupoutch", "Violette", "Montenegro", "Alexandre")) assertTrue(name, NameFilter.isAllowed(name))
     }
+    @Test fun automaticPseudo() {
+        repeat(200) {
+            val name = NameFilter.automatic()
+            assertTrue(name, NameFilter.isAutomatic(name))
+            assertTrue(name, NameFilter.isAllowed(name))
+            assertTrue(name, name.length in 2..20)
+        }
+        for (name in listOf("Joueur", "Joueur123", "Joueur123456", "joueur4821", "Joueur48a1", "Camille", "Joueur 4821")) assertFalse(name, NameFilter.isAutomatic(name))
+    }
 }
 
 class GameRulesTest {
@@ -279,6 +288,9 @@ class ProgressMergeTest {
         assertTrue(CommunityRules.mustAccept(Progress(username = "Alice")))
         assertFalse(CommunityRules.mustAccept(Progress(username = "Alice", rulesVersion = 1)))
         assertFalse(CommunityRules.mustAccept(Progress()))
+        // The automatic pseudo: nothing written yet, the rules come when a pseudo is chosen.
+        assertFalse(CommunityRules.mustAccept(Progress(username = "Joueur4821")))
+        assertFalse(CommunityRules.accepted(Progress(username = "Joueur4821")))
     }
 
     @Test fun twoDevicesKeepEveryGame() {

@@ -134,28 +134,12 @@ class SmallScreenTest {
     private fun run() {
         val metrics = context.resources.displayMetrics
         notes.appendLine("Écran : ${(metrics.widthPixels / metrics.density).toInt()} × ${(metrics.heightPixels / metrics.density).toInt()} dp")
-        waitFor("Continuer")
-        rule.onNodeWithText("Continuer").performClick()
-        waitFor("Choisissez un pseudo")
-        val accept = rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true)
-        assertOnScreen("Case à cocher (sans clavier)", bounds(accept), visibleBottom())
-        assertOnScreen("Bouton C’est parti (sans clavier)", bounds(rule.onNodeWithText("C’est parti")), visibleBottom())
-        shot("01-pseudo")
-
-        // The keyboard comes up: the box and the button stay above it.
-        rule.onNodeWithText("Pseudo").performClick()
-        rule.onNodeWithText("Pseudo").performTextInput("Alex")
-        // The keyboard can take a moment on a slow emulator: a second tap on the field if need be.
-        runCatching { rule.waitUntil(10_000) { keyboardHeight() > 0 } }.onFailure { rule.onNodeWithText("Pseudo").performClick() }
-        rule.waitUntil(15_000) { keyboardHeight() > 0 }
-        Thread.sleep(1_200)
-        rule.waitForIdle()
-        notes.appendLine("Clavier : ${(keyboardHeight() / metrics.density).toInt()} dp")
-        assertOnScreen("Case à cocher (clavier ouvert)", bounds(accept), visibleBottom())
-        assertOnScreen("Bouton C’est parti (clavier ouvert)", bounds(rule.onNodeWithText("C’est parti")), visibleBottom())
-        assertOnScreen("Champ pseudo (clavier ouvert)", bounds(rule.onNodeWithText("Pseudo")), visibleBottom())
-        accept.performClick()
-        shot("02-pseudo-clavier")
+        // First launch: one screen, no pseudo to type, no box to tick.
+        waitFor("J’ai déjà un compte")
+        assertOnScreen("Bouton C’est parti", bounds(rule.onNodeWithText("C’est parti")), visibleBottom())
+        assertOnScreen("Lien J’ai déjà un compte", bounds(rule.onNodeWithText("J’ai déjà un compte")), visibleBottom())
+        shot("01-premier-lancement")
+        AppViewModel.testPseudo = "Alex"
         rule.onNodeWithText("C’est parti").performClick()
 
         waitFor("Bonjour,", 20_000)

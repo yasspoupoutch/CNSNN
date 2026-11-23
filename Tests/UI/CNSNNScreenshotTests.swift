@@ -8,20 +8,13 @@ final class CNSNNScreenshotTests: XCTestCase {
     @MainActor func testAppStoreScreenshots() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7"]
+        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7", "--pseudo", "Camille"]
         app.launch()
 
         // Onboarding, as in CNSNNUITests.
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        let color = app.buttons["Couleur 3"]
-        if color.exists { color.tap() }
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
 
         // 1. Accueil: today's word found, Léa's challenge, the modes and their records.
         let ranking = app.buttons["Classement"]
@@ -87,16 +80,11 @@ final class CNSNNScreenshotTests: XCTestCase {
     @MainActor func testDuelScreenshots() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--screenshots", "--duel-demo", "--mode-seed=7"]
+        app.launchArguments = ["--uitesting", "--screenshots", "--duel-demo", "--mode-seed=7", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
         XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
         dismissKeyboardIfNeeded(app)
 
@@ -138,16 +126,11 @@ final class CNSNNScreenshotTests: XCTestCase {
     @MainActor func testAppPreview() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7"]
+        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
         XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
         dismissKeyboardIfNeeded(app)
         Thread.sleep(forTimeInterval: 1)

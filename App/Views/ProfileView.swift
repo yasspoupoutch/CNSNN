@@ -6,12 +6,17 @@ struct ProfileView: View {
     @AppStorage(CNSNNTheme.avatarKey) private var avatar = 0
     @State private var editingName = false
     @State private var name = ""
+    @State private var nameTitle = "Modifier le pseudo"
     @State private var account = false
     @State private var propose = false
     @State private var moderation = false
     @State private var attendance = false
     @State private var privacy = false
     @State private var rules = false
+    /// What opens once the community rules are accepted (a player with the automatic pseudo accepts
+    /// them the first time they choose a pseudo or propose a word).
+    @State private var rulesNext: RulesNext?
+    enum RulesNext: Identifiable { case rename, propose; var id: Self { self } }
     /// Signature at the bottom of the profile.
     private var credits: some View {
         VStack(spacing: 6) {
@@ -34,13 +39,13 @@ struct ProfileView: View {
                     Text("Niveau \(state.progress.level) · \(Format.number(state.progress.correctAnswers)) " + (state.progress.correctAnswers > 1 ? "mots trouvés" : "mot trouvé"))
                         .scaledFont(15).foregroundStyle(Palette.secondary).padding(.top, 4)
                     AvatarPicker(selection: $avatar).padding(.top, 18)
-                    Button("Modifier le pseudo") { name = state.progress.username; editingName = true }
+                    Button(NameFilter.isAutomatic(state.progress.username) ? "Choisir mon pseudo" : "Modifier le pseudo") { needingRules(.rename) }
                         .buttonStyle(GlassPillStyle(height: 48)).padding(.top, 18)
                 }.frame(maxWidth: .infinity).glassCard(radius: 34, padding: 22)
                 VStack(spacing: 0) {
                     Button { account = true } label: { row(state.isAnonymous ? "Sauvegarder mon compte" : "Mon compte", symbol: "person.crop.circle.badge.checkmark") }
                     Rectangle().fill(Palette.line).frame(height: 1)
-                    Button { propose = true } label: { row("Proposer un mot", symbol: "plus.bubble") }
+                    Button { needingRules(.propose) } label: { row("Proposer un mot", symbol: "plus.bubble") }
                         .accessibilityIdentifier("profile.propose")
                     if state.isAdmin {
                         Rectangle().fill(Palette.line).frame(height: 1)
@@ -77,13 +82,21 @@ struct ProfileView: View {
             }
             // "Proposer un mot" on the daily result: opens once the game has closed.
             .onChange(of: state.proposeRequest) { _, _ in
-                Task { try? await Task.sleep(for: .seconds(0.7)); propose = true }
+                Task { try? await Task.sleep(for: .seconds(0.7)); needingRules(.propose) }
+            }
+            .onChange(of: state.renameRequest) { _, _ in
+                Task { try? await Task.sleep(for: .seconds(0.5)); needingRules(.rename) }
+            }
+            .sheet(item: $rulesNext) { next in
+                CommunityRulesView(accepting: true) {
+                    Task { try? await Task.sleep(for: .seconds(0.6)); open(next) }
+                }
             }
             .sheet(isPresented: $moderation) { NavigationStack { ModerationView() } }
             .sheet(isPresented: $attendance) { NavigationStack { AttendanceView() } }
             .sheet(isPresented: $privacy) { PrivacyView() }
             .sheet(isPresented: $rules) { CommunityRulesView() }
-            .alert("Modifier le pseudo", isPresented: $editingName) {
+            .alert(nameTitle, isPresented: $editingName) {
                 TextField("Pseudo", text: $name)
                 Button("Enregistrer") { Task { await state.rename(name) } }
                 Button("Annuler", role: .cancel) {}
@@ -92,6 +105,19 @@ struct ProfileView: View {
                 state.isAdmin = (try? await state.cloud?.isAdmin()) ?? state.isAdmin
                 if let uid = state.uid { state.isSuspended = (try? await state.cloud?.isSuspended(uid: uid)) ?? state.isSuspended }
             }
+    }
+    private func needingRules(_ next: RulesNext) {
+        if state.rulesAccepted { open(next) } else { rulesNext = next }
+    }
+    private func open(_ next: RulesNext) {
+        switch next {
+        case .rename:
+            let automatic = NameFilter.isAutomatic(state.progress.username)
+            name = automatic ? "" : state.progress.username
+            nameTitle = automatic ? "Choisir mon pseudo" : "Modifier le pseudo"
+            editingName = true
+        case .propose: propose = true
+        }
     }
     private func row(_ title: String, symbol: String) -> some View {
         HStack(spacing: 14) {

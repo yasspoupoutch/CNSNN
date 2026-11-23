@@ -1,5 +1,6 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.state.AppViewModel
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -24,13 +25,10 @@ class AppFlowTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Test fun onboardingThenClassicGame() {
-        rule.waitUntil(15_000) { rule.onAllNodes(hasText("Continuer")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
-        if (rule.onAllNodes(hasText("Continuer")).fetchSemanticsNodes().isNotEmpty()) {
-            rule.onNodeWithText("Continuer").performClick()
-            rule.onNodeWithText("Pseudo").performTextInput("Testeur")
-            // The start button waits for the community rules to be accepted.
-            rule.onNodeWithText("C’est parti").assertIsNotEnabled()
-            rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
+        rule.waitUntil(15_000) { rule.onAllNodes(hasText("J’ai déjà un compte")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
+        if (rule.onAllNodes(hasText("J’ai déjà un compte")).fetchSemanticsNodes().isNotEmpty()) {
+            // First launch: no pseudo to type, no box to tick.
+            AppViewModel.testPseudo = "Testeur"
             rule.onNodeWithText("C’est parti").performClick()
         }
         rule.waitUntil(20_000) { rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }

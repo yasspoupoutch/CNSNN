@@ -26,6 +26,7 @@ import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
+import com.poupoutch.cnsnn.core.NameFilter
 import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.GameMode
@@ -87,7 +88,7 @@ fun reservable(name: String): Boolean {
     return '/' !in key && key != "." && key != ".." && !(key.startsWith("__") && key.endsWith("__"))
 }
 /** The pseudo given to an account that signs in without a profile yet (made on the web, say). */
-fun fallbackName(): String = "Joueur" + (1000..9999).random()
+fun fallbackName(): String = NameFilter.automatic()
 
 class CloudRepository(
     private val auth: FirebaseAuth = com.poupoutch.cnsnn.Cloud.auth,
@@ -105,16 +106,24 @@ class CloudRepository(
         val ref = db.collection("users").document(user.uid)
         // Falls back to the cached profile offline, so a returning player keeps their identity.
         val doc = ref.get().await()
+        var username = username
         if (!doc.exists()) {
             if (doc.metadata.isFromCache) throw CloudError(CloudError.Kind.OFFLINE)
             // A deletion cut off halfway (network, app closed) must finish, never bring the profile back.
             if (db.collection("deletedUsers").document(user.uid).get(Source.SERVER).await().exists()) throw CloudError(CloudError.Kind.DELETION_PENDING)
+            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
+            // An automatic pseudo already taken is simply drawn again.
+            val batch = db.batch()
+            for (attempt in 1..5) {
+                try { reserve(username, user.uid, batch); break }
+                catch (e: CloudError) {
+                    if (e.kind != CloudError.Kind.USERNAME_TAKEN || attempt == 5 || !NameFilter.isAutomatic(username)) throw e
+                    username = NameFilter.automatic()
+                }
+            }
             val data = mutableMapOf<String, Any?>("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
                 "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)
             if (rulesVersion != null) { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
-            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
-            val batch = db.batch()
-            reserve(username, user.uid, batch)
             batch.set(ref, data)
             batch.commit().await()
             return CloudProfile(user.uid, user.isAnonymous, username, user.email, rulesVersion)

@@ -80,6 +80,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.poupoutch.cnsnn.BuildConfig
 import com.poupoutch.cnsnn.core.CommunityRules
+import com.poupoutch.cnsnn.core.NameFilter
 import com.poupoutch.cnsnn.core.Format
 import com.poupoutch.cnsnn.core.Site
 import com.poupoutch.cnsnn.data.CloudError
@@ -97,7 +98,14 @@ fun ProfileScreen(state: AppViewModel) {
     var propose by rememberSaveable { mutableStateOf(false) }
     // "Proposer un mot" on the daily result.
     var seenPropose by rememberSaveable { mutableStateOf(state.proposeRequest) }
-    LaunchedEffect(state.proposeRequest) { if (state.proposeRequest != seenPropose) { seenPropose = state.proposeRequest; propose = true } }
+    // A player with the automatic pseudo accepts the community rules the first time they choose a pseudo
+    // or propose a word; then what they asked for opens.
+    var rulesNext by rememberSaveable { mutableStateOf<String?>(null) }
+    fun open(next: String) { if (next == "rename") editingName = true else propose = true }
+    fun needingRules(next: String) { if (CommunityRules.accepted(state.progress)) open(next) else rulesNext = next }
+    LaunchedEffect(state.proposeRequest) { if (state.proposeRequest != seenPropose) { seenPropose = state.proposeRequest; needingRules("propose") } }
+    var seenRename by rememberSaveable { mutableStateOf(state.renameRequest) }
+    LaunchedEffect(state.renameRequest) { if (state.renameRequest != seenRename) { seenRename = state.renameRequest; needingRules("rename") } }
     var moderation by rememberSaveable { mutableStateOf(false) }
     var attendance by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
@@ -114,13 +122,14 @@ fun ProfileScreen(state: AppViewModel) {
                 Text(state.progress.username, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp))
                 Text("Niveau ${state.progress.level} · ${Format.number(state.progress.correctAnswers)} mot${if (state.progress.correctAnswers > 1) "s" else ""} trouvé${if (state.progress.correctAnswers > 1) "s" else ""}", color = Palette.secondary, modifier = Modifier.padding(top = 4.dp))
                 AvatarPicker(state.avatar, state::chooseAvatar, Modifier.padding(top = 14.dp))
-                TonalButton("Modifier le pseudo", Modifier.fillMaxWidth().padding(top = 14.dp)) { editingName = true }
+                TonalButton(if (NameFilter.isAutomatic(state.progress.username)) "Choisir mon pseudo" else "Modifier le pseudo",
+                    Modifier.fillMaxWidth().padding(top = 14.dp)) { needingRules("rename") }
             }
         }
         SectionCard(padding = 0.dp, radius = 24.dp) {
             NavRow(if (state.isAnonymous) "Sauvegarder mon compte" else "Mon compte", Icons.Outlined.AccountCircle) { account = true }
             Divider()
-            NavRow("Proposer un mot", Icons.Outlined.AddComment, Modifier.testTag("profile.propose")) { propose = true }
+            NavRow("Proposer un mot", Icons.Outlined.AddComment, Modifier.testTag("profile.propose")) { needingRules("propose") }
             if (state.isAdmin) {
                 Divider(); NavRow("Modération", Icons.Outlined.Shield) { moderation = true }
                 Divider(); NavRow("Fréquentation", Icons.Outlined.BarChart) { attendance = true }
@@ -152,7 +161,8 @@ fun ProfileScreen(state: AppViewModel) {
         }
     }
 
-    if (editingName) RenameDialog(state.progress.username, { editingName = false }) { state.rename(it); editingName = false }
+    rulesNext?.let { next -> RulesAcceptance(cancel = { rulesNext = null }) { state.acceptRules(); rulesNext = null; open(next) } }
+    if (editingName) RenameDialog(state.progress.username.takeUnless { NameFilter.isAutomatic(it) } ?: "", { editingName = false }) { state.rename(it); editingName = false }
     if (account) FullScreen("Votre compte", { account = false }) { AccountContent(state) { account = false } }
     if (propose) FullScreen("Proposer un mot", { propose = false }) { ProposeScreen(state, inSheet = true) }
     if (moderation) FullScreen("Modération", { moderation = false }) { ModerationContent(state) }
@@ -178,7 +188,7 @@ private fun NavRow(title: String, icon: ImageVector, modifier: Modifier = Modifi
 @Composable
 private fun RenameDialog(current: String, dismiss: () -> Unit, save: (String) -> Unit) {
     var name by remember { mutableStateOf(current) }
-    AlertDialog(dismiss, title = { Text("Modifier le pseudo") },
+    AlertDialog(dismiss, title = { Text(if (current.isEmpty()) "Choisir mon pseudo" else "Modifier le pseudo") },
         text = { OutlinedTextField(name, { name = it.take(20) }, singleLine = true, supportingText = { Text("Entre 2 et 20 caractères.") }) },
         confirmButton = { TextButton({ save(name) }, enabled = name.trim().length in 2..20) { Text("Enregistrer") } },
         dismissButton = { TextButton(dismiss) { Text("Annuler") } })
