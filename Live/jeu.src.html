@@ -11,7 +11,7 @@
 :root { --fg: #f4f5f8; --fg2: rgba(244,245,248,.72); --fg3: rgba(244,245,248,.5); --gold: #ffc65a; --gold-top: #ffd673; --gold-bot: #f6b84d;
   --mint: #5ae6c6; --red: #ff8785; --b: rgba(255,255,255,.14); }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--fg);
+html, body { margin: 0; height: 100%; background: #06070c; overflow: hidden; color: var(--fg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 /* The live is drawn on a fixed 1080 x 1920 portrait canvas, scaled to fit the window. */
 #stage { position: absolute; left: 50%; top: 50%; width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; background: #06070c; }
@@ -136,6 +136,7 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color:
   <select id="voiceSel"></select>
   <label for="test">Tester un commentaire</label>
   <input id="test" placeholder="Écris un mot puis Entrée" autocomplete="off">
+  <button id="fit">Mettre la fenêtre en vertical (9:16)</button>
   <button id="skip">Passer au mot suivant</button>
   <button id="reset">Remettre le classement à zéro</button>
   <small>Ce panneau se cache tout seul quand la souris ne bouge plus. Dans LIVE Studio, capture seulement la partie verticale du jeu.</small>
@@ -365,6 +366,15 @@ function scale() {
   $('stage').style.transform = `scale(${s}) translate(-50%, -50%)`;
 }
 addEventListener('resize', scale); scale();
+// The window itself takes the exact 9:16 shape, as tall as the screen: LIVE Studio then captures it with no bars and as sharp as possible.
+function fit916() {
+  const cw = outerWidth - innerWidth, ch = outerHeight - innerHeight, h = screen.availHeight;
+  const w = Math.round((h - ch) * 9 / 16) + cw;
+  try { moveTo(screen.availLeft || 0, screen.availTop || 0); resizeTo(w, h); } catch {}
+  setTimeout(() => { if (Math.abs(innerWidth / innerHeight - 9 / 16) > .02) $('status').insertAdjacentHTML('beforeend', '<br>Fenêtre pas au bon format : quitte le plein écran puis réessaie.'); }, 600);
+}
+$('fit').onclick = fit916;
+setTimeout(fit916, 300);
 let idle; function wake() { $('panel').classList.remove('hide'); clearTimeout(idle); idle = setTimeout(() => { if (!$('panel').contains(document.activeElement)) $('panel').classList.add('hide'); }, 4000); }
 addEventListener('mousemove', wake); addEventListener('keydown', wake); wake();
 
