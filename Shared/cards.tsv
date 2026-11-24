@@ -2695,3 +2695,2008 @@ D	Animaux	Moa	Un oiseau géant disparu de Nouvelle-Zélande.
 D	Animaux	Kéa	Un perroquet des montagnes néo-zélandaises très malin.
 D	Animaux	Léopard de mer	Un phoque prédateur de l’Antarctique.
 D	Animaux	Ratel	Un carnivore intrépide qui pille les ruches.
+# Cartes ajoutées en version 1.5 (2 004 mots) : verbes, adjectifs, expressions, couleurs, métiers, personnages célèbres, marques (nom seulement) et un peu de football facile.
+F	Général	Manger	Ce qu’on fait à table avec une fourchette.
+F	Général	Boire	Ce qu’on fait quand on a soif.
+F	Général	Dormir	Ce qu’on fait la nuit, les yeux fermés.
+F	Général	Courir	Aller très vite sur ses deux jambes.
+F	Général	Marcher	Avancer un pied après l’autre.
+F	Général	Sauter	Quitter le sol d’un bond.
+F	Général	Nager	Avancer dans l’eau en bougeant bras et jambes.
+F	Général	Danser	Bouger en rythme sur de la musique.
+F	Général	Chanter	Faire de la musique avec sa voix.
+F	Général	Lire	Ce qu’on fait avec un livre ouvert.
+F	Général	Écrire	Tracer des lettres avec un stylo.
+F	Général	Dessiner	Faire un croquis avec un crayon.
+F	Général	Peindre	Mettre de la couleur avec un pinceau.
+F	Général	Jouer	Ce que font les enfants à la récréation.
+F	Général	Pleurer	Verser des larmes.
+F	Général	Crier	Parler très, très fort.
+F	Général	Parler	Dire des mots avec sa bouche.
+F	Général	Écouter	Prêter l’oreille.
+F	Général	Regarder	Poser les yeux sur quelque chose.
+F	Général	Sentir	Ce que fait le nez devant une fleur.
+F	Général	Toucher	L’un des cinq sens, avec les doigts.
+F	Général	Penser	Réfléchir dans sa tête.
+F	Général	Rêver	Ce qu’on fait en dormant, ou les yeux ouverts.
+F	Général	Oublier	Ne plus se souvenir.
+F	Général	Apprendre	Ce qu’on fait à l’école pour savoir.
+F	Général	Comprendre	Saisir le sens d’une explication.
+F	Général	Travailler	Ce qu’on fait au bureau toute la journée.
+F	Général	Cuisiner	Préparer un bon plat.
+F	Général	Laver	Nettoyer avec de l’eau et du savon.
+F	Général	Nettoyer	Rendre propre.
+F	Général	Ranger	Remettre chaque chose à sa place dans sa chambre.
+F	Général	Ouvrir	Le contraire de fermer.
+F	Général	Fermer	Le contraire d’ouvrir.
+F	Général	Monter	Le contraire de descendre.
+F	Général	Descendre	Le contraire de monter.
+F	Général	Tomber	Perdre l’équilibre et finir par terre.
+F	Général	Lancer	Envoyer une balle loin de soi.
+F	Général	Attraper	Saisir au vol.
+F	Général	Pousser	Le contraire de tirer.
+F	Général	Tirer	Le contraire de pousser.
+F	Général	Porter	Tenir dans ses bras un objet lourd.
+F	Général	Acheter	Payer pour avoir quelque chose.
+F	Général	Vendre	Le contraire d’acheter.
+F	Général	Payer	Donner de l’argent en échange.
+F	Général	Voler	Ce que fait l’oiseau dans le ciel.
+F	Général	Conduire	Tenir le volant d’une voiture.
+F	Général	Voyager	Partir découvrir d’autres pays.
+F	Général	Partir	Le contraire d’arriver.
+F	Général	Arriver	Le contraire de partir.
+F	Général	Rentrer	Revenir chez soi.
+F	Général	Sortir	Aller dehors.
+F	Général	Entrer	Passer la porte pour être dedans.
+F	Général	Attendre	Rester là jusqu’à ce que quelqu’un vienne.
+F	Général	Chercher	Fouiller pour trouver.
+F	Général	Trouver	Mettre enfin la main sur ce qu’on cherchait.
+F	Général	Perdre	Le contraire de gagner.
+F	Général	Gagner	Finir premier.
+F	Général	Compter	Dire un, deux, trois, quatre, cinq.
+M	Général	Calculer	Faire une opération de mathématiques.
+F	Général	Tricher	Ne pas respecter les règles du jeu en douce.
+F	Général	Mentir	Ne pas dire la vérité.
+M	Général	Gronder	Disputer un enfant qui a fait une bêtise.
+F	Général	Embrasser	Faire un bisou.
+M	Général	Câliner	Serrer quelqu’un tendrement dans ses bras.
+M	Général	Saluer	Dire bonjour d’un geste de la main.
+M	Général	Remercier	Dire merci.
+F	Général	Sourire	Étirer les lèvres quand on est content.
+M	Général	Bâiller	Ouvrir grand la bouche quand on est fatigué.
+M	Général	Éternuer	Faire « Atchoum ! ».
+F	Général	Tousser	Ce qu’on fait quand on a mal à la gorge.
+F	Général	Ronfler	Faire du bruit en dormant.
+F	Général	Siffler	Souffler entre ses lèvres pour faire un son aigu.
+F	Général	Frapper	Toquer à la porte.
+F	Général	Sonner	Ce que fait le réveil le matin.
+F	Général	Couper	Trancher avec des ciseaux.
+F	Général	Coller	Fixer avec de la glue.
+M	Général	Plier	Faire un pli dans une feuille ou un vêtement.
+M	Général	Coudre	Assembler du tissu avec du fil et une aiguille.
+M	Général	Tricoter	Faire une écharpe avec de la laine et deux aiguilles.
+M	Général	Repasser	Enlever les plis d’un vêtement avec un fer.
+M	Général	Balayer	Nettoyer le sol avec un balai.
+F	Général	Arroser	Donner de l’eau aux plantes.
+F	Général	Planter	Mettre une graine dans la terre.
+M	Général	Cueillir	Détacher une fleur ou un fruit de sa tige.
+M	Général	Pêcher	Attraper du poisson avec une canne.
+M	Général	Chasser	Poursuivre du gibier.
+M	Général	Construire	Bâtir une maison.
+F	Général	Réparer	Remettre en état ce qui est cassé.
+F	Général	Casser	Briser en morceaux.
+F	Général	Allumer	Faire la lumière en appuyant sur l’interrupteur.
+F	Général	Éteindre	Le contraire d’allumer.
+M	Général	Brûler	Ce que fait le feu.
+M	Général	Geler	Devenir de la glace à cause du froid.
+F	Général	Fondre	Ce que fait la glace au soleil.
+M	Général	Bouillir	Ce que fait l’eau à 100 degrés.
+M	Général	Cuire	Chauffer un aliment pour le rendre mangeable.
+M	Général	Griller	Cuire au barbecue.
+M	Général	Mélanger	Remuer pour mêler les ingrédients.
+M	Général	Verser	Faire couler un liquide dans un verre.
+M	Général	Remplir	Le contraire de vider.
+M	Général	Vider	Le contraire de remplir.
+F	Général	Souffler	Ce qu’on fait sur les bougies du gâteau.
+M	Général	Respirer	Faire entrer l’air dans ses poumons.
+F	Général	Grandir	Ce que font les enfants chaque année.
+M	Général	Vieillir	Prendre de l’âge.
+M	Général	Naître	Venir au monde.
+M	Général	Mourir	Le contraire de naître.
+M	Général	Guérir	Aller mieux après une maladie.
+M	Général	Soigner	Ce que fait le médecin.
+M	Général	Habiller	Mettre des vêtements à quelqu’un.
+M	Général	Coiffer	Arranger les cheveux.
+M	Général	Maquiller	Mettre du fard et du rouge à lèvres.
+M	Général	Réveiller	Tirer quelqu’un de son sommeil.
+M	Général	Se lever	Sortir du lit le matin.
+M	Général	Se coucher	Aller au lit le soir.
+M	Général	Téléphoner	Appeler quelqu’un.
+D	Général	Photographier	Prendre en photo.
+M	Général	Filmer	Enregistrer une vidéo.
+M	Général	Imprimer	Sortir un document sur papier.
+F	Général	Envoyer	Expédier une lettre ou un message.
+M	Général	Recevoir	Le contraire d’envoyer.
+F	Général	Offrir	Donner un cadeau.
+M	Général	Partager	Donner une part à chacun.
+M	Général	Prêter	Donner pour un temps, en attendant qu’on le rende.
+D	Général	Emprunter	Prendre pour un temps, en promettant de rendre.
+M	Général	Choisir	Faire son choix parmi plusieurs options.
+M	Général	Décider	Trancher, prendre une décision.
+D	Général	Hésiter	Ne pas savoir quoi choisir.
+M	Général	Applaudir	Taper dans ses mains à la fin du spectacle.
+M	Général	Grimper	Monter dans un arbre en s’agrippant.
+M	Général	Glisser	Ce qu’on fait sur le verglas ou sur un toboggan.
+F	Général	Rouler	Ce que fait une roue.
+M	Général	Pédaler	Faire avancer son vélo.
+M	Général	Skier	Descendre une piste enneigée sur des lattes.
+M	Général	Patiner	Glisser sur la glace avec des lames.
+M	Général	Plonger	Sauter tête la première dans la piscine.
+M	Général	Ramer	Faire avancer une barque.
+D	Général	Atterrir	Ce que fait l’avion en se posant.
+D	Général	Décoller	Ce que fait l’avion en quittant le sol.
+M	Général	Klaxonner	Faire « tût-tût » en voiture.
+M	Général	Freiner	Ralentir en appuyant sur la pédale.
+M	Général	Garer	Mettre sa voiture sur une place de parking.
+M	Général	Déménager	Changer de maison avec tous ses cartons.
+M	Général	Visiter	Découvrir un musée ou une ville.
+D	Général	Explorer	Partir à la découverte de terres inconnues.
+M	Général	Camper	Dormir sous une tente.
+M	Général	Bronzer	Prendre des couleurs au soleil.
+D	Général	Bavarder	Discuter de tout et de rien.
+D	Général	Chuchoter	Parler tout bas à l’oreille.
+M	Général	Hurler	Crier de toutes ses forces.
+D	Général	Murmurer	Parler à voix très basse.
+M	Général	Raconter	Dire une histoire.
+M	Général	Expliquer	Faire comprendre.
+F	Général	Répondre	Donner la réponse à une question.
+F	Général	Demander	Poser une question.
+D	Général	Promettre	Jurer qu’on le fera.
+D	Général	Pardonner	Ne plus en vouloir à quelqu’un.
+M	Général	Bouder	Faire la tête dans son coin.
+M	Général	Rougir	Devenir tout rouge de honte.
+M	Général	Trembler	Ce qu’on fait quand on a froid ou peur.
+D	Général	Frissonner	Avoir la chair de poule.
+D	Général	Transpirer	Suer pendant le sport.
+M	Général	Grignoter	Manger un petit peu entre les repas.
+M	Général	Dévorer	Manger goulûment.
+M	Général	Avaler	Faire descendre dans la gorge.
+D	Général	Mâcher	Écraser la nourriture avec ses dents.
+M	Général	Croquer	Mordre dans une pomme.
+M	Général	Lécher	Passer la langue sur une glace.
+D	Général	Tartiner	Étaler du beurre sur du pain.
+M	Général	Éplucher	Retirer la peau d’une pomme de terre.
+D	Général	Râper	Réduire du fromage en petits filaments.
+D	Général	Pétrir	Travailler la pâte à pain avec les mains.
+M	Général	Saler	Ajouter du sel.
+M	Général	Sucrer	Ajouter du sucre.
+F	Général	Frite	Un bâtonnet de pomme de terre doré dans l’huile.
+F	Général	Pâtes	Spaghettis, coquillettes ou penne.
+F	Général	Sel	On en met une pincée dans l’eau des pâtes.
+F	Général	Saucisse	On la grille au barbecue, de Strasbourg ou de Toulouse.
+F	Général	Tarte	Une pâte garnie de fruits, cuite au four.
+F	Général	Purée	Des pommes de terre écrasées.
+F	Général	Melon	Un fruit d’été rond à la chair orange.
+F	Général	Poire	Un fruit en forme de goutte.
+F	Général	Pêche	Un fruit à la peau duveteuse.
+F	Général	Petit pois	De petites billes vertes dans une cosse.
+F	Général	Chou	Un légume rond et feuillu, vert ou rouge.
+F	Général	Citrouille	Elle devient un carrosse pour Cendrillon.
+F	Général	Mois	Janvier en est un.
+F	Général	Midi	L’heure du déjeuner.
+F	Général	Minuit	Douze coups sonnent et c’est un nouveau jour.
+F	Général	Orage	Éclairs et tonnerre dans le ciel.
+F	Général	Feuille	Elle tombe des arbres en automne.
+F	Général	Toilettes	On tire la chasse en sortant.
+F	Général	Porte	On frappe dessus avant d’entrer.
+M	Général	Cheminée	Le Père Noël y descend.
+F	Général	Gare	On y attend le train.
+F	Général	Hôtel	On y dort en vacances, dans une chambre réservée.
+F	Général	Tunnel	Un passage creusé sous une montagne.
+F	Général	Train	Il roule sur des rails.
+F	Général	Avion	Il vole dans le ciel avec des passagers.
+F	Général	Bateau	Il flotte sur la mer.
+F	Général	Vélo	Deux roues, un guidon et des pédales.
+F	Général	Infirmier	Il fait les piqûres à l’hôpital.
+F	Général	Maître	Celui qui fait la classe en primaire.
+F	Général	Pilote	Il est aux commandes de l’avion.
+F	Général	Fermier	Il s’occupe des vaches et des champs.
+F	Général	Peintre	Un artiste qui manie le pinceau.
+F	Général	Pirate	Un bandit des mers avec un bandeau sur l’œil.
+F	Général	Reine	La femme du roi.
+F	Général	Prince	Le fils du roi.
+F	Général	Géant	Le contraire d’un nain.
+F	Général	Robot	Une machine qui imite l’humain.
+F	Général	Monstre	Il se cache sous le lit dans les cauchemars.
+F	Général	Bouche	On y met la nourriture.
+F	Général	Cœur	Il bat dans la poitrine.
+M	Général	Front	Le haut du visage, au-dessus des sourcils.
+F	Général	Frère	Un garçon qui a les mêmes parents que toi.
+F	Général	Enfant	Un petit garçon ou une petite fille.
+F	Général	Grand-père	Le papa de papa ou de maman.
+F	Général	Sport	Tennis, natation ou course à pied.
+F	Général	Colère	Quand on est très fâché.
+F	Général	Sommeil	Ce qu’on a quand les yeux se ferment tout seuls.
+F	Général	Marron	La couleur du chocolat.
+F	Général	Gris	La couleur de la souris et des nuages de pluie.
+F	Général	Argent	On le gagne en travaillant.
+F	Général	Bois	La matière d’un arbre coupé.
+M	Général	Plastique	La matière de beaucoup de bouteilles.
+M	Général	Silence	Quand plus personne ne fait de bruit.
+M	Général	Chiffre	De 0 à 9.
+M	Général	Phrase	Elle commence par une majuscule et finit par un point.
+F	Général	Livre	On tourne ses pages.
+M	Général	Conte	« Il était une fois… »
+F	Général	Question	Elle finit par un point d’interrogation.
+F	Général	Réponse	Ce qu’on donne après une question.
+F	Général	Secret	On le garde pour soi et on ne le répète pas.
+F	Général	Mensonge	Pinocchio en dit et son nez s’allonge.
+M	Général	Vérité	Le contraire d’un mensonge.
+F	Général	Travail	Ce qu’on fait pour gagner sa vie.
+F	Général	Bureau	Une table de travail.
+F	Général	Internet	Le réseau mondial qui relie les ordinateurs.
+F	Général	Message	On l’envoie par téléphone.
+F	Général	Photo	On la prend avec un appareil ou un téléphone.
+F	Général	Film	On le regarde au cinéma.
+F	Général	Carte	As, roi ou dame dans un jeu.
+F	Général	Gant	Il protège la main du froid.
+F	Général	Manteau	On le met par-dessus tout en hiver.
+F	Général	Poche	On y glisse ses mains ou ses clés.
+F	Général	Petit déjeuner	Le premier repas de la journée.
+M	Général	Coup de foudre	Tomber amoureux au premier regard.
+M	Général	Coup de soleil	La peau devient rouge après la plage.
+M	Général	Coup de main	Une petite aide.
+M	Général	Coup de fil	Un appel téléphonique.
+F	Général	Bonne nuit	Ce qu’on dit avant d’aller dormir.
+F	Général	Bon appétit	Ce qu’on dit avant de manger.
+F	Général	Joyeux anniversaire	Ce qu’on chante devant le gâteau.
+M	Général	Fête des mères	Le dimanche où l’on gâte maman, au printemps.
+M	Général	Fête de la musique	Le 21 juin, on joue dans les rues.
+F	Général	Salle à manger	La pièce où l’on prend ses repas.
+F	Général	Salle de classe	La pièce de l’école où l’on fait cours.
+M	Général	Cour de récréation	On y joue entre deux cours.
+M	Général	Boîte de nuit	On y danse jusqu’au matin.
+F	Général	Pot de fleurs	On y plante un géranium sur le balcon.
+F	Général	Tasse de thé	Une boisson chaude très appréciée des Anglais.
+F	Général	Verre d’eau	La boisson la plus simple pour la soif.
+M	Général	Morceau de sucre	Un petit cube qu’on met dans le café.
+F	Général	Pain au chocolat	Une viennoiserie, ou chocolatine dans le Sud-Ouest.
+M	Général	Steak frites	Un plat de brasserie : viande et pommes de terre.
+M	Général	Œuf à la coque	On y trempe des mouillettes.
+M	Général	Œuf au plat	Un jaune entouré de blanc, cuit dans la poêle.
+F	Général	Tarte au citron	Un dessert acidulé, parfois meringué.
+F	Général	Gâteau d’anniversaire	On souffle ses bougies.
+F	Général	Glace à la vanille	Un parfum blanc pour un cornet.
+F	Général	Sapin de Noël	On le décore de guirlandes en décembre.
+F	Général	Père Noël	Il descend par la cheminée le 24 décembre.
+F	Général	Lapin de Pâques	Il cache les œufs en chocolat dans le jardin.
+F	Général	Œuf de Pâques	On le cherche dans le jardin en avril.
+F	Général	Chasse au trésor	Un jeu où l’on suit des indices jusqu’au coffre.
+M	Général	Pierre-feuille-ciseaux	Un jeu de mains où l’on compte « un, deux, trois ».
+F	Général	Jeu de société	Monopoly ou Scrabble.
+M	Général	Carte bancaire	On la glisse dans le terminal pour payer.
+M	Général	Permis de conduire	Le papier rose qu’il faut pour prendre le volant.
+M	Général	Code de la route	L’examen avant le permis.
+M	Général	Ceinture de sécurité	On l’attache dès qu’on monte en voiture.
+D	Général	Roue de secours	Elle attend dans le coffre en cas de crevaison.
+M	Général	Heure de pointe	Le moment où le métro est bondé.
+M	Général	Grasse matinée	Rester au lit tard le dimanche.
+M	Général	Pyjama party	Une soirée entre amis où l’on dort chez l’un d’eux.
+F	Général	Fou rire	Un rire qu’on n’arrive plus à arrêter.
+M	Général	Chair de poule	Les petits boutons sur la peau quand on a froid.
+F	Général	Mal de tête	Une migraine.
+F	Général	Mal de dos	Une douleur fréquente quand on porte trop lourd.
+F	Général	Bosse	Elle pousse sur le front après un choc.
+D	Général	Écharde	Un petit éclat de bois planté sous la peau.
+M	Général	Piqûre	Ce que fait le moustique, ou l’infirmière.
+F	Général	Boule de neige	On la lance en hiver.
+M	Général	Flocon	Un petit cristal blanc qui tombe du ciel.
+M	Général	Marée haute	Quand la mer recouvre la plage.
+F	Général	Crème glacée	Un dessert glacé à base de lait.
+M	Général	Feu de camp	On chante autour, en grillant des chamallows.
+M	Général	Tour de magie	Le magicien en fait sortir un lapin de son chapeau.
+M	Général	Tapis volant	Aladdin voyage dessus.
+M	Général	Lampe magique	On la frotte et un génie en sort.
+M	Général	Boule de cristal	La voyante y lit l’avenir.
+M	Général	Balai de sorcière	Elle vole dessus dans le ciel.
+M	Général	Chapeau pointu	Celui de la sorcière ou du magicien.
+M	Général	Perruque	De faux cheveux.
+F	Général	Nez rouge	Celui du clown.
+F	Général	Maquillage	Mascara, fond de teint et rouge à lèvres.
+M	Général	Vernis à ongles	On le passe au pinceau sur les mains.
+M	Général	Coiffure	Ce que le coiffeur fait avec les cheveux.
+M	Général	Queue de cheval	Des cheveux attachés en arrière par un élastique.
+F	Général	Tresse	Trois mèches de cheveux entremêlées.
+M	Général	Chignon	Les cheveux enroulés sur le haut de la tête.
+M	Général	Frange	Les cheveux coupés droit sur le front.
+D	Général	Calvitie	Quand on perd ses cheveux.
+M	Général	Fossette	Un petit creux sur la joue quand on sourit.
+M	Général	Grain de beauté	Un petit point brun sur la peau.
+M	Général	Tatouage	Un dessin à l’encre sous la peau.
+M	Général	Appareil dentaire	Il redresse les dents des ados.
+F	Général	Dent de lait	La première qui tombe chez l’enfant.
+F	Général	Petite souris	Elle laisse une pièce sous l’oreiller.
+M	Général	Argent de poche	La petite somme que les parents donnent aux enfants.
+M	Général	Pourboire	Un petit billet laissé au serveur.
+M	Général	Facture	Le document qui dit combien il faut payer.
+M	Général	Ticket de caisse	Le petit papier qu’on te donne après tes courses.
+M	Général	File d’attente	Une rangée de personnes qui attendent leur tour.
+M	Général	Vitrine	La devanture vitrée d’un magasin.
+D	Général	Cabine d’essayage	On y essaie les vêtements avant de les acheter.
+M	Général	Pointure	La taille des chaussures.
+M	Général	Étiquette	Elle donne le prix d’un article.
+M	Général	Code-barres	Des traits noirs que la caisse lit au scanner.
+F	Animaux	Taureau	Le mâle de la vache.
+F	Animaux	Biche	La femelle du cerf.
+F	Animaux	Paon	Il fait la roue avec ses belles plumes.
+F	Animaux	Mouche	Un insecte qui bourdonne autour de la confiture.
+M	Animaux	Moufette	Elle pue pour se défendre, aussi appelée sconse.
+M	Animaux	Cafard	Un insecte des cuisines sales, aussi appelé blatte.
+D	Animaux	Yack	Un bœuf à long poil de l’Himalaya.
+M	Animaux	Furet	Un petit carnivore au corps allongé qui chasse le lapin.
+F	Objets	Matelas	On dort dessus.
+F	Objets	Lave-linge	Il lave le linge à la maison.
+F	Objets	Brosse	Elle démêle les cheveux.
+F	Objets	Bol	On y boit son chocolat le matin.
+F	Objets	Boîte	Un emballage en carton avec un couvercle.
+M	Objets	Sac poubelle	On l’attache avant de le sortir.
+M	Objets	Pince	Un outil pour serrer.
+M	Objets	Scotch	Un ruban adhésif transparent.
+F	Objets	Tableau	Le maître y écrit à la craie.
+F	Objets	Carte postale	On l’envoie de vacances.
+F	Objets	Écouteurs	On les met dans les oreilles pour écouter de la musique.
+M	Objets	Câble	Un long fil électrique.
+M	Objets	Gourde	Une bouteille qu’on emporte en randonnée.
+M	Objets	Patin	Une chaussure à lame pour glisser sur la glace.
+F	Objets	Luge	On descend la piste enneigée assis dessus.
+F	Objets	Piano	Un instrument à touches noires et blanches.
+M	Objets	Clochette	Une petite cloche qui tinte.
+M	Objets	Chaîne	Une suite d’anneaux de métal.
+M	Objets	Ficelle	Une petite corde pour fermer un colis.
+M	Objets	Aiguille	On y enfile du fil pour coudre.
+F	Objets	Fil	On le passe dans le chas d’une aiguille pour coudre.
+M	Objets	Fermeture éclair	On la remonte pour fermer son blouson.
+F	Objets	Masque	On le met sur le visage pour Halloween.
+M	Objets	Tuba	Un tube pour respirer sous l’eau.
+M	Objets	Palme	On l’enfile au pied pour nager plus vite.
+F	Objets	Lunettes de soleil	Elles protègent les yeux à la plage.
+M	Objets	Planche à repasser	On y pose la chemise avant de passer le fer.
+M	Objets	Évier	On y fait la vaisselle.
+F	Objets	Couvercle	On le pose sur la casserole.
+F	Objets	Paille	On boit son jus avec.
+M	Objets	Verre à pied	Un verre élégant pour le vin.
+M	Objets	Machine à coudre	Elle pique le tissu à toute vitesse.
+F	Objets	Feutre	Un crayon à pointe molle et à encre de couleur.
+M	Géographie	Hollywood	Le quartier du cinéma à Los Angeles.
+F	Géographie	Pôle Nord	Le point le plus au nord de la Terre.
+F	Géographie	Disneyland	Le parc de Mickey près de Paris.
+M	Géographie	Notre-Dame	La cathédrale de Paris qui a brûlé en 2019.
+M	Géographie	Champs-Élysées	La plus belle avenue du monde, à Paris.
+D	Géographie	Havane	La capitale de Cuba.
+M	Général	Générosité	La qualité de celui qui donne sans compter.
+M	Général	Paresse	Le défaut de celui qui ne veut rien faire.
+M	Général	Confiance	Ce qu’on accorde à un ami fiable.
+D	Général	Méfiance	Le contraire de la confiance.
+M	Général	Espoir	Ce qui fait croire que demain sera meilleur.
+M	Général	Panique	Une peur soudaine qui fait perdre ses moyens.
+D	Général	Soulagement	Ce qu’on ressent quand l’inquiétude s’en va.
+D	Général	Remords	La conscience qui tourmente après une faute.
+M	Général	Regret	Ce qu’on ressent en se disant « j’aurais dû ».
+D	Général	Rancune	En vouloir longtemps à quelqu’un.
+M	Général	Vengeance	Rendre le mal pour le mal.
+M	Général	Pardon	Ce qu’on demande après une bêtise.
+M	Général	Promesse	Un engagement qu’on jure de tenir.
+D	Général	Serment	Une promesse solennelle, la main levée.
+M	Général	Trahison	Le geste de Judas.
+M	Général	Complot	Un plan secret contre quelqu’un.
+M	Général	Mystère	Une énigme qu’on n’arrive pas à résoudre.
+M	Général	Enquête	Ce que mène le détective.
+M	Général	Témoin	Il a vu la scène et le raconte au tribunal.
+M	Général	Suspect	Celui que la police soupçonne.
+D	Général	Alibi	La preuve qu’on était ailleurs au moment du crime.
+M	Général	Coupable	Le contraire d’innocent.
+M	Général	Innocent	Le contraire de coupable.
+D	Général	Verdict	La décision finale du jury.
+M	Général	Procès	Il se déroule au tribunal.
+M	Général	Amende	Une somme à payer pour une infraction.
+D	Général	Délit	Une infraction moins grave qu’un crime.
+M	Général	Crime	La faute la plus grave aux yeux de la loi.
+M	Général	Cambriolage	Un vol dans une maison vide.
+M	Général	Otage	Une personne retenue contre une rançon.
+M	Général	Rançon	L’argent réclamé par les ravisseurs.
+M	Général	Empreinte	La trace laissée par un doigt ou un pied.
+D	Général	Préméditation	Une résolution prise à l’avance.
+D	Général	Imprudence	Prendre des risques sans réfléchir.
+D	Général	Négligence	Un manque de soin ou d’attention.
+M	Général	Malentendu	Quand on s’est mal compris.
+M	Général	Hasard	Ce qui arrive sans qu’on l’ait prévu.
+D	Général	Coïncidence	Deux évènements qui arrivent en même temps par hasard.
+M	Général	Destin	Ce qui doit arriver, écrit d’avance.
+F	Général	Chance	Ce qu’on souhaite avant un examen.
+M	Général	Malchance	Le contraire de la chance.
+M	Général	Miracle	Un évènement extraordinaire et inexplicable.
+D	Général	Mythe	Un récit des dieux et des héros de l’Antiquité.
+M	Général	Fable	Un petit récit avec une morale, comme chez La Fontaine.
+M	Général	Contraire	Grand est celui de petit.
+M	Général	Rime	Le même son à la fin de deux vers.
+F	Général	Poème	Un texte en vers.
+D	Général	Strophe	Un groupe de vers dans un poème.
+M	Général	Roman	Un long livre qui raconte une histoire inventée.
+M	Général	Chapitre	Une partie d’un livre.
+D	Général	Prologue	Le texte qui ouvre un récit.
+D	Général	Éditeur	Il publie les livres des auteurs.
+M	Général	Grammaire	Les règles de la langue.
+M	Général	Orthographe	La bonne façon d’écrire les mots.
+M	Général	Conjugaison	Je suis, tu es, il est, nous sommes.
+D	Général	Récitation	Une poésie apprise par cœur et dite devant la classe.
+M	Général	Rédaction	Un devoir où l’on écrit un texte.
+M	Général	Examen	Une épreuve pour vérifier ce qu’on sait.
+M	Général	Diplôme	Le papier qui prouve qu’on a réussi ses études.
+M	Général	Bulletin	Les notes du trimestre envoyées aux parents.
+M	Général	Moyenne	Dix sur vingt.
+M	Général	Bac	L’examen de fin de lycée.
+M	Général	Brevet	L’examen de fin de collège.
+D	Général	Internat	L’école où l’on dort la semaine.
+M	Général	Rentrée	Le retour à l’école en septembre.
+M	Général	Uniforme	La tenue identique pour tous les élèves.
+D	Général	Discipline	Le respect des règles.
+M	Général	Punition	Ce qu’on reçoit après une bêtise.
+M	Général	Compliment	Une parole agréable sur quelqu’un.
+M	Général	Critique	Un avis, souvent négatif.
+D	Général	Reproche	Ce qu’on dit à quelqu’un qui a mal agi.
+M	Général	Excuse	Ce qu’on présente après une faute.
+D	Général	Prétexte	Une fausse raison.
+M	Général	Rumeur	Un bruit qui court.
+D	Général	Ragot	Un bavardage malveillant.
+D	Général	Commérage	Ce qu’on raconte sur les voisins.
+D	Général	Potin	Une petite nouvelle croustillante.
+M	Général	Scandale	Une affaire qui choque tout le monde.
+D	Général	Polémique	Une dispute publique.
+M	Général	Débat	Une discussion où chacun défend son point de vue.
+M	Général	Discours	Ce que le président prononce à la télé.
+M	Général	Interview	Le journaliste pose des questions à une star.
+D	Général	Reportage	Un sujet filmé par un journaliste sur le terrain.
+D	Général	Rédacteur	Celui qui écrit les articles.
+D	Général	Abonnement	On le paie chaque mois pour un magazine ou une série.
+M	Général	Publicité	Elle coupe le film à la télé.
+D	Général	Slogan	Une petite phrase choc de publicité.
+M	Général	Logo	L’emblème d’une marque.
+M	Général	Marque	Le nom d’une entreprise sur ses produits.
+M	Général	Entreprise	Une société qui emploie des salariés.
+M	Général	Patron	Le chef de l’entreprise.
+D	Général	Salarié	Un employé payé chaque mois.
+M	Général	Chômage	Quand on n’a pas de travail.
+M	Général	Retraite	Quand on arrête de travailler pour de bon.
+M	Général	Salaire	L’argent qu’on reçoit chaque mois pour son travail.
+M	Général	Impôt	Ce que l’on verse à l’État.
+D	Général	Budget	Combien on peut dépenser.
+D	Général	Économie	L’argent qu’on met de côté.
+D	Général	Épargne	L’argent mis de côté sur un livret.
+M	Général	Dette	L’argent qu’on doit rendre.
+D	Général	Crédit	Un prêt de la banque.
+D	Général	Faillite	Une entreprise qui ne peut plus payer.
+D	Général	Testament	Il dit à qui revient l’héritage.
+D	Général	Notaire	Il lit le testament.
+M	Général	Contrat	Un accord écrit et signé.
+M	Général	Signature	Son nom écrit de sa main au bas d’un papier.
+M	Général	Vote	On le glisse dans l’urne.
+M	Général	Loi	Une règle votée par le Parlement.
+M	Général	Révolution	Celle de 1789 a fait tomber le roi.
+D	Général	Monarchie	Un pays gouverné par un roi.
+M	Général	Empire	Celui de Napoléon.
+M	Général	Royaume	Le pays d’un roi.
+D	Général	Couronnement	La cérémonie où un roi reçoit sa couronne.
+M	Général	Guerre	Le contraire de la paix.
+M	Général	Paix	Le contraire de la guerre.
+M	Général	Bataille	Waterloo en est une célèbre.
+M	Général	Défaite	Le contraire de la victoire.
+D	Général	Trêve	Un arrêt provisoire des combats.
+D	Général	Alliance	Un pacte, ou la bague des mariés.
+D	Général	Traité	Un accord signé entre pays.
+M	Général	Douane	On y contrôle les bagages à la frontière.
+M	Général	Passeport	On le montre pour voyager à l’étranger.
+D	Général	Visa	L’autorisation d’entrer dans un pays.
+D	Général	Ambassade	La maison d’un pays chez un autre pays.
+D	Général	Exil	Quitter son pays sans pouvoir y revenir.
+M	Général	Réfugié	Il a fui son pays en guerre.
+D	Général	Immigration	S’installer dans un autre pays.
+M	Général	Tradition	Une habitude transmise de génération en génération.
+D	Général	Coutume	Un usage propre à un peuple.
+D	Général	Civilisation	Les Égyptiens ou les Mayas en avaient une.
+M	Général	Fossile	La trace d’un être vivant figée dans la roche.
+D	Général	Sarcophage	Le cercueil de pierre d’une momie.
+D	Général	Chevalerie	L’ordre des chevaliers du Moyen Âge.
+D	Général	Croisade	Une expédition des chevaliers vers Jérusalem.
+D	Général	Blason	Les armoiries d’une famille noble.
+D	Général	Épave	Un bateau coulé au fond de la mer.
+M	Général	Carte au trésor	Une croix y marque l’endroit où creuser.
+M	Général	Voile	Le vent la gonfle pour faire avancer le bateau.
+D	Général	Mât	Le poteau qui porte la voile.
+D	Général	Escale	Un arrêt en cours de voyage.
+M	Général	Traversée	Le passage d’une rive à l’autre.
+D	Général	Expédition	Un long voyage d’exploration.
+M	Général	Aventure	Une suite d’évènements extraordinaires.
+D	Général	Exploration	Partir à la découverte de terres inconnues.
+M	Général	Découverte	Christophe Colomb en a fait une en 1492.
+M	Général	Invention	L’ampoule en est une, signée Edison.
+M	Général	Expérience	Un essai scientifique en laboratoire.
+M	Général	Galaxie	La Voie lactée en est une.
+D	Général	Gravité	La force qui fait tomber les objets.
+D	Général	Atome	La plus petite partie d’un élément.
+D	Général	Molécule	Un assemblage d’atomes, comme H₂O.
+M	Général	Vitesse	Elle se mesure en kilomètres par heure.
+M	Général	Température	Elle se mesure en degrés.
+D	Général	Pression	Celle des pneus se vérifie à la station.
+M	Général	Volume	On le monte pour entendre la musique plus fort.
+M	Général	Poids	Il se mesure en kilos.
+M	Général	Longueur	Elle se mesure en mètres.
+M	Général	Hauteur	La taille de bas en haut.
+D	Général	Profondeur	Celle de la mer peut dépasser 10 000 mètres.
+M	Général	Distance	L’écart entre deux villes.
+M	Général	Équilibre	Ce que garde le funambule.
+D	Général	Symétrie	Les deux moitiés sont pareilles, comme dans un miroir.
+D	Général	Pourcentage	Il se note avec le signe %.
+D	Général	Fraction	Un demi ou un quart.
+M	Général	Addition	Une opération avec le signe +.
+D	Général	Soustraction	Une opération avec le signe −.
+M	Général	Multiplication	Une opération avec le signe ×.
+M	Général	Division	Une opération avec le signe ÷.
+D	Général	Équation	Trouver la valeur de x.
+D	Général	Losange	Une figure à quatre côtés égaux, comme un carreau.
+D	Général	Sphère	Une boule parfaite.
+D	Général	Diagonale	Elle relie deux coins opposés d’un carré.
+D	Général	Parallèle	Deux droites qui ne se croisent jamais.
+M	Général	Angle	Il se mesure avec un rapporteur.
+D	Général	Diamètre	Il traverse le cercle en passant par le centre.
+D	Général	Périmètre	Le tour d’une figure.
+D	Général	Superficie	La surface d’un terrain.
+M	Général	Litre	Une bouteille d’eau en contient souvent un et demi.
+M	Général	Gramme	Il en faut mille pour un kilo.
+M	Général	Minute	Soixante secondes.
+D	Général	Décennie	Dix ans.
+M	Général	Siècle	Cent ans.
+M	Général	Horaire	L’heure de passage du train.
+M	Général	Retard	Arriver après l’heure.
+M	Général	Avance	Arriver avant l’heure.
+D	Général	Ponctualité	La qualité de celui qui est toujours à l’heure.
+D	Général	Routine	Les mêmes gestes chaque jour.
+M	Général	Habitude	Ce qu’on fait toujours de la même façon.
+D	Général	Manie	Une petite habitude bizarre.
+D	Général	Obsession	Une idée fixe.
+M	Général	Passion	Ce qu’on aime par-dessus tout.
+M	Général	Loisir	Ce qu’on fait pendant son temps libre.
+M	Général	Collection	Timbres ou cartes qu’on rassemble.
+M	Général	Jardinage	Planter, tailler, arroser.
+M	Général	Couture	L’art de faire des vêtements.
+D	Général	Tricot	Un pull fait main avec des aiguilles.
+D	Général	Poterie	Modeler l’argile sur un tour.
+M	Général	Sculpture	Une statue taillée dans la pierre.
+D	Général	Trapéziste	Il se balance haut sous le chapiteau.
+M	Général	Mime	Un artiste qui joue sans parler.
+M	Général	Humoriste	Il fait rire sur scène.
+D	Général	Imitation	Reproduire la voix de quelqu’un.
+F	Général	Grimace	On la fait en tirant la langue.
+F	Général	Blague	Une petite histoire pour faire rire.
+M	Général	Farce	Un tour qu’on joue le 1er avril.
+D	Général	Canular	Une fausse nouvelle pour faire une blague.
+D	Général	Ostréiculteur	Il élève des huîtres.
+D	Général	Viticulteur	Il cultive la vigne.
+M	Général	Forgeron	Il tape le fer chaud sur l’enclume.
+D	Général	Couvreur	Il répare les toits.
+M	Général	Peintre en bâtiment	Il repeint les murs des maisons.
+D	Général	Carreleur	Il pose le carrelage.
+D	Général	Vitrier	Il remplace les carreaux cassés.
+M	Général	Ramoneur	Il nettoie les cheminées.
+M	Général	Éboueur	Il ramasse les poubelles le matin.
+F	Général	Livreur	Il apporte la pizza à domicile.
+M	Général	Chocolatier	Il fabrique des bonbons au cacao.
+M	Général	Épicier	Il tient la petite boutique du coin.
+M	Général	Libraire	Il vend des livres.
+D	Général	Couturier	Il crée des robes de haute couture.
+D	Général	Tailleur	Il fait des costumes sur mesure.
+M	Général	Ingénieur	Il conçoit des ponts ou des machines.
+D	Général	Informaticien	Il programme les ordinateurs.
+D	Général	Comptable	Il tient les comptes d’une entreprise.
+M	Général	Banquier	Il travaille à la banque.
+M	Général	Secrétaire	Il ou elle répond au téléphone et tient l’agenda du patron.
+D	Général	Steward	Il sert les passagers dans l’avion.
+M	Général	Contrôleur	Il vérifie les billets dans le train.
+D	Général	Douanier	Il fouille les valises à la frontière.
+F	Général	Soldat	Un militaire qui sert dans l’armée.
+D	Général	Amiral	Le plus haut grade de la marine.
+M	Général	Général	Un officier de haut rang dans l’armée.
+D	Général	Diplomate	Il représente son pays à l’étranger.
+D	Général	Interprète	Il traduit à l’oral.
+M	Général	Traducteur	Il fait passer un texte d’une langue à une autre.
+M	Général	Moniteur	Il apprend à skier ou à conduire.
+M	Général	Animateur	Il présente une émission ou anime une colonie.
+M	Général	Pompiste	Il servait l’essence à la station.
+M	Général	Caissier	Il scanne tes courses au supermarché.
+F	Général	Vendeur	Il te conseille dans le magasin.
+D	Général	Éleveur	Il élève des vaches ou des moutons.
+M	Général	Jockey	Il monte les chevaux de course.
+D	Général	Caméraman	Il filme les images du reportage.
+M	Général	Présentateur	Il présente le journal télévisé.
+D	Général	Chroniqueur	Il donne son avis chaque semaine dans une émission.
+D	Général	Physicien	Un savant comme Einstein.
+D	Général	Mathématicien	Un savant des nombres, comme Pythagore.
+D	Général	Philosophe	Un penseur comme Socrate.
+D	Général	Historien	Il étudie le passé.
+M	Général	Plongeur	Il descend sous l’eau avec des bouteilles.
+M	Général	Surfeur	Il glisse sur les vagues avec sa planche.
+M	Général	Skieur	Il dévale les pistes enneigées.
+M	Général	Cycliste	Il court le Tour de France.
+M	Général	Gymnaste	Un sportif des barres asymétriques.
+D	Général	Escrimeur	Il se bat au fleuret.
+D	Général	Haltérophile	Il soulève des barres très lourdes.
+M	Objets	Péniche	Un long bateau plat qui navigue sur les canaux.
+M	Objets	Yacht	Un bateau de luxe de milliardaire.
+M	Objets	Tramway	Il roule sur des rails au milieu de la ville.
+M	Objets	Rail	Le train roule dessus.
+D	Objets	Aiguillage	Il permet au train de changer de voie.
+M	Géographie	Passage à niveau	Là où la route croise la voie ferrée.
+M	Géographie	Carrefour	Là où plusieurs routes se croisent.
+D	Géographie	Caniveau	L’eau de pluie coule dedans le long du trottoir.
+M	Objets	Feu orange	Il annonce le rouge.
+M	Objets	Ralentisseur	Une bosse sur la route qui oblige à freiner.
+M	Géographie	Impasse	Une rue sans issue.
+M	Géographie	Ruelle	Une petite rue étroite.
+F	Géographie	Place	L’espace dégagé au centre du village, souvent avec une fontaine.
+M	Objets	Statue	Une sculpture qui représente quelqu’un.
+M	Géographie	Monument	La tour Eiffel en est un.
+D	Géographie	Basilique	Le Sacré-Cœur en est une.
+M	Géographie	Mosquée	Un lieu de prière avec un minaret.
+D	Géographie	Pagode	Un temple asiatique à plusieurs toits.
+D	Géographie	Monastère	Les moines y vivent.
+D	Géographie	Couvent	Les religieuses y vivent.
+D	Géographie	Cloître	Une galerie à colonnes autour d’un jardin d’abbaye.
+M	Géographie	Clocher	La tour de l’église.
+D	Objets	Vitrail	Une fenêtre d’église en verre coloré.
+D	Géographie	Crypte	Une salle souterraine sous une église.
+D	Géographie	Obélisque	Une colonne égyptienne au milieu de la Concorde.
+D	Géographie	Rempart	La muraille qui protège une ville.
+D	Géographie	Citadelle	Une forteresse qui domine une ville.
+M	Géographie	Forteresse	Un château fort très protégé.
+D	Géographie	Tour de contrôle	D’où l’on guide les avions à l’aéroport.
+D	Géographie	Pavillon	Une maison individuelle avec un petit jardin.
+M	Géographie	Moulin	Ses ailes tournent avec le vent.
+M	Animaux	Ruche	La maison des abeilles.
+M	Animaux	Terrier	Le trou où vit le lapin.
+D	Animaux	Tanière	Le repaire de l’ours ou du loup.
+D	Animaux	Volière	Une grande cage à oiseaux.
+D	Animaux	Vivarium	Une cage vitrée pour les serpents et les lézards.
+M	Géographie	Serre	Une maison de verre pour les plantes.
+M	Géographie	Potager	Le jardin des légumes.
+M	Géographie	Verger	Un terrain planté d’arbres fruitiers.
+D	Géographie	Vignoble	Des rangées de vigne à perte de vue.
+D	Géographie	Rizière	Un champ inondé en Asie.
+F	Géographie	Champ	Le fermier y cultive du blé.
+M	Géographie	Pré	Un petit champ d’herbe où broutent les vaches.
+M	Objets	Clôture	Elle entoure le jardin.
+M	Objets	Portail	La grande porte du jardin.
+D	Géographie	Massif	Un groupe de montagnes, ou de fleurs.
+D	Géographie	Bosquet	Un petit groupe d’arbres.
+D	Géographie	Clairière	Un endroit dégagé au milieu de la forêt.
+D	Géographie	Sous-bois	La partie ombragée de la forêt, sous les arbres.
+D	Géographie	Marécage	Un terrain boueux plein d’eau stagnante.
+M	Géographie	Mare	Un petit point d’eau où vivent les grenouilles.
+D	Géographie	Torrent	Un cours d’eau de montagne très rapide.
+D	Géographie	Embouchure	L’endroit où le fleuve se jette dans la mer.
+M	Géographie	Dune	Une colline de sable.
+D	Géographie	Steppe	Une grande plaine d’herbe sèche en Asie.
+D	Géographie	Mangrove	Une forêt de palétuviers les pieds dans l’eau.
+D	Géographie	Lagune	Une étendue d’eau salée séparée de la mer.
+D	Géographie	Récif	Des rochers ou du corail à fleur d’eau.
+M	Géographie	Golfe	Une grande avancée de la mer dans les terres.
+D	Géographie	Crique	Une petite baie abritée.
+D	Géographie	Détroit	Un passage de mer entre deux terres, comme Gibraltar.
+M	Géographie	Canal	Une rivière creusée par l’homme.
+D	Géographie	Isthme	Une bande de terre entre deux mers, comme Panama.
+D	Géographie	Gouffre	Un trou très profond.
+M	Géographie	Cratère	Le trou au sommet d’un volcan.
+D	Géographie	Geyser	Un jet d’eau chaude qui jaillit du sol.
+M	Géographie	Séisme	Un tremblement de terre.
+D	Général	Sécheresse	Une longue période sans pluie.
+M	Général	Tornade	Un tourbillon de vent qui détruit tout.
+D	Général	Cyclone	Une énorme tempête tournante.
+D	Général	Mousson	La saison des pluies en Inde.
+D	Général	Blizzard	Une tempête de neige glaciale.
+M	Général	Givre	Une fine couche de glace blanche le matin.
+D	Général	Bruine	Une pluie très fine.
+M	Général	Averse	Une pluie soudaine et forte.
+D	Général	Éclaircie	Un moment de soleil entre deux nuages.
+D	Général	Aurore	La lumière qui précède le lever du soleil.
+M	Géographie	Horizon	La ligne où le ciel semble toucher la terre.
+M	Animaux	Basset	Un chien aux pattes courtes et aux longues oreilles qui traînent.
+M	Animaux	Persan	Un chat au long poil et au nez tout plat.
+F	Animaux	Poney Shetland	Un tout petit cheval venu d’Écosse.
+F	Animaux	Tigre blanc	Un grand félin rayé au pelage clair.
+M	Animaux	Cabillaud	Un poisson de mer à chair blanche, la morue fraîche.
+M	Animaux	Calamar	On le mange en beignets, frit en anneaux.
+D	Animaux	Plancton	Les minuscules êtres vivants dont se nourrit la baleine.
+D	Animaux	Moucheron	Une toute petite mouche.
+D	Animaux	Charançon	Un petit insecte à long nez qui ravage le blé.
+M	Animaux	Oie sauvage	Elle migre en volant en V.
+D	Animaux	Effraie	Une chouette au visage blanc en forme de cœur.
+D	Animaux	Freux	Un corbeau au bec grisâtre qui vit en colonie.
+M	Général	Lasagne	Un plat italien de pâtes en couches gratinées.
+M	Général	Ramen	Une soupe japonaise de nouilles.
+F	Général	Taco	Une galette mexicaine garnie et repliée.
+M	Général	Falafel	Une boulette de pois chiches frite.
+M	Général	Quiche lorraine	Une tarte salée aux lardons.
+M	Général	Croque-madame	Un croque-monsieur avec un œuf sur le dessus.
+M	Général	Coq au vin	Une volaille mijotée dans du vin rouge.
+D	Général	Magret	Le filet de canard.
+D	Général	Confit de canard	Une cuisse cuite dans sa graisse, spécialité du Sud-Ouest.
+M	Général	Gigot	Une cuisse d’agneau rôtie, souvent à Pâques.
+M	Général	Rôti	Une pièce de viande cuite au four.
+M	Général	Côtelette	Une côte d’agneau ou de porc grillée.
+F	Général	Merguez	Une saucisse rouge et épicée.
+M	Général	Chipolata	Une petite saucisse fine pour le barbecue.
+M	Général	Boudin	Une charcuterie noire ou blanche.
+D	Général	Andouillette	Une saucisse de tripes à l’odeur forte.
+D	Général	Terrine	Un pâté cuit dans un plat en grès.
+F	Général	Jambon-beurre	Le sandwich préféré des Français.
+M	Général	Biscotte	Une tranche de pain grillé qui se casse quand on la tartine.
+F	Général	Cupcake	Un petit gâteau couvert de crème colorée.
+M	Général	Éclair au chocolat	Une pâte à chou allongée et glacée.
+D	Général	Far breton	Un flan aux pruneaux.
+D	Général	Kouign-amann	Un gâteau breton très beurré.
+D	Général	Financier	Un petit gâteau aux amandes en forme de lingot.
+F	Général	Caramel	Du sucre fondu et doré.
+M	Général	Dragée	Une amande enrobée de sucre, offerte aux baptêmes.
+M	Général	Sucre d’orge	Un bâton de sucre torsadé.
+M	Général	Crumble	Des fruits cuits sous une pâte sablée émiettée.
+F	Général	Compote	Des fruits cuits écrasés.
+D	Général	Granité	De la glace pilée au sirop.
+M	Général	Cappuccino	Un café italien avec de la mousse de lait.
+M	Général	Expresso	Un petit café serré.
+M	Général	Menthe à l’eau	Un sirop vert dilué.
+M	Général	Diabolo	De la limonade avec du sirop.
+M	Général	Orangeade	Une boisson pétillante à l’orange.
+M	Général	Emmental	Un fromage à trous.
+M	Général	Feta	Un fromage grec de la salade grecque.
+D	Général	Munster	Un fromage alsacien qui sent fort.
+D	Général	Cantal	Un fromage d’Auvergne à pâte pressée.
+M	Général	Mimolette	Un fromage orange en boule.
+F	Général	Olive	Un petit fruit vert ou noir de l’apéritif.
+D	Général	Câpre	Un petit bouton de fleur confit au vinaigre.
+D	Général	Laurier	On met sa feuille dans le pot-au-feu.
+M	Général	Curry	Un mélange d’épices indien.
+D	Général	Muscade	Une noix râpée dans la béchamel.
+D	Général	Clou de girofle	Une épice qu’on pique dans l’oignon.
+F	Général	Piment	Il fait très mal à la langue.
+D	Général	Topinambour	Un légume oublié, au goût d’artichaut.
+M	Général	Patate douce	Un tubercule orange au goût sucré.
+D	Général	Butternut	Une courge beige en forme de poire.
+M	Général	Lentille	Une petite graine verte ou corail.
+M	Général	Pois chiche	La base du houmous.
+M	Général	Soja	On en fait une sauce salée pour les sushis.
+D	Général	Quinoa	Une petite graine des Andes.
+M	Général	Semoule	Elle accompagne le couscous.
+D	Général	Boulgour	Du blé concassé.
+D	Général	Seigle	Une céréale du pain foncé.
+D	Général	Orge	Une céréale qui sert à faire la bière.
+D	Général	Sarrasin	La farine des galettes bretonnes.
+D	Général	Airelle	Une petite baie rouge des montagnes.
+D	Général	Canneberge	Une baie rouge appelée cranberry.
+M	Général	Fruit de la passion	Un fruit exotique fripé plein de graines.
+F	Général	Mandarine	Un petit agrume très proche de la clémentine.
+M	Général	Citron vert	L’agrume du mojito.
+M	Général	Noix de cajou	Une noix en forme de croissant.
+M	Général	Marron glacé	Une châtaigne confite de Noël.
+D	Général	Rhubarbe	Une tige acide qu’on met en tarte.
+D	Général	Reine-claude	Une prune verte et sucrée.
+D	Général	Quetsche	Une prune violette d’Alsace.
+F	Général	Nutella	Une pâte à tartiner aux noisettes très connue.
+F	Objets	Playmobil	De petits personnages en plastique allemands.
+F	Général	Coca-Cola	Le soda le plus célèbre au monde.
+M	Général	Orangina	Une boisson qu’il faut secouer.
+M	Général	Perrier	Une eau gazeuse française en bouteille verte.
+M	Général	Evian	Une eau minérale des Alpes.
+F	Général	Haribo	Des bonbons en forme d’ours en gélatine.
+F	Général	Kinder	Ses œufs en chocolat cachent une surprise.
+M	Général	Ferrero Rocher	Une bouchée en papier doré.
+M	Général	Kit Kat	« Have a break », une barre à casser.
+M	Général	Twix	Deux barres de biscuit et caramel.
+M	Général	Snickers	Une barre chocolatée aux cacahuètes.
+M	Général	Pringles	Des chips en tube.
+F	Général	Oreo	Un biscuit noir fourré de crème blanche.
+M	Général	Petit Écolier	Un biscuit avec une tablette de chocolat dessus.
+M	Général	Danette	Une crème dessert au chocolat.
+F	Général	Babybel	Un petit fromage dans de la cire rouge.
+M	Général	Vache qui rit	Un fromage en portions, avec un animal sur la boîte.
+D	Général	Banania	Une poudre chocolatée pour le petit déjeuner.
+M	Général	Nesquik	Un chocolat en poudre au lapin.
+D	Général	Ricoré	Un mélange de café et de chicorée.
+M	Objets	Nespresso	Une machine à café en capsules.
+M	Objets	Michelin	Le fabricant de pneus avec un bonhomme blanc.
+F	Objets	Peugeot	Une marque de voiture au lion.
+F	Objets	Renault	Une marque de voiture au losange.
+M	Objets	Citroën	Une marque de voiture aux deux chevrons.
+F	Objets	Ferrari	Une voiture de sport rouge au cheval cabré.
+M	Objets	Lamborghini	Une voiture de sport italienne au taureau.
+M	Objets	Porsche	Une voiture de sport allemande.
+M	Objets	Tesla	Une voiture électrique d’Elon Musk.
+M	Objets	Toyota	Le grand constructeur automobile japonais.
+M	Objets	Volkswagen	La marque de la Coccinelle.
+M	Objets	Mercedes	Une voiture allemande à l’étoile.
+M	Objets	BMW	Une voiture allemande de Munich.
+M	Objets	Airbus	Un avionneur européen de Toulouse.
+M	Objets	Boeing	Un avionneur américain.
+F	Objets	Apple	La marque à la pomme.
+M	Objets	Samsung	Une marque coréenne de téléphones.
+F	Général	Google	Le moteur de recherche le plus utilisé.
+M	Général	Microsoft	L’entreprise de Bill Gates.
+M	Général	Facebook	Le réseau social de Mark Zuckerberg.
+F	Général	Instagram	Le réseau social des photos.
+F	Général	WhatsApp	Une messagerie au logo vert.
+F	Général	Snapchat	Une appli au fantôme jaune.
+F	Général	TikTok	Une appli de vidéos courtes.
+F	Général	YouTube	Le site de vidéos le plus célèbre.
+F	Général	Netflix	Une plateforme de séries.
+M	Général	Spotify	Une appli de musique au logo vert.
+M	Général	Amazon	Le géant de la vente en ligne.
+M	Général	Wikipédia	L’encyclopédie libre en ligne.
+F	Objets	Nintendo	Le fabricant de la Switch.
+F	Objets	PlayStation	La console de Sony.
+M	Objets	Xbox	La console de Microsoft.
+M	Objets	Game Boy	Une console portable de 1989.
+M	Général	Tetris	Un jeu vidéo de blocs qui tombent.
+F	Général	Minecraft	Un jeu vidéo de cubes à construire.
+F	Général	Fortnite	Un jeu vidéo de survie à cent joueurs.
+M	Général	Pac-Man	Un rond jaune qui mange des pastilles.
+F	Général	Uno	Un jeu de cartes de couleurs, avec des +4.
+M	Général	Cluedo	Un jeu de société où l’on cherche l’assassin.
+M	Objets	Rubik’s Cube	Un casse-tête à faces colorées.
+D	Objets	Tamagotchi	Un animal virtuel dans un petit œuf.
+M	Objets	Nerf	Un pistolet à fléchettes en mousse.
+D	Objets	Kapla	De petites planchettes de bois à empiler.
+F	Objets	Nike	La marque à la virgule.
+F	Objets	Adidas	La marque aux trois bandes.
+M	Objets	Converse	Des baskets en toile.
+M	Objets	Lacoste	La marque au crocodile.
+M	Objets	Chanel	La marque du parfum N° 5.
+M	Objets	Dior	Une maison de haute couture parisienne.
+D	Objets	Louis Vuitton	Une marque de sacs de luxe.
+D	Objets	Hermès	Une maison de luxe célèbre pour ses foulards.
+M	Objets	Ikea	Un magasin suédois de meubles à monter.
+M	Général	McDonald’s	Une chaîne de fast-food au M jaune.
+M	Général	Burger King	Une chaîne de fast-food du Whopper.
+M	Général	Starbucks	Une chaîne de cafés à la sirène verte.
+F	Cinéma	Disney	Le studio de Mickey.
+M	Cinéma	Marvel	Le studio des Avengers.
+M	Objets	Bic	Le célèbre stylo à quatre couleurs.
+D	Objets	Velcro	Une fermeture qui scratche.
+M	Objets	Kleenex	Un mouchoir en papier.
+D	Objets	Frigidaire	Un autre nom du réfrigérateur.
+M	Objets	Sopalin	Du papier absorbant de cuisine.
+M	Objets	Tupperware	Une boîte en plastique pour les restes.
+D	Objets	Opinel	Un couteau pliant savoyard.
+D	Objets	Zippo	Un briquet métallique américain.
+D	Objets	Dyson	Un aspirateur sans sac.
+D	Objets	Moulinex	Une marque de robots de cuisine.
+D	Objets	Tefal	Une marque de poêles antiadhésives.
+D	Objets	Rolex	Une montre suisse de luxe.
+M	Objets	Swatch	Une montre suisse en plastique.
+M	Objets	Ray-Ban	Une marque de lunettes de soleil.
+M	Football	Milieu de terrain	Le joueur placé entre la défense et l’attaque.
+F	Football	Crampon	Une chaussure de sport à clous.
+F	Football	Protège-tibia	Il protège le bas de la jambe sous la chaussette.
+M	Football	Passe décisive	Le dernier ballon avant le but.
+F	Football	Neymar	La star brésilienne passée par le PSG.
+F	Football	PSG	Le club de la capitale.
+F	Football	Real Madrid	Le club espagnol en blanc.
+F	Football	Barça	Le club de Barcelone.
+F	Football	Équipe de France	Les Bleus.
+F	Football	Stade de France	Le grand stade de Saint-Denis.
+F	Objets	Poutre	Une longue pièce de bois qui soutient le plafond.
+F	Général	Poison	La sorcière en met dans la pomme de Blanche-Neige.
+M	Cinéma	Le Bossu de Notre-Dame	Quasimodo sonne les cloches de la cathédrale.
+M	Cinéma	Comme des bêtes	Ce que font nos animaux quand on part travailler.
+M	Cinéma	Tous en scène	Un koala organise un concours de chant.
+M	Cinéma	Le Fabuleux Destin d’Amélie Poulain	Une serveuse de Montmartre qui fait le bonheur des autres.
+M	Cinéma	Babysitting	Une garde d’enfant qui tourne à la fête géante, filmée caméra à l’épaule.
+F	Cinéma	Le Petit Nicolas	L’écolier de Sempé et Goscinny au cinéma.
+F	Cinéma	Charlie Chaplin	Charlot, avec sa canne et son chapeau melon.
+F	Cinéma	Mickey	La souris la plus célèbre du monde.
+F	Cinéma	Donald	Un canard colérique en costume de marin.
+F	Cinéma	Pluto	Le chien jaune de Mickey.
+F	Cinéma	Minnie	La fiancée de Mickey, au nœud rose.
+F	Cinéma	Simba	Le lionceau du Roi lion.
+F	Cinéma	Dory	La poisson bleue qui oublie tout.
+F	Cinéma	Woody	Le cow-boy de Toy Story.
+F	Cinéma	Buzz l’Éclair	« Vers l’infini et au-delà ! »
+F	Cinéma	Olaf	Le bonhomme de neige de La Reine des neiges.
+F	Cinéma	Elsa	La reine aux pouvoirs glacés d’Arendelle.
+F	Cinéma	Stitch	Une petite créature bleue venue de l’espace, amie de Lilo.
+F	Cinéma	Pikachu	Le Pokémon jaune électrique.
+F	Cinéma	Mario	Le plombier moustachu de Nintendo.
+F	Cinéma	Bob l’éponge	Il vit dans un ananas sous la mer.
+F	Cinéma	Les Simpson	Homer, Marge, Bart, Lisa et Maggie.
+F	Cinéma	Tom et Jerry	Un chat et une souris qui se poursuivent sans fin.
+F	Cinéma	Bugs Bunny	« Quoi de neuf, docteur ? »
+M	Cinéma	Titeuf	Un écolier suisse à la mèche blonde.
+M	Cinéma	Gaston Lagaffe	Le gaffeur de Franquin.
+F	Cinéma	Snoopy	Le beagle de Charlie Brown.
+M	Cinéma	Casper	Un gentil petit fantôme.
+M	Cinéma	César	La récompense du cinéma français.
+M	Cinéma	Festival de Cannes	On y monte les marches en mai.
+F	Cinéma	Dessin animé	Un film fait de dessins qui bougent.
+M	Cinéma	Clap	Le claquement noir et blanc avant chaque prise.
+F	Cinéma	Caméra	L’appareil qui filme.
+M	Cinéma	Studio	Le lieu où l’on tourne les films.
+D	Cinéma	Doublage	Les voix françaises d’un film étranger.
+M	Cinéma	Sous-titre	La traduction écrite en bas de l’écran.
+D	Cinéma	Générique	La liste des noms qui défile à la fin du film.
+D	Cinéma	Figurant	Il passe au fond de l’image sans rien dire.
+M	Cinéma	Tapis rouge	Les stars marchent dessus.
+F	Cinéma	Star	Une vedette très célèbre.
+F	Cinéma	Héros	Le personnage principal qui sauve le monde.
+F	Cinéma	Méchant	Le contraire du gentil.
+F	Cinéma	Super-héros	Il porte une cape et sauve la ville.
+M	Cinéma	Western	Un film de cow-boys.
+F	Cinéma	Comédie	Un film pour rire.
+M	Cinéma	Horreur	Un film qui fait très peur.
+M	Cinéma	Science-fiction	Un genre de films avec des vaisseaux et des robots.
+D	Cinéma	La Liste de Schindler	Spielberg raconte un industriel qui sauve des Juifs.
+M	Cinéma	Le Dictateur	Chaplin se moque d’Hitler.
+D	Cinéma	2001, l’Odyssée de l’espace	L’ordinateur HAL 9000.
+M	Cinéma	Les Aventuriers de l’arche perdue	Le premier film d’Indiana Jones.
+M	Cinéma	Taken	Liam Neeson cherche sa fille enlevée.
+D	Cinéma	La Chèvre	Pierre Richard et Gérard Depardieu au Mexique.
+D	Cinéma	Les Compères	Deux hommes croient chacun être le père d’un ado en fugue.
+D	Cinéma	Trois hommes et un couffin	Trois célibataires élèvent un bébé.
+D	Cinéma	L’Auberge espagnole	Un étudiant Erasmus à Barcelone.
+M	Cinéma	Le Prénom	Un dîner qui dégénère à cause du nom d’un bébé.
+M	Cinéma	La Famille Bélier	Une ado chante dans une famille de sourds.
+M	Cinéma	Le Grand Bain	Des quadras en natation synchronisée.
+D	Cinéma	Le Sens de la fête	Un traiteur et un mariage qui tourne mal.
+D	Cinéma	Hors normes	Vincent Cassel s’occupe d’enfants autistes.
+D	Cinéma	Les Demoiselles de Rochefort	Deux sœurs jumelles chantent en ville.
+D	Cinéma	Jeux interdits	Deux enfants pendant la guerre, sur un air de guitare.
+F	Cinéma	La Belle et le Clochard	Deux chiens partagent un plat de spaghettis.
+F	Cinéma	Robin des Bois	Un renard qui vole aux riches pour donner aux pauvres.
+M	Cinéma	Rox et Rouky	Un renard et un chien de chasse amis.
+M	Cinéma	Bernard et Bianca	Deux souris agents secrets.
+F	Cinéma	Lilo et Stitch	Une fillette hawaïenne adopte un extraterrestre bleu.
+M	Cinéma	Frère des ours	Un jeune Inuit transformé en ours.
+D	Cinéma	Atlantide	La cité engloutie retrouvée par Milo.
+M	Cinéma	Kuzco	Un empereur transformé en lama.
+M	Cinéma	Les Mondes de Ralph	Un méchant de jeu vidéo veut devenir un héros.
+M	Cinéma	Les Nouveaux Héros	Un robot gonflable nommé Baymax.
+D	Cinéma	Le Voyage d’Arlo	Un dinosaure et un petit garçon.
+M	Cinéma	Soul	Un professeur de musique entre la vie et l’au-delà.
+M	Cinéma	Luca	Un petit monstre marin découvre l’Italie.
+D	Cinéma	Alerte rouge	Une ado se transforme en panda roux.
+M	Cinéma	Élémentaire	Une flamme et une goutte d’eau tombent amoureuses.
+D	Cinéma	Wish	Asha fait un vœu à une étoile.
+M	Cinéma	Rebelle	Une princesse écossaise rousse tire à l’arc.
+F	Cinéma	Le Monde de Dory	La poisson bleue cherche ses parents.
+F	Cinéma	Le Grinch	Un être vert qui déteste Noël.
+M	Cinéma	Hôtel Transylvanie	Dracula tient un hôtel pour monstres.
+M	Cinéma	Les Croods	Une famille préhistorique.
+M	Cinéma	Spirit	Un mustang sauvage dans l’Ouest américain.
+M	Cinéma	Le Chat potté	Le chat botté de Shrek a son film.
+D	Cinéma	Ponyo sur la falaise	Un petit poisson rouge veut devenir humain.
+D	Cinéma	Le Roi et l’Oiseau	Un roi tyrannique et un oiseau malin, de Paul Grimault.
+M	Cinéma	Astérix et Cléopâtre	Les Gaulois construisent un palais en Égypte.
+M	Cinéma	Les Douze Travaux d’Astérix	Le laissez-passer A-38.
+D	Cinéma	Coraline	Une fillette découvre une autre mère aux yeux de boutons.
+M	Cinéma	Mercredi	La fille de la famille Addams a sa série.
+D	Cinéma	La Boussole d’or	Lyra et son daemon.
+M	Cinéma	Divergente	Une société divisée en factions.
+M	Cinéma	Le Labyrinthe	Des ados enfermés au milieu de murs géants.
+M	Cinéma	Aquaman	Le roi de l’Atlantide.
+M	Cinéma	Venom	Un symbiote noir ennemi de Spider-Man.
+M	Cinéma	Les Quatre Fantastiques	La Torche, la Chose, l’Invisible et Mister Fantastic.
+M	Cinéma	Wolverine	Le mutant aux griffes de métal.
+M	Cinéma	Doctor Strange	Le sorcier suprême de Marvel.
+M	Cinéma	Ant-Man	Un super-héros qui rétrécit.
+D	Cinéma	Shazam	Un ado qui devient un super-héros en criant un mot magique.
+D	Cinéma	Cast Away	Tom Hanks seul sur une île avec un ballon nommé Wilson.
+M	Cinéma	Matilda	Une petite fille surdouée aux pouvoirs magiques.
+M	Cinéma	Space Jam	Michael Jordan joue au basket avec les Looney Tunes.
+D	Cinéma	Flubber	Une gomme verte qui rebondit partout.
+D	Cinéma	Chérie, j’ai rétréci les gosses	Un inventeur réduit ses enfants à la taille de fourmis.
+M	Cinéma	Stuart Little	Une souris adoptée par une famille new-yorkaise.
+D	Cinéma	Sacrées sorcières	Un garçon transformé en souris, d’après Roald Dahl.
+D	Cinéma	Nanny McPhee	Une nounou magique au gros nez.
+M	Cinéma	Les Profs	Les pires professeurs réunis dans un lycée.
+D	Cinéma	Les Nouvelles Aventures d’Aladin	Kev Adams dans la peau du voleur de Bagdad.
+M	Cinéma	Fantômas	Un génie du crime poursuivi par Louis de Funès.
+M	Cinéma	L’Aile ou la Cuisse	Louis de Funès en critique gastronomique.
+M	Cinéma	Rabbi Jacob	Louis de Funès danse déguisé en rabbin.
+M	Cinéma	La Soupe aux choux	Un extraterrestre adore la cuisine de Louis de Funès.
+D	Cinéma	La Cage aux folles	Un cabaret de Saint-Tropez.
+D	Cinéma	Les Ripoux	Deux policiers corrompus à Paris.
+D	Cinéma	Les Sous-doués	Des cancres tentent de tricher au bac.
+D	Cinéma	Marche à l’ombre	Michel Blanc et Gérard Lanvin en vadrouille.
+M	Cinéma	Les Trois Frères	Les Inconnus héritent ensemble.
+D	Cinéma	Le Placard	Un employé fait croire qu’il est homosexuel pour garder son poste.
+M	Cinéma	Rien à déclarer	Dany Boon en douanier à la frontière belge.
+M	Cinéma	Supercondriaque	Dany Boon a peur de toutes les maladies.
+F	Cinéma	Dany Boon	Le réalisateur de Bienvenue chez les Ch’tis.
+F	Cinéma	Omar Sy	L’acteur d’Intouchables et de Lupin.
+F	Cinéma	Louis de Funès	Le gendarme de Saint-Tropez.
+M	Cinéma	Jean Dujardin	L’acteur de The Artist et d’OSS 117.
+M	Cinéma	Gérard Depardieu	Il a joué Obélix et Cyrano.
+M	Cinéma	Christian Clavier	Jacquouille dans Les Visiteurs.
+M	Cinéma	Jean Reno	L’acteur de Léon et du Grand Bleu.
+M	Cinéma	Marion Cotillard	Oscar pour son rôle d’Édith Piaf.
+M	Cinéma	Audrey Tautou	Elle a joué Amélie Poulain.
+M	Cinéma	Sophie Marceau	Révélée dans La Boum.
+M	Cinéma	Brigitte Bardot	Icône de Et Dieu… créa la femme, connue par ses initiales BB.
+M	Cinéma	Alain Delon	Le Samouraï, star des années 60.
+M	Cinéma	Jean-Paul Belmondo	Bébel, le Magnifique.
+D	Cinéma	Bourvil	Le partenaire de De Funès dans La Grande Vadrouille.
+D	Cinéma	Fernandel	Il a joué Don Camillo.
+M	Cinéma	Coluche	Le fondateur des Restos du cœur.
+F	Cinéma	Jamel Debbouze	L’humoriste qui a joué Numérobis dans Astérix.
+M	Cinéma	Kad Merad	Le directeur de La Poste dans Bienvenue chez les Ch’tis.
+M	Cinéma	Franck Dubosc	L’acteur de Camping, Patrick Chirac.
+M	Cinéma	Gad Elmaleh	L’humoriste de Chouchou.
+F	Cinéma	Leonardo DiCaprio	Jack dans Titanic.
+F	Cinéma	Tom Cruise	La star de Mission impossible et Top Gun.
+F	Cinéma	Brad Pitt	La star de Fight Club.
+F	Cinéma	Johnny Depp	Jack Sparrow dans Pirates des Caraïbes.
+F	Cinéma	Will Smith	Agent J dans Men in Black.
+M	Cinéma	Tom Hanks	Forrest Gump.
+M	Cinéma	Morgan Freeman	Sa voix grave a joué Dieu et Nelson Mandela.
+M	Cinéma	Robert De Niro	Taxi Driver et Le Parrain 2.
+M	Cinéma	Al Pacino	Michael Corleone dans Le Parrain.
+D	Cinéma	Meryl Streep	La reine des Oscars, dans Le Diable s’habille en Prada.
+M	Cinéma	Julia Roberts	La star de Pretty Woman.
+M	Cinéma	Angelina Jolie	Lara Croft et Maléfique.
+M	Cinéma	Scarlett Johansson	Black Widow chez les Avengers.
+F	Cinéma	Jackie Chan	Le roi du kung-fu comique.
+F	Cinéma	Bruce Lee	La légende des arts martiaux, en survêtement jaune.
+M	Cinéma	Arnold Schwarzenegger	Terminator.
+M	Cinéma	Sylvester Stallone	Rocky et Rambo.
+F	Cinéma	Jim Carrey	The Mask.
+M	Cinéma	Marilyn Monroe	Sa robe blanche se soulève sur une bouche d’aération.
+D	Cinéma	Audrey Hepburn	Diamants sur canapé.
+F	Cinéma	Steven Spielberg	Le réalisateur d’E.T. et de Jurassic Park.
+M	Cinéma	Alfred Hitchcock	Le maître du suspense.
+M	Cinéma	Quentin Tarantino	Le réalisateur de Pulp Fiction.
+M	Cinéma	Luc Besson	Le réalisateur du Grand Bleu.
+M	Cinéma	Tim Burton	Le réalisateur d’Edward aux mains d’argent.
+M	Cinéma	Walt Disney	Le créateur de Mickey.
+D	Cinéma	Hayao Miyazaki	Le maître japonais du studio Ghibli.
+D	Général	Mercure	La planète la plus proche du Soleil.
+M	Général	Vénus	La planète la plus brillante du ciel, l’étoile du berger.
+F	Général	Mars	La planète rouge.
+M	Général	Jupiter	La plus grosse planète du système solaire.
+M	Général	Saturne	La planète aux anneaux.
+D	Général	Uranus	La septième planète, couchée sur le côté.
+D	Général	Neptune	La planète la plus lointaine du Soleil.
+D	Général	Pluton	Elle a perdu son titre de planète en 2006.
+M	Général	Voie lactée	Notre galaxie.
+M	Général	Big Bang	L’explosion qui a donné naissance à l’Univers.
+M	Général	Trou noir	Même la lumière ne peut pas en sortir.
+D	Général	Grande Ourse	Une constellation en forme de casserole.
+F	Général	Étoile filante	On fait un vœu quand on en voit une.
+D	Général	Station spatiale	Thomas Pesquet y a vécu en orbite.
+F	Général	Extraterrestre	Un petit homme vert venu d’une autre planète.
+M	Général	Soucoupe volante	Le vaisseau rond des martiens.
+M	Général	Zeus	Le roi des dieux grecs, maître de la foudre.
+D	Général	Héra	L’épouse de Zeus.
+M	Général	Poséidon	Le dieu grec de la mer, armé d’un trident.
+M	Général	Hadès	Le dieu grec des Enfers.
+D	Général	Athéna	La déesse grecque de la sagesse, protectrice d’Athènes.
+D	Général	Apollon	Le dieu grec du soleil et des arts.
+M	Général	Aphrodite	La déesse grecque de l’amour.
+D	Général	Arès	Le dieu grec de la guerre.
+D	Général	Dionysos	Le dieu grec du vin et de la fête.
+M	Général	Ulysse	Le héros de l’Odyssée et du cheval de Troie.
+M	Général	Achille	Un héros grec invincible, sauf au talon.
+D	Général	Persée	Il a coupé la tête de Méduse.
+M	Général	Minotaure	Un monstre mi-homme mi-taureau du labyrinthe.
+M	Général	Pégase	Un cheval ailé.
+D	Général	Cerbère	Le chien à trois têtes qui garde les Enfers.
+M	Général	Cyclope	Un géant à un seul œil.
+D	Général	Centaure	Mi-homme, mi-cheval.
+M	Général	Phénix	Un oiseau qui renaît de ses cendres.
+D	Général	Griffon	Mi-aigle, mi-lion.
+D	Général	Odin	Le roi des dieux nordiques, père de Thor.
+M	Général	Loki	Le dieu nordique de la ruse et des farces.
+M	Général	Excalibur	L’épée plantée dans la pierre.
+F	Général	Merlin	L’enchanteur du roi Arthur.
+M	Général	Roi Arthur	Il a retiré Excalibur de la pierre.
+D	Général	Lancelot	Le plus célèbre chevalier de la Table ronde.
+D	Général	Graal	La coupe sacrée que cherchent les chevaliers.
+F	Général	Napoléon	L’empereur battu à Waterloo.
+M	Général	Jules César	« Je suis venu, j’ai vu, j’ai vaincu. »
+M	Général	Cléopâtre	La dernière reine d’Égypte.
+D	Général	Toutânkhamon	Le jeune pharaon au masque d’or.
+M	Général	Charlemagne	L’empereur à la barbe fleurie qui aurait inventé l’école.
+F	Général	Jeanne d’Arc	La Pucelle d’Orléans.
+M	Général	Louis XIV	Le Roi-Soleil de Versailles.
+M	Général	Marie-Antoinette	La reine guillotinée en 1793.
+M	Général	Vercingétorix	Le chef gaulois vaincu à Alésia.
+D	Général	Clovis	Le roi des Francs baptisé à Reims.
+F	Général	Christophe Colomb	Il a découvert l’Amérique en 1492.
+M	Général	Marco Polo	Le voyageur vénitien parti en Chine.
+D	Général	Magellan	Son expédition a fait le premier tour du monde.
+F	Général	Einstein	Le génie de la relativité, à la langue tirée.
+M	Général	Newton	Une pomme lui est tombée sur la tête.
+M	Général	Galilée	« Et pourtant, elle tourne ! »
+M	Général	Pasteur	Il a inventé le vaccin contre la rage.
+M	Général	Marie Curie	Deux prix Nobel pour ses travaux sur la radioactivité.
+M	Général	Darwin	Le savant de l’évolution des espèces.
+F	Général	Léonard de Vinci	Le peintre de La Joconde.
+M	Général	Michel-Ange	Il a peint le plafond de la chapelle Sixtine.
+F	Général	Picasso	Le peintre de Guernica et du cubisme.
+F	Général	Van Gogh	Le peintre des Tournesols, à l’oreille coupée.
+M	Général	Monet	Le peintre des Nymphéas.
+F	Général	Mozart	Un compositeur prodige de Salzbourg.
+M	Général	Bach	Le compositeur allemand des toccatas pour orgue.
+M	Général	Chopin	Un pianiste polonais romantique.
+F	Général	Victor Hugo	L’auteur des Misérables.
+M	Général	Molière	L’auteur de L’Avare et du Malade imaginaire.
+M	Général	Jules Verne	L’auteur du Tour du monde en 80 jours.
+M	Général	Shakespeare	L’auteur de Roméo et Juliette.
+M	Général	La Fontaine	L’auteur du Corbeau et du Renard.
+M	Général	Gandhi	Le père de l’indépendance de l’Inde, non violent.
+M	Général	Martin Luther King	« I have a dream. »
+M	Général	Nelson Mandela	Le premier président noir d’Afrique du Sud.
+D	Général	Abraham Lincoln	Le président américain qui a aboli l’esclavage.
+M	Général	Charles de Gaulle	L’homme de l’appel du 18 juin.
+M	Général	Neil Armstrong	Le premier homme à marcher sur la Lune.
+M	Général	Thomas Pesquet	L’astronaute français de la station spatiale.
+M	Général	Édith Piaf	« Non, rien de rien, je ne regrette rien. »
+F	Général	Johnny Hallyday	« Allumer le feu ! »
+F	Général	Michael Jackson	Le roi de la pop et du moonwalk.
+M	Général	Elvis Presley	Le King du rock’n’roll.
+M	Général	Madonna	La reine de la pop de Like a Virgin.
+F	Général	Beyoncé	Une chanteuse américaine surnommée Queen B.
+M	Général	Rihanna	La chanteuse d’Umbrella.
+M	Général	Stromae	Le chanteur belge d’Alors on danse.
+F	Général	Aya Nakamura	La chanteuse de Djadja.
+M	Général	Céline Dion	La chanteuse québécoise du Titanic.
+D	Général	Mylène Farmer	La chanteuse de Libertine, rousse et mystérieuse.
+M	Général	Daft Punk	Un duo électro français casqué.
+M	Général	Les Beatles	Le groupe de Liverpool.
+M	Général	Queen	Le groupe de We Will Rock You.
+M	Général	Bob Marley	La légende du reggae jamaïcain.
+D	Général	Freddie Mercury	Le chanteur moustachu de Bohemian Rhapsody.
+M	Général	Jul	Le rappeur marseillais aux deux mains en forme de J.
+M	Général	Booba	Le rappeur surnommé le Duc de Boulogne.
+M	Général	Orelsan	Le rappeur caennais de Basique.
+M	Général	Vianney	Le chanteur de Je m’en vais.
+M	Général	Angèle	La chanteuse belge de Balance ton quoi.
+D	Général	Indila	La chanteuse de Dernière danse.
+D	Général	Zaz	La chanteuse de Je veux.
+M	Général	Soprano	Le rappeur marseillais de Cosmo.
+M	Général	Gims	Le chanteur aux lunettes noires de Bella.
+M	Général	Ninho	Le rappeur de Lettre à une femme.
+D	Général	PNL	Le duo de rappeurs frères de QLF.
+M	Objets	Orgue	L’instrument à tuyaux des églises.
+D	Objets	Flûte de Pan	Des tuyaux de bambou collés côte à côte.
+M	Général	Solfège	On y apprend à lire les notes.
+M	Général	Gamme	Do, ré, mi, fa, sol, la, si, do.
+M	Général	Refrain	La partie de la chanson qu’on répète.
+D	Général	Couplet	La partie de la chanson entre deux refrains.
+M	Général	Rythme	Le batteur le donne.
+M	Général	Chorale	Un groupe qui chante ensemble.
+M	Général	Festival	Plusieurs jours de concerts, comme les Vieilles Charrues.
+M	Général	Tube	Une chanson à grand succès.
+F	Général	Rap	Une musique de rimes scandées.
+F	Général	Rock	La musique des guitares électriques.
+M	Général	Jazz	La musique de La Nouvelle-Orléans.
+M	Général	Reggae	La musique jamaïcaine de Bob Marley.
+D	Général	Slam	Une poésie dite sur scène, comme Grand Corps Malade.
+M	Général	Hip-hop	Une culture de rap, de graff et de breakdance.
+M	Général	Disco	La musique des boules à facettes des années 70.
+M	Général	Techno	Une musique électronique répétitive.
+D	Général	Blues	La musique mélancolique du Mississippi.
+F	Général	Ping-pong	Le tennis de table.
+M	Général	Baseball	Un sport américain avec une batte.
+D	Général	Cricket	Le sport anglais à la batte plate.
+D	Général	Polo	Un sport de balle à cheval.
+D	Général	Water-polo	Du handball dans une piscine.
+D	Général	Taekwondo	Un art martial coréen à coups de pied.
+M	Général	Lutte	Un sport où l’on doit plaquer l’adversaire au sol.
+M	Général	Sumo	Une lutte japonaise de colosses.
+D	Général	Haltérophilie	Soulever des barres très lourdes.
+D	Général	Biathlon	Ski de fond et tir à la carabine.
+D	Général	Bobsleigh	Une luge à plusieurs dans un tube de glace.
+M	Général	Saut à la perche	On s’envole au-dessus d’une barre grâce à une longue tige.
+M	Général	Javelot	On lance une sorte de lance le plus loin possible.
+M	Objets	Billard	On pousse des boules avec une queue.
+M	Général	Poker	Un jeu de cartes où l’on bluffe.
+D	Général	Belote	Un jeu de cartes à quatre avec des atouts et un valet maître.
+D	Général	Tarot	Un jeu de cartes avec l’Excuse et le petit.
+M	Général	Record	La meilleure performance jamais réalisée.
+F	Général	Champion	Le vainqueur de la compétition.
+M	Général	Finale	Le dernier match du tournoi.
+D	Général	Dossard	Le numéro accroché sur le maillot du coureur.
+M	Général	Ligne d’arrivée	On la franchit à la fin de la course.
+M	Général	Relais	Une course où l’on se passe un témoin.
+D	Géographie	Antibes	Une ville de la Côte d’Azur, entre Nice et Cannes.
+D	Géographie	Le Puy-en-Velay	Une ville de Haute-Loire célèbre pour ses lentilles vertes.
+M	Géographie	Verdun	Une ville de la Meuse, symbole de la bataille de 1916.
+D	Géographie	Tibre	Le fleuve qui traverse Rome.
+D	Géographie	Yangzi	Le plus long fleuve de Chine.
+D	Géographie	Volga	Le plus long fleuve d’Europe, en Russie.
+M	Géographie	Lac Léman	Le grand lac entre Genève et Évian.
+M	Géographie	Mer Noire	Une mer bordée par la Turquie et l’Ukraine.
+D	Géographie	Mer Baltique	La mer du Nord-Est de l’Europe, entre Suède et Pologne.
+M	Géographie	Mont Fuji	Le volcan sacré du Japon.
+D	Géographie	Sierra Nevada	Une chaîne de montagnes du sud de l’Espagne.
+M	Géographie	Grand Canyon	Une gorge géante creusée par le Colorado.
+D	Géographie	Uluru	Le gros rocher rouge du centre de l’Australie.
+M	Géographie	Crète	La plus grande île grecque.
+M	Géographie	Irak	Le pays de Bagdad.
+M	Géographie	Syrie	Le pays de Damas.
+D	Géographie	Koweït	Un petit émirat pétrolier du golfe Persique.
+D	Géographie	Bangladesh	Le pays de Dacca, voisin de l’Inde.
+M	Géographie	Taïwan	Une île face à la Chine, capitale Taipei.
+D	Géographie	Papouasie	La moitié est de la Nouvelle-Guinée.
+D	Géographie	Zambie	Un pays d’Afrique australe aux chutes Victoria.
+M	Géographie	Porto Rico	Une île des Caraïbes associée aux États-Unis.
+D	Géographie	Johannesburg	La plus grande ville d’Afrique du Sud.
+M	Géographie	Tanger	Un port du Maroc face à Gibraltar.
+M	Géographie	Fès	Une ville impériale du Maroc à la célèbre médina.
+M	Géographie	Oran	La deuxième ville d’Algérie.
+M	Géographie	Abou Dabi	La capitale des Émirats arabes unis.
+D	Géographie	Karachi	La plus grande ville du Pakistan.
+D	Géographie	Jakarta	La capitale de l’Indonésie.
+M	Géographie	Melbourne	La deuxième ville d’Australie.
+D	Géographie	Auckland	La plus grande ville de Nouvelle-Zélande.
+M	Géographie	Honolulu	La capitale d’Hawaï.
+M	Géographie	Boston	La ville américaine de Harvard.
+D	Géographie	Seattle	La ville américaine de la Space Needle.
+D	Géographie	Houston	« Nous avons un problème. »
+M	Géographie	Dallas	Une ville du Texas, titre d’une série culte.
+D	Géographie	Philadelphie	La ville américaine de la Déclaration d’indépendance.
+M	Géographie	São Paulo	La plus grande ville du Brésil.
+M	Géographie	Cancún	Une station balnéaire du Mexique.
+D	Géographie	Acapulco	Une station balnéaire mexicaine du Pacifique.
+D	Géographie	Francfort	La capitale financière de l’Allemagne.
+M	Géographie	Cologne	Une ville allemande célèbre pour sa cathédrale gothique.
+M	Géographie	Zurich	La plus grande ville de Suisse.
+D	Géographie	Bâle	Une ville suisse au bord du Rhin, près de l’Alsace.
+D	Géographie	La Haye	La ville néerlandaise de la Cour internationale de justice.
+D	Géographie	Malaga	Une ville andalouse de la Costa del Sol.
+D	Géographie	Bilbao	Une ville basque au musée Guggenheim.
+D	Géographie	Saint-Jacques-de-Compostelle	Le but du célèbre pèlerinage espagnol.
+M	Géographie	Turin	Une ville italienne célèbre pour son saint suaire.
+D	Géographie	Gênes	Le grand port italien, ville natale de Christophe Colomb.
+D	Géographie	Bologne	La ville italienne qui a donné son nom à une sauce.
+D	Géographie	Innsbruck	Une ville autrichienne du Tyrol.
+D	Géographie	Glasgow	La plus grande ville d’Écosse.
+D	Géographie	Cardiff	La capitale du pays de Galles.
+D	Géographie	Belfast	La capitale de l’Irlande du Nord.
+M	Géographie	Oxford	Une ville anglaise à l’université prestigieuse.
+D	Géographie	Cambridge	La grande rivale universitaire d’Oxford.
+D	Géographie	Brighton	Une station balnéaire anglaise au sud de Londres.
+F	Général	Selfie	Une photo de soi prise avec son téléphone.
+F	Général	Émoji	Un petit visage qui rit ou pleure dans un message.
+M	Général	Hashtag	Un mot précédé du signe #.
+F	Général	Wifi	La connexion internet sans fil.
+M	Général	Mot de passe	Il faut le taper pour se connecter.
+M	Général	Pseudo	Le nom qu’on se choisit pour jouer en ligne.
+M	Général	Application	Un programme qu’on télécharge sur son téléphone.
+M	Général	Notification	Une petite alerte qui s’affiche sur le téléphone.
+D	Général	Bluetooth	Il relie sans fil les écouteurs au téléphone.
+M	Objets	Souris sans fil	Elle déplace le curseur sans câble.
+D	Général	Capture d’écran	Une photo de ce qui s’affiche sur le téléphone.
+M	Général	Influenceur	Il donne des conseils à ses abonnés sur les réseaux.
+M	Général	Youtubeur	Il publie des vidéos sur la plateforme rouge.
+D	Général	Streaming	Regarder une vidéo en direct sur internet, sans la télécharger.
+D	Général	Podcast	Une émission audio à écouter quand on veut.
+M	Général	Abonné	Celui qui suit un compte sur les réseaux.
+M	Général	Like	Un petit pouce levé sur les réseaux.
+D	Général	Story	Une publication qui disparaît au bout de 24 heures.
+M	Objets	Robot aspirateur	Il fait le ménage tout seul en tournant dans la maison.
+D	Objets	Imprimante 3D	Elle fabrique des objets couche par couche.
+D	Objets	Casque de réalité virtuelle	On le met sur les yeux pour entrer dans un monde en 3D.
+D	Général	Intelligence artificielle	Un programme qui imite la réflexion humaine.
+M	Général	Pirate informatique	Il s’introduit dans les ordinateurs des autres.
+M	Général	Virus	Il donne la grippe, ou infecte un ordinateur.
+M	Général	Mise à jour	La nouvelle version d’une appli.
+D	Général	Téléchargement	Récupérer un fichier depuis internet.
+D	Général	Moteur de recherche	Google en est un.
+D	Général	Courriel	Le mot québécois pour un e-mail.
+M	Général	Spam	Un message publicitaire indésirable.
+D	Général	Arobase	Le signe @ des adresses e-mail.
+M	Objets	Écran tactile	On le touche du doigt pour s’en servir.
+D	Général	Visioconférence	Une réunion par vidéo.
+M	Général	Télétravail	Travailler depuis chez soi.
+M	Général	Code secret	Quatre chiffres à taper pour payer.
+D	Objets	Distributeur de billets	On y retire de l’argent avec sa carte.
+D	Objets	Chéquier	Un carnet pour payer par chèque.
+D	Général	Livret	Un compte d’épargne à la banque, comme le A.
+M	Objets	Lingot	Une barre d’or.
+F	Objets	Diamant	La pierre précieuse la plus dure.
+M	Objets	Rubis	Une pierre précieuse rouge.
+M	Objets	Émeraude	Une pierre précieuse verte.
+D	Objets	Saphir	Une pierre précieuse bleue.
+F	Objets	Perle	Elle se forme dans une huître.
+D	Objets	Améthyste	Une pierre violette.
+M	Général	Turquoise	Une pierre et une couleur bleu-vert.
+D	Objets	Jade	Une pierre verte très prisée en Chine.
+D	Objets	Ambre	Une résine fossile couleur miel.
+M	Objets	Cristal	Un verre très pur qui tinte.
+M	Général	Bronze	La médaille de la troisième place.
+M	Général	Cuivre	Un métal orangé des fils électriques.
+D	Général	Plomb	Un métal lourd et gris, autrefois dans l’essence.
+D	Général	Étain	Un métal gris et malléable des vieilles cuillères et des chopes.
+D	Général	Zinc	Le métal des toits de Paris.
+M	Général	Aluminium	Le métal du papier qui emballe les restes.
+M	Général	Acier	Un fer très solide.
+D	Général	Titane	Un métal léger et résistant des prothèses.
+D	Général	Platine	Un métal précieux plus rare que l’or.
+M	Général	Charbon	Le combustible noir des mineurs.
+M	Général	Pétrole	L’or noir.
+D	Général	Uranium	Le combustible des centrales nucléaires.
+D	Général	Granit	Une roche dure de Bretagne.
+M	Général	Marbre	La pierre blanche des statues grecques.
+D	Général	Ardoise	La pierre grise des toits d’Angers.
+M	Général	Argile	La terre du potier.
+D	Général	Calcaire	Il laisse des traces blanches dans la bouilloire.
+D	Général	Silex	La pierre des hommes préhistoriques pour faire du feu.
+M	Général	Lave	La roche en fusion qui coule du volcan.
+D	Général	Basalte	Une roche volcanique noire.
+D	Général	Quartz	Un cristal qu’on trouve dans les montres.
+M	Général	Béton	Un mélange de ciment, de sable et de gravier.
+M	Général	Ciment	La poudre grise du maçon.
+M	Général	Brique	Le bloc rouge des maisons du Nord.
+D	Général	Goudron	La matière noire et collante des routes.
+D	Général	Bitume	Le revêtement noir des trottoirs.
+D	Général	Asphalte	Le revêtement noir de la chaussée.
+M	Général	Caoutchouc	La matière des pneus.
+M	Général	Velours	Un tissu doux et côtelé.
+D	Général	Lin	Une fibre végétale pour les chemises d’été.
+M	Général	Jean	La toile bleue des pantalons.
+D	Général	Satin	Un tissu brillant et lisse.
+M	Général	Dentelle	Un tissu ajouré très délicat.
+M	Général	Polaire	Une veste douce et chaude.
+M	Général	Fourrure	Le pelage d’un animal.
+F	Général	Plume	L’oiseau en est couvert.
+M	Général	Duvet	Les plumes très fines de la couette.
+D	Général	Osier	On en fait des paniers tressés.
+D	Général	Écorce	La peau de l’arbre.
+D	Général	Résine	La matière collante qui coule du pin.
+D	Général	Sève	Le liquide qui circule dans les plantes.
+M	Général	Tronc	Le corps de l’arbre, entre les racines et les branches.
+F	Général	Branche	Les oiseaux s’y perchent.
+D	Général	Brindille	Une petite branche sèche.
+M	Général	Bourgeon	Il éclot au printemps sur la branche.
+M	Général	Tige	La fleur pousse au bout.
+D	Général	Pollen	La poudre jaune que transportent les abeilles.
+M	Général	Noyau	Le gros pépin dur de la cerise.
+M	Général	Gland	Le fruit du chêne.
+F	Général	Pomme de pin	On la ramasse sous les pins.
+M	Général	Mousse	Une petite plante verte et douce qui couvre les pierres humides.
+D	Général	Lichen	Un mélange d’algue et de champignon sur les rochers.
+M	Général	Fougère	Une plante des sous-bois aux feuilles découpées.
+M	Général	Lierre	Une plante grimpante qui s’accroche aux murs.
+F	Général	Ortie	Elle pique quand on la touche.
+M	Général	Trèfle	Celui à quatre feuilles porte bonheur.
+D	Général	Bleuet	Une fleur bleue des champs de blé.
+M	Général	Lavande	Une fleur violette de Provence qui sent bon.
+D	Général	Jonquille	Une fleur jaune du printemps.
+D	Général	Narcisse	Une fleur, ou un jeune homme amoureux de son reflet.
+D	Général	Jacinthe	Une fleur en grappe au parfum puissant.
+M	Général	Lys	La fleur des rois de France.
+M	Général	Orchidée	Une fleur exotique très élégante.
+M	Général	Iris	Une fleur, ou la partie colorée de l’œil.
+D	Général	Pivoine	Une grosse fleur ronde rose.
+D	Général	Hortensia	Un arbuste à grosses boules de fleurs bleues ou roses.
+D	Général	Glycine	Une plante grimpante aux grappes mauves.
+D	Général	Bougainvillier	Une plante aux fleurs fuchsia du Midi.
+M	Général	Lilas	Un arbuste aux grappes mauves parfumées.
+D	Général	Mimosa	Un arbre aux petites boules jaunes de février.
+D	Général	Camélia	Une fleur que portait Coco Chanel.
+M	Général	Géranium	Une fleur rouge des balcons.
+D	Général	Bégonia	Une plante à fleurs des jardinières.
+F	Général	Cactus	Une plante du désert pleine d’épines.
+D	Général	Aloe vera	Une plante grasse qui apaise les coups de soleil.
+M	Général	Bonsaï	Un arbre miniature japonais.
+M	Général	Saule pleureur	Un arbre aux branches qui tombent vers l’eau.
+D	Général	Peuplier	Un arbre très haut et élancé des bords de rivière.
+D	Général	Platane	L’arbre des places de village du Sud.
+D	Général	Hêtre	Un grand arbre des forêts, homonyme du verbe être.
+D	Général	Frêne	Un arbre au bois très souple.
+D	Général	Tilleul	Un arbre dont les fleurs font une tisane.
+D	Général	Marronnier	L’arbre des marrons d’Inde.
+D	Général	Châtaignier	L’arbre dont on ramasse les fruits en automne.
+D	Général	Noyer	L’arbre qui donne des noix.
+M	Général	Olivier	L’arbre qui donne des olives.
+M	Général	Cerisier	Ses fleurs roses sont fêtées au Japon.
+F	Général	Pommier	L’arbre de Newton.
+M	Général	Cocotier	Le palmier des noix de coco.
+M	Général	Baobab	Un arbre géant d’Afrique.
+D	Général	Séquoia	Un arbre géant de Californie.
+D	Général	Cèdre	Le grand arbre du drapeau libanais.
+D	Général	Mélèze	Un conifère qui perd ses aiguilles l’hiver.
+M	Général	Houx	Un arbuste aux feuilles piquantes et aux boules rouges.
+M	Général	Gui	On s’embrasse dessous au Nouvel An.
+D	Général	Buis	Un petit arbuste qu’on taille en boule.
+D	Général	Laurier-rose	Un arbuste toxique aux fleurs roses du Midi.
+D	Général	Bruyère	Une petite fleur mauve des landes.
+D	Général	Genêt	Un arbuste aux fleurs jaunes.
+D	Général	Ajonc	Un arbuste épineux à fleurs jaunes de Bretagne.
+D	Général	Nénuphar	Une plante aux larges feuilles qui flottent sur l’étang.
+M	Général	Algue	Une plante de la mer.
+M	Général	Champignon de Paris	Le petit champignon blanc du supermarché.
+D	Général	Cèpe	Un champignon à chapeau brun très recherché.
+D	Général	Girolle	Un champignon jaune orangé.
+D	Général	Morille	Un champignon au chapeau alvéolé.
+M	Général	Truffe	Le diamant noir de la cuisine, ou le nez du chien.
+D	Général	Amanite	Un champignon dont certaines espèces sont mortelles.
+D	Général	Humanitaire	Se dit d’une aide apportée aux victimes d’une guerre ou d’une catastrophe.
+D	Général	Obsolète	Dépassé, qui n’est plus utilisé.
+M	Général	Casino	On y joue à la roulette et aux machines à sous.
+M	Objets	Airbag	Un coussin qui se gonfle en cas de choc en voiture.
+D	Général	Abandonné	Laissé seul, comme un chien au bord de la route.
+M	Général	Voyelle	A, E, I, O, U ou Y.
+F	Général	Animal	Le chien, le chat ou le lion en sont un.
+D	Général	ADN	La molécule de l’hérédité, en double hélice.
+M	Général	Oxygène	Le gaz qu’on respire.
+M	Général	Laser	Un rayon de lumière très fin et puissant.
+F	Général	Gentil	Le contraire de méchant.
+F	Général	Grand	Le contraire de petit.
+F	Général	Petit	Le contraire de grand.
+F	Général	Gros	Le contraire de maigre.
+F	Général	Mince	Fin, élancé, le contraire d’épais.
+F	Général	Beau	Le contraire de laid.
+F	Général	Joli	Agréable à regarder.
+F	Général	Moche	Pas beau du tout, en langage familier.
+F	Général	Rapide	Le contraire de lent.
+F	Général	Lent	Comme un escargot.
+F	Général	Fort	Le contraire de faible.
+F	Général	Faible	Le contraire de fort.
+M	Général	Courageux	Qui n’a peur de rien.
+M	Général	Peureux	Qui a peur de tout.
+M	Général	Timide	Qui rougit quand on lui parle.
+M	Général	Bavard	Qui parle sans arrêt.
+F	Général	Drôle	Qui fait rire.
+M	Général	Sérieux	Le contraire de rigolo.
+F	Général	Triste	Le contraire de gai.
+F	Général	Content	Ravi, satisfait.
+F	Général	Heureux	Plein de bonheur.
+M	Général	Malheureux	Le contraire d’heureux.
+F	Général	Malade	Qui a de la fièvre et reste au lit.
+M	Général	Fâché	En colère contre quelqu’un.
+M	Général	Jaloux	Qui envie ce que les autres ont.
+F	Général	Gourmand	Qui adore les gâteaux et les sucreries.
+M	Général	Curieux	Qui veut tout savoir.
+M	Général	Poli	Qui dit bonjour, merci et s’il vous plaît.
+D	Général	Impoli	Qui ne dit jamais merci.
+F	Général	Sage	Se dit d’un enfant obéissant.
+D	Général	Coquin	Espiègle, malicieux.
+M	Général	Têtu	Qui ne change jamais d’avis, comme une mule.
+M	Général	Généreux	Qui partage tout.
+D	Général	Avare	Qui ne veut jamais dépenser, comme Harpagon.
+M	Général	Honnête	Qui ne ment jamais et ne vole pas.
+M	Général	Menteur	Celui qui ne dit pas la vérité.
+M	Général	Fier	Content de soi après une réussite.
+D	Général	Modeste	Qui ne se vante jamais.
+M	Général	Nerveux	Agité, qui ne tient pas en place.
+M	Général	Stressé	Angoissé avant un examen.
+F	Général	Amoureux	Qui a le cœur qui bat pour quelqu’un.
+M	Général	Célèbre	Connu de tous.
+F	Général	Riche	Qui a beaucoup d’argent.
+F	Général	Pauvre	Le contraire de riche.
+F	Général	Jeune	Le contraire de vieux.
+F	Général	Vieux	Le contraire de jeune.
+M	Général	Neuf	Qui sort tout juste du magasin, ou le chiffre après huit.
+M	Général	Ancien	D’une autre époque.
+M	Général	Moderne	Le contraire d’ancien.
+F	Général	Propre	Le contraire de sale.
+F	Général	Sale	Le contraire de propre.
+F	Général	Mouillé	Trempé par la pluie.
+F	Général	Sec	Le contraire de mouillé.
+F	Général	Chaud	Le contraire de froid.
+M	Général	Tiède	Ni chaud ni froid.
+M	Général	Brûlant	Très, très chaud.
+M	Général	Amer	Le goût du café sans sucre.
+M	Général	Acide	Le goût du citron.
+M	Général	Épicé	Relevé par le piment ou le curry.
+M	Général	Piquant	Comme le hérisson ou le piment.
+F	Général	Délicieux	Très bon à manger.
+M	Général	Dégoûtant	Qui donne envie de vomir.
+F	Général	Lourd	Le contraire de léger.
+F	Général	Léger	Comme une plume.
+F	Général	Dur	Le contraire de mou.
+F	Général	Mou	Le contraire de dur.
+F	Général	Doux	Comme une peluche.
+D	Général	Rugueux	Le contraire de lisse.
+M	Général	Lisse	Sans aucune aspérité.
+M	Général	Pointu	Qui se termine en pointe.
+F	Général	Rond	Comme un ballon.
+M	Général	Large	Le contraire d’étroit.
+D	Général	Étroit	Le contraire de large.
+F	Général	Long	Le contraire de court.
+F	Général	Court	Le contraire de long.
+F	Général	Haut	Le contraire de bas.
+F	Général	Bas	Le contraire de haut.
+M	Général	Profond	Comme un puits ou l’océan.
+F	Général	Vide	Le contraire de plein.
+F	Général	Plein	Le contraire de vide.
+F	Général	Ouvert	Le contraire de fermé.
+F	Général	Cassé	Brisé, en morceaux.
+F	Général	Perdu	Introuvable.
+M	Général	Caché	Que personne ne peut voir, bien planqué.
+M	Général	Invisible	Que l’on ne peut pas voir, comme l’homme de H. G. Wells.
+F	Général	Magique	Comme une baguette de fée.
+M	Général	Bizarre	Étrange, pas normal.
+M	Général	Étrange	Bizarre, inhabituel.
+M	Général	Normal	Comme d’habitude, rien d’étrange.
+F	Général	Facile	Le contraire de difficile.
+M	Général	Difficile	Le contraire de facile.
+F	Général	Simple	Le contraire de compliqué.
+M	Général	Compliqué	Difficile à comprendre.
+M	Général	Possible	Qui peut arriver.
+M	Général	Impossible	Qui ne peut pas arriver.
+F	Général	Vrai	Le contraire de faux.
+M	Général	Juste	Équitable, ou exact.
+D	Général	Injuste	Pas équitable du tout.
+M	Général	Gratuit	Qui ne coûte rien.
+F	Général	Cher	Qui coûte beaucoup d’argent.
+M	Général	Bruyant	Qui fait beaucoup de bruit.
+M	Général	Silencieux	Qui ne fait aucun bruit.
+M	Général	Sombre	Le contraire de lumineux.
+F	Général	Clair	Le contraire de foncé.
+M	Général	Lumineux	Plein de lumière.
+M	Général	Brillant	Qui étincelle, ou très intelligent.
+D	Général	Transparent	Comme une vitre.
+M	Général	Coloré	Plein de couleurs.
+F	Général	Blond	La couleur des cheveux de Boucle d’or.
+M	Général	Brun	Châtain foncé.
+M	Général	Roux	La couleur des cheveux de Poil de Carotte.
+M	Général	Chauve	Qui n’a plus de cheveux.
+M	Général	Barbu	Qui porte une barbe.
+M	Général	Maigre	Très mince, le contraire de gros.
+D	Général	Affamé	Qui a très faim.
+D	Général	Assoiffé	Qui a très soif.
+M	Général	Endormi	Qui dort.
+M	Général	Réveillé	Qui ne dort plus.
+M	Général	Pressé	Qui n’a pas le temps.
+M	Général	Patient	Qui sait attendre.
+D	Général	Impatient	Qui ne sait pas attendre.
+D	Général	Ponctuel	Toujours à l’heure.
+D	Général	Distrait	Qui oublie tout, la tête en l’air.
+M	Général	Maladroit	Qui fait tout tomber.
+D	Général	Habile	Adroit de ses mains.
+M	Général	Intelligent	Qui comprend tout très vite.
+F	Général	Génial	Super, formidable.
+F	Général	Nul	Très mauvais.
+M	Général	Parfait	Sans aucun défaut.
+M	Général	Immense	Très, très grand.
+F	Général	Énorme	Très gros.
+D	Général	Gigantesque	D’une taille démesurée.
+M	Général	Sauvage	Qui vit en liberté dans la nature.
+D	Général	Domestique	Se dit d’un animal qui vit avec l’homme.
+M	Général	Dangereux	Qui peut faire du mal.
+M	Général	Prudent	Qui fait attention.
+D	Général	Imprudent	Qui prend des risques.
+M	Général	Inquiet	Qui se fait du souci.
+M	Général	Surpris	Qui ne s’y attendait pas.
+M	Général	Étonné	Surpris, stupéfait.
+D	Général	Effrayé	Qui a peur.
+D	Général	Terrifié	Mort de peur.
+M	Général	Ravi	Très content.
+D	Général	Enthousiaste	Plein d’entrain.
+M	Général	Déçu	Qui attendait mieux.
+D	Général	Vexé	Blessé dans son amour-propre.
+M	Général	Furieux	Très en colère.
+D	Général	Gêné	Mal à l’aise.
+D	Général	Honteux	Qui a honte.
+D	Général	Ému	Touché au point d’avoir les larmes aux yeux.
+D	Général	Nostalgique	Qui regrette le bon vieux temps.
+D	Général	Optimiste	Qui voit le verre à moitié plein.
+D	Général	Pessimiste	Qui voit le verre à moitié vide.
+D	Général	Sincère	Qui dit ce qu’il pense vraiment.
+D	Général	Hypocrite	Qui fait semblant.
+D	Général	Arrogant	Qui se croit supérieur aux autres.
+D	Général	Humble	Modeste, sans orgueil.
+D	Général	Ambitieux	Qui veut réussir à tout prix.
+M	Général	Rusé	Malin comme un renard.
+D	Général	Naïf	Qui croit tout ce qu’on lui dit.
+M	Général	Fidèle	Comme un chien avec son maître.
+D	Général	Loyal	Qui ne trahit jamais.
+D	Général	Solitaire	Qui aime être seul.
+D	Général	Sociable	Qui aime la compagnie des autres.
+M	Général	Unique	Le seul de son espèce.
+M	Général	Rare	Qu’on voit très peu.
+M	Général	Fragile	Qui se casse facilement, comme le verre.
+M	Général	Solide	Qui ne se casse pas.
+D	Général	Éternel	Qui dure toujours.
+D	Général	Immortel	Qui ne meurt jamais.
+M	Général	Mystérieux	Plein de secrets.
+M	Général	Interdit	Défendu.
+D	Général	Obligatoire	Qu’on est forcé de faire.
+M	Général	Urgent	Qui ne peut pas attendre.
+M	Général	Végétarien	Qui ne mange pas de viande.
+M	Général	Bio	Cultivé sans pesticides.
+M	Général	Fait maison	Préparé chez soi, pas acheté tout prêt.
+M	Général	Fusion	Quand deux choses n’en font plus qu’une, ou quand la glace devient liquide.
+D	Général	Filon	Une veine de minerai, ou une bonne idée qui rapporte.
+F	Général	Beige	La couleur du sable clair.
+M	Général	Doré	De la couleur de l’or.
+M	Général	Argenté	De la couleur de l’argent.
+D	Général	Fuchsia	Un rose vif tirant sur le violet.
+D	Général	Indigo	Le bleu-violet de l’arc-en-ciel.
+D	Général	Écarlate	Un rouge éclatant.
+D	Général	Vermillon	Un rouge vif tirant sur l’orange.
+D	Général	Ocre	La couleur jaune-brun de la terre du Roussillon.
+M	Général	Ivoire	Un blanc crème, comme les défenses de l’éléphant.
+D	Général	Pourpre	Le rouge foncé des empereurs romains.
+D	Général	Magenta	Le rose violacé des cartouches d’imprimante.
+D	Général	Cyan	Le bleu clair des cartouches d’imprimante.
+D	Général	Céleste	Se dit du bleu du ciel.
+D	Général	Anthracite	Un gris très foncé, presque noir.
+M	Général	Châtain	La couleur de cheveux brun clair.
+D	Général	Fauve	Un jaune roussâtre, ou un grand félin sauvage.
+D	Général	Grenat	Un rouge sombre, comme la pierre du même nom.
+D	Général	Cramoisi	Rouge foncé, comme un visage très gêné.
+M	Général	Mauve	Un violet pâle.
+D	Général	Sépia	Le brun des vieilles photos.
+M	Général	Bleu marine	Un bleu très foncé, celui des uniformes de marin.
+F	Général	Bleu ciel	Un bleu clair, comme le ciel d’été.
+F	Général	Vert pomme	Un vert acidulé et vif.
+F	Général	Rose bonbon	Un rose vif et sucré.
+M	Général	Vert sapin	Un vert foncé, celui des forêts de conifères.
+M	Général	Blanc cassé	Un blanc légèrement crème.
+F	Général	Aimer	« Je t’… », dit-on à son amoureux.
+F	Général	Détester	Le contraire d’adorer.
+F	Général	Adorer	Aimer à la folie.
+M	Général	Préférer	Aimer mieux.
+F	Général	Vouloir	Avoir envie de quelque chose.
+M	Général	Pouvoir	Être capable de faire quelque chose.
+M	Général	Savoir	Connaître la réponse.
+M	Général	Connaître	« Je le … depuis l’école. »
+M	Général	Croire	Penser que c’est vrai, sans preuve.
+M	Général	Espérer	Attendre avec confiance que ça arrive.
+M	Général	Souhaiter	Faire un vœu.
+M	Général	Imaginer	Se représenter dans sa tête.
+M	Général	Inventer	Créer quelque chose qui n’existait pas.
+M	Général	Créer	Faire naître quelque chose de nouveau.
+M	Général	Fabriquer	Faire un objet de ses mains ou à l’usine.
+M	Général	Bricoler	Réparer avec ses outils le samedi.
+F	Général	Colorier	Remplir un dessin avec des feutres.
+M	Général	Découper	Suivre les pointillés avec des ciseaux.
+F	Général	Gonfler	Souffler dans un ballon.
+M	Général	Éclater	Ce que fait la bulle de savon.
+M	Général	Exploser	Ce que fait la bombe.
+M	Général	Briller	Ce que font les étoiles.
+D	Général	Clignoter	Ce que fait le phare de la voiture avant de tourner.
+M	Général	Chatouiller	Faire rire en touchant sous les bras.
+M	Général	Pincer	Ce que fait le crabe avec ses pinces.
+F	Général	Mordre	Ce que fait le chien avec ses crocs.
+M	Général	Griffer	Ce que fait le chat avec ses ongles.
+F	Animaux	Aboyer	Le cri du chien.
+F	Animaux	Miauler	Le cri du chat.
+M	Animaux	Rugir	Le cri du lion.
+D	Animaux	Hennir	Le cri du cheval.
+M	Animaux	Meugler	Le cri de la vache.
+M	Animaux	Bêler	Le cri du mouton.
+D	Animaux	Caqueter	Le cri de la poule.
+D	Animaux	Roucouler	Le cri du pigeon.
+M	Animaux	Bourdonner	Le bruit de l’abeille.
+D	Animaux	Gazouiller	Le chant des petits oiseaux.
+D	Animaux	Hululer	Le cri du hibou.
+D	Animaux	Coasser	Le cri de la grenouille.
+D	Animaux	Barrir	Le cri de l’éléphant.
+M	Animaux	Galoper	Courir à toute vitesse, comme le cheval.
+M	Animaux	Ramper	Avancer sur le ventre, comme le serpent.
+M	Général	Flotter	Rester à la surface de l’eau.
+M	Général	Couler	Ce que fait le Titanic.
+D	Général	Sombrer	Couler au fond de la mer.
+M	Général	Naviguer	Voyager en bateau.
+D	Général	Accoster	S’approcher du quai en bateau.
+D	Général	Débarquer	Descendre du bateau.
+M	Général	Embarquer	Monter à bord.
+F	Général	Se baigner	Aller dans l’eau à la plage.
+M	Général	Se reposer	Faire une pause pour reprendre des forces.
+M	Général	Se promener	Faire une balade.
+F	Général	Se cacher	Ce qu’on fait à cache-cache.
+M	Général	Se dépêcher	Aller vite parce qu’on est en retard.
+M	Général	Se moquer	Rire de quelqu’un.
+F	Général	Se brosser les dents	Ce qu’on fait matin et soir devant le lavabo.
+F	Général	Faire la vaisselle	Laver les assiettes après le repas.
+F	Général	Mettre la table	Poser assiettes et couverts avant le repas.
+F	Général	Faire les courses	Remplir son chariot au supermarché.
+F	Général	Faire la sieste	Dormir un peu après le déjeuner.
+F	Général	Faire du vélo	Pédaler dans la rue.
+F	Général	Faire la fête	S’amuser toute la nuit avec ses amis.
+F	Général	Prendre le bus	Monter dans le véhicule de transport en commun, à l’arrêt.
+F	Général	Prendre une douche	Se laver debout sous le jet d’eau.
+F	Général	Avoir faim	Quand le ventre gargouille.
+F	Général	Avoir peur	Quand on tremble devant un film d’horreur.
+M	Général	Avoir de la chance	Gagner au loto, par exemple.
+F	Général	Dire bonjour	Saluer quelqu’un le matin.
+M	Général	Raccrocher	Mettre fin à l’appel.
+M	Général	Décrocher	Répondre au téléphone.
+D	Général	Toquer	Frapper doucement à la porte.
+M	Général	Signer	Écrire son nom au bas d’un contrat.
+M	Général	Voter	Mettre un bulletin dans l’urne.
+D	Général	Élire	Choisir par un vote.
+M	Général	Juger	Ce que fait le tribunal.
+D	Général	Condamner	Déclarer coupable et punir.
+M	Général	Arrêter	Ce que fait la police avec un voleur.
+D	Général	Libérer	Rendre la liberté.
+D	Général	Enquêter	Ce que fait l’inspecteur.
+D	Général	Espionner	Surveiller en cachette.
+D	Général	Cambrioler	Voler dans une maison.
+D	Général	Escroquer	Voler par la ruse.
+D	Général	Bluffer	Faire croire qu’on a un bon jeu au poker.
+M	Général	Parier	Miser sur le gagnant.
+D	Général	Miser	Mettre de l’argent en jeu.
+M	Général	Économiser	Mettre de l’argent de côté.
+M	Général	Dépenser	Le contraire d’économiser.
+D	Général	Gaspiller	Jeter ce qu’on pourrait encore utiliser.
+M	Général	Recycler	Transformer un déchet en nouvel objet.
+M	Général	Trier	Mettre le verre et le carton dans les bonnes poubelles.
+F	Général	Jeter	Mettre à la poubelle.
+M	Général	Polluer	Salir la nature.
+M	Général	Protéger	Mettre à l’abri du danger.
+F	Général	Sauver	Ce que fait le héros.
+F	Général	Aider	Donner un coup de main.
+D	Général	Secourir	Porter assistance à quelqu’un en danger.
+M	Général	Consoler	Réconforter quelqu’un qui pleure.
+M	Général	Encourager	Crier « Allez ! » pendant la course.
+M	Général	Féliciter	Dire « Bravo ! ».
+D	Général	Huer	Siffler un artiste qu’on n’aime pas.
+D	Général	Fredonner	Chanter tout bas, bouche fermée.
+D	Général	Siffloter	Siffler doucement en marchant.
+M	Général	Jongler	Lancer plusieurs balles en l’air sans les faire tomber.
+D	Général	Broder	Décorer un tissu avec du fil.
+M	Général	Sculpter	Tailler la pierre pour en faire une statue.
+D	Général	Modeler	Façonner de l’argile avec ses doigts.
+D	Général	Graver	Inscrire dans le bois ou le métal.
+M	Général	Tailler	Couper la haie ou un crayon.
+M	Général	Scier	Couper du bois avec une lame dentée.
+M	Général	Clouer	Enfoncer une pointe avec un marteau.
+M	Général	Visser	Tourner avec un tournevis.
+M	Général	Percer	Faire un trou avec une perceuse.
+D	Général	Poncer	Frotter avec du papier de verre.
+D	Général	Vernir	Passer une couche brillante sur le bois.
+D	Général	Tapisser	Coller du papier peint.
+M	Général	Repeindre	Refaire la peinture d’une pièce.
+D	Général	Déboucher	Ouvrir une bouteille de vin, ou un évier bouché.
+M	Général	Réchauffer	Passer au micro-ondes.
+M	Général	Congeler	Mettre au congélateur.
+D	Général	Décongeler	Sortir du congélateur et laisser fondre.
+D	Général	Mijoter	Cuire longtemps à feu doux.
+D	Général	Rissoler	Faire dorer dans la poêle.
+D	Général	Flamber	Arroser d’alcool et allumer, comme les crêpes Suzette.
+D	Général	Gratiner	Faire dorer le fromage au four.
+D	Général	Assaisonner	Ajouter sel, poivre et épices.
+M	Général	Savourer	Manger lentement en appréciant.
+M	Général	Déguster	Goûter avec plaisir.
+M	Général	Trinquer	Faire tinter les verres en disant « Santé ! ».
+D	Général	Digérer	Ce que fait l’estomac après le repas.
+D	Général	Saigner	Perdre du sang.
+D	Général	Cicatriser	Ce que fait la plaie en se refermant.
+M	Général	Vacciner	Faire une piqûre pour protéger d’une maladie.
+D	Général	Opérer	Ce que fait le chirurgien.
+D	Général	Plâtrer	Immobiliser un bras cassé.
+M	Général	Masser	Détendre les muscles avec les mains.
+M	Général	Étirer	Allonger ses muscles après le sport.
+D	Général	S’échauffer	Se préparer avant le sport.
+D	Général	Sprinter	Courir à toute vitesse sur la fin.
+F	Football	Dribbler	Passer un adversaire avec le ballon.
+F	Football	Marquer	Mettre le ballon au fond des filets.
+M	Football	Tirer au but	Frapper vers la cage.
+D	Général	Arbitrer	Diriger un match avec un sifflet.
+M	Général	Abandonner	Renoncer avant la fin.
+M	Général	Recommencer	Faire une nouvelle fois.
+F	Général	Réussir	Le contraire d’échouer.
+M	Général	Échouer	Le contraire de réussir.
+F	Général	Rater	Manquer sa cible.
+M	Général	Réviser	Relire ses cours avant l’examen.
+D	Général	Mémoriser	Apprendre par cœur.
+F	Général	Copier	Regarder sur la feuille du voisin.
+M	Général	Recopier	Écrire une deuxième fois au propre.
+M	Général	Souligner	Tracer un trait sous un mot.
+F	Général	Effacer	Ce que fait la gomme.
+M	Général	Corriger	Ce que fait le professeur avec son stylo rouge.
+M	Général	Noter	Mettre une note sur une copie.
+M	Général	Punir	Donner une punition.
+M	Général	Récompenser	Offrir quelque chose pour un effort.
+M	Général	Mollet	Le muscle à l’arrière de la jambe, sous le genou.
+F	Général	Cuisse	Le haut de la jambe.
+M	Général	Hanche	On y pose les mains en signe d’impatience.
+M	Général	Poitrine	Le haut du torse.
+M	Général	Crâne	Les os de la tête.
+D	Général	Veine	Un vaisseau qui ramène le sang au cœur.
+D	Général	Salive	On en a plein la bouche devant un bon plat.
+M	Général	Narine	L’un des deux trous du nez.
+D	Général	Gencive	La chair rose autour des dents.
+D	Général	Molaire	Une grosse dent du fond pour mâcher.
+D	Général	Canine	Une dent pointue, comme celles du vampire.
+D	Général	Nuque	L’arrière du cou.
+D	Général	Aisselle	Le creux sous le bras.
+M	Général	Index	Le doigt qui montre.
+D	Général	Auriculaire	Le petit doigt.
+D	Général	Chevelure	L’ensemble des cheveux.
+D	Général	Pellicule	De petites peaux blanches sur les épaules, ou un film d’appareil photo.
+M	Général	Ride	Un pli de la peau qui vient avec l’âge.
+M	Général	Cicatrice	La marque laissée par une blessure.
+D	Général	Verrue	Une petite excroissance sur la peau, souvent au pied.
+D	Général	Rhume des foins	Une allergie au pollen.
+F	Général	Toux	On la soigne avec du sirop.
+M	Général	Migraine	Un violent mal de tête.
+M	Général	Entorse	Une cheville tordue.
+M	Général	Fracture	Un os cassé.
+M	Général	Brûlure	Ce qu’on se fait en touchant le four.
+F	Général	Coupure	Ce qu’on se fait avec un couteau.
+D	Général	Hématome	Un bleu.
+M	Général	Comprimé	Un médicament à avaler avec un verre d’eau.
+F	Général	Sirop pour la toux	Un médicament sucré pour la gorge.
+M	Général	Pommade	Une crème qu’on étale sur la peau.
+D	Objets	Brancard	On y transporte les blessés.
+M	Objets	Blouse	La tenue blanche du médecin.
+F	Objets	Tong	Une sandale de plage entre les orteils.
+D	Objets	Bottine	Une petite botte qui monte à la cheville.
+M	Objets	Foulard	Un carré de soie autour du cou.
+D	Objets	Châle	Une grande étoffe sur les épaules.
+M	Objets	Blouson	Une veste courte, souvent en cuir.
+D	Objets	Ciré	Le manteau jaune du marin.
+M	Objets	Anorak	Une veste imperméable à capuche.
+F	Objets	Costume	Veste et pantalon assortis.
+M	Objets	Survêtement	La tenue de sport.
+M	Objets	Legging	Un pantalon moulant.
+M	Objets	Débardeur	Un haut sans manches.
+F	Objets	Sweat	Un pull en coton, souvent à capuche.
+D	Objets	Sac banane	Une petite pochette attachée à la taille.
+D	Objets	Cabas	Un grand sac pour faire le marché.
+D	Objets	Porte-documents	Une serviette pour transporter des papiers.
+M	Objets	Mallette	Une petite valise rigide.
+M	Objets	Pochette	Un petit sac plat.
+D	Général	Vestibule	La pièce d’entrée d’une maison.
+F	Général	Couloir	Un passage qui relie les pièces.
+M	Général	Véranda	Une pièce vitrée qui donne sur le jardin.
+M	Général	Terrasse	On y mange dehors l’été.
+D	Général	Buanderie	La pièce où l’on lave le linge.
+D	Général	Débarras	Une petite pièce où l’on entasse ce qui encombre.
+F	Objets	Placard	On y range les vêtements ou la vaisselle.
+M	Général	Dressing	Une pièce pour ranger tous ses vêtements.
+D	Général	Mezzanine	Un étage intermédiaire ouvert sur la pièce.
+M	Général	Sous-sol	L’étage sous le rez-de-chaussée.
+D	Objets	Velux	Une fenêtre de toit.
+D	Objets	Gouttière	Elle recueille l’eau de pluie au bord du toit.
+M	Objets	Antenne	Elle capte la télé sur le toit.
+D	Objets	Parabole	Une antenne ronde pour la télé satellite.
+F	Objets	Boîte à outils	On y range marteau et tournevis.
+D	Objets	Établi	La table de travail du menuisier.
+M	Objets	Clé anglaise	Un outil réglable pour serrer les écrous.
+M	Objets	Mètre	Il se déplie pour mesurer.
+M	Objets	Papier peint	On le colle sur les murs.
+M	Objets	Moquette	Un revêtement de sol en tissu.
+M	Objets	Parquet	Un sol en lames de bois.
+M	Objets	Carrelage	Un sol en petits carreaux de céramique.
+D	Objets	Plinthe	Une bande de bois au pied du mur.
+D	Objets	Gond	La charnière sur laquelle tourne une porte.
+D	Objets	Persienne	Un volet à lamelles.
+D	Objets	Moustiquaire	Un filet contre les moustiques.
+D	Objets	Applique	Une lampe fixée au mur.
+F	Objets	Table de nuit	Le petit meuble à côté du lit.
+D	Objets	Vaisselier	Un meuble pour ranger et montrer la belle vaisselle.
+D	Objets	Banquette	Un long siège rembourré.
+M	Objets	Rocking-chair	Un fauteuil à bascule.
+F	Objets	Lit superposé	Deux lits l’un au-dessus de l’autre.
+F	Objets	Couette	On se glisse dessous pour dormir.
+D	Objets	Traversin	Un long oreiller.
+M	Objets	Taie d’oreiller	La housse de l’oreiller.
+M	Objets	Housse	Une enveloppe de tissu qui protège.
+M	Objets	Plaid	Une petite couverture pour le canapé.
+D	Objets	Édredon	Une couverture épaisse garnie de plumes.
+M	Objets	Torchon	On essuie la vaisselle avec.
+D	Objets	Balayette	Un petit balai.
+M	Objets	Pelle à poussière	On y pousse la poussière avec la balayette.
+M	Objets	Produit vaisselle	Un liquide qui mousse dans l’évier.
+M	Objets	Lessive	On la met dans la machine à laver.
+D	Objets	Adoucissant	Il rend le linge doux et parfumé.
+M	Objets	Étendoir	On y fait sécher le linge.
+M	Objets	Panier à linge	On y met les vêtements sales.
+M	Objets	Corbeille	Une petite poubelle de bureau.
+D	Objets	Composteur	On y met les épluchures, ou on y valide son billet.
+M	Objets	Bocal	Un pot en verre pour les conserves ou le poisson rouge.
+F	Objets	Pot de confiture	On le trouve sur la table du petit déjeuner.
+M	Objets	Boîte de conserve	Il faut un ouvre-boîte pour l’ouvrir.
+M	Objets	Canette	Une boîte de soda en métal.
+F	Objets	Bouchon	On le retire de la bouteille.
+M	Objets	Capsule	Le petit bouchon de métal d’une bouteille.
+M	Objets	Emballage	Ce qui enveloppe un produit.
+F	Objets	Papier cadeau	On emballe les présents avec.
+M	Objets	Ruban	On fait un joli nœud avec.
+M	Objets	Carton d’invitation	On le reçoit pour une fête.
+D	Objets	Faire-part	Il annonce un mariage ou une naissance.
+M	Objets	Serpentin	Un ruban de papier qu’on souffle au carnaval.
+F	Objets	Guirlande	On l’accroche au sapin.
+F	Objets	Boule de Noël	On l’accroche aux branches du sapin.
+M	Général	Crèche	Elle représente la naissance de Jésus, ou garde les bébés.
+M	Objets	Calendrier de l’Avent	Une case à ouvrir chaque jour de décembre.
+F	Objets	Chaussette de Noël	On la suspend à la cheminée.
+D	Général	Chandeleur	La fête des crêpes, le 2 février.
+F	Général	Nouvel An	Le 1er janvier.
+M	Général	Réveillon	Le repas de fête du 24 ou du 31 décembre.
+M	Général	Fête nationale	En France, c’est le 14 juillet.
+M	Général	Quatorze juillet	La prise de la Bastille et le feu d’artifice.
+M	Général	Exposition	Des œuvres présentées au musée.
+M	Général	Applaudissement	Le bruit des mains qui claquent à la fin du spectacle.
+D	Général	Rappel	Le public le réclame à la fin du concert.
+M	Général	Fan	Un grand admirateur.
+F	Général	Maternelle	L’école des tout-petits.
+F	Général	Collège	L’école après le CM2, de la 6e à la 3e.
+F	Général	Lycée	L’école de la seconde à la terminale.
+M	Général	Université	On y fait ses études après le bac.
+F	Général	Leçon	Ce qu’on apprend en classe.
+M	Général	Exercice	Un problème à résoudre en classe.
+M	Général	Contrôle	Une interrogation écrite notée.
+M	Général	Cahier de textes	On y note ses devoirs.
+M	Général	Tableau blanc	On y écrit au feutre effaçable.
+M	Général	Récré	La pause dans la cour, en abrégé.
+M	Général	Directeur	Le chef de l’école.
+F	Général	Élève	Il apprend à l’école.
+F	Général	Copine	Une amie, en langage familier.
+F	Général	Meilleur ami	Celui à qui l’on confie tous ses secrets.
+M	Général	Camarade	Un compagnon de classe.
+M	Général	Club	Une association de sport ou de loisirs.
+F	Général	Score	Le nombre de points d’une partie.
+M	Général	Revanche	Une nouvelle partie pour prendre sa chance contre celui qui nous a battu.
+F	Général	Gagnant	Celui qui remporte la partie.
+F	Général	Perdant	Le contraire du gagnant.
+F	Général	Joueur	Celui qui participe à la partie.
+F	Général	Partie	Une manche de jeu, du début à la fin.
+M	Général	Bonus	Des points en plus.
+F	Général	Pause	Un petit moment de repos.
+D	Général	Pixel	Un petit point de l’écran.
+M	Général	Bug	Un plantage d’ordinateur.
+D	Général	Sauvegarde	Une copie de ses fichiers en cas de panne.
+M	Général	Duel	Un combat à deux, ou un mode de CNSNN.
+F	Général	Sprint	Une course très rapide, ou un mode de CNSNN.
+M	Général	Survie	Tenir le plus longtemps possible, comme dans un mode de CNSNN.
+M	Général	Chrono	Il mesure le temps de la course.
+F	Général	Demain	Le jour après aujourd’hui.
+F	Général	Hier	Le jour avant aujourd’hui.
+F	Général	Mardi	Le jour après lundi.
+F	Général	Février	Le mois le plus court.
+F	Général	Avril	Le mois des poissons en papier.
+F	Général	Mai	Le mois du muguet.
+F	Général	Juin	Le mois de la fin de l’école.
+F	Général	Juillet	Le mois du 14.
+F	Général	Août	Le mois des grandes vacances en plein été.
+F	Général	Septembre	Le mois de la rentrée.
+F	Général	Octobre	Le mois d’Halloween.
+F	Général	Novembre	Le onzième mois de l’année.
+F	Général	Saison	Il y en a quatre dans l’année.
+M	Général	Matinée	La partie de la journée avant midi.
+F	Général	Après-midi	La partie de la journée après le déjeuner.
+F	Général	Soirée	La fin de la journée, après le dîner.
+F	Général	Coucher de soleil	Le ciel devient orange le soir.
+M	Général	Lever du soleil	Quand le jour se lève.
+M	Général	Pleine lune	Quand l’astre de la nuit est tout rond.
+M	Général	Flaque	On saute dedans avec des bottes.
+F	Général	Rocher	Une grosse pierre au bord de la mer.
+M	Général	Coquille	L’enveloppe dure de l’œuf ou de l’escargot.
+M	Objets	Seau et pelle	Les jouets de plage pour faire des châteaux.
+D	Objets	Ponton	Un petit quai flottant.
+M	Objets	Plongeoir	On saute de là dans la piscine.
+M	Objets	Toboggan aquatique	On glisse dedans jusqu’à la piscine.
+M	Général	Crêperie	Un restaurant de galettes bretonnes.
+F	Général	Pizzeria	Un restaurant italien.
+D	Général	Fromagerie	La boutique du camembert et du comté.
+D	Général	Poissonnerie	La boutique où l’on achète les produits de la mer.
+M	Général	Épicerie	Une petite boutique d’alimentation.
+D	Général	Cordonnerie	L’atelier où l’on répare les chaussures.
+D	Général	Bijouterie	La boutique des bagues et des colliers.
+D	Général	Parfumerie	La boutique des eaux de toilette.
+M	Général	Arrêt de bus	On y attend le car de ville.
+M	Général	Station de lavage	On y nettoie sa voiture.
+M	Général	Auto-école	On y apprend à conduire.
+M	Général	Salle de sport	On y soulève des haltères.
+M	Général	Patinoire	On y glisse sur la glace.
+D	Général	Ferme pédagogique	Les écoliers y découvrent les animaux.
+M	Général	Jardin public	Un parc ouvert à tous en ville.
+F	Général	Aire de jeux	Toboggans et balançoires pour les enfants.
+F	Objets	Bac à sable	Les petits y font des pâtés.
+D	Objets	Tourniquet	Un manège qu’on fait tourner à la main.
+M	Objets	Tyrolienne	Un câble pour glisser d’un arbre à l’autre.
+M	Général	Accrobranche	Un parcours dans les arbres avec harnais.

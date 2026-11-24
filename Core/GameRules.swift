@@ -158,7 +158,7 @@ public enum DailySchedule {
 }
 public enum CardPicker {
     /// Classique cards remembered per player, so the same card does not come back for a long while.
-    public static let memory = 500
+    public static let memory = 1000
 
     public static func candidates(cards: [Card], category: Category?, difficulty: Difficulty?, recent: [String]) -> [Card] {
         let eligible = cards.filter { $0.status == .approved && (category == nil || $0.category == category) && (difficulty == nil || $0.difficulty == difficulty) }

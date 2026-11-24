@@ -130,7 +130,7 @@ object DailySchedule {
 
 object CardPicker {
     /** Classique cards remembered per player, so the same card does not come back for a long while. */
-    const val MEMORY = 500
+    const val MEMORY = 1000
 
     /** Cards matching the filters, preferring those not seen recently. */
     fun candidates(cards: List<Card>, category: Category?, difficulty: Difficulty?, recent: List<String>): List<Card> {
