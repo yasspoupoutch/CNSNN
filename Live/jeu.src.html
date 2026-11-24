@@ -240,7 +240,6 @@ function step() {
 function points(el) { const d = dur(); return el < d * .5 ? 30 : el < d * .78 ? 20 : 10; }
 
 function onComment(c) {
-  if (demo.on && c.source !== 'demo' && c.source !== 'test') return;
   if (!demo.on && c.source === 'demo') return;
   if (phase !== 'play' || !current || !c.comment) return;
   if (!isAnswer(c.comment, current.word)) return;
@@ -328,11 +327,13 @@ const demo = {
 };
 
 // ---- Real comments: the small program (serveur) reads the live chat and passes each comment here.
-let ws = null, wsUp = false, liveState = 'Pas connecté';
+let ws = null, wsUp = false, liveState = 'Pas connecté', got = 0, lastChat = '';
 function status() {
   const st = $('status');
   if (location.protocol === 'file:') { st.innerHTML = 'Ouvert sans le programme : seul le <b class="ok">mode essai</b> marche.'; return; }
-  st.innerHTML = (wsUp ? '<b class="ok">●</b> Programme lancé' : '<b class="ko">●</b> Programme arrêté') + '<br>' + liveState;
+  st.innerHTML = (wsUp ? '<b class="ok">●</b> Programme lancé' : '<b class="ko">●</b> Programme arrêté') + '<br>' + liveState
+    + (got ? `<br>${got} commentaire${got > 1 ? 's' : ''} reçu${got > 1 ? 's' : ''}. Dernier : ` : '');
+  if (got) st.appendChild(document.createTextNode(lastChat.slice(0, 80)));
 }
 function openWs() {
   if (location.protocol === 'file:') { status(); return; }
@@ -341,7 +342,7 @@ function openWs() {
   ws.onclose = () => { wsUp = false; status(); setTimeout(openWs, 2000); };
   ws.onmessage = e => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === 'chat') onComment({ source: 'live', user: m.user || {}, comment: m.comment });
+    if (m.type === 'chat') { got++; lastChat = `${(m.user && (m.user.uniqueId || m.user.nickname)) || '?'} : ${m.comment}`; status(); onComment({ source: 'live', user: m.user || {}, comment: m.comment }); }
     if (m.type === 'state') { liveState = m.text; status(); }
   };
 }

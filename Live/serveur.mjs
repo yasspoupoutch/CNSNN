@@ -25,7 +25,11 @@ async function connect(u) {
   if (conn) { try { conn.disconnect(); } catch {} conn = null; }
   const c = new TikTokLiveConnection(user, { processInitialData: false });
   conn = c;
-  c.on(WebcastEvent.CHAT, d => send({ type: 'chat', comment: d.comment, user: { uniqueId: d.user?.uniqueId, nickname: d.user?.nickname } }));
+  c.on(WebcastEvent.CHAT, d => {
+    const u = { uniqueId: d.user?.uniqueId, nickname: d.user?.nickname };
+    console.log(new Date().toLocaleTimeString('fr-FR'), `💬 ${u.uniqueId || u.nickname || '?'} : ${d.comment}`);
+    send({ type: 'chat', comment: d.comment, user: u });
+  });
   c.on(ControlEvent.DISCONNECTED, () => { if (conn !== c) return; setState(`Live de @${user} terminé ou coupé. Nouvel essai dans 20 s…`); retry = setTimeout(() => connect(), 20000); });
   c.on(WebcastEvent.STREAM_END, () => { if (conn !== c) return; setState(`Live de @${user} terminé.`); });
   setState(`Connexion au live de @${user}…`);
@@ -34,6 +38,7 @@ async function connect(u) {
     if (conn === c) setState(`✅ Commentaires du live de @${user} reçus`);
   } catch (e) {
     if (conn !== c) return;
+    console.log('   détail :', e?.name, e?.message);
     const offline = /offline|not live|UserOffline|Room ID/i.test(String(e?.name) + String(e?.message));
     setState(offline ? `En attente : @${user} n'est pas encore en live. Lance ton live, le jeu le trouvera tout seul (nouvel essai dans 20 s)…` : `Connexion impossible (${String(e?.message || e).slice(0, 120)}). Nouvel essai dans 20 s…`);
     retry = setTimeout(() => connect(), 20000);
