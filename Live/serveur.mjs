@@ -61,6 +61,9 @@ server.listen(PORT, '127.0.0.1', () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n  CNSNN Live est lancé : ${url}\n  Laisse cette fenêtre ouverte pendant le live. Pour arrêter : ferme-la.\n`);
   // Ouvre la fenêtre des réglages ; le bouton « Ouvrir l'écran du jeu » ouvre ensuite la fenêtre verticale à filmer.
-  if (!process.env.NO_OPEN) exec(process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`);
+  // Sur Windows on force Edge : ses voix « Natural » sortent du navigateur lui-même, donc LIVE Studio les capte avec la fenêtre.
+  // (Les voix de Chrome passent par Windows et peuvent échapper à la capture.)
+  const open = () => exec(process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`);
+  if (!process.env.NO_OPEN) process.platform === 'win32' ? exec(`start msedge "${url}"`, e => e && open()) : open();
   connect();
 });
