@@ -26,9 +26,11 @@ async function connect(u) {
   const c = new TikTokLiveConnection(user, { processInitialData: false });
   conn = c;
   c.on(WebcastEvent.CHAT, d => {
-    const u = { uniqueId: d.user?.uniqueId, nickname: d.user?.nickname };
-    console.log(new Date().toLocaleTimeString('fr-FR'), `💬 ${u.uniqueId || u.nickname || '?'} : ${d.comment}`);
-    send({ type: 'chat', comment: d.comment, user: u });
+    // Version 2.5 : le texte est dans « content » et le @pseudo dans « displayId » (anciennes versions : comment, uniqueId).
+    const u = { uniqueId: d.user?.uniqueId || d.user?.displayId, nickname: d.user?.nickname };
+    const text = d.content ?? d.comment ?? '';
+    console.log(new Date().toLocaleTimeString('fr-FR'), `💬 ${u.nickname || u.uniqueId || '?'} : ${text}`);
+    send({ type: 'chat', comment: text, user: u });
   });
   c.on(ControlEvent.DISCONNECTED, () => { if (conn !== c) return; setState(`Live de @${user} terminé ou coupé. Nouvel essai dans 20 s…`); retry = setTimeout(() => connect(), 20000); });
   c.on(WebcastEvent.STREAM_END, () => { if (conn !== c) return; setState(`Live de @${user} terminé.`); });
