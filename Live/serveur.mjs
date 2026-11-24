@@ -60,8 +60,7 @@ wss.on('connection', ws => {
 server.listen(PORT, '127.0.0.1', () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n  CNSNN Live est lancé : ${url}\n  Laisse cette fenêtre ouverte pendant le live. Pour arrêter : ferme-la.\n`);
-  // Sur Windows, Edge ouvre le jeu dans une fenêtre verticale sans barre d'adresse : facile à capturer dans LIVE Studio.
-  const open = () => exec(process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`);
-  if (!process.env.NO_OPEN) process.platform === 'win32' ? exec(`start msedge --app=${url} --window-size=608,1080`, e => e && open()) : open();
+  // Ouvre la fenêtre des réglages ; le bouton « Ouvrir l'écran du jeu » ouvre ensuite la fenêtre verticale à filmer.
+  if (!process.env.NO_OPEN) exec(process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`);
   connect();
 });

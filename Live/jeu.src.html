@@ -97,6 +97,11 @@ html, body { margin: 0; height: 100%; background: #06070c; overflow: hidden; col
 #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); z-index: 10; cursor: pointer; }
 #start div { padding: 26px 40px; border-radius: 999px; background: linear-gradient(var(--gold-top), var(--gold-bot)); color: #1a1406; font-weight: 800; font-size: 22px; }
 #start[hidden] { display: none; }
+body.screen #panel { display: none; }
+body.screen { background: linear-gradient(90deg, #1b1840, #06070c 50%, #04262b); }
+body.control { overflow: auto; background: #121426; }
+body.control #stage, body.control #start { display: none; }
+body.control #panel { position: static; margin: 24px auto; width: min(420px, calc(100% - 32px)); max-height: none; }
 </style>
 </head>
 <body>
@@ -125,6 +130,7 @@ html, body { margin: 0; height: 100%; background: #06070c; overflow: hidden; col
 <div id="panel">
   <h4>CNSNN Live · réglages</h4>
   <div class="st" id="status">Connexion…</div>
+  <button class="main" id="open">Ouvrir l'écran du jeu</button>
   <label for="user">Ton compte TikTok</label>
   <input id="user" value="jeucnsnn" autocomplete="off">
   <button class="main" id="connect">Lire les commentaires de mon live</button>
@@ -139,7 +145,7 @@ html, body { margin: 0; height: 100%; background: #06070c; overflow: hidden; col
   <button id="fit">Mettre la fenêtre en vertical (9:16)</button>
   <button id="skip">Passer au mot suivant</button>
   <button id="reset">Remettre le classement à zéro</button>
-  <small>Ce panneau se cache tout seul quand la souris ne bouge plus. Dans LIVE Studio, capture seulement la partie verticale du jeu.</small>
+  <small>Dans LIVE Studio, ajoute une capture de la fenêtre « CNSNN écran du live », pas de celle-ci. Cette fenêtre de réglages n'est jamais filmée.</small>
 </div>
 
 <script>
@@ -360,28 +366,75 @@ $('test').onkeydown = e => { if (e.key === 'Enter' && e.target.value.trim()) { o
 $('skip').onclick = () => { if (phase === 'play') endRound(null); else newRound(); };
 $('reset').onclick = () => { if (confirm('Remettre le classement à zéro ?')) { scores = {}; roundNo = 0; lastLeader = null; store.set('scores', scores); store.set('round', 0); renderBoard(); } };
 
-// ---- Layout and panel auto-hide.
+// ---- Two windows: the control page (réglages, never filmed) and the game screen (?ecran, filmed by LIVE Studio).
+const SCREEN = new URLSearchParams(location.search).has('ecran') || location.protocol === 'file:';
+const CH = 'BroadcastChannel' in window ? new BroadcastChannel('cnsnn-live') : null;
+const post = m => CH && CH.postMessage(m);
+function doReset() { scores = {}; roundNo = 0; lastLeader = null; store.set('scores', scores); store.set('round', 0); renderBoard(); }
+
 function scale() {
-  const s = Math.min(innerWidth / 1080, innerHeight / 1920);
+  // Fit inside the window; when the window is almost 9:16, fill it completely (a few edge pixels cropped) so no band shows.
+  const a = innerWidth / 1080, b = innerHeight / 1920, s = Math.max(a, b) / Math.min(a, b) < 1.08 ? Math.max(a, b) : Math.min(a, b);
   $('stage').style.transform = `scale(${s}) translate(-50%, -50%)`;
 }
-addEventListener('resize', scale); scale();
-// The window itself takes the exact 9:16 shape, as tall as the screen: LIVE Studio then captures it with no bars and as sharp as possible.
+// The game window takes the exact 9:16 shape, as tall as the screen: LIVE Studio then films it with no bars and as sharp as possible.
 function fit916() {
   const cw = outerWidth - innerWidth, ch = outerHeight - innerHeight, h = screen.availHeight;
   const w = Math.round((h - ch) * 9 / 16) + cw;
   try { moveTo(screen.availLeft || 0, screen.availTop || 0); resizeTo(w, h); } catch {}
-  setTimeout(() => { if (Math.abs(innerWidth / innerHeight - 9 / 16) > .02) $('status').insertAdjacentHTML('beforeend', '<br>Fenêtre pas au bon format : quitte le plein écran puis réessaie.'); }, 600);
 }
-$('fit').onclick = fit916;
-setTimeout(fit916, 300);
-let idle; function wake() { $('panel').classList.remove('hide'); clearTimeout(idle); idle = setTimeout(() => { if (!$('panel').contains(document.activeElement)) $('panel').classList.add('hide'); }, 4000); }
-addEventListener('mousemove', wake); addEventListener('keydown', wake); wake();
+function openScreen() {
+  const h = screen.availHeight, w = Math.round((h - 70) * 9 / 16) + 16;
+  const win = window.open('/?ecran', 'cnsnnEcran', `popup=yes,width=${w},height=${h},left=0,top=0`);
+  if (!win) $('status').insertAdjacentHTML('beforeend', '<br><b class="ko">Le navigateur a bloqué la fenêtre : autorise les fenêtres pop-up pour localhost.</b>');
+}
 
-renderBoard(); status(); openWs();
-if ($('mode').value === 'demo') demo.start();
-$('start').onclick = () => { $('start').hidden = true; say('C\'est parti ! Retrouve le mot grâce à ses consonnes.', { interrupt: true }); nextTimer = setTimeout(newRound, 3500); };
-if (new URLSearchParams(location.search).has('auto')) { $('start').hidden = true; newRound(); }
+if (SCREEN) {
+  document.title = 'CNSNN écran du live';
+  document.body.classList.add('screen');
+  addEventListener('resize', scale); scale();
+  setTimeout(fit916, 300);
+  $('fit').onclick = fit916;
+  $('reset').onclick = () => { if (confirm('Remettre le classement à zéro ?')) doReset(); };
+  // Settings sent by the control window.
+  const sync = () => post({ type: 'sync', html: $('status').innerHTML, mode: $('mode').value, dur: $('dur').value, voice: voice && voice.name, user: $('user').value });
+  const oldStatus = status; status = function () { oldStatus(); sync(); };
+  if (CH) CH.onmessage = ({ data: m }) => {
+    if (m.cmd === 'hello') sync();
+    if (m.cmd === 'connect') { $('user').value = m.user; $('connect').onclick(); }
+    if (m.cmd === 'mode') { $('mode').value = m.v; $('mode').onchange(); sync(); }
+    if (m.cmd === 'dur') { $('dur').value = m.v; $('dur').onchange(); }
+    if (m.cmd === 'voice') { $('voiceSel').value = m.v; $('voiceSel').onchange({ target: { value: m.v } }); }
+    if (m.cmd === 'test') onComment({ source: 'test', user: { uniqueId: 'test', nickname: 'Test' }, comment: m.v });
+    if (m.cmd === 'skip') $('skip').onclick();
+    if (m.cmd === 'reset') doReset();
+    if (m.cmd === 'fit') fit916();
+  };
+  renderBoard(); status(); openWs();
+  if ($('mode').value === 'demo') demo.start();
+  $('start').onclick = () => { $('start').hidden = true; say('C\'est parti ! Retrouve le mot grâce à ses consonnes.', { interrupt: true }); nextTimer = setTimeout(newRound, 3500); };
+  if (new URLSearchParams(location.search).has('auto')) { $('start').hidden = true; newRound(); }
+} else {
+  // Control window: same buttons, they drive the game screen.
+  document.title = 'CNSNN Live · réglages';
+  document.body.classList.add('control');
+  $('status').innerHTML = 'Ouvre l\'écran du jeu avec le bouton ci-dessous.';
+  $('connect').onclick = () => post({ cmd: 'connect', user: $('user').value.replace(/^@/, '').trim() });
+  $('mode').onchange = () => { store.set('mode', $('mode').value); post({ cmd: 'mode', v: $('mode').value }); };
+  $('dur').onchange = () => { store.set('dur', +$('dur').value); post({ cmd: 'dur', v: $('dur').value }); };
+  $('voiceSel').onchange = e => { store.set('voice', e.target.value); post({ cmd: 'voice', v: e.target.value }); };
+  $('test').onkeydown = e => { if (e.key === 'Enter' && e.target.value.trim()) { post({ cmd: 'test', v: e.target.value }); e.target.value = ''; } };
+  $('skip').onclick = () => post({ cmd: 'skip' });
+  $('reset').onclick = () => { if (confirm('Remettre le classement à zéro ?')) post({ cmd: 'reset' }); };
+  $('fit').onclick = () => post({ cmd: 'fit' });
+  $('open').onclick = openScreen;
+  if (CH) CH.onmessage = ({ data: m }) => {
+    if (m.type !== 'sync') return;
+    $('status').innerHTML = m.html; $('mode').value = m.mode; $('dur').value = m.dur; $('user').value = m.user;
+    if (m.voice) $('voiceSel').value = m.voice;
+  };
+  post({ cmd: 'hello' });
+}
 </script>
 </body>
 </html>
