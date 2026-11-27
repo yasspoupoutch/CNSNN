@@ -140,6 +140,73 @@ extension View {
     }
 }
 
+/// The Sprint notes, made in code (no sound file; Android's SprintSound makes the same ones): each word
+/// in a row plays a note one step higher on a bright pentatonic scale, a mistake a soft low note, ×5
+/// and ×8 a small chord, a beaten record three rising notes. Ambient: silent with the ring/silent
+/// switch, mixed with music.
+@MainActor enum SprintSound {
+    /// Steps of the scale, in semitones above C5.
+    static let scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28]
+    private static var cache: [String: Data] = [:]
+    private static var players: [AVAudioPlayer] = []
+
+    /// The n-th word in a row (1 for the first).
+    static func note(_ n: Int) { play("n\(n)") { tone(pitch(n), at: 0, length: 0.35, volume: 0.16) } }
+    static func chord(_ n: Int) {
+        let base = scale[min(max(n, 1), scale.count) - 1] - 12
+        play("c\(n)") { [0, 4, 7, 12].enumerated().flatMap { index, step in tone(hz(base + step), at: Double(index) * 0.035, length: 0.7, volume: 0.07) } }
+    }
+    static func record() { play("r") { [0, 4, 7, 12].enumerated().flatMap { index, step in tone(hz(step + 7), at: Double(index) * 0.09, length: 0.45, volume: 0.11) } } }
+    static func miss() { play("m") { tone(150, at: 0, length: 0.25, volume: 0.18) } }
+
+    private static func pitch(_ n: Int) -> Double { hz(scale[min(max(n, 1), scale.count) - 1]) }
+    private static func hz(_ semitones: Int) -> Double { 523.25 * pow(2, Double(semitones) / 12) }
+
+    /// One note: a sine and a soft triangle an octave up, a quick attack and a bell-like fade. The
+    /// result is a list of (sample index, value) pairs mixed by `play`.
+    private static func tone(_ frequency: Double, at offset: Double, length: Double, volume: Double) -> [(Int, Double)] {
+        let rate = 44_100.0, start = Int(offset * rate), count = Int((length + 0.05) * rate)
+        return (0..<count).map { index in
+            let time = Double(index) / rate
+            let envelope = time < 0.008 ? time / 0.008 : max(0, exp(log(0.0001 / 1) * (time - 0.008) / (length - 0.008)))
+            let phase = 2 * frequency * time
+            let triangle = 2 * abs(2 * (phase - floor(phase + 0.5))) - 1
+            return (start + index, volume * envelope * (sin(2 * .pi * frequency * time) + 0.18 * triangle))
+        }
+    }
+
+    private static func play(_ key: String, make: () -> [(Int, Double)]) {
+        let data: Data
+        if let cached = cache[key] {
+            data = cached
+        } else {
+            let samples = make()
+            var mix = [Double](repeating: 0, count: (samples.map(\.0).max() ?? 0) + 1)
+            for (index, value) in samples { mix[index] += value }
+            data = wav(mix.map { Int16(max(-1, min(1, $0)) * 32_767) })
+            cache[key] = data
+        }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: .mixWithOthers)
+        guard let player = try? AVAudioPlayer(data: data) else { return }
+        player.play()
+        players.removeAll { !$0.isPlaying }
+        players.append(player)
+    }
+
+    /// 16-bit mono PCM at 44.1 kHz in a WAV container, which AVAudioPlayer reads from memory.
+    private static func wav(_ samples: [Int16]) -> Data {
+        var data = Data()
+        func put<T>(_ value: T) { withUnsafeBytes(of: value) { data.append(contentsOf: $0) } }
+        let bytes = UInt32(samples.count * 2)
+        data.append(contentsOf: Array("RIFF".utf8)); put(UInt32(36 + bytes).littleEndian); data.append(contentsOf: Array("WAVEfmt ".utf8))
+        put(UInt32(16).littleEndian); put(UInt16(1).littleEndian); put(UInt16(1).littleEndian)
+        put(UInt32(44_100).littleEndian); put(UInt32(88_200).littleEndian); put(UInt16(2).littleEndian); put(UInt16(16).littleEndian)
+        data.append(contentsOf: Array("data".utf8)); put(bytes.littleEndian)
+        for sample in samples { put(sample.littleEndian) }
+        return data
+    }
+}
+
 enum Vowels {
     static func contains(_ character: Character) -> Bool {
         let folded = String(character).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR")).uppercased()
