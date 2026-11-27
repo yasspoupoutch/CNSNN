@@ -265,7 +265,7 @@ struct GameView: View {
             }
             if session.result == nil, TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 56)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)
@@ -700,7 +700,9 @@ struct AnswerLetters: View {
             letter.foregroundColor = wrong ? Palette.red : Vowels.contains(character) ? Palette.accent : Palette.foreground
             line += letter
         }
-        return Text(line).tracking(4.4).scaledFont(30, .medium)
+        // The letter spacing does not shrink with the letters: a long expression gets a tighter one, so it
+        // shrinks less and stays whole on the line (« QUESTCEQUONAFAITAUBONDIEU »).
+        return Text(line).tracking(answer.count > 14 ? 1.5 : 4.4).scaledFont(30, .medium)
     }
 }
 

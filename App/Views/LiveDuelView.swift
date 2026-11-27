@@ -351,7 +351,7 @@ struct WordsBoard: View {
             if !answer.isEmpty { AnswerLetters(answer: answer, wrong: answerWrong, cursor: cursor, place: placeCursor) }
             if TypedAnswer(text: answer, cursor: cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)
