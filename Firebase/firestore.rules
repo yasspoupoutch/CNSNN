@@ -681,7 +681,10 @@ service cloud.firestore {
   match /tournaments/{week}/players/{uid} {
    allow get, list: if signedIn();
    allow create: if active() && owner(uid) && validWeek(week)
-    && request.resource.data.keys().hasOnly(['uid','name','at']) && request.resource.data.uid == uid
+    && request.resource.data.keys().hasOnly(['uid','name','at','v']) && request.resource.data.uid == uid
+    // From the tournament of 2026-12-07 everyone plays every round (a new bracket): only the apps that
+    // know it ('v' 2) sign up, so every player sees the same bracket.
+    && request.resource.data.get('v', 2) == 2 && (week < '2026-12-07' || 'v' in request.resource.data)
     && request.resource.data.name == get(at('users/' + uid)).data.username && request.resource.data.at == request.time
     && request.time < tournamentStart(week) && request.time >= tournamentStart(week) - duration.value(7, 'd');
    // Withdrawn before the draw, or with the account.

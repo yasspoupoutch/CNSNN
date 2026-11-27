@@ -836,7 +836,7 @@ class CloudRepository(
         tournament(week).collection("players").document(uid).get(Source.SERVER).await().exists()
     suspend fun signUp(week: String, uid: String, username: String) {
         val ref = tournament(week).collection("players").document(uid)
-        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp())))) throw CloudError(CloudError.Kind.OFFLINE)
+        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp(), "v" to 2)))) throw CloudError(CloudError.Kind.OFFLINE)
     }
     suspend fun withdraw(week: String, uid: String) {
         if (!awaitWrite(tournament(week).collection("players").document(uid).delete())) throw CloudError(CloudError.Kind.OFFLINE)

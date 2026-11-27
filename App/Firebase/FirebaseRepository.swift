@@ -1070,7 +1070,7 @@ enum DailyGuesses {
     }
     func signUp(week: String, uid: String, username: String) async throws {
         let ref = tournament(week).collection("players").document(uid)
-        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp(), "v": 2], completion: done) }) else { throw CloudError.offline }
     }
     func withdraw(week: String, uid: String) async throws {
         let ref = tournament(week).collection("players").document(uid)
