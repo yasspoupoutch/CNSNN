@@ -3755,7 +3755,7 @@ public enum ExtraCards {
         Card(id: "seed-marioncotillard", wordFull: "Marion Cotillard", hint: "Oscar pour son rôle d’Édith Piaf.", category: .cinema, difficulty: .medium),
         Card(id: "seed-audreytautou", wordFull: "Audrey Tautou", hint: "Elle a joué Amélie Poulain.", category: .cinema, difficulty: .medium),
         Card(id: "seed-sophiemarceau", wordFull: "Sophie Marceau", hint: "Révélée dans La Boum.", category: .cinema, difficulty: .medium),
-        Card(id: "seed-brigittebardot", wordFull: "Brigitte Bardot", hint: "Icône de Et Dieu… créa la femme, connue par ses initiales BB.", category: .cinema, difficulty: .medium),
+        Card(id: "seed-brigittebardot", wordFull: "Brigitte Bardot", hint: "Une star des années 60 connue par ses initiales BB.", category: .cinema, difficulty: .medium),
         Card(id: "seed-alaindelon", wordFull: "Alain Delon", hint: "Le Samouraï, star des années 60.", category: .cinema, difficulty: .medium),
         Card(id: "seed-jeanpaulbelmondo", wordFull: "Jean-Paul Belmondo", hint: "Bébel, le Magnifique.", category: .cinema, difficulty: .medium),
         Card(id: "seed-bourvil", wordFull: "Bourvil", hint: "Le partenaire de De Funès dans La Grande Vadrouille.", category: .cinema, difficulty: .hard),
@@ -3771,7 +3771,7 @@ public enum ExtraCards {
         Card(id: "seed-johnnydepp", wordFull: "Johnny Depp", hint: "Jack Sparrow dans Pirates des Caraïbes.", category: .cinema, difficulty: .easy),
         Card(id: "seed-willsmith", wordFull: "Will Smith", hint: "Agent J dans Men in Black.", category: .cinema, difficulty: .easy),
         Card(id: "seed-tomhanks", wordFull: "Tom Hanks", hint: "Forrest Gump.", category: .cinema, difficulty: .medium),
-        Card(id: "seed-morganfreeman", wordFull: "Morgan Freeman", hint: "Sa voix grave a joué Dieu et Nelson Mandela.", category: .cinema, difficulty: .medium),
+        Card(id: "seed-morganfreeman", wordFull: "Morgan Freeman", hint: "L’acteur à la voix grave qui a joué Nelson Mandela dans Invictus.", category: .cinema, difficulty: .medium),
         Card(id: "seed-robertdeniro", wordFull: "Robert De Niro", hint: "Taxi Driver et Le Parrain 2.", category: .cinema, difficulty: .medium),
         Card(id: "seed-alpacino", wordFull: "Al Pacino", hint: "Michael Corleone dans Le Parrain.", category: .cinema, difficulty: .medium),
         Card(id: "seed-merylstreep", wordFull: "Meryl Streep", hint: "La reine des Oscars, dans Le Diable s’habille en Prada.", category: .cinema, difficulty: .hard),
@@ -3809,25 +3809,15 @@ public enum ExtraCards {
         Card(id: "seed-extraterrestre", wordFull: "Extraterrestre", hint: "Un petit homme vert venu d’une autre planète.", category: .general, difficulty: .easy),
         Card(id: "seed-soucoupevolante", wordFull: "Soucoupe volante", hint: "Le vaisseau rond des martiens.", category: .general, difficulty: .medium),
         Card(id: "seed-hera", wordFull: "Héra", hint: "L’épouse de Zeus.", category: .general, difficulty: .hard),
-        Card(id: "seed-poseidon", wordFull: "Poséidon", hint: "Le dieu grec de la mer, armé d’un trident.", category: .general, difficulty: .medium),
-        Card(id: "seed-hades", wordFull: "Hadès", hint: "Le dieu grec des Enfers.", category: .general, difficulty: .medium),
-        Card(id: "seed-athena", wordFull: "Athéna", hint: "La déesse grecque de la sagesse, protectrice d’Athènes.", category: .general, difficulty: .hard),
-        Card(id: "seed-apollon", wordFull: "Apollon", hint: "Le dieu grec du soleil et des arts.", category: .general, difficulty: .hard),
-        Card(id: "seed-aphrodite", wordFull: "Aphrodite", hint: "La déesse grecque de l’amour.", category: .general, difficulty: .medium),
-        Card(id: "seed-ares", wordFull: "Arès", hint: "Le dieu grec de la guerre.", category: .general, difficulty: .hard),
-        Card(id: "seed-dionysos", wordFull: "Dionysos", hint: "Le dieu grec du vin et de la fête.", category: .general, difficulty: .hard),
         Card(id: "seed-ulysse", wordFull: "Ulysse", hint: "Le héros de l’Odyssée et du cheval de Troie.", category: .general, difficulty: .medium),
         Card(id: "seed-achille", wordFull: "Achille", hint: "Un héros grec invincible, sauf au talon.", category: .general, difficulty: .medium),
         Card(id: "seed-persee", wordFull: "Persée", hint: "Il a coupé la tête de Méduse.", category: .general, difficulty: .hard),
         Card(id: "seed-minotaure", wordFull: "Minotaure", hint: "Un monstre mi-homme mi-taureau du labyrinthe.", category: .general, difficulty: .medium),
         Card(id: "seed-pegase", wordFull: "Pégase", hint: "Un cheval ailé.", category: .general, difficulty: .medium),
-        Card(id: "seed-cerbere", wordFull: "Cerbère", hint: "Le chien à trois têtes qui garde les Enfers.", category: .general, difficulty: .hard),
         Card(id: "seed-cyclope", wordFull: "Cyclope", hint: "Un géant à un seul œil.", category: .general, difficulty: .medium),
         Card(id: "seed-centaure", wordFull: "Centaure", hint: "Mi-homme, mi-cheval.", category: .general, difficulty: .hard),
         Card(id: "seed-phenix", wordFull: "Phénix", hint: "Un oiseau qui renaît de ses cendres.", category: .general, difficulty: .medium),
         Card(id: "seed-griffon", wordFull: "Griffon", hint: "Mi-aigle, mi-lion.", category: .general, difficulty: .hard),
-        Card(id: "seed-odin", wordFull: "Odin", hint: "Le roi des dieux nordiques, père de Thor.", category: .general, difficulty: .hard),
-        Card(id: "seed-loki", wordFull: "Loki", hint: "Le dieu nordique de la ruse et des farces.", category: .general, difficulty: .medium),
         Card(id: "seed-excalibur", wordFull: "Excalibur", hint: "L’épée plantée dans la pierre.", category: .general, difficulty: .medium),
         Card(id: "seed-merlin", wordFull: "Merlin", hint: "L’enchanteur du roi Arthur.", category: .general, difficulty: .easy),
         Card(id: "seed-roiarthur", wordFull: "Roi Arthur", hint: "Il a retiré Excalibur de la pierre.", category: .general, difficulty: .medium),
@@ -4034,9 +4024,6 @@ public enum ExtraCards {
         Card(id: "seed-teletravail", wordFull: "Télétravail", hint: "Travailler depuis chez soi.", category: .general, difficulty: .medium),
         Card(id: "seed-codesecret", wordFull: "Code secret", hint: "Quatre chiffres à taper pour payer.", category: .general, difficulty: .medium),
         Card(id: "seed-distributeurdebillets", wordFull: "Distributeur de billets", hint: "On y retire de l’argent avec sa carte.", category: .objects, difficulty: .hard),
-    ]
-
-    private static let part10: [Card] = [
         Card(id: "seed-chequier", wordFull: "Chéquier", hint: "Un carnet pour payer par chèque.", category: .objects, difficulty: .hard),
         Card(id: "seed-livret", wordFull: "Livret", hint: "Un compte d’épargne à la banque, comme le A.", category: .general, difficulty: .hard),
         Card(id: "seed-lingot", wordFull: "Lingot", hint: "Une barre d’or.", category: .objects, difficulty: .medium),
@@ -4047,6 +4034,9 @@ public enum ExtraCards {
         Card(id: "seed-perle", wordFull: "Perle", hint: "Elle se forme dans une huître.", category: .objects, difficulty: .easy),
         Card(id: "seed-amethyste", wordFull: "Améthyste", hint: "Une pierre violette.", category: .objects, difficulty: .hard),
         Card(id: "seed-turquoise", wordFull: "Turquoise", hint: "Une pierre et une couleur bleu-vert.", category: .general, difficulty: .medium),
+    ]
+
+    private static let part10: [Card] = [
         Card(id: "seed-jade", wordFull: "Jade", hint: "Une pierre verte très prisée en Chine.", category: .objects, difficulty: .hard),
         Card(id: "seed-ambre", wordFull: "Ambre", hint: "Une résine fossile couleur miel.", category: .objects, difficulty: .hard),
         Card(id: "seed-cristal", wordFull: "Cristal", hint: "Un verre très pur qui tinte.", category: .objects, difficulty: .medium),
@@ -4105,7 +4095,7 @@ public enum ExtraCards {
         Card(id: "seed-fougere", wordFull: "Fougère", hint: "Une plante des sous-bois aux feuilles découpées.", category: .general, difficulty: .medium),
         Card(id: "seed-lierre", wordFull: "Lierre", hint: "Une plante grimpante qui s’accroche aux murs.", category: .general, difficulty: .medium),
         Card(id: "seed-ortie", wordFull: "Ortie", hint: "Elle pique quand on la touche.", category: .general, difficulty: .easy),
-        Card(id: "seed-trefle", wordFull: "Trèfle", hint: "Celui à quatre feuilles porte bonheur.", category: .general, difficulty: .medium),
+        Card(id: "seed-trefle", wordFull: "Trèfle", hint: "Une petite plante à trois feuilles, parfois quatre.", category: .general, difficulty: .medium),
         Card(id: "seed-bleuet", wordFull: "Bleuet", hint: "Une fleur bleue des champs de blé.", category: .general, difficulty: .hard),
         Card(id: "seed-lavande", wordFull: "Lavande", hint: "Une fleur violette de Provence qui sent bon.", category: .general, difficulty: .medium),
         Card(id: "seed-jonquille", wordFull: "Jonquille", hint: "Une fleur jaune du printemps.", category: .general, difficulty: .hard),
@@ -4437,9 +4427,6 @@ public enum ExtraCards {
         Card(id: "seed-fairelafete", wordFull: "Faire la fête", hint: "S’amuser toute la nuit avec ses amis.", category: .general, difficulty: .easy),
         Card(id: "seed-prendrelebus", wordFull: "Prendre le bus", hint: "Monter dans le véhicule de transport en commun, à l’arrêt.", category: .general, difficulty: .easy),
         Card(id: "seed-prendreunedouche", wordFull: "Prendre une douche", hint: "Se laver debout sous le jet d’eau.", category: .general, difficulty: .easy),
-    ]
-
-    private static let part11: [Card] = [
         Card(id: "seed-avoirfaim", wordFull: "Avoir faim", hint: "Quand le ventre gargouille.", category: .general, difficulty: .easy),
         Card(id: "seed-avoirpeur", wordFull: "Avoir peur", hint: "Quand on tremble devant un film d’horreur.", category: .general, difficulty: .easy),
         Card(id: "seed-avoirdelachance", wordFull: "Avoir de la chance", hint: "Gagner au loto, par exemple.", category: .general, difficulty: .medium),
@@ -4450,6 +4437,9 @@ public enum ExtraCards {
         Card(id: "seed-signer", wordFull: "Signer", hint: "Écrire son nom au bas d’un contrat.", category: .general, difficulty: .medium),
         Card(id: "seed-voter", wordFull: "Voter", hint: "Mettre un bulletin dans l’urne.", category: .general, difficulty: .medium),
         Card(id: "seed-elire", wordFull: "Élire", hint: "Choisir par un vote.", category: .general, difficulty: .hard),
+    ]
+
+    private static let part11: [Card] = [
         Card(id: "seed-juger", wordFull: "Juger", hint: "Ce que fait le tribunal.", category: .general, difficulty: .medium),
         Card(id: "seed-condamner", wordFull: "Condamner", hint: "Déclarer coupable et punir.", category: .general, difficulty: .hard),
         Card(id: "seed-arreter", wordFull: "Arrêter", hint: "Ce que fait la police avec un voleur.", category: .general, difficulty: .medium),

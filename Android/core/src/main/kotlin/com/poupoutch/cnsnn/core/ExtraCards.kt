@@ -3754,7 +3754,7 @@ object ExtraCards {
         Card("seed-marioncotillard", "Marion Cotillard", "Oscar pour son rôle d’Édith Piaf.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-audreytautou", "Audrey Tautou", "Elle a joué Amélie Poulain.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-sophiemarceau", "Sophie Marceau", "Révélée dans La Boum.", Category.CINEMA, Difficulty.MEDIUM),
-        Card("seed-brigittebardot", "Brigitte Bardot", "Icône de Et Dieu… créa la femme, connue par ses initiales BB.", Category.CINEMA, Difficulty.MEDIUM),
+        Card("seed-brigittebardot", "Brigitte Bardot", "Une star des années 60 connue par ses initiales BB.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-alaindelon", "Alain Delon", "Le Samouraï, star des années 60.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-jeanpaulbelmondo", "Jean-Paul Belmondo", "Bébel, le Magnifique.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-bourvil", "Bourvil", "Le partenaire de De Funès dans La Grande Vadrouille.", Category.CINEMA, Difficulty.HARD),
@@ -3770,7 +3770,7 @@ object ExtraCards {
         Card("seed-johnnydepp", "Johnny Depp", "Jack Sparrow dans Pirates des Caraïbes.", Category.CINEMA, Difficulty.EASY),
         Card("seed-willsmith", "Will Smith", "Agent J dans Men in Black.", Category.CINEMA, Difficulty.EASY),
         Card("seed-tomhanks", "Tom Hanks", "Forrest Gump.", Category.CINEMA, Difficulty.MEDIUM),
-        Card("seed-morganfreeman", "Morgan Freeman", "Sa voix grave a joué Dieu et Nelson Mandela.", Category.CINEMA, Difficulty.MEDIUM),
+        Card("seed-morganfreeman", "Morgan Freeman", "L’acteur à la voix grave qui a joué Nelson Mandela dans Invictus.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-robertdeniro", "Robert De Niro", "Taxi Driver et Le Parrain 2.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-alpacino", "Al Pacino", "Michael Corleone dans Le Parrain.", Category.CINEMA, Difficulty.MEDIUM),
         Card("seed-merylstreep", "Meryl Streep", "La reine des Oscars, dans Le Diable s’habille en Prada.", Category.CINEMA, Difficulty.HARD),
@@ -3808,25 +3808,15 @@ object ExtraCards {
         Card("seed-extraterrestre", "Extraterrestre", "Un petit homme vert venu d’une autre planète.", Category.GENERAL, Difficulty.EASY),
         Card("seed-soucoupevolante", "Soucoupe volante", "Le vaisseau rond des martiens.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-hera", "Héra", "L’épouse de Zeus.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-poseidon", "Poséidon", "Le dieu grec de la mer, armé d’un trident.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-hades", "Hadès", "Le dieu grec des Enfers.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-athena", "Athéna", "La déesse grecque de la sagesse, protectrice d’Athènes.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-apollon", "Apollon", "Le dieu grec du soleil et des arts.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-aphrodite", "Aphrodite", "La déesse grecque de l’amour.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-ares", "Arès", "Le dieu grec de la guerre.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-dionysos", "Dionysos", "Le dieu grec du vin et de la fête.", Category.GENERAL, Difficulty.HARD),
         Card("seed-ulysse", "Ulysse", "Le héros de l’Odyssée et du cheval de Troie.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-achille", "Achille", "Un héros grec invincible, sauf au talon.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-persee", "Persée", "Il a coupé la tête de Méduse.", Category.GENERAL, Difficulty.HARD),
         Card("seed-minotaure", "Minotaure", "Un monstre mi-homme mi-taureau du labyrinthe.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-pegase", "Pégase", "Un cheval ailé.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-cerbere", "Cerbère", "Le chien à trois têtes qui garde les Enfers.", Category.GENERAL, Difficulty.HARD),
         Card("seed-cyclope", "Cyclope", "Un géant à un seul œil.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-centaure", "Centaure", "Mi-homme, mi-cheval.", Category.GENERAL, Difficulty.HARD),
         Card("seed-phenix", "Phénix", "Un oiseau qui renaît de ses cendres.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-griffon", "Griffon", "Mi-aigle, mi-lion.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-odin", "Odin", "Le roi des dieux nordiques, père de Thor.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-loki", "Loki", "Le dieu nordique de la ruse et des farces.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-excalibur", "Excalibur", "L’épée plantée dans la pierre.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-merlin", "Merlin", "L’enchanteur du roi Arthur.", Category.GENERAL, Difficulty.EASY),
         Card("seed-roiarthur", "Roi Arthur", "Il a retiré Excalibur de la pierre.", Category.GENERAL, Difficulty.MEDIUM),
@@ -4033,9 +4023,6 @@ object ExtraCards {
         Card("seed-teletravail", "Télétravail", "Travailler depuis chez soi.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-codesecret", "Code secret", "Quatre chiffres à taper pour payer.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-distributeurdebillets", "Distributeur de billets", "On y retire de l’argent avec sa carte.", Category.OBJECTS, Difficulty.HARD),
-    )
-
-    private fun part10(): List<Card> = listOf(
         Card("seed-chequier", "Chéquier", "Un carnet pour payer par chèque.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-livret", "Livret", "Un compte d’épargne à la banque, comme le A.", Category.GENERAL, Difficulty.HARD),
         Card("seed-lingot", "Lingot", "Une barre d’or.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -4046,6 +4033,9 @@ object ExtraCards {
         Card("seed-perle", "Perle", "Elle se forme dans une huître.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-amethyste", "Améthyste", "Une pierre violette.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-turquoise", "Turquoise", "Une pierre et une couleur bleu-vert.", Category.GENERAL, Difficulty.MEDIUM),
+    )
+
+    private fun part10(): List<Card> = listOf(
         Card("seed-jade", "Jade", "Une pierre verte très prisée en Chine.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-ambre", "Ambre", "Une résine fossile couleur miel.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-cristal", "Cristal", "Un verre très pur qui tinte.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -4104,7 +4094,7 @@ object ExtraCards {
         Card("seed-fougere", "Fougère", "Une plante des sous-bois aux feuilles découpées.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-lierre", "Lierre", "Une plante grimpante qui s’accroche aux murs.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-ortie", "Ortie", "Elle pique quand on la touche.", Category.GENERAL, Difficulty.EASY),
-        Card("seed-trefle", "Trèfle", "Celui à quatre feuilles porte bonheur.", Category.GENERAL, Difficulty.MEDIUM),
+        Card("seed-trefle", "Trèfle", "Une petite plante à trois feuilles, parfois quatre.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-bleuet", "Bleuet", "Une fleur bleue des champs de blé.", Category.GENERAL, Difficulty.HARD),
         Card("seed-lavande", "Lavande", "Une fleur violette de Provence qui sent bon.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-jonquille", "Jonquille", "Une fleur jaune du printemps.", Category.GENERAL, Difficulty.HARD),
@@ -4436,9 +4426,6 @@ object ExtraCards {
         Card("seed-fairelafete", "Faire la fête", "S’amuser toute la nuit avec ses amis.", Category.GENERAL, Difficulty.EASY),
         Card("seed-prendrelebus", "Prendre le bus", "Monter dans le véhicule de transport en commun, à l’arrêt.", Category.GENERAL, Difficulty.EASY),
         Card("seed-prendreunedouche", "Prendre une douche", "Se laver debout sous le jet d’eau.", Category.GENERAL, Difficulty.EASY),
-    )
-
-    private fun part11(): List<Card> = listOf(
         Card("seed-avoirfaim", "Avoir faim", "Quand le ventre gargouille.", Category.GENERAL, Difficulty.EASY),
         Card("seed-avoirpeur", "Avoir peur", "Quand on tremble devant un film d’horreur.", Category.GENERAL, Difficulty.EASY),
         Card("seed-avoirdelachance", "Avoir de la chance", "Gagner au loto, par exemple.", Category.GENERAL, Difficulty.MEDIUM),
@@ -4449,6 +4436,9 @@ object ExtraCards {
         Card("seed-signer", "Signer", "Écrire son nom au bas d’un contrat.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-voter", "Voter", "Mettre un bulletin dans l’urne.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-elire", "Élire", "Choisir par un vote.", Category.GENERAL, Difficulty.HARD),
+    )
+
+    private fun part11(): List<Card> = listOf(
         Card("seed-juger", "Juger", "Ce que fait le tribunal.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-condamner", "Condamner", "Déclarer coupable et punir.", Category.GENERAL, Difficulty.HARD),
         Card("seed-arreter", "Arrêter", "Ce que fait la police avec un voleur.", Category.GENERAL, Difficulty.MEDIUM),

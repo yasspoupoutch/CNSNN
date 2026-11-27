@@ -2695,7 +2695,7 @@ D	Animaux	Moa	Un oiseau géant disparu de Nouvelle-Zélande.
 D	Animaux	Kéa	Un perroquet des montagnes néo-zélandaises très malin.
 D	Animaux	Léopard de mer	Un phoque prédateur de l’Antarctique.
 D	Animaux	Ratel	Un carnivore intrépide qui pille les ruches.
-# Cartes ajoutées en version 1.5 (2 003 mots) : verbes, adjectifs, expressions, couleurs, métiers, personnages célèbres, marques (nom seulement) et un peu de football facile.
+# Cartes ajoutées en version 1.5 (1 993 mots) : verbes, adjectifs, expressions, couleurs, métiers, personnages célèbres, marques (nom seulement) et un peu de football facile.
 F	Général	Manger	Ce qu’on fait à table avec une fourchette.
 F	Général	Boire	Ce qu’on fait quand on a soif.
 F	Général	Dormir	Ce qu’on fait la nuit, les yeux fermés.
@@ -3726,7 +3726,7 @@ M	Cinéma	Jean Reno	L’acteur de Léon et du Grand Bleu.
 M	Cinéma	Marion Cotillard	Oscar pour son rôle d’Édith Piaf.
 M	Cinéma	Audrey Tautou	Elle a joué Amélie Poulain.
 M	Cinéma	Sophie Marceau	Révélée dans La Boum.
-M	Cinéma	Brigitte Bardot	Icône de Et Dieu… créa la femme, connue par ses initiales BB.
+M	Cinéma	Brigitte Bardot	Une star des années 60 connue par ses initiales BB.
 M	Cinéma	Alain Delon	Le Samouraï, star des années 60.
 M	Cinéma	Jean-Paul Belmondo	Bébel, le Magnifique.
 D	Cinéma	Bourvil	Le partenaire de De Funès dans La Grande Vadrouille.
@@ -3742,7 +3742,7 @@ F	Cinéma	Brad Pitt	La star de Fight Club.
 F	Cinéma	Johnny Depp	Jack Sparrow dans Pirates des Caraïbes.
 F	Cinéma	Will Smith	Agent J dans Men in Black.
 M	Cinéma	Tom Hanks	Forrest Gump.
-M	Cinéma	Morgan Freeman	Sa voix grave a joué Dieu et Nelson Mandela.
+M	Cinéma	Morgan Freeman	L’acteur à la voix grave qui a joué Nelson Mandela dans Invictus.
 M	Cinéma	Robert De Niro	Taxi Driver et Le Parrain 2.
 M	Cinéma	Al Pacino	Michael Corleone dans Le Parrain.
 D	Cinéma	Meryl Streep	La reine des Oscars, dans Le Diable s’habille en Prada.
@@ -3780,25 +3780,15 @@ D	Général	Station spatiale	Thomas Pesquet y a vécu en orbite.
 F	Général	Extraterrestre	Un petit homme vert venu d’une autre planète.
 M	Général	Soucoupe volante	Le vaisseau rond des martiens.
 D	Général	Héra	L’épouse de Zeus.
-M	Général	Poséidon	Le dieu grec de la mer, armé d’un trident.
-M	Général	Hadès	Le dieu grec des Enfers.
-D	Général	Athéna	La déesse grecque de la sagesse, protectrice d’Athènes.
-D	Général	Apollon	Le dieu grec du soleil et des arts.
-M	Général	Aphrodite	La déesse grecque de l’amour.
-D	Général	Arès	Le dieu grec de la guerre.
-D	Général	Dionysos	Le dieu grec du vin et de la fête.
 M	Général	Ulysse	Le héros de l’Odyssée et du cheval de Troie.
 M	Général	Achille	Un héros grec invincible, sauf au talon.
 D	Général	Persée	Il a coupé la tête de Méduse.
 M	Général	Minotaure	Un monstre mi-homme mi-taureau du labyrinthe.
 M	Général	Pégase	Un cheval ailé.
-D	Général	Cerbère	Le chien à trois têtes qui garde les Enfers.
 M	Général	Cyclope	Un géant à un seul œil.
 D	Général	Centaure	Mi-homme, mi-cheval.
 M	Général	Phénix	Un oiseau qui renaît de ses cendres.
 D	Général	Griffon	Mi-aigle, mi-lion.
-D	Général	Odin	Le roi des dieux nordiques, père de Thor.
-M	Général	Loki	Le dieu nordique de la ruse et des farces.
 M	Général	Excalibur	L’épée plantée dans la pierre.
 F	Général	Merlin	L’enchanteur du roi Arthur.
 M	Général	Roi Arthur	Il a retiré Excalibur de la pierre.
@@ -4073,7 +4063,7 @@ D	Général	Lichen	Un mélange d’algue et de champignon sur les rochers.
 M	Général	Fougère	Une plante des sous-bois aux feuilles découpées.
 M	Général	Lierre	Une plante grimpante qui s’accroche aux murs.
 F	Général	Ortie	Elle pique quand on la touche.
-M	Général	Trèfle	Celui à quatre feuilles porte bonheur.
+M	Général	Trèfle	Une petite plante à trois feuilles, parfois quatre.
 D	Général	Bleuet	Une fleur bleue des champs de blé.
 M	Général	Lavande	Une fleur violette de Provence qui sent bon.
 D	Général	Jonquille	Une fleur jaune du printemps.
