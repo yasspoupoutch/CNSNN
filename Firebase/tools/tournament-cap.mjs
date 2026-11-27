@@ -1,7 +1,7 @@
 // Tournament of 2026-11-30 (old bracket, before everyone plays): with a number of players that is not a
 // power of 2, the apps of that time leave many players alone in round 1 ("contre personne"). Run once
 // right after sign-ups close (Monday 08:00 UTC), it keeps the first signed up, as many as the largest
-// power of 2 (35 -> 32), so everyone has an opponent on Monday. The others' sign-ups are deleted.
+// power of 2 (32), so everyone has an opponent on Monday. The others' sign-ups are deleted.
 // Yasin's decision of 2026-11-28. Names are never printed (the repository can be public).
 //
 // Usage: node tournament-cap.mjs <week> [--dry-run]   env FIREBASE_SERVICE_ACCOUNT (JSON)
@@ -29,12 +29,11 @@ async function accessToken(sa) {
   return (await res.json()).access_token;
 }
 
-/** The players kept, in the apps' order (sign-up time, then uid): the largest power of 2, at most 64. */
-export function keep(players) {
+/** The players kept, in the apps' order (sign-up time, then uid): the first 32 when there are more
+ *  (with fewer, nobody is removed: Yasin chose 32, not fewer). */
+export function keep(players, limit = 32) {
   const sorted = [...players].sort((a, b) => a.atMs - b.atMs || (a.uid < b.uid ? -1 : 1));
-  let size = 1;
-  while (size * 2 <= Math.min(sorted.length, 64)) size *= 2;
-  return sorted.length < 2 ? { kept: sorted, removed: [] } : { kept: sorted.slice(0, size), removed: sorted.slice(size) };
+  return { kept: sorted.slice(0, limit), removed: sorted.slice(limit) };
 }
 
 export async function run(week, { dryRun = false, now = Date.now() } = {}) {
