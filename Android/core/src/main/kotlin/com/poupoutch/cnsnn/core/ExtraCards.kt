@@ -3807,7 +3807,6 @@ object ExtraCards {
         Card("seed-stationspatiale", "Station spatiale", "Thomas Pesquet y a vécu en orbite.", Category.GENERAL, Difficulty.HARD),
         Card("seed-extraterrestre", "Extraterrestre", "Un petit homme vert venu d’une autre planète.", Category.GENERAL, Difficulty.EASY),
         Card("seed-soucoupevolante", "Soucoupe volante", "Le vaisseau rond des martiens.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-zeus", "Zeus", "Le roi des dieux grecs, maître de la foudre.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-hera", "Héra", "L’épouse de Zeus.", Category.GENERAL, Difficulty.HARD),
         Card("seed-poseidon", "Poséidon", "Le dieu grec de la mer, armé d’un trident.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-hades", "Hadès", "Le dieu grec des Enfers.", Category.GENERAL, Difficulty.MEDIUM),
@@ -4033,10 +4032,10 @@ object ExtraCards {
         Card("seed-visioconference", "Visioconférence", "Une réunion par vidéo.", Category.GENERAL, Difficulty.HARD),
         Card("seed-teletravail", "Télétravail", "Travailler depuis chez soi.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-codesecret", "Code secret", "Quatre chiffres à taper pour payer.", Category.GENERAL, Difficulty.MEDIUM),
+        Card("seed-distributeurdebillets", "Distributeur de billets", "On y retire de l’argent avec sa carte.", Category.OBJECTS, Difficulty.HARD),
     )
 
     private fun part10(): List<Card> = listOf(
-        Card("seed-distributeurdebillets", "Distributeur de billets", "On y retire de l’argent avec sa carte.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-chequier", "Chéquier", "Un carnet pour payer par chèque.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-livret", "Livret", "Un compte d’épargne à la banque, comme le A.", Category.GENERAL, Difficulty.HARD),
         Card("seed-lingot", "Lingot", "Une barre d’or.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -4436,10 +4435,10 @@ object ExtraCards {
         Card("seed-faireduvelo", "Faire du vélo", "Pédaler dans la rue.", Category.GENERAL, Difficulty.EASY),
         Card("seed-fairelafete", "Faire la fête", "S’amuser toute la nuit avec ses amis.", Category.GENERAL, Difficulty.EASY),
         Card("seed-prendrelebus", "Prendre le bus", "Monter dans le véhicule de transport en commun, à l’arrêt.", Category.GENERAL, Difficulty.EASY),
+        Card("seed-prendreunedouche", "Prendre une douche", "Se laver debout sous le jet d’eau.", Category.GENERAL, Difficulty.EASY),
     )
 
     private fun part11(): List<Card> = listOf(
-        Card("seed-prendreunedouche", "Prendre une douche", "Se laver debout sous le jet d’eau.", Category.GENERAL, Difficulty.EASY),
         Card("seed-avoirfaim", "Avoir faim", "Quand le ventre gargouille.", Category.GENERAL, Difficulty.EASY),
         Card("seed-avoirpeur", "Avoir peur", "Quand on tremble devant un film d’horreur.", Category.GENERAL, Difficulty.EASY),
         Card("seed-avoirdelachance", "Avoir de la chance", "Gagner au loto, par exemple.", Category.GENERAL, Difficulty.MEDIUM),

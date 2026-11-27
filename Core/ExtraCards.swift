@@ -3808,7 +3808,6 @@ public enum ExtraCards {
         Card(id: "seed-stationspatiale", wordFull: "Station spatiale", hint: "Thomas Pesquet y a vécu en orbite.", category: .general, difficulty: .hard),
         Card(id: "seed-extraterrestre", wordFull: "Extraterrestre", hint: "Un petit homme vert venu d’une autre planète.", category: .general, difficulty: .easy),
         Card(id: "seed-soucoupevolante", wordFull: "Soucoupe volante", hint: "Le vaisseau rond des martiens.", category: .general, difficulty: .medium),
-        Card(id: "seed-zeus", wordFull: "Zeus", hint: "Le roi des dieux grecs, maître de la foudre.", category: .general, difficulty: .medium),
         Card(id: "seed-hera", wordFull: "Héra", hint: "L’épouse de Zeus.", category: .general, difficulty: .hard),
         Card(id: "seed-poseidon", wordFull: "Poséidon", hint: "Le dieu grec de la mer, armé d’un trident.", category: .general, difficulty: .medium),
         Card(id: "seed-hades", wordFull: "Hadès", hint: "Le dieu grec des Enfers.", category: .general, difficulty: .medium),
@@ -4034,10 +4033,10 @@ public enum ExtraCards {
         Card(id: "seed-visioconference", wordFull: "Visioconférence", hint: "Une réunion par vidéo.", category: .general, difficulty: .hard),
         Card(id: "seed-teletravail", wordFull: "Télétravail", hint: "Travailler depuis chez soi.", category: .general, difficulty: .medium),
         Card(id: "seed-codesecret", wordFull: "Code secret", hint: "Quatre chiffres à taper pour payer.", category: .general, difficulty: .medium),
+        Card(id: "seed-distributeurdebillets", wordFull: "Distributeur de billets", hint: "On y retire de l’argent avec sa carte.", category: .objects, difficulty: .hard),
     ]
 
     private static let part10: [Card] = [
-        Card(id: "seed-distributeurdebillets", wordFull: "Distributeur de billets", hint: "On y retire de l’argent avec sa carte.", category: .objects, difficulty: .hard),
         Card(id: "seed-chequier", wordFull: "Chéquier", hint: "Un carnet pour payer par chèque.", category: .objects, difficulty: .hard),
         Card(id: "seed-livret", wordFull: "Livret", hint: "Un compte d’épargne à la banque, comme le A.", category: .general, difficulty: .hard),
         Card(id: "seed-lingot", wordFull: "Lingot", hint: "Une barre d’or.", category: .objects, difficulty: .medium),
@@ -4437,10 +4436,10 @@ public enum ExtraCards {
         Card(id: "seed-faireduvelo", wordFull: "Faire du vélo", hint: "Pédaler dans la rue.", category: .general, difficulty: .easy),
         Card(id: "seed-fairelafete", wordFull: "Faire la fête", hint: "S’amuser toute la nuit avec ses amis.", category: .general, difficulty: .easy),
         Card(id: "seed-prendrelebus", wordFull: "Prendre le bus", hint: "Monter dans le véhicule de transport en commun, à l’arrêt.", category: .general, difficulty: .easy),
+        Card(id: "seed-prendreunedouche", wordFull: "Prendre une douche", hint: "Se laver debout sous le jet d’eau.", category: .general, difficulty: .easy),
     ]
 
     private static let part11: [Card] = [
-        Card(id: "seed-prendreunedouche", wordFull: "Prendre une douche", hint: "Se laver debout sous le jet d’eau.", category: .general, difficulty: .easy),
         Card(id: "seed-avoirfaim", wordFull: "Avoir faim", hint: "Quand le ventre gargouille.", category: .general, difficulty: .easy),
         Card(id: "seed-avoirpeur", wordFull: "Avoir peur", hint: "Quand on tremble devant un film d’horreur.", category: .general, difficulty: .easy),
         Card(id: "seed-avoirdelachance", wordFull: "Avoir de la chance", hint: "Gagner au loto, par exemple.", category: .general, difficulty: .medium),
