@@ -3,6 +3,7 @@ package com.poupoutch.cnsnn
 import android.graphics.Bitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -53,7 +54,11 @@ class LongWordsTest {
         }
     }
 
-    private fun type(word: String) = WordEngine.normalize(word).forEach { rule.onNodeWithContentDescription(it.toString()).performClick() }
+    /** Lit vowels read « U, voyelle du mot » once the first hint is taken. */
+    private fun type(word: String) = WordEngine.normalize(word).forEach { letter ->
+        val key = if (rule.onAllNodes(hasContentDescription(letter.toString())).fetchSemanticsNodes().isNotEmpty()) letter.toString() else "$letter, voyelle du mot"
+        rule.onNodeWithContentDescription(key).performClick()
+    }
 
     @Test fun longExpressionsShowWhole() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("smallScreen") == "true")
