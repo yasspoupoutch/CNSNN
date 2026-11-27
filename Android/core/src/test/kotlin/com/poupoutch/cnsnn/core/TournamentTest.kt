@@ -131,6 +131,21 @@ class TournamentTest {
         assertEquals(null, TournamentRules.firstRoundThrees(49))
     }
 
+    @Test fun nobodyPlayedTheMatch() {
+        val later = "2026-12-07"
+        val begin = TournamentRules.deadlineMs(later)!!
+        val order = TournamentBracket(later, players(4), emptyList(), begin).players
+        // Round 1: match 2 played, match 1 not at all -> the first signed up of the two goes through.
+        val first = listOf(order[2], order[3]).mapIndexed { i, p -> TournamentRun(p.uid, 1, begin, begin + 30_000 + i * 1_000L) }
+        val after = TournamentBracket(later, players(4), first, begin + day)
+        assertEquals(listOf(order[0], order[1]).minBy { it.atMs }, after.rounds[0][0].winner)
+        // The final not played either: the best time of the round before (match 2's winner had one).
+        val final = TournamentBracket(later, players(4), first, begin + 2 * day)
+        assertEquals(order[2], final.rounds[1][0].winner)
+        // Before December (old bracket): nobody goes through.
+        assertEquals(null, TournamentBracket(week, players(4), emptyList(), start + day).rounds[0][0].winner)
+    }
+
     @Test fun drawnLikeAFootballBracket() {
         val later = "2026-12-07"
         val begin = TournamentRules.deadlineMs(later)!!

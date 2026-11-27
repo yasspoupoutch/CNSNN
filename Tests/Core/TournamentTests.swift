@@ -132,6 +132,21 @@ final class TournamentTests: XCTestCase {
         XCTAssertEqual(TournamentRules.weeks(untilMs: monday16), ["2026-11-09", "2026-11-16", "2026-11-23"])
     }
 
+    func testNobodyPlayedTheMatch() {
+        let later = TournamentRules.everyonePlaysFrom
+        let begin = TournamentRules.deadlineMs(week: later)!
+        let order = TournamentBracket(week: later, signedUp: players(4), runs: [], nowMs: begin).players
+        // Round 1: match 2 played, match 1 not at all -> the first signed up of the two goes through.
+        let first = [order[2], order[3]].enumerated().map { TournamentRun(uid: $1.uid, round: 1, startedMs: begin, finishedMs: begin + 30_000 + $0 * 1_000) }
+        let after = TournamentBracket(week: later, signedUp: players(4), runs: first, nowMs: begin + day)
+        XCTAssertEqual(after.rounds[0][0].winner, [order[0], order[1]].min { $0.atMs < $1.atMs })
+        // The final not played either: the best time of the round before (match 2's winner had one).
+        let final = TournamentBracket(week: later, signedUp: players(4), runs: first, nowMs: begin + 2 * day)
+        XCTAssertEqual(final.rounds[1][0].winner, order[2])
+        // Before December (old bracket): nobody goes through.
+        XCTAssertNil(TournamentBracket(week: week, signedUp: players(4), runs: [], nowMs: start + day).rounds[0][0].winner)
+    }
+
     func testDrawnLikeAFootballBracketWithReminders() {
         let later = TournamentRules.everyonePlaysFrom
         let begin = TournamentRules.deadlineMs(week: later)!

@@ -205,7 +205,7 @@ public struct TournamentBracket: Sendable, Equatable {
                     }
                     return match
                 } }
-                matches = matches.map { Self.decide($0, round: round, end: end, now: nowMs, runs: byKey) }
+                matches = matches.map { Self.decide($0, week: week, round: round, end: end, now: nowMs, runs: byKey) }
                 rounds.append(matches)
                 slots = matches.map(Self.next)
             }
@@ -217,7 +217,7 @@ public struct TournamentBracket: Sendable, Equatable {
         }
         for round in 1...total {
             let end = TournamentRules.roundEndMs(week: week, round: round) ?? 0
-            current = current.map { Self.decide($0, round: round, end: end, now: nowMs, runs: byKey) }
+            current = current.map { Self.decide($0, week: week, round: round, end: end, now: nowMs, runs: byKey) }
             rounds.append(current)
             guard round < total else { break }
             current = stride(from: 0, to: current.count, by: 2).map { k in
@@ -231,7 +231,7 @@ public struct TournamentBracket: Sendable, Equatable {
         return match.winner.map { .player($0) } ?? .empty
     }
 
-    private static func decide(_ match: Match, round: Int, end: Int, now: Int, runs: [String: TournamentRun]) -> Match {
+    private static func decide(_ match: Match, week: String, round: Int, end: Int, now: Int, runs: [String: TournamentRun]) -> Match {
         var m = match
         if m.slots.contains(.pending) { return m }
         let players = m.slots.compactMap(\.player)
@@ -245,7 +245,19 @@ public struct TournamentBracket: Sendable, Equatable {
         guard scored.count == players.count || now >= end else { return m }
         m.decided = true
         m.winner = scored.min { Self.better($0.1, $1.1) }?.0
+        if m.winner == nil, TournamentRules.everyonePlays(week: week) { m.winner = noShowWinner(players, round: round, runs: runs) }
         return m
+    }
+    /// Nobody played the match (from `TournamentRules.everyonePlaysFrom`, Yasin's rule): the best time of the
+    /// round before goes through; in round 1, or without a time, the first one signed up.
+    private static func noShowWinner(_ players: [TournamentPlayer], round: Int, runs: [String: TournamentRun]) -> TournamentPlayer? {
+        let first = players.min { ($0.atMs, $0.uid) < ($1.atMs, $1.uid) }
+        guard round > 1 else { return first }
+        let timed = players.compactMap { p -> (TournamentPlayer, TournamentRun)? in
+            guard let run = runs["\(round - 1)_\(p.uid)"], run.scoreMs != nil else { return nil }
+            return (p, run)
+        }
+        return timed.min { Self.better($0.1, $1.1) }?.0 ?? first
     }
     /// Best time, then fewer errors, then the first one to finish.
     static func better(_ x: TournamentRun, _ y: TournamentRun) -> Bool {

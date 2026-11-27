@@ -220,7 +220,17 @@ class TournamentBracket(val week: String, signedUp: List<TournamentPlayer>, runs
         // Everyone finished: no need to wait for the end of the day.
         if (scored.size < players.size && now < end) return match
         val best = scored.reduceOrNull { x, y -> if (better(x.second, y.second)) x else y }
+        if (best == null && TournamentRules.everyonePlays(week)) return match.copy(decided = true, winner = noShowWinner(players, round, runs))
         return match.copy(decided = true, winner = best?.first)
+    }
+
+    /** Nobody played the match (from [TournamentRules.EVERYONE_PLAYS_FROM], Yasin's rule): the best time of
+     *  the round before goes through; in round 1, or without a time, the first one signed up. */
+    private fun noShowWinner(players: List<TournamentPlayer>, round: Int, runs: Map<String, TournamentRun>): TournamentPlayer {
+        val first = players.minWith(compareBy({ it.atMs }, { it.uid }))
+        if (round == 1) return first
+        val timed = players.mapNotNull { p -> runs["${round - 1}_${p.uid}"]?.takeIf { it.scoreMs != null }?.let { p to it } }
+        return timed.reduceOrNull { x, y -> if (better(x.second, y.second)) x else y }?.first ?: first
     }
 
     /** The match of the next round that match [index] of [round] leads to, and the positions of the others in it. */
