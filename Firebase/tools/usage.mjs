@@ -39,5 +39,22 @@ console.log(`Pic : ${peak} joueurs/jour. Seuil d'alerte : ~${ceiling} joueurs/jo
 console.log('Chiffres réels : console Firebase > Firestore > Utilisation.');
 if (peak >= ceiling) {
     console.log(`::error::Firestore approche du quota gratuit : ${peak} joueurs/jour, alerte à ${ceiling}. Vérifier l'onglet Utilisation et préparer la suite.`);
-    process.exit(2);
+    process.exitCode = 2;
 }
+
+// Detail (counts only): the anonymous attendance counter and the size of each collection.
+console.log('\nFréquentation (stats/{jour}) des 14 derniers jours :');
+const fields = ['opensIos', 'opensAndroid', 'newIos', 'newAndroid', 'players', 'newPlayers', 'daily', 'classic', 'sprint', 'survival', 'duo', 'challenge'];
+console.log(['jour      ', ...fields].join(' '));
+for (let i = 14; i >= 0; i--) {
+    const day = shiftDay(today, -i);
+    const d = (await db.collection('stats').doc(day).get()).data() ?? {};
+    console.log([day, ...fields.map((f) => String(d[f] ?? 0).padStart(f.length))].join(' '));
+}
+console.log('\nTaille des collections :');
+for (const name of ['users', 'usernames', 'leaderboard', 'dailyResults', 'dailySessions', 'sprintRecords', 'sprintRuns', 'cards', 'challenges', 'duels', 'duelQueue', 'stats', 'reports', 'playerReports', 'attempts', 'friendCodes', 'challengeInvites']) {
+    const n = (await db.collection(name).count().get()).data().count;
+    console.log(`${name.padEnd(18)} ${n}`);
+}
+const approved = (await db.collection('cards').where('status', '==', 'approved').count().get()).data().count;
+console.log(`cartes approuvées  ${approved}`);
