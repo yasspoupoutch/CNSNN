@@ -6,7 +6,8 @@ import FirebaseAnalytics
 /// Minimal on purpose: FirebaseAnalyticsCore (no advertising identifier, no AdSupport, no ATT prompt),
 /// IDFV and ad personalisation off in Info.plist, collection off until the answer, and no custom event:
 /// only Firebase's automatic ones (first_open, sessions). Installs are then matched by Google with
-/// Apple's anonymous SKAdNetwork and its own estimates.
+/// GoogleAdsOnDeviceConversion (matching done on the iPhone, no identifier leaves it; without it an
+/// iPhone install can't be linked to the ad click and Google Ads shows 0), Apple's SKAdNetwork and its estimates.
 enum AdMeasurement {
     /// No value: never asked. true / false: the player's answer (changeable in Profil).
     static let key = "cnsnn.adMeasurement"
