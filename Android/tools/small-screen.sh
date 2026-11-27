@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # The app on a small phone, like a Galaxy S9 (1080 × 2220 at 480 dpi = 360 × 740 dp, three-button bar,
 # on-screen keyboard), then SmallScreenTest: the pictures and the margins land in $1.
+# Other screens: $2 = size in pixels, $3 = density, e.g. "1200x1920 320" (7-inch tablet, 600 × 960 dp)
+# or "2560x1600 320" (10-inch tablet sideways, 1280 × 800 dp).
 set -euo pipefail
 out=${1:?dossier de sortie}
+size=${2:-1080x2220}
+density=${3:-480}
 mkdir -p "$out"
-adb shell wm size 1080x2220
-adb shell wm density 480
+adb shell wm size "$size"
+adb shell wm density "$density"
 adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton || true
 adb shell settings put secure show_ime_with_hard_keyboard 1
 adb shell cmd uimode night yes

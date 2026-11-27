@@ -2,12 +2,13 @@ name: CNSNN - Android petit écran
 
 # L'app sur un petit téléphone (comme un Galaxy S9 : 360 × 740 dp, clavier à l'écran) : la page du pseudo
 # garde sa case à cocher et son bouton au-dessus du clavier, Double sens montre ses deux indices au-dessus
-# de la réponse, sans faire défiler. Les captures sont publiées sur la branche apercus-android.
+# de la réponse, sans faire défiler. Même test sur une tablette 7 pouces et une tablette 10 pouces en
+# paysage. Les captures sont publiées sur la branche apercus-android (un dossier par écran).
 on:
   push:
     branches: ['claude/**']
     paths: ['.github/workflows/android-small-screen.yml', 'Android/tools/small-screen.sh', 'Android/app/src/androidTest/java/com/poupoutch/cnsnn/SmallScreenTest.kt',
-      'Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/GameScreen.kt']
+      'Android/app/src/main/java/com/poupoutch/cnsnn/ui/Components.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/GameScreen.kt']
   pull_request:
     paths: ['Android/app/src/main/java/com/poupoutch/cnsnn/ui/RootScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/ModeScreen.kt', 'Android/app/src/main/java/com/poupoutch/cnsnn/ui/GameScreen.kt']
   workflow_dispatch:
@@ -21,7 +22,14 @@ concurrency:
 
 jobs:
   petit-ecran:
-    name: Petit écran sans défilement (émulateur)
+    name: ${{ matrix.label }} sans défilement (émulateur)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: 'Petit écran', folder: petit-ecran, size: 1080x2220, density: 480 }
+          - { label: 'Tablette 7 pouces', folder: tablette-7, size: 1200x1920, density: 320 }
+          - { label: 'Tablette 10 pouces en paysage', folder: tablette-10-paysage, size: 2560x1600, density: 320 }
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -60,7 +68,7 @@ jobs:
         env:
           CNSNN_EMULATOR_HOST: 10.0.2.2
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
-      - name: Petit écran, clavier ouvert
+      - name: ${{ matrix.label }}, clavier ouvert
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           CNSNN_EMULATOR_HOST: 10.0.2.2
@@ -72,11 +80,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           working-directory: Android
-          script: ./tools/small-screen.sh ${{ runner.temp }}/shots
+          script: ./tools/small-screen.sh ${{ runner.temp }}/shots ${{ matrix.size }} ${{ matrix.density }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: cnsnn-petit-ecran
+          name: cnsnn-${{ matrix.folder }}
           path: ${{ runner.temp }}/shots/*
           retention-days: 7
 
@@ -95,7 +103,7 @@ jobs:
           persist-credentials: true
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: cnsnn-petit-ecran
+          pattern: cnsnn-*
           path: ${{ runner.temp }}/shots
       - name: Pousser les captures
         run: |
@@ -105,8 +113,11 @@ jobs:
           git checkout --orphan apercus-android
           git rm -rf --quiet .
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          mkdir -p petit-ecran
-          cp "$RUNNER_TEMP/shots/"* petit-ecran/
+          # One folder per screen: petit-ecran, tablette-7, tablette-10-paysage.
+          for dir in "$RUNNER_TEMP/shots/"cnsnn-*; do
+            name=$(basename "$dir"); name=${name#cnsnn-}
+            mkdir -p "$name"; cp "$dir/"* "$name/"
+          done
           git add -A .
           git commit -m "Captures petit écran depuis ${GITHUB_SHA::7}"
           git push --force origin HEAD:refs/heads/apercus-android
