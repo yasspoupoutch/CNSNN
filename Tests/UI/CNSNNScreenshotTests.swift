@@ -211,7 +211,7 @@ final class CNSNNScreenshotTests: XCTestCase {
         field.tap(); field.typeText("Camille")
         app.buttons["accept-rules"].tap()
         app.buttons["C’est parti"].tap()
-        XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout: 10))
         dismissKeyboardIfNeeded(app)
 
         let classic = tile(app, "Classique")
