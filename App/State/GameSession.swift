@@ -3,6 +3,11 @@ import Observation
 import CNSNNCore
 
 @MainActor @Observable final class GameSession {
+    /// Interface tests only: the Classique card to deal (`--classic-card=seed-…`, CNSNNScreenshotTests.testLongExpressions).
+    static var testCardID: String? {
+        guard ProcessInfo.processInfo.arguments.contains("--uitesting") else { return nil }
+        return ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--classic-card=") }.map { String($0.dropFirst("--classic-card=".count)) }
+    }
     enum Phase: Equatable { case loading, playing, failed(String) }
     var phase: Phase = .playing
     var card: Card?
@@ -70,6 +75,9 @@ import CNSNNCore
             } else {
                 loadLocalDaily(key: key, state: state)
             }
+        } else if let id = Self.testCardID, let forced = state.cards.first(where: { $0.id == id }) {
+            // Interface tests only (`--classic-card=seed-…`): the Classique card to deal.
+            card = forced
         } else if ScreenshotDemo.isActive {
             // App Store screenshots: always the same public Classique card.
             card = ScreenshotDemo.classicCard
