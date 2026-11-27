@@ -360,7 +360,8 @@ private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
     AnimatedVisibility(visible && passed != null, modifier, enter = fadeIn(), exit = fadeOut()) {
-        Surface(shape = RoundedCornerShape(50), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
+        // A long expression goes on two lines: the corners stay round without turning the pill into a lens.
+        Surface(shape = RoundedCornerShape(18.dp), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
             Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 2, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
         }

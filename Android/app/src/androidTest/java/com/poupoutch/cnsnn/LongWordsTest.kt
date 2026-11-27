@@ -50,7 +50,7 @@ class LongWordsTest {
         nodes.forEach { node ->
             val layouts = mutableListOf<TextLayoutResult>()
             node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
-            layouts.forEach { assertFalse("$where : « $part » est coupé", it.hasVisualOverflow) }
+            layouts.forEach { assertFalse("$where : « $part » est coupé (${it.lineCount} lignes, ${it.size}, largeur ${it.multiParagraph.width}, hauteur ${it.multiParagraph.height})", it.hasVisualOverflow) }
         }
     }
 
@@ -104,8 +104,8 @@ class LongWordsTest {
         shot("24-sprint-expression")
         rule.onNodeWithText("Passer · −5 s").performClick()
         rule.waitUntil(3_000) { has("C’était", substring = true) }
-        assertWhole("Sprint, réponse passée", "C’était")
         shot("25-sprint-cetait")
+        assertWhole("Sprint, réponse passée", "C’était")
         ModeViewModel.testSeed = null
         rule.onNodeWithContentDescription("Quitter").performClick()
         rule.onNodeWithText("Arrêter").performClick()
