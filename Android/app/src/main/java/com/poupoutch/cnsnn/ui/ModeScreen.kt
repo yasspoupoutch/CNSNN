@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -359,11 +360,17 @@ internal fun ColumnScope.Clue(card: Card, passed: String? = null, passedTick: In
 private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
-    AnimatedVisibility(visible && passed != null, modifier, enter = fadeIn(), exit = fadeOut()) {
-        // A long expression goes on two lines: the corners stay round without turning the pill into a lens.
-        Surface(shape = RoundedCornerShape(18.dp), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
-            Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 2, textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
+    // The whole answer on one line, smaller if it is a long expression (« C’était : LA BELLE AU BOIS DORMANT »),
+    // on an opaque pill so the hint under it does not show through.
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        val text = "C’était : " + (passed ?: "").uppercase()
+        val room = with(LocalDensity.current) { (maxWidth - 28.dp - 16.dp).roundToPx() }
+        val size = fitToWidth(text, androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)), room, min = 9)
+        AnimatedVisibility(visible && passed != null, enter = fadeIn(), exit = fadeOut()) {
+            Surface(shape = RoundedCornerShape(50), color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
+                Text(text, fontSize = size.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1, softWrap = false,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
+            }
         }
     }
 }

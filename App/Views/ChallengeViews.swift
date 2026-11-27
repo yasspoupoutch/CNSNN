@@ -640,7 +640,7 @@ struct ChallengeGameView: View {
             ZStack {
                 if showPassed, let passed = session.passed {
                     Text("C’était : " + passed.uppercased())
-                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.4).fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
                         .transition(.opacity)
                 }
