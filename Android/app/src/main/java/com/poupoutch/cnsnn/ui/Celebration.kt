@@ -66,7 +66,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.poupoutch.cnsnn.data.DailyStanding
+import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.data.SprintRecord
 import kotlinx.coroutines.delay
 import kotlin.math.PI
