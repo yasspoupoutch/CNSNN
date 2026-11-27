@@ -206,7 +206,7 @@ jobs:
   publier:
     name: Publier les captures sur la branche apercus-mots-longs
     needs: ios
-    if: always() && needs.ios.result != 'skipped' && needs.ios.result != 'cancelled'
+    if: needs.ios.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
