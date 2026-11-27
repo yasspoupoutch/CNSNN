@@ -127,7 +127,8 @@ class GameViewModel : ViewModel() {
                 loadRankedDaily(key, catchUp != null, state.cloud, uid, state)
             }
         } else {
-            card = CardPicker.candidates(state.cards, category, difficulty, state.progress.recentCards).randomOrNull()
+            card = testCardId?.let { id -> state.cards.firstOrNull { it.id == id } }
+                ?: CardPicker.candidates(state.cards, category, difficulty, state.progress.recentCards).randomOrNull()
         }
     }
 
@@ -458,5 +459,10 @@ class GameViewModel : ViewModel() {
         val day = attempt.dailyKey ?: return
         val rank = DailyScore.rank(day, officialMs(attempt), attempt.correct) ?: return
         standing = runCatching { cloud.standing(day, rank, attempt.correct) }.getOrNull()
+    }
+
+    companion object {
+        /** Tests only: the Classique card to deal (LongWordsTest). */
+        var testCardId: String? = null
     }
 }

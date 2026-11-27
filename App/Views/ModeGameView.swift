@@ -208,7 +208,7 @@ struct ModeGameView: View {
         ZStack {
             if showPassed, let passed = session.passed {
                 Text("C’était : " + passed.uppercased())
-                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
                     .transition(.opacity)
             }
@@ -220,9 +220,7 @@ struct ModeGameView: View {
     private func clue(_ card: Card) -> some View {
         VStack(spacing: 0) {
             let consonants = card.wordNoVowels
-            Text(consonants)
-                .font(Typo.serif(consonants.count > 5 ? 60 : 80)).tracking(3)
-                .lineLimit(1).minimumScaleFactor(0.35)
+            BoardLetters(text: consonants, size: consonants.count > 5 ? 60 : 80)
                 .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))

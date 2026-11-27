@@ -74,7 +74,12 @@ object Share {
         }
         val title = if (mode == GameMode.DAILY) "MOT DU JOUR · " + (attempt.dailyKey ?: DailySchedule.key(attempt.date)) else "CLASSIQUE"
         centered(title, 270f, 38f, Typeface.DEFAULT_BOLD, grey, 0.12f)
-        centered(card.wordNoVowels, 690f, 230f, serif, white, 0.08f)
+        // A long expression goes on two or three lines, cut between its words; the last one stays where a word sits.
+        val board = WordEngine.lines(card.wordNoVowels)
+        board.forEachIndexed { index, line ->
+            if (board.size == 1) centered(line, 690f, 230f, serif, white, 0.08f)
+            else centered(line, 690f - (board.size - 1 - index) * 150f, 140f, serif, white, 0.08f)
+        }
         paint.color = gold
         canvas.drawRoundRect(RectF(w / 2f - 66, 760f, w / 2f + 66, 772f), 6f, 6f, paint)
         val outcome = if (attempt.correct) "Trouvé en ${Format.clock(attempt.timeMs)}" else "Raté cette fois"
