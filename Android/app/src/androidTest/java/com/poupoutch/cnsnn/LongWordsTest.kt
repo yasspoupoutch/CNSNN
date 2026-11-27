@@ -50,7 +50,13 @@ class LongWordsTest {
         nodes.forEach { node ->
             val layouts = mutableListOf<TextLayoutResult>()
             node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
-            layouts.forEach { assertFalse("$where : « $part » est coupé (${it.lineCount} lignes, ${it.size}, largeur ${it.multiParagraph.width}, hauteur ${it.multiParagraph.height})", it.hasVisualOverflow) }
+            // hasVisualOverflow is not enough: a one-line text (softWrap = false) is laid out on the whole width it may
+            // take, so it reports an overflow even when every letter is in. Each line must end inside the text instead.
+            layouts.forEach { layout ->
+                val widest = (0 until layout.lineCount).maxOf { layout.getLineRight(it) }
+                assertFalse("$where : « $part » est coupé (${layout.lineCount} lignes, ${layout.size}, ligne la plus longue $widest)",
+                    widest > layout.size.width + 1f || layout.didOverflowHeight || (0 until layout.lineCount).any { layout.isLineEllipsized(it) })
+            }
         }
     }
 
