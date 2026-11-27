@@ -121,6 +121,9 @@ extension View {
     static func retry() { softGenerator.impactOccurred(); softGenerator.prepare() }
     /// Letter keys: a very light tap, like the system keyboard.
     static func key() { keyGenerator.impactOccurred(intensity: 0.55); keyGenerator.prepare() }
+    private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    /// The found word bursting into letters.
+    static func burst() { heavyGenerator.impactOccurred(); heavyGenerator.prepare() }
 }
 
 /// The "match found" sound of a live duel (App/Resources/duel-found.m4a, the same file as Android's

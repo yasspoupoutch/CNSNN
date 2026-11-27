@@ -232,13 +232,10 @@ internal fun missedSentence(words: List<String>): String? =
 private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sprint: SprintGame) {
     game.version // The core games are plain objects: each part re-reads them after every move.
     SprintClock { sprint.remainingMs(game.elapsedMs) }
-    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Stat("${sprint.found}", if (sprint.found > 1) "mots" else "mot", Modifier.weight(1f))
-        Stat("×${maxOf(1, sprint.streak)}", "combo", Modifier.weight(1f), highlight = sprint.streak > 1)
-        var showGain by remember { mutableStateOf(false) }
-        LaunchedEffect(game.successTick) { if (game.successTick > 0) { showGain = true; delay(900); showGain = false } }
-        Stat(if (showGain) game.gain ?: "" else "${sprint.accuracy} %", if (showGain) "trouvé" else "précision", Modifier.weight(1f), highlight = showGain)
-    }
+    // The record holder for the bar (cached: at most 2 reads every 15 minutes).
+    LaunchedEffect(Unit) { state.refreshSprintLeader() }
+    SprintRecordBar(sprint.found, sprint.streak, sprint.accuracy, game.previous.best(ModeStat.WORDS), state.sprintLeader, state.uid, game.successTick,
+        Modifier.padding(top = 12.dp))
     sprint.card?.let { Clue(it, game.passed, game.passedTick) }
     Controls(state, game, "Passer · −5 s", "Passer ce mot, 5 secondes de pénalité")
 }

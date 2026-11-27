@@ -11,7 +11,6 @@ struct ModeGameView: View {
     @State private var session: ModeSession
     @State private var confirmQuit = false
     @State private var shakes: CGFloat = 0
-    @State private var showGain = false
     @State private var showPassed = false
     let mode: PlayMode
 
@@ -40,6 +39,8 @@ struct ModeGameView: View {
         .task {
             if session.sprint == nil && session.survival == nil && session.duo == nil { session.begin(state: state) }
             guard mode == .sprint else { return }
+            // The record holder for the bar (cached: at most 2 reads every 15 minutes).
+            Task { await state.refreshSprintLeader() }
             // The Sprint clock: ends the game the moment the time is up.
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
@@ -56,11 +57,6 @@ struct ModeGameView: View {
             showPassed = true
             AccessibilityNotification.Announcement("C’était " + word).post()
             Task { try? await Task.sleep(for: .seconds(2)); if session.passedTick == tick { showPassed = false } }
-        }
-        .onChange(of: session.successTick) { _, _ in
-            guard mode == .sprint else { return }
-            showGain = true
-            Task { try? await Task.sleep(for: .seconds(0.9)); showGain = false }
         }
         .confirmationDialog(quitTitle, isPresented: $confirmQuit, titleVisibility: .visible) {
             if mode != .sprint {
@@ -148,11 +144,9 @@ struct ModeGameView: View {
         TimelineView(.periodic(from: .now, by: 0.2)) { _ in
             SprintClock(remainingMs: game.remainingMs(elapsed: session.elapsedMs))
         }.padding(.top, 6)
-        HStack(spacing: 8) {
-            stat("\(game.found)", game.found > 1 ? "mots" : "mot")
-            stat("×\(max(1, game.streak))", "combo", highlight: game.streak > 1)
-            stat(showGain ? (session.gain ?? "") : "\(game.accuracy) %", showGain ? "trouvé" : "précision", highlight: showGain)
-        }.padding(.top, 12)
+        SprintRecordBar(found: game.found, streak: game.streak, accuracy: game.accuracy,
+                        personal: session.previous.best(ModeStat.words), leader: state.sprintLeader, me: state.uid, pulse: session.successTick)
+            .padding(.top, 12)
         if let card = game.card { clue(card) }
         // Over the free space, so the board never moves.
         Spacer(minLength: 8).overlay { passedLine }
@@ -280,6 +274,122 @@ struct ModeGameView: View {
 }
 
 // MARK: - Pieces
+
+/// The Sprint progress: a bar of the words found, marked with the player's record and the game's record
+/// (when it is within reach: at most 1.5 times the player's record). A halo of light turns around it
+/// once two words follow in a row, faster and brighter as the streak grows. Each word makes it leap
+/// and flash; nothing here delays the next word. Same rules as Android's SprintRecordBar.
+private struct SprintRecordBar: View {
+    var found: Int
+    var streak: Int
+    var accuracy: Int
+    /// The player's best before this game (0: none yet, the bar aims at 10).
+    var personal: Int
+    var leader: SprintRecord?
+    var me: String?
+    var pulse: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var flash = false
+
+    private var goal: Int { personal > 0 ? personal : 10 }
+    private var gameRecord: SprintRecord? {
+        guard let leader, leader.uid != me, leader.best > personal, Double(leader.best) <= Double(goal) * 1.5 else { return nil }
+        return leader
+    }
+    private var scale: Double { max(Double(max(goal, gameRecord?.best ?? 0)) * 1.2, Double(found) + 2, 10) }
+    private var level: Int { streak >= 8 ? 4 : streak >= 5 ? 3 : streak >= 3 ? 2 : streak >= 2 ? 1 : 0 }
+    private var streakText: String {
+        streak >= 8 ? "Inarrêtable ×\(streak)" : streak >= 5 ? "Quelle série ×\(streak)" : streak >= 3 ? "Belle série ×\(streak)" : "Combo ×\(max(1, streak))"
+    }
+    private var beatMine: Bool { personal > 0 && found > personal }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(streakText).font(streak >= 2 ? Typo.serifItalic(17) : .system(size: 12, weight: .semibold))
+                    .foregroundStyle(streak >= 2 ? Palette.accent : Palette.tertiary)
+                    .contentTransition(.numericText()).animation(reduceMotion ? nil : .snappy, value: streak)
+                Spacer()
+                Text("\(accuracy) % précision").scaledFont(12).foregroundStyle(Palette.tertiary)
+            }
+            .frame(height: 20)
+            GeometryReader { geo in
+                let width = geo.size.width
+                let x = { (value: Int) in width * min(1, CGFloat(Double(value) / scale)) }
+                VStack(alignment: .leading, spacing: 4) {
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Palette.fill1).overlay(Capsule().strokeBorder(Palette.line, lineWidth: 1))
+                        Capsule()
+                            .fill(LinearGradient(colors: beatMine ? [Palette.accent, Color(red: 1, green: 0.95, blue: 0.8)] : [Palette.accentBottom, Palette.accentTop],
+                                                 startPoint: .leading, endPoint: .trailing))
+                            .frame(width: max(18, x(found)))
+                            .overlay(alignment: .trailing) {
+                                Text("\(found)").font(.system(size: 11, weight: .heavy)).monospacedDigit().foregroundStyle(Palette.ink).padding(.trailing, 6)
+                            }
+                            .shadow(color: Palette.accent.opacity(flash ? 0.9 : 0.3), radius: flash ? 12 : 5)
+                            .brightness(flash ? 0.18 : 0)
+                            .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.55), value: found)
+                        tick(at: x(goal))
+                        if let record = gameRecord { tick(at: x(record.best)) }
+                    }
+                    .frame(height: 18)
+                    .overlay { BarHalo(level: level).allowsHitTesting(false) }
+                    .scaleEffect(flash ? 1.03 : 1)
+                    label(personal > 0 ? (beatMine ? "Record battu !" : "Ton record \(personal)") : "Objectif 10", done: beatMine || (personal == 0 && found >= 10), at: x(goal), width: width)
+                    if let record = gameRecord {
+                        label(found > record.best ? "Record du jeu : toi !" : found >= record.best - 2 ? "Plus que \(record.best - found + 1) !" : "Record du jeu · \(record.username) \(record.best)",
+                              done: found >= record.best - 2, at: x(record.best), width: width)
+                    }
+                }
+            }
+            .frame(height: gameRecord == nil ? 40 : 56)
+        }
+        .onChange(of: pulse) { _, _ in
+            guard !reduceMotion else { return }
+            withAnimation(.easeOut(duration: 0.12)) { flash = true }
+            Task { try? await Task.sleep(for: .seconds(0.22)); withAnimation(.easeOut(duration: 0.3)) { flash = false } }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(found) mot\(found > 1 ? "s" : ""), " + (personal > 0 ? "votre record : \(personal)" : "objectif : 10") + (streak >= 2 ? ", série de \(streak)" : ""))
+    }
+
+    private func tick(at x: CGFloat) -> some View {
+        Rectangle().fill(Palette.foreground.opacity(0.5)).frame(width: 1.5, height: 26).offset(x: x - 0.75, y: 7)
+    }
+    /// A label whose right edge sits on its mark (kept inside the bar's width).
+    private func label(_ text: String, done: Bool, at x: CGFloat, width: CGFloat) -> some View {
+        Text(text).font(.system(size: 11, weight: .bold)).foregroundStyle(done ? Palette.accent : Palette.tertiary).lineLimit(1).fixedSize()
+            .frame(width: min(width, max(x + 1, 150)), alignment: .trailing)
+    }
+}
+
+/// A light turning around the Sprint bar. Off below two words in a row; faster and brighter with the
+/// streak; two lights from eight. Still (no turning) with Reduce Motion.
+private struct BarHalo: View {
+    var level: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var period: Double { [5, 4.5, 3.2, 1.9, 1.1][level] }
+    private var opacity: Double { [0, 0.5, 0.7, 0.9, 1][level] }
+    private var gradient: Gradient {
+        let gold = Palette.accent, white = Color(red: 1, green: 0.97, blue: 0.86)
+        return level >= 4
+            ? Gradient(stops: [.init(color: .clear, location: 0), .init(color: white, location: 0.2), .init(color: .clear, location: 0.4), .init(color: .clear, location: 0.5), .init(color: white, location: 0.7), .init(color: .clear, location: 0.9)])
+            : Gradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.55), .init(color: gold, location: 0.82), .init(color: white, location: 0.9), .init(color: gold, location: 0.95), .init(color: .clear, location: 1)])
+    }
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion || level == 0)) { timeline in
+            let turn = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period * 360
+            let ring = AngularGradient(gradient: gradient, center: .center, angle: .degrees(turn))
+            ZStack {
+                Capsule().strokeBorder(ring, lineWidth: 2.5).blur(radius: 6)
+                Capsule().strokeBorder(ring, lineWidth: 2)
+            }
+            .padding(-3)
+        }
+        .opacity(opacity)
+        .animation(.easeOut(duration: 0.4), value: level)
+    }
+}
 
 /// The Sprint countdown: a thin bar and the seconds left. The last ten seconds turn red and beat
 /// gently, with a light tap for each of the last five.
