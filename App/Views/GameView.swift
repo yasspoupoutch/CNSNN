@@ -544,7 +544,36 @@ struct LetterKeyboard: View {
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
     static let rowHeight: CGFloat = 57.5
+    /// An iPad with a keyboard attached (or a Mac): typing on it works like the keys on screen.
+    @FocusState private var hardwareKeys: Bool
     var body: some View {
+        keys
+            .focusable(interactions: .edit)
+            .focused($hardwareKeys)
+            .focusEffectDisabled()
+            .onKeyPress(phases: [.down, .repeat]) { key in handle(key) }
+            .onAppear { hardwareKeys = true }
+    }
+
+    /// Letters (accents dropped), space, ⌫, ⏎ and ← → from a hardware keyboard.
+    private func handle(_ key: KeyPress) -> KeyPress.Result {
+        if key.modifiers.contains(.command) || key.modifiers.contains(.control) { return .ignored }
+        switch key.key {
+        case .delete: delete(); return .handled
+        case .return: if key.phase == .down { submit() }; return .handled
+        case .leftArrow: if let moveCursor { moveCursor(-1); return .handled }; return .ignored
+        case .rightArrow: if let moveCursor { moveCursor(1); return .handled }; return .ignored
+        case .space: if key.phase == .down { press(" ") }; return .handled
+        default: break
+        }
+        guard key.phase == .down else { return .ignored }
+        let letter = key.characters.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR")).uppercased()
+        guard letter.unicodeScalars.count == 1, let scalar = letter.unicodeScalars.first, (65...90).contains(scalar.value) else { return .ignored }
+        press(letter)
+        return .handled
+    }
+
+    private var keys: some View {
         GeometryReader { geo in
             let unit = geo.size.width / 10
             VStack(spacing: 0) {

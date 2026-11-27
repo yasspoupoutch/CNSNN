@@ -23,6 +23,19 @@ import com.poupoutch.cnsnn.core.TypedAnswer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key as HardKey
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -423,8 +436,15 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
     val haptics = rememberHaptics()
     val rows = listOf("AZERTYUIOP", "QSDFGHJKLM", "WXCVBN")
     val rowHeight = 56.dp
+    // A tablet or Chromebook with a keyboard attached: typing on it works like the keys on screen.
+    val hardwareKeys = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { hardwareKeys.requestFocus() } }
+    val keyModifier = Modifier
+        .onKeyEvent { event -> enabled && hardwareKey(event, press, delete, submit, moveCursor) }
+        .focusRequester(hardwareKeys)
+        .focusable()
     // A background, not a Surface: a Surface clips, and the top row's popups go past the edge.
-    Box(Modifier.bleed(9.dp).fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
+    Box(keyModifier.bleed(9.dp).fillMaxWidth().padding(bottom = 6.dp).background(Palette.surface.copy(alpha = 0.9f), RoundedCornerShape(28.dp))) {
         BoxWithConstraints(Modifier.padding(horizontal = 3.dp, vertical = 6.dp)) {
             val unit = maxWidth / 10
             Column {
@@ -453,6 +473,25 @@ fun LetterKeyboard(press: (String) -> Unit, delete: () -> Unit, submit: () -> Un
             }
         }
     }
+}
+
+/** Letters (accents dropped), space, ⌫, Entrée and ← → from a hardware keyboard; true when used. */
+private fun hardwareKey(event: KeyEvent, press: (String) -> Unit, delete: () -> Unit, submit: () -> Unit, moveCursor: ((Int) -> Unit)?): Boolean {
+    if (event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return false
+    when (event.key) {
+        HardKey.Backspace -> { delete(); return true }
+        HardKey.Enter, HardKey.NumPadEnter -> { if (event.nativeKeyEvent.repeatCount == 0) submit(); return true }
+        HardKey.Spacebar -> { press(" "); return true }
+        HardKey.DirectionLeft -> return moveCursor?.let { it(-1); true } ?: false
+        HardKey.DirectionRight -> return moveCursor?.let { it(1); true } ?: false
+    }
+    val code = event.utf16CodePoint
+    if (code <= 0) return false
+    val letter = java.text.Normalizer.normalize(String(Character.toChars(code)), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "").uppercase()
+    if (letter.length != 1 || letter[0] !in 'A'..'Z') return false
+    press(letter)
+    return true
 }
 
 /** Widens past the screen's 12 dp margin (padding can't be negative): the keyboard runs edge to edge like the phone's. */

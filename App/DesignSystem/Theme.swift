@@ -51,12 +51,39 @@ enum CNSNNTheme {
     static let avatarKey = "cnsnn.avatarIndex"
     /// Widest the content gets: on a wide screen (the unfolded iPhone Duo) it stays phone-shaped, centered.
     static let readableWidth: CGFloat = 560
+    /// On an iPad (or any wide window), the column grows: the game fills more of the screen
+    /// without stretching cards and keys across a 13-inch display.
+    static let wideReadableWidth: CGFloat = 680
 }
 
 extension View {
-    /// Caps the width at `CNSNNTheme.readableWidth` and centers it; no effect on a phone.
-    func readableWidth() -> some View {
-        frame(maxWidth: CNSNNTheme.readableWidth).frame(maxWidth: .infinity)
+    /// Caps the width (560 pt, 680 pt in a wide window such as an iPad's) and centers it; no effect on a phone.
+    func readableWidth() -> some View { modifier(ReadableWidth()) }
+}
+
+private struct ReadableWidth: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: sizeClass == .regular ? CNSNNTheme.wideReadableWidth : CNSNNTheme.readableWidth)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+/// iPad: below this window size (Stage Manager, side by side) the board and keyboard stop fitting, so
+/// the window cannot be made smaller. iPhone: nothing happens.
+struct MinimumWindowSize: UIViewRepresentable {
+    static let size = CGSize(width: 375, height: 600)
+    func makeUIView(context: Context) -> Probe { Probe() }
+    func updateUIView(_ view: Probe, context: Context) {}
+    final class Probe: UIView {
+        override init(frame: CGRect) { super.init(frame: frame); isUserInteractionEnabled = false; isAccessibilityElement = false }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard UIDevice.current.userInterfaceIdiom == .pad, let scene = window?.windowScene else { return }
+            scene.sizeRestrictions?.minimumSize = MinimumWindowSize.size
+        }
     }
 }
 

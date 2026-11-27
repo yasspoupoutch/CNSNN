@@ -264,33 +264,20 @@ struct LaunchView: View {
 
 struct OnboardingView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var signingIn = false
     /// One screen, no question: the rules of the game, then straight in under an automatic pseudo
     /// ("Joueur4821"), changed in Profil whenever the player likes.
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    VowelWord(word: "CONSONNE", font: Typo.wordmark(52))
-                        .padding(.top, 50)
-                    Text("Retrouvez le mot. Sans ses voyelles.")
-                        .font(Typo.serifItalic(22)).foregroundStyle(Palette.secondary)
-                        .multilineTextAlignment(.center).padding(.top, 14)
-                    VStack(spacing: 0) {
-                        SectionKicker(text: "Exemple").frame(maxWidth: .infinity, alignment: .leading)
-                        Text("SRR").font(Typo.serif(64)).tracking(3).padding(.top, 12)
-                        Text("Indice : « On le voit sur mon visage. »").scaledFont(15).foregroundStyle(Palette.secondary)
-                            .multilineTextAlignment(.center).padding(.top, 14)
-                        Rectangle().fill(Palette.line).frame(height: 1).padding(.vertical, 18)
-                        VowelWord(word: "SOURIRE", font: .system(size: 30, weight: .heavy), delay: 0.6).tracking(2.4)
-                    }.glassCard(radius: 30, padding: 22).padding(.top, 38)
-                    VStack(alignment: .leading, spacing: 14) {
-                        bullet("Tapez le mot complet, les accents sont ignorés")
-                        bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
-                        bullet("Un mot du jour commun, et le mode Classique sans limite")
-                    }.padding(.horizontal, 6).padding(.top, 28)
-                }.padding(.horizontal, 26)
-            }.scrollBounceBehavior(.basedOnSize)
+            // The whole page fits without scrolling: roomy on a big screen, tighter on a small
+            // phone (iPhone SE) or a short iPad window, and only scrolls when nothing else fits
+            // (very large text).
+            ViewThatFits(in: .vertical) {
+                welcome(compact: false)
+                welcome(compact: true)
+                ScrollView { welcome(compact: true) }.scrollBounceBehavior(.basedOnSize)
+            }.frame(maxHeight: .infinity, alignment: sizeClass == .regular ? .center : .top)
             VStack(spacing: 4) {
                 Button(state.isBusy ? "Un instant…" : "C’est parti", action: start)
                     .buttonStyle(PrimaryPillStyle())
@@ -302,6 +289,29 @@ struct OnboardingView: View {
             }.padding(.horizontal, 26).padding(.top, 12).padding(.bottom, 8)
         }
         .sheet(isPresented: $signingIn) { SignInSheet() }
+    }
+
+    private func welcome(compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            VowelWord(word: "CONSONNE", font: Typo.wordmark(compact ? 44 : 52))
+                .padding(.top, compact ? 14 : 50)
+            Text("Retrouvez le mot. Sans ses voyelles.")
+                .font(Typo.serifItalic(compact ? 20 : 22)).foregroundStyle(Palette.secondary)
+                .multilineTextAlignment(.center).padding(.top, compact ? 8 : 14)
+            VStack(spacing: 0) {
+                SectionKicker(text: "Exemple").frame(maxWidth: .infinity, alignment: .leading)
+                Text("SRR").font(Typo.serif(compact ? 52 : 64)).tracking(3).padding(.top, compact ? 6 : 12)
+                Text("Indice : « On le voit sur mon visage. »").scaledFont(15).foregroundStyle(Palette.secondary)
+                    .multilineTextAlignment(.center).padding(.top, compact ? 8 : 14)
+                Rectangle().fill(Palette.line).frame(height: 1).padding(.vertical, compact ? 12 : 18)
+                VowelWord(word: "SOURIRE", font: .system(size: compact ? 26 : 30, weight: .heavy), delay: 0.6).tracking(2.4)
+            }.glassCard(radius: 30, padding: compact ? 16 : 22).padding(.top, compact ? 20 : 38)
+            VStack(alignment: .leading, spacing: compact ? 10 : 14) {
+                bullet("Tapez le mot complet, les accents sont ignorés")
+                bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
+                bullet("Un mot du jour commun, et le mode Classique sans limite")
+            }.padding(.horizontal, 6).padding(.top, compact ? 18 : 28)
+        }.padding(.horizontal, 26)
     }
 
     private func bullet(_ text: String) -> some View {

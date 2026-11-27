@@ -1,0 +1,201 @@
+name: CNSNN - Écrans iPhone et iPad
+
+# Vérifie que l'app tient sur tous les écrans sans faire défiler : page d'accueil des nouveaux
+# joueurs, accueil, Classique, Sprint et Profil sur un petit iPhone, un grand iPhone, un iPad mini
+# et un iPad 13 pouces (portrait puis paysage). Test : CNSNNScreenshotTests/testScreenFit.
+# Les captures sont publiées en artefact et sur la branche `apercus-ecrans` (un dossier par appareil).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'App/**'
+      - 'Tests/UI/CNSNNScreenshotTests.swift'
+      - 'CNSNN.xcodeproj/**'
+      - '.github/workflows/ios-ecrans.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-ios-ecrans-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screens:
+    name: Vérifier les écrans iPhone et iPad
+    runs-on: xcode-27
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+      NSUnbufferedIO: 'YES'
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Vérifier la structure du projet
+        run: |
+          set -euo pipefail
+          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cnsnn-ci/logs" "$RUNNER_TEMP/cnsnn-ci/screens"
+          xcodebuild -version
+          python3 Scripts/verify_project.py
+
+      - name: Télécharger les dépendances Firebase
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies -project CNSNN.xcodeproj -scheme CNSNN \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
+            2>&1 | tail -5
+
+      # Un appareil par taille, sur le runtime iOS du SDK. Nom exact de préférence, sinon le premier
+      # appareil dont le nom commence pareil. Un appareil absent est signalé et sauté.
+      - name: Choisir les simulateurs
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json, os, subprocess
+          sdk = subprocess.check_output(['xcodebuild', '-version', '-sdk', 'iphonesimulator', 'SDKVersion'], text=True).strip()
+          major = int(sdk.split('.')[0])
+          listing = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '--json'], text=True))
+          devices = []
+          for runtime in listing['runtimes']:
+              if runtime.get('isAvailable') and '.iOS-' in runtime['identifier'] and int(runtime['version'].split('.')[0]) == major:
+                  devices += [d for d in listing['devices'].get(runtime['identifier'], []) if d.get('isAvailable')]
+          wanted = [
+              ('petit-iphone', ['iPhone SE (3rd generation)', 'iPhone 17e', 'iPhone 16e', 'iPhone 13 mini']),
+              ('grand-iphone', ['iPhone 17 Pro Max', 'iPhone 16 Pro Max', 'iPhone Air']),
+              ('ipad-mini', ['iPad mini (A17 Pro)', 'iPad mini']),
+              ('ipad-13', ['iPad Pro 13-inch (M5)', 'iPad Pro 13-inch (M4)', 'iPad Pro 13', 'iPad Air 13', 'iPad Pro (12.9']),
+          ]
+          chosen = []
+          for folder, names in wanted:
+              found = next((d for n in names for d in devices if d['name'] == n), None) \
+                  or next((d for n in names for d in devices if d['name'].startswith(n)), None)
+              if found:
+                  chosen.append(f"{folder}={found['udid']}={found['name']}")
+                  print(f"{folder} : {found['name']}")
+              else:
+                  print(f'::warning::Aucun simulateur pour {folder} ({", ".join(names)}).')
+          if not chosen:
+              raise SystemExit('Aucun simulateur trouvé.')
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('DEVICES=' + ';'.join(chosen) + '\n')
+              env.write('FIRST_ID=' + chosen[0].split('=')[1] + '\n')
+          PY
+
+      - name: Compiler l'application et les tests UI (iPhone et iPad)
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing -project CNSNN.xcodeproj -scheme CNSNN -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            > "$CI_ROOT/logs/build.log" 2>&1 || { tail -80 "$CI_ROOT/logs/build.log"; exit 1; }
+          tail -5 "$CI_ROOT/logs/build.log"
+
+      - name: Lancer testScreenFit sur chaque appareil
+        run: |
+          set -uo pipefail
+          failed=''
+          IFS=';' read -ra list <<< "$DEVICES"
+          for entry in "${list[@]}"; do
+            folder="${entry%%=*}"; rest="${entry#*=}"; udid="${rest%%=*}"; name="${rest#*=}"
+            echo "::group::$name ($folder)"
+            xcrun simctl boot "$udid" 2>/dev/null; xcrun simctl bootstatus "$udid" -b
+            xcrun simctl ui "$udid" appearance dark
+            xcrun simctl status_bar "$udid" override --time '9:41' --batteryState charged --batteryLevel 100 || true
+            xcodebuild test-without-building -project CNSNN.xcodeproj -scheme CNSNN -configuration Debug \
+              -sdk iphonesimulator -destination "platform=iOS Simulator,id=$udid" -destination-timeout 60 \
+              -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
+              -disableAutomaticPackageResolution -parallel-testing-enabled NO \
+              -only-testing:CNSNNUITests/CNSNNScreenshotTests/testScreenFit \
+              -resultBundlePath "$CI_ROOT/$folder.xcresult" \
+              ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+              > "$CI_ROOT/logs/$folder.log" 2>&1
+            status=$?
+            grep -E "error:|failed|passed|dépasse|pas touchable|absent" "$CI_ROOT/logs/$folder.log" | tail -30
+            if [ "$status" -ne 0 ]; then failed="$failed $name"; fi
+            mkdir -p "$CI_ROOT/raw/$folder" "$CI_ROOT/screens/$folder"
+            xcrun xcresulttool export attachments --path "$CI_ROOT/$folder.xcresult" --output-path "$CI_ROOT/raw/$folder" || true
+            python3 - "$CI_ROOT/raw/$folder" "$CI_ROOT/screens/$folder" <<'PY'
+          import json, pathlib, re, shutil, sys
+          source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          manifest_path = source / 'manifest.json'
+          if not manifest_path.exists():
+              sys.exit(0)
+          manifest = json.loads(manifest_path.read_text())
+          for test in manifest if isinstance(manifest, list) else [manifest]:
+              for attachment in test.get('attachments', []):
+                  match = re.match(r'(\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*)', attachment.get('suggestedHumanReadableName', ''))
+                  if match:
+                      shutil.copyfile(source / attachment['exportedFileName'], target / (match.group(1) + '.png'))
+                      print('Capture :', match.group(1))
+          PY
+            xcrun simctl shutdown "$udid" || true
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Écran qui ne tient pas sur :$failed"; exit 1; fi
+
+      - name: Conserver les captures
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-ecrans-ios
+          path: ${{ runner.temp }}/cnsnn-ci/screens/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Conserver les journaux en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-ecrans-ios-journaux-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnsnn-ci/logs/
+          if-no-files-found: warn
+          retention-days: 3
+
+  # Seul ce job écrit dans le dépôt, sans rien compiler : les captures vont sur `apercus-ecrans`.
+  publish:
+    name: Publier sur la branche apercus-ecrans
+    needs: screens
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: true
+      - name: Récupérer les captures
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cnsnn-ecrans-ios
+          path: ${{ runner.temp }}/screens
+      - name: Pousser les captures
+        env:
+          SOURCE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch --depth=1 origin apercus-ecrans; then
+            git checkout -B apercus-ecrans FETCH_HEAD
+          else
+            git checkout --orphan apercus-ecrans
+            git rm -rf --quiet .
+          fi
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name ios ! -name android -exec rm -rf {} +
+          rm -rf ios && mkdir -p ios && cp -R "$RUNNER_TEMP/screens/." ios/
+          git add -A
+          git commit -m "Écrans iOS ($SOURCE_REF)" || { echo 'Rien de nouveau.'; exit 0; }
+          git push origin apercus-ecrans

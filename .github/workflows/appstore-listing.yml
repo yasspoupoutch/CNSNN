@@ -1,7 +1,7 @@
 name: CNSNN - Fiche App Store
 
 # Lancement manuel : remplit la fiche App Store de la version en préparation (textes de
-# Store/app-store-fr.json, catégorie, copyright, captures 6,9 pouces de la branche
+# Store/app-store-fr.json, catégorie, copyright, captures iPhone 6,9 pouces et iPad 13 pouces de la branche
 # `store-screenshots` avec leurs légendes). Ne soumet jamais rien à la revue d'Apple ; relancer remplace tout.
 on:
   workflow_dispatch:
@@ -50,6 +50,13 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet --break-system-packages pillow 2>/dev/null || python3 -m pip install --quiet pillow
           python3 Scripts/store_captions.py Store/app-store-fr.json "$RUNNER_TEMP/shots/ios/$APPEARANCE" "$RUNNER_TEMP/captioned"
+          # iPad 13 pouces (l'app tourne en vraie app iPad depuis la 1.5), s'il y a des captures.
+          if git archive FETCH_HEAD "ios/ipad-$APPEARANCE" 2>/dev/null | tar -x -C "$RUNNER_TEMP/shots"; then
+            python3 Scripts/store_captions.py Store/app-store-fr.json "$RUNNER_TEMP/shots/ios/ipad-$APPEARANCE" "$RUNNER_TEMP/captioned-ipad"
+            printf 'IPAD_SHOTS=%s\n' "$RUNNER_TEMP/captioned-ipad" >> "$GITHUB_ENV"
+          else
+            echo '::warning::Pas de captures iPad sur store-screenshots : lancez « CNSNN - Captures App Store » avant de soumettre.'
+          fi
           printf 'SHOTS=%s\n' "$RUNNER_TEMP/captioned" >> "$GITHUB_ENV"
           printf 'PREVIEW=%s\n' "$RUNNER_TEMP/shots/ios/$APPEARANCE/preview.mp4" >> "$GITHUB_ENV"
 

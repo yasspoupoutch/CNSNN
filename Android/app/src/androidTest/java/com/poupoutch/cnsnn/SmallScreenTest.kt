@@ -138,6 +138,11 @@ class SmallScreenTest {
         waitFor("J’ai déjà un compte")
         assertOnScreen("Bouton C’est parti", bounds(rule.onNodeWithText("C’est parti")), visibleBottom())
         assertOnScreen("Lien J’ai déjà un compte", bounds(rule.onNodeWithText("J’ai déjà un compte")), visibleBottom())
+        // The rules above the button are all visible: nothing hidden under it, no scrolling.
+        val lastRule = bounds(rule.onNodeWithText("Un mot du jour commun, et le mode Classique sans limite"))
+        val button = bounds(rule.onNodeWithText("C’est parti"))
+        assertTrue("Dernière règle cachée sous le bouton : il faut faire défiler (${lastRule.bottom} > ${button.top})", lastRule.bottom <= button.top)
+        notes.appendLine("Premier lancement : dernière règle à ${lastRule.bottom.toInt()} px, bouton à ${button.top.toInt()} px")
         shot("01-premier-lancement")
         AppViewModel.testPseudo = "Alex"
         rule.onNodeWithText("C’est parti").performClick()

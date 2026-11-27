@@ -17,6 +17,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -343,31 +344,36 @@ private fun OnboardingScreen(state: AppViewModel) {
 
 @Composable
 private fun Welcome(busy: Boolean, start: () -> Unit, existing: () -> Unit) {
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(50.dp))
-            VowelWord("CONSONNE", Type.wordmark(52))
-            Text("Retrouvez le mot. Sans ses voyelles.", style = Type.serifItalic(22), color = Palette.secondary, textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 14.dp))
-            SectionCard(Modifier.padding(top = 38.dp), padding = 22.dp, radius = 30.dp) {
-                Kicker("Exemple")
-                Text("SRR", style = Type.serif(64), letterSpacing = 3.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
-                Text("Indice : « On le voit sur mon visage. »", color = Palette.secondary, textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
-                Box(Modifier.padding(vertical = 18.dp)) { Divider() }
-                VowelWord("SOURIRE", MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 2.4.sp),
-                    Modifier.align(Alignment.CenterHorizontally), delayMs = 600)
+    // The whole page fits without scrolling: roomy on a tall screen, tighter on a small phone (Galaxy S9)
+    // or a short window; it only scrolls when even that does not fit (very large text).
+    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        val compact = maxHeight < 760.dp
+        Column(Modifier.fillMaxSize().padding(horizontal = 26.dp)) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(if (compact) 14.dp else 50.dp))
+                VowelWord("CONSONNE", Type.wordmark(if (compact) 44 else 52))
+                Text("Retrouvez le mot. Sans ses voyelles.", style = Type.serifItalic(if (compact) 20 else 22), color = Palette.secondary, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = if (compact) 8.dp else 14.dp))
+                SectionCard(Modifier.padding(top = if (compact) 20.dp else 38.dp), padding = if (compact) 16.dp else 22.dp, radius = 30.dp) {
+                    Kicker("Exemple")
+                    Text("SRR", style = Type.serif(if (compact) 52 else 64), letterSpacing = 3.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = if (compact) 6.dp else 12.dp))
+                    Text("Indice : « On le voit sur mon visage. »", color = Palette.secondary, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 8.dp else 14.dp))
+                    Box(Modifier.padding(vertical = if (compact) 12.dp else 18.dp)) { Divider() }
+                    VowelWord("SOURIRE", MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 2.4.sp),
+                        Modifier.align(Alignment.CenterHorizontally), delayMs = 600)
+                }
+                Column(Modifier.padding(top = if (compact) 18.dp else 28.dp, start = 6.dp, end = 6.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)) {
+                    Bullet("Tapez le mot complet, les accents sont ignorés")
+                    Bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
+                    Bullet("Un mot du jour commun, et le mode Classique sans limite")
+                }
+                Spacer(Modifier.height(16.dp))
             }
-            Column(Modifier.padding(top = 28.dp, start = 6.dp, end = 6.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Bullet("Tapez le mot complet, les accents sont ignorés")
-                Bullet("Un chrono tourne. Si vous séchez : les voyelles du mot s’allument, puis une phrase (30 s chacun)")
-                Bullet("Un mot du jour commun, et le mode Classique sans limite")
+            PrimaryButton(if (busy) "Un instant…" else "C’est parti", enabled = !busy, onClick = start)
+            TextButton(existing, Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, bottom = 8.dp)) {
+                Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(16.dp))
-        }
-        PrimaryButton(if (busy) "Un instant…" else "C’est parti", enabled = !busy, onClick = start)
-        TextButton(existing, Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, bottom = 8.dp)) {
-            Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold)
         }
     }
 }
