@@ -71,35 +71,47 @@ final class TournamentTests: XCTestCase {
         XCTAssertTrue(TournamentRules.everyonePlays(week: later))
         XCTAssertFalse(TournamentRules.everyonePlays(week: week))
         XCTAssertEqual([0, 1, 2, 3, 4, 7, 10, 64, 200].map { TournamentRules.rounds(players: $0, week: later) }, [0, 0, 1, 1, 2, 2, 3, 6, 6])
-        // 10 players: 5 matches, then 2 (the last one by 3), then the final. Nobody alone.
-        let bracket = TournamentBracket(week: later, signedUp: players(10), runs: [], nowMs: begin)
-        XCTAssertEqual(bracket.rounds.map(\.count), [5, 2, 1])
+        // 14 players (too many for matches of 3 on Monday): 7 matches, then 3 (the last one by 3), then a
+        // final by 3. Nobody alone.
+        let bracket = TournamentBracket(week: later, signedUp: players(14), runs: [], nowMs: begin)
+        XCTAssertEqual(bracket.rounds.map(\.count), [7, 3, 1])
         XCTAssertTrue(bracket.rounds[0].allSatisfy { $0.c == nil && $0.slots.allSatisfy { $0.player != nil } && !$0.decided })
         let semis = bracket.rounds[1]
         XCTAssertEqual(semis[0].from, [0, 1])
-        XCTAssertEqual(semis[1].from, [2, 3, 4])
-        XCTAssertEqual(semis[1].c, .pending)
+        XCTAssertEqual(semis[2].from, [4, 5, 6])
+        XCTAssertEqual(semis[2].c, .pending)
         let order = bracket.players
         XCTAssertEqual(TournamentFormat.slotName(bracket, round: 2, match: semis[0], position: 1), "Gagnant de \(order[2].name) / \(order[3].name)")
         XCTAssertEqual(TournamentFormat.slotName(bracket, round: 3, match: bracket.rounds[2][0], position: 0), "Gagnant du match 1")
-        let next = bracket.following(round: 1, index: 4)
-        XCTAssertEqual(next?.match, semis[1])
+        let next = bracket.following(round: 1, index: 6)
+        XCTAssertEqual(next?.match, semis[2])
         XCTAssertEqual(next?.others, [0, 1])
         // Round 1 finished: the fastest of each match goes on, in the same order.
-        let runs = (0..<10).map { TournamentRun(uid: order[$0].uid, round: 1, startedMs: begin + 1_000, finishedMs: begin + 30_000 + $0 * 1_000) }
-        let after = TournamentBracket(week: later, signedUp: players(10), runs: runs, nowMs: begin + 100_000)
-        XCTAssertEqual(after.rounds[0].map(\.winner), [order[0], order[2], order[4], order[6], order[8]])
-        let three = after.rounds[1][1]
-        XCTAssertEqual(three.slots, [order[4], order[6], order[8]].map { .player($0) })
-        XCTAssertEqual(three.opponents(of: order[6].uid).count, 2)
+        let runs = (0..<14).map { TournamentRun(uid: order[$0].uid, round: 1, startedMs: begin + 1_000, finishedMs: begin + 30_000 + $0 * 1_000) }
+        let after = TournamentBracket(week: later, signedUp: players(14), runs: runs, nowMs: begin + 100_000)
+        XCTAssertEqual(after.rounds[0].map(\.winner), stride(from: 0, to: 14, by: 2).map { order[$0] })
+        let three = after.rounds[1][2]
+        XCTAssertEqual(three.slots, [order[8], order[10], order[12]].map { .player($0) })
+        XCTAssertEqual(three.opponents(of: order[10].uid).count, 2)
         // The match of 3: the fastest goes through, the two others are out.
-        let second = runs + [TournamentRun(uid: order[4].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 50_000),
-                             TournamentRun(uid: order[6].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 20_000),
-                             TournamentRun(uid: order[8].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 40_000)]
-        let later2 = TournamentBracket(week: later, signedUp: players(10), runs: second, nowMs: begin + day + 60_000)
-        XCTAssertEqual(later2.rounds[1][1].winner, order[6])
-        XCTAssertEqual(later2.standing(of: order[8].uid, nowMs: begin + day + 60_000), .eliminated(round: 2))
-        XCTAssertEqual(later2.rounds[2][0].b, .player(order[6]))
+        let second = runs + [TournamentRun(uid: order[8].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 50_000),
+                             TournamentRun(uid: order[10].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 20_000),
+                             TournamentRun(uid: order[12].uid, round: 2, startedMs: begin + day, finishedMs: begin + day + 40_000)]
+        let later2 = TournamentBracket(week: later, signedUp: players(14), runs: second, nowMs: begin + day + 60_000)
+        XCTAssertEqual(later2.rounds[1][2].winner, order[10])
+        XCTAssertEqual(later2.standing(of: order[12].uid, nowMs: begin + day + 60_000), .eliminated(round: 2))
+        XCTAssertEqual(later2.rounds[2][0].c, .player(order[10]))
+        // Yasin's idea: 35 players, 16 matches on Monday (3 of them by 3), then 16 left: 8, 4, 2, 1.
+        XCTAssertEqual(TournamentRules.firstRoundThrees(players: 35), (0..<16).map { [5, 10, 15].contains($0) })
+        let big = TournamentBracket(week: later, signedUp: players(35), runs: [], nowMs: begin)
+        XCTAssertEqual(big.rounds.map(\.count), [16, 8, 4, 2, 1])
+        XCTAssertEqual(big.rounds[0].filter { $0.c != nil }.count, 3)
+        XCTAssertEqual(big.rounds[0].flatMap { $0.slots.compactMap { $0.player?.uid } }, big.players.map(\.uid))
+        XCTAssertTrue(big.rounds.dropFirst().allSatisfy { $0.allSatisfy { $0.c == nil } })
+        XCTAssertEqual(TournamentBracket(week: later, signedUp: players(10), runs: [], nowMs: begin).rounds.map(\.count), [4, 2, 1])
+        XCTAssertNil(TournamentRules.firstRoundThrees(players: 8))
+        XCTAssertNil(TournamentRules.firstRoundThrees(players: 49))
+        XCTAssertEqual(TournamentRules.firstRoundThrees(players: 48), Array(repeating: true, count: 16))
         // 3 players: one match of 3, which is the final.
         let small = TournamentBracket(week: later, signedUp: players(3), runs: [], nowMs: begin)
         XCTAssertEqual(small.rounds.count, 1)
@@ -125,11 +137,13 @@ final class TournamentTests: XCTestCase {
         let begin = TournamentRules.deadlineMs(week: later)!
         let layout = TournamentLayout(TournamentBracket(week: later, signedUp: players(10), runs: [], nowMs: begin), height: { $0 == 3 ? 84 : 60 }, gap: 10)
         XCTAssertEqual(layout.columns, 5)
-        XCTAssertEqual(layout.height, 200, accuracy: 0.01)
-        XCTAssertEqual(layout.nodes.count, 8)
-        XCTAssertEqual(layout.node(round: 1, index: 0)?.y ?? 0, 65, accuracy: 0.01)
-        XCTAssertEqual(layout.node(round: 1, index: 4)?.column, 4)
-        XCTAssertEqual(layout.node(round: 2, index: 1)?.y ?? 0, 100, accuracy: 0.01)
+        XCTAssertEqual(layout.height, 154, accuracy: 0.01)
+        XCTAssertEqual(layout.nodes.count, 7)
+        XCTAssertEqual(layout.node(round: 1, index: 0)?.y ?? 0, 30, accuracy: 0.01)
+        XCTAssertEqual(layout.node(round: 1, index: 1)?.y ?? 0, 112, accuracy: 0.01)
+        XCTAssertEqual(layout.node(round: 1, index: 3)?.column, 4)
+        XCTAssertEqual(layout.node(round: 2, index: 1)?.y ?? 0, 71, accuracy: 0.01)
+        XCTAssertEqual(layout.node(round: 3, index: 0)?.y ?? 0, 77, accuracy: 0.01)
         XCTAssertEqual(layout.node(round: 3, index: 0)?.side, .center)
         XCTAssertEqual(layout.node(round: 3, index: 0)?.column, 2)
 

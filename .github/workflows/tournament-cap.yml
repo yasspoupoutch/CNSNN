@@ -1,0 +1,46 @@
+name: CNSNN - Tournoi à 32
+
+# Tournament of Monday 2026-11-30 only (Yasin's decision of 2026-11-28): right after sign-ups close at
+# 08:00 UTC, keep the first 32 signed up (Firebase/tools/tournament-cap.mjs) so everyone has an opponent
+# with the apps of that time. Started by hand a few minutes before 08:00 UTC (it waits for 08:00:05);
+# the schedules are a backup (a second run finds nothing to do). Remove after that tournament.
+on:
+  schedule:
+    - cron: '1 8 30 11 *'
+    - cron: '10 8 30 11 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Essai à blanc (ne supprime rien)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-tournament-cap
+  cancel-in-progress: false
+
+jobs:
+  cap:
+    name: Garder les 32 premiers inscrits
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: Firebase/tools/tournament-cap.mjs
+          sparse-checkout-cone-mode: false
+      - name: Attendre la clôture des inscriptions (lundi 8 h UTC)
+        if: ${{ github.event_name == 'schedule' || inputs.dry_run == false }}
+        run: |
+          close=$(date -u -d '2026-11-30T08:00:05Z' +%s)
+          wait=$(( close - $(date -u +%s) ))
+          if [ "$wait" -gt 1500 ]; then echo "Trop tôt."; exit 1; fi
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+      - name: Garder les 32 premiers
+        run: node Firebase/tools/tournament-cap.mjs 2026-11-30 ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}

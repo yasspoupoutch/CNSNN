@@ -51,6 +51,18 @@ object TournamentRules {
         else while (size < count) { size *= 2; rounds++ }
         return rounds
     }
+    /** Round 1 when everyone plays, match by match (true: a match of 3), when some matches of 3 leave a
+     *  power of 2 for round 2 (35 players: 16 matches, 3 of them of 3). Null otherwise: neighbours meet. */
+    fun firstRoundThrees(players: Int): List<Boolean>? {
+        val count = minOf(players, MAX_PLAYERS)
+        var size = 1
+        while (size * 2 <= count) size *= 2
+        val matches = size / 2
+        val threes = count - size
+        if (matches < 1 || threes <= 0 || threes > matches) return null
+        // Spread out: the matches of 3 are not all on the same side of the bracket.
+        return (0 until matches).map { i -> (i + 1) * threes / matches > i * threes / matches }
+    }
     /** The round open at this moment, if any. */
     fun round(week: String, players: Int, nowMs: Long): Int? {
         val start = deadlineMs(week) ?: return null
@@ -154,11 +166,21 @@ class TournamentBracket(val week: String, signedUp: List<TournamentPlayer>, runs
         val byKey = runs.associateBy { "${it.round}_${it.uid}" }
         if (total > 0 && TournamentRules.everyonePlays(week)) {
             // Everyone plays every round: neighbours meet; with an odd number, the last match is played by 3.
+            // Round 1 has matches of 3 when that leaves a power of 2 (35 players: 13 of 2 and 3 of 3, then 16).
             var slots: List<Slot> = entrants.map { Slot.Player(it) }
             for (round in 1..total) {
                 val end = TournamentRules.roundEndMs(week, round) ?: 0L
                 val count = slots.size / 2
-                val matches = (0 until count).map { i ->
+                val threes = if (round == 1) TournamentRules.firstRoundThrees(slots.size) else null
+                val matches = if (threes != null) {
+                    // Yasin's idea: enough matches of 3 on Monday that the winners are a power of 2.
+                    var next = 0
+                    threes.map { three ->
+                        val match = Match(slots[next], slots[next + 1], c = if (three) slots[next + 2] else null)
+                        next += if (three) 3 else 2
+                        decide(match, round, end, nowMs, byKey)
+                    }
+                } else (0 until count).map { i ->
                     val three = i == count - 1 && slots.size % 2 == 1
                     val from = if (round == 1) emptyList() else if (three) listOf(2 * i, 2 * i + 1, 2 * i + 2) else listOf(2 * i, 2 * i + 1)
                     decide(Match(slots[2 * i], slots[2 * i + 1], c = if (three) slots[2 * i + 2] else null, from = from), round, end, nowMs, byKey)

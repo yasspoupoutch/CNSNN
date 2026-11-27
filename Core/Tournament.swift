@@ -52,6 +52,17 @@ public enum TournamentRules {
         }
         return rounds
     }
+    /// Round 1 when everyone plays, match by match (true: a match of 3), when some matches of 3 leave a
+    /// power of 2 for round 2 (35 players: 16 matches, 3 of them of 3). Nil otherwise: neighbours meet.
+    public static func firstRoundThrees(players: Int) -> [Bool]? {
+        let count = min(players, maxPlayers)
+        var size = 1
+        while size * 2 <= count { size *= 2 }
+        let matches = size / 2, threes = count - size
+        guard matches >= 1, threes > 0, threes <= matches else { return nil }
+        // Spread out: the matches of 3 are not all on the same side of the bracket.
+        return (0..<matches).map { i in (i + 1) * threes / matches > i * threes / matches }
+    }
     /// The round open at this moment, if any.
     public static func round(week: String, players: Int, nowMs: Int) -> Int? {
         guard let start = deadlineMs(week: week), nowMs >= start else { return nil }
@@ -171,18 +182,29 @@ public struct TournamentBracket: Sendable, Equatable {
         for run in runs { byKey["\(run.round)_\(run.uid)"] = run }
         if TournamentRules.everyonePlays(week: week) {
             // Everyone plays every round: neighbours meet; with an odd number, the last match is played by 3.
+            // Round 1 has matches of 3 when that leaves a power of 2 (35 players: 13 of 2 and 3 of 3, then 16).
             var slots: [Slot] = entrants.map { .player($0) }
             for round in 1...total {
                 let end = TournamentRules.roundEndMs(week: week, round: round) ?? 0
                 let count = slots.count / 2
-                var matches: [Match] = (0..<count).map { i in
+                var matches: [Match]
+                if round == 1, let threes = TournamentRules.firstRoundThrees(players: slots.count) {
+                    // Yasin's idea: enough matches of 3 on Monday that the winners are a power of 2.
+                    var cursor = 0
+                    matches = threes.map { three in
+                        var match = Match(a: slots[cursor], b: slots[cursor + 1])
+                        if three { match.c = slots[cursor + 2] }
+                        cursor += three ? 3 : 2
+                        return match
+                    }
+                } else { matches = (0..<count).map { i in
                     var match = Match(a: slots[2 * i], b: slots[2 * i + 1], from: round > 1 ? [2 * i, 2 * i + 1] : [])
                     if i == count - 1, slots.count % 2 == 1 {
                         match.c = slots[2 * i + 2]
                         if round > 1 { match.from.append(2 * i + 2) }
                     }
                     return match
-                }
+                } }
                 matches = matches.map { Self.decide($0, round: round, end: end, now: nowMs, runs: byKey) }
                 rounds.append(matches)
                 slots = matches.map(Self.next)
