@@ -196,14 +196,17 @@ struct ModeGameView: View {
     }
 
     /// "C'était : TOURNESOL" for two seconds after a pass, so the answer is never lost.
-    /// Built only while shown: Liquid Glass ignores a zero opacity, so a hidden capsule left an empty bubble.
+    /// A plain capsule, not Liquid Glass: the glass showed up without its text (an empty bubble, seen
+    /// again in 1.4.2), so the bubble and its text are now drawn together, as on Android.
     /// The text keeps its full height even when little room is left above the answer, or it vanished.
     private var passedLine: some View {
         ZStack {
             if showPassed, let passed = session.passed {
                 Text("C’était : " + passed.uppercased())
-                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
+                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+                    .padding(.horizontal, 14).frame(minHeight: 32)
+                    .background(Capsule().fill(Palette.surface.opacity(0.92)).overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1)))
+                    .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
             }
         }
