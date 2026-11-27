@@ -1586,7 +1586,6 @@ public enum ExtraCards {
         Card(id: "seed-telepherique", wordFull: "Téléphérique", hint: "Une cabine suspendue à un câble en montagne.", category: .objects, difficulty: .medium),
         Card(id: "seed-telesiege", wordFull: "Télésiège", hint: "Un siège qui remonte les skieurs.", category: .objects, difficulty: .medium),
         Card(id: "seed-funiculaire", wordFull: "Funiculaire", hint: "Un train tiré par un câble sur une pente raide.", category: .objects, difficulty: .medium),
-        Card(id: "seed-tgv", wordFull: "TGV", hint: "Le train à grande vitesse français.", category: .objects, difficulty: .medium),
         Card(id: "seed-wagon", wordFull: "Wagon", hint: "Une voiture de train.", category: .objects, difficulty: .medium),
         Card(id: "seed-draisine", wordFull: "Draisine", hint: "Un petit véhicule sur rails à pédales ou à bras.", category: .objects, difficulty: .medium),
         Card(id: "seed-caleche", wordFull: "Calèche", hint: "Une voiture tirée par des chevaux.", category: .objects, difficulty: .medium),
@@ -1613,14 +1612,13 @@ public enum ExtraCards {
         Card(id: "seed-pneu", wordFull: "Pneu", hint: "Le caoutchouc autour de la roue.", category: .objects, difficulty: .medium),
         Card(id: "seed-coffre", wordFull: "Coffre", hint: "On y met les bagages à l’arrière de la voiture.", category: .objects, difficulty: .medium),
         Card(id: "seed-siegeauto", wordFull: "Siège auto", hint: "Le siège des bébés en voiture.", category: .objects, difficulty: .medium),
-        Card(id: "seed-gps", wordFull: "GPS", hint: "Il indique la route à suivre.", category: .objects, difficulty: .medium),
         Card(id: "seed-giletjaune", wordFull: "Gilet jaune", hint: "On doit l’avoir dans sa voiture en cas de panne.", category: .objects, difficulty: .medium),
         Card(id: "seed-cric", wordFull: "Cric", hint: "On l’utilise pour soulever la voiture et changer une roue.", category: .objects, difficulty: .medium),
+        Card(id: "seed-jerrican", wordFull: "Jerrican", hint: "Un bidon pour l’essence.", category: .objects, difficulty: .medium),
+        Card(id: "seed-antivol", wordFull: "Antivol", hint: "Il empêche de voler le vélo.", category: .objects, difficulty: .medium),
     ]
 
     private static let part4: [Card] = [
-        Card(id: "seed-jerrican", wordFull: "Jerrican", hint: "Un bidon pour l’essence.", category: .objects, difficulty: .medium),
-        Card(id: "seed-antivol", wordFull: "Antivol", hint: "Il empêche de voler le vélo.", category: .objects, difficulty: .medium),
         Card(id: "seed-pompeavelo", wordFull: "Pompe à vélo", hint: "On regonfle les pneus avec.", category: .objects, difficulty: .medium),
         Card(id: "seed-gardeboue", wordFull: "Garde-boue", hint: "Il évite les éclaboussures sur la roue.", category: .objects, difficulty: .medium),
         Card(id: "seed-guidon", wordFull: "Guidon", hint: "On le tient pour diriger le vélo.", category: .objects, difficulty: .medium),
@@ -2019,11 +2017,11 @@ public enum ExtraCards {
         Card(id: "seed-katmandou", wordFull: "Katmandou", hint: "La capitale du Népal.", category: .geography, difficulty: .hard),
         Card(id: "seed-hanoi", wordFull: "Hanoï", hint: "La capitale du Vietnam.", category: .geography, difficulty: .hard),
         Card(id: "seed-phnompenh", wordFull: "Phnom Penh", hint: "La capitale du Cambodge.", category: .geography, difficulty: .hard),
+        Card(id: "seed-vientiane", wordFull: "Vientiane", hint: "La capitale du Laos.", category: .geography, difficulty: .hard),
+        Card(id: "seed-kualalumpur", wordFull: "Kuala Lumpur", hint: "La capitale de la Malaisie, aux tours jumelles.", category: .geography, difficulty: .hard),
     ]
 
     private static let part5: [Card] = [
-        Card(id: "seed-vientiane", wordFull: "Vientiane", hint: "La capitale du Laos.", category: .geography, difficulty: .hard),
-        Card(id: "seed-kualalumpur", wordFull: "Kuala Lumpur", hint: "La capitale de la Malaisie, aux tours jumelles.", category: .geography, difficulty: .hard),
         Card(id: "seed-djakarta", wordFull: "Djakarta", hint: "La capitale de l’Indonésie.", category: .geography, difficulty: .hard),
         Card(id: "seed-manille", wordFull: "Manille", hint: "La capitale des Philippines.", category: .geography, difficulty: .hard),
         Card(id: "seed-taipei", wordFull: "Taipei", hint: "La grande ville du nord de Taïwan, avec sa tour 101.", category: .geography, difficulty: .hard),
@@ -2422,11 +2420,11 @@ public enum ExtraCards {
         Card(id: "seed-cardigan", wordFull: "Cardigan", hint: "Un gilet de laine boutonné.", category: .objects, difficulty: .hard),
         Card(id: "seed-jogging", wordFull: "Jogging", hint: "Un pantalon de sport molletonné.", category: .objects, difficulty: .hard),
         Card(id: "seed-bermuda", wordFull: "Bermuda", hint: "Un short qui descend aux genoux.", category: .objects, difficulty: .hard),
+        Card(id: "seed-collant", wordFull: "Collant", hint: "On le porte sous une jupe.", category: .objects, difficulty: .hard),
+        Card(id: "seed-tutu", wordFull: "Tutu", hint: "La jupe en tulle des danseuses.", category: .objects, difficulty: .hard),
     ]
 
     private static let part6: [Card] = [
-        Card(id: "seed-collant", wordFull: "Collant", hint: "On le porte sous une jupe.", category: .objects, difficulty: .hard),
-        Card(id: "seed-tutu", wordFull: "Tutu", hint: "La jupe en tulle des danseuses.", category: .objects, difficulty: .hard),
         Card(id: "seed-diademe", wordFull: "Diadème", hint: "Une petite couronne de princesse.", category: .objects, difficulty: .hard),
         Card(id: "seed-broche", wordFull: "Broche", hint: "Un bijou qu’on épingle sur un vêtement.", category: .objects, difficulty: .hard),
         Card(id: "seed-medaillon", wordFull: "Médaillon", hint: "Un bijou qui s’ouvre et cache une photo.", category: .objects, difficulty: .hard),
@@ -2825,11 +2823,11 @@ public enum ExtraCards {
         Card(id: "seed-mourir", wordFull: "Mourir", hint: "Le contraire de naître.", category: .general, difficulty: .medium),
         Card(id: "seed-guerir", wordFull: "Guérir", hint: "Aller mieux après une maladie.", category: .general, difficulty: .medium),
         Card(id: "seed-soigner", wordFull: "Soigner", hint: "Ce que fait le médecin.", category: .general, difficulty: .medium),
+        Card(id: "seed-habiller", wordFull: "Habiller", hint: "Mettre des vêtements à quelqu’un.", category: .general, difficulty: .medium),
+        Card(id: "seed-coiffer", wordFull: "Coiffer", hint: "Arranger les cheveux.", category: .general, difficulty: .medium),
     ]
 
     private static let part7: [Card] = [
-        Card(id: "seed-habiller", wordFull: "Habiller", hint: "Mettre des vêtements à quelqu’un.", category: .general, difficulty: .medium),
-        Card(id: "seed-coiffer", wordFull: "Coiffer", hint: "Arranger les cheveux.", category: .general, difficulty: .medium),
         Card(id: "seed-maquiller", wordFull: "Maquiller", hint: "Mettre du fard et du rouge à lèvres.", category: .general, difficulty: .medium),
         Card(id: "seed-reveiller", wordFull: "Réveiller", hint: "Tirer quelqu’un de son sommeil.", category: .general, difficulty: .medium),
         Card(id: "seed-selever", wordFull: "Se lever", hint: "Sortir du lit le matin.", category: .general, difficulty: .medium),
@@ -3228,11 +3226,11 @@ public enum ExtraCards {
         Card(id: "seed-civilisation", wordFull: "Civilisation", hint: "Les Égyptiens ou les Mayas en avaient une.", category: .general, difficulty: .hard),
         Card(id: "seed-fossile", wordFull: "Fossile", hint: "La trace d’un être vivant figée dans la roche.", category: .general, difficulty: .medium),
         Card(id: "seed-sarcophage", wordFull: "Sarcophage", hint: "Le cercueil de pierre d’une momie.", category: .general, difficulty: .hard),
+        Card(id: "seed-chevalerie", wordFull: "Chevalerie", hint: "L’ordre des chevaliers du Moyen Âge.", category: .general, difficulty: .hard),
+        Card(id: "seed-croisade", wordFull: "Croisade", hint: "Une expédition des chevaliers vers Jérusalem.", category: .general, difficulty: .hard),
     ]
 
     private static let part8: [Card] = [
-        Card(id: "seed-chevalerie", wordFull: "Chevalerie", hint: "L’ordre des chevaliers du Moyen Âge.", category: .general, difficulty: .hard),
-        Card(id: "seed-croisade", wordFull: "Croisade", hint: "Une expédition des chevaliers vers Jérusalem.", category: .general, difficulty: .hard),
         Card(id: "seed-blason", wordFull: "Blason", hint: "Les armoiries d’une famille noble.", category: .general, difficulty: .hard),
         Card(id: "seed-epave", wordFull: "Épave", hint: "Un bateau coulé au fond de la mer.", category: .general, difficulty: .hard),
         Card(id: "seed-carteautresor", wordFull: "Carte au trésor", hint: "Une croix y marque l’endroit où creuser.", category: .general, difficulty: .medium),
@@ -3547,7 +3545,6 @@ public enum ExtraCards {
         Card(id: "seed-toyota", wordFull: "Toyota", hint: "Le grand constructeur automobile japonais.", category: .objects, difficulty: .medium),
         Card(id: "seed-volkswagen", wordFull: "Volkswagen", hint: "La marque de la Coccinelle.", category: .objects, difficulty: .medium),
         Card(id: "seed-mercedes", wordFull: "Mercedes", hint: "Une voiture allemande à l’étoile.", category: .objects, difficulty: .medium),
-        Card(id: "seed-bmw", wordFull: "BMW", hint: "Une voiture allemande de Munich.", category: .objects, difficulty: .medium),
         Card(id: "seed-airbus", wordFull: "Airbus", hint: "Un avionneur européen de Toulouse.", category: .objects, difficulty: .medium),
         Card(id: "seed-boeing", wordFull: "Boeing", hint: "Un avionneur américain.", category: .objects, difficulty: .medium),
         Card(id: "seed-apple", wordFull: "Apple", hint: "La marque à la pomme.", category: .objects, difficulty: .easy),
@@ -3611,7 +3608,6 @@ public enum ExtraCards {
         Card(id: "seed-protegetibia", wordFull: "Protège-tibia", hint: "Il protège le bas de la jambe sous la chaussette.", category: .football, difficulty: .easy),
         Card(id: "seed-passedecisive", wordFull: "Passe décisive", hint: "Le dernier ballon avant le but.", category: .football, difficulty: .medium),
         Card(id: "seed-neymar", wordFull: "Neymar", hint: "La star brésilienne passée par le PSG.", category: .football, difficulty: .easy),
-        Card(id: "seed-psg", wordFull: "PSG", hint: "Le club de la capitale.", category: .football, difficulty: .easy),
         Card(id: "seed-realmadrid", wordFull: "Real Madrid", hint: "Le club espagnol en blanc.", category: .football, difficulty: .easy),
         Card(id: "seed-barca", wordFull: "Barça", hint: "Le club de Barcelone.", category: .football, difficulty: .easy),
         Card(id: "seed-equipedefrance", wordFull: "Équipe de France", hint: "Les Bleus.", category: .football, difficulty: .easy),
@@ -3631,13 +3627,13 @@ public enum ExtraCards {
         Card(id: "seed-minnie", wordFull: "Minnie", hint: "La fiancée de Mickey, au nœud rose.", category: .cinema, difficulty: .easy),
         Card(id: "seed-simba", wordFull: "Simba", hint: "Le lionceau du Roi lion.", category: .cinema, difficulty: .easy),
         Card(id: "seed-dory", wordFull: "Dory", hint: "La poisson bleue qui oublie tout.", category: .cinema, difficulty: .easy),
-    ]
-
-    private static let part9: [Card] = [
         Card(id: "seed-woody", wordFull: "Woody", hint: "Le cow-boy de Toy Story.", category: .cinema, difficulty: .easy),
         Card(id: "seed-buzzleclair", wordFull: "Buzz l’Éclair", hint: "« Vers l’infini et au-delà ! »", category: .cinema, difficulty: .easy),
         Card(id: "seed-olaf", wordFull: "Olaf", hint: "Le bonhomme de neige de La Reine des neiges.", category: .cinema, difficulty: .easy),
         Card(id: "seed-elsa", wordFull: "Elsa", hint: "La reine aux pouvoirs glacés d’Arendelle.", category: .cinema, difficulty: .easy),
+    ]
+
+    private static let part9: [Card] = [
         Card(id: "seed-stitch", wordFull: "Stitch", hint: "Une petite créature bleue venue de l’espace, amie de Lilo.", category: .cinema, difficulty: .easy),
         Card(id: "seed-pikachu", wordFull: "Pikachu", hint: "Le Pokémon jaune électrique.", category: .cinema, difficulty: .easy),
         Card(id: "seed-mario", wordFull: "Mario", hint: "Le plombier moustachu de Nintendo.", category: .cinema, difficulty: .easy),
@@ -3888,7 +3884,6 @@ public enum ExtraCards {
         Card(id: "seed-soprano", wordFull: "Soprano", hint: "Le rappeur marseillais de Cosmo.", category: .general, difficulty: .medium),
         Card(id: "seed-gims", wordFull: "Gims", hint: "Le chanteur aux lunettes noires de Bella.", category: .general, difficulty: .medium),
         Card(id: "seed-ninho", wordFull: "Ninho", hint: "Le rappeur de Lettre à une femme.", category: .general, difficulty: .medium),
-        Card(id: "seed-pnl", wordFull: "PNL", hint: "Le duo de rappeurs frères de QLF.", category: .general, difficulty: .hard),
         Card(id: "seed-orgue", wordFull: "Orgue", hint: "L’instrument à tuyaux des églises.", category: .objects, difficulty: .medium),
         Card(id: "seed-flutedepan", wordFull: "Flûte de Pan", hint: "Des tuyaux de bambou collés côte à côte.", category: .objects, difficulty: .hard),
         Card(id: "seed-solfege", wordFull: "Solfège", hint: "On y apprend à lire les notes.", category: .general, difficulty: .medium),
@@ -4034,14 +4029,14 @@ public enum ExtraCards {
         Card(id: "seed-perle", wordFull: "Perle", hint: "Elle se forme dans une huître.", category: .objects, difficulty: .easy),
         Card(id: "seed-amethyste", wordFull: "Améthyste", hint: "Une pierre violette.", category: .objects, difficulty: .hard),
         Card(id: "seed-turquoise", wordFull: "Turquoise", hint: "Une pierre et une couleur bleu-vert.", category: .general, difficulty: .medium),
-    ]
-
-    private static let part10: [Card] = [
         Card(id: "seed-jade", wordFull: "Jade", hint: "Une pierre verte très prisée en Chine.", category: .objects, difficulty: .hard),
         Card(id: "seed-ambre", wordFull: "Ambre", hint: "Une résine fossile couleur miel.", category: .objects, difficulty: .hard),
         Card(id: "seed-cristal", wordFull: "Cristal", hint: "Un verre très pur qui tinte.", category: .objects, difficulty: .medium),
         Card(id: "seed-bronze", wordFull: "Bronze", hint: "La médaille de la troisième place.", category: .general, difficulty: .medium),
         Card(id: "seed-cuivre", wordFull: "Cuivre", hint: "Un métal orangé des fils électriques.", category: .general, difficulty: .medium),
+    ]
+
+    private static let part10: [Card] = [
         Card(id: "seed-plomb", wordFull: "Plomb", hint: "Un métal lourd et gris, autrefois dans l’essence.", category: .general, difficulty: .hard),
         Card(id: "seed-etain", wordFull: "Étain", hint: "Un métal gris et malléable des vieilles cuillères et des chopes.", category: .general, difficulty: .hard),
         Card(id: "seed-zinc", wordFull: "Zinc", hint: "Le métal des toits de Paris.", category: .general, difficulty: .hard),
@@ -4437,14 +4432,14 @@ public enum ExtraCards {
         Card(id: "seed-signer", wordFull: "Signer", hint: "Écrire son nom au bas d’un contrat.", category: .general, difficulty: .medium),
         Card(id: "seed-voter", wordFull: "Voter", hint: "Mettre un bulletin dans l’urne.", category: .general, difficulty: .medium),
         Card(id: "seed-elire", wordFull: "Élire", hint: "Choisir par un vote.", category: .general, difficulty: .hard),
-    ]
-
-    private static let part11: [Card] = [
         Card(id: "seed-juger", wordFull: "Juger", hint: "Ce que fait le tribunal.", category: .general, difficulty: .medium),
         Card(id: "seed-condamner", wordFull: "Condamner", hint: "Déclarer coupable et punir.", category: .general, difficulty: .hard),
         Card(id: "seed-arreter", wordFull: "Arrêter", hint: "Ce que fait la police avec un voleur.", category: .general, difficulty: .medium),
         Card(id: "seed-liberer", wordFull: "Libérer", hint: "Rendre la liberté.", category: .general, difficulty: .hard),
         Card(id: "seed-enqueter", wordFull: "Enquêter", hint: "Ce que fait l’inspecteur.", category: .general, difficulty: .hard),
+    ]
+
+    private static let part11: [Card] = [
         Card(id: "seed-espionner", wordFull: "Espionner", hint: "Surveiller en cachette.", category: .general, difficulty: .hard),
         Card(id: "seed-cambrioler", wordFull: "Cambrioler", hint: "Voler dans une maison.", category: .general, difficulty: .hard),
         Card(id: "seed-escroquer", wordFull: "Escroquer", hint: "Voler par la ruse.", category: .general, difficulty: .hard),

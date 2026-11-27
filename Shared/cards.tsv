@@ -1574,7 +1574,6 @@ M	Objets	Satellite	Il tourne autour de la Terre.
 M	Objets	Téléphérique	Une cabine suspendue à un câble en montagne.
 M	Objets	Télésiège	Un siège qui remonte les skieurs.
 M	Objets	Funiculaire	Un train tiré par un câble sur une pente raide.
-M	Objets	TGV	Le train à grande vitesse français.
 M	Objets	Wagon	Une voiture de train.
 M	Objets	Draisine	Un petit véhicule sur rails à pédales ou à bras.
 M	Objets	Calèche	Une voiture tirée par des chevaux.
@@ -1601,7 +1600,6 @@ M	Objets	Klaxon	On appuie dessus pour faire « tut-tut ».
 M	Objets	Pneu	Le caoutchouc autour de la roue.
 M	Objets	Coffre	On y met les bagages à l’arrière de la voiture.
 M	Objets	Siège auto	Le siège des bébés en voiture.
-M	Objets	GPS	Il indique la route à suivre.
 M	Objets	Gilet jaune	On doit l’avoir dans sa voiture en cas de panne.
 M	Objets	Cric	On l’utilise pour soulever la voiture et changer une roue.
 M	Objets	Jerrican	Un bidon pour l’essence.
@@ -2695,7 +2693,7 @@ D	Animaux	Moa	Un oiseau géant disparu de Nouvelle-Zélande.
 D	Animaux	Kéa	Un perroquet des montagnes néo-zélandaises très malin.
 D	Animaux	Léopard de mer	Un phoque prédateur de l’Antarctique.
 D	Animaux	Ratel	Un carnivore intrépide qui pille les ruches.
-# Cartes ajoutées en version 1.5 (1 993 mots) : verbes, adjectifs, expressions, couleurs, métiers, personnages célèbres, marques (nom seulement) et un peu de football facile.
+# Cartes ajoutées en version 1.5 (1 990 mots) : verbes, adjectifs, expressions, couleurs, métiers, personnages célèbres, marques (nom seulement) et un peu de football facile.
 F	Général	Manger	Ce qu’on fait à table avec une fourchette.
 F	Général	Boire	Ce qu’on fait quand on a soif.
 F	Général	Dormir	Ce qu’on fait la nuit, les yeux fermés.
@@ -3521,7 +3519,6 @@ M	Objets	Tesla	Une voiture électrique d’Elon Musk.
 M	Objets	Toyota	Le grand constructeur automobile japonais.
 M	Objets	Volkswagen	La marque de la Coccinelle.
 M	Objets	Mercedes	Une voiture allemande à l’étoile.
-M	Objets	BMW	Une voiture allemande de Munich.
 M	Objets	Airbus	Un avionneur européen de Toulouse.
 M	Objets	Boeing	Un avionneur américain.
 F	Objets	Apple	La marque à la pomme.
@@ -3585,7 +3582,6 @@ F	Football	Crampon	Une chaussure de sport à clous.
 F	Football	Protège-tibia	Il protège le bas de la jambe sous la chaussette.
 M	Football	Passe décisive	Le dernier ballon avant le but.
 F	Football	Neymar	La star brésilienne passée par le PSG.
-F	Football	PSG	Le club de la capitale.
 F	Football	Real Madrid	Le club espagnol en blanc.
 F	Football	Barça	Le club de Barcelone.
 F	Football	Équipe de France	Les Bleus.
@@ -3859,7 +3855,6 @@ D	Général	Zaz	La chanteuse de Je veux.
 M	Général	Soprano	Le rappeur marseillais de Cosmo.
 M	Général	Gims	Le chanteur aux lunettes noires de Bella.
 M	Général	Ninho	Le rappeur de Lettre à une femme.
-D	Général	PNL	Le duo de rappeurs frères de QLF.
 M	Objets	Orgue	L’instrument à tuyaux des églises.
 D	Objets	Flûte de Pan	Des tuyaux de bambou collés côte à côte.
 M	Général	Solfège	On y apprend à lire les notes.

@@ -1585,7 +1585,6 @@ object ExtraCards {
         Card("seed-telepherique", "Téléphérique", "Une cabine suspendue à un câble en montagne.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-telesiege", "Télésiège", "Un siège qui remonte les skieurs.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-funiculaire", "Funiculaire", "Un train tiré par un câble sur une pente raide.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-tgv", "TGV", "Le train à grande vitesse français.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-wagon", "Wagon", "Une voiture de train.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-draisine", "Draisine", "Un petit véhicule sur rails à pédales ou à bras.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-caleche", "Calèche", "Une voiture tirée par des chevaux.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -1612,14 +1611,13 @@ object ExtraCards {
         Card("seed-pneu", "Pneu", "Le caoutchouc autour de la roue.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-coffre", "Coffre", "On y met les bagages à l’arrière de la voiture.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-siegeauto", "Siège auto", "Le siège des bébés en voiture.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-gps", "GPS", "Il indique la route à suivre.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-giletjaune", "Gilet jaune", "On doit l’avoir dans sa voiture en cas de panne.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-cric", "Cric", "On l’utilise pour soulever la voiture et changer une roue.", Category.OBJECTS, Difficulty.MEDIUM),
+        Card("seed-jerrican", "Jerrican", "Un bidon pour l’essence.", Category.OBJECTS, Difficulty.MEDIUM),
+        Card("seed-antivol", "Antivol", "Il empêche de voler le vélo.", Category.OBJECTS, Difficulty.MEDIUM),
     )
 
     private fun part4(): List<Card> = listOf(
-        Card("seed-jerrican", "Jerrican", "Un bidon pour l’essence.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-antivol", "Antivol", "Il empêche de voler le vélo.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-pompeavelo", "Pompe à vélo", "On regonfle les pneus avec.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-gardeboue", "Garde-boue", "Il évite les éclaboussures sur la roue.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-guidon", "Guidon", "On le tient pour diriger le vélo.", Category.OBJECTS, Difficulty.MEDIUM),
@@ -2018,11 +2016,11 @@ object ExtraCards {
         Card("seed-katmandou", "Katmandou", "La capitale du Népal.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-hanoi", "Hanoï", "La capitale du Vietnam.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-phnompenh", "Phnom Penh", "La capitale du Cambodge.", Category.GEOGRAPHY, Difficulty.HARD),
+        Card("seed-vientiane", "Vientiane", "La capitale du Laos.", Category.GEOGRAPHY, Difficulty.HARD),
+        Card("seed-kualalumpur", "Kuala Lumpur", "La capitale de la Malaisie, aux tours jumelles.", Category.GEOGRAPHY, Difficulty.HARD),
     )
 
     private fun part5(): List<Card> = listOf(
-        Card("seed-vientiane", "Vientiane", "La capitale du Laos.", Category.GEOGRAPHY, Difficulty.HARD),
-        Card("seed-kualalumpur", "Kuala Lumpur", "La capitale de la Malaisie, aux tours jumelles.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-djakarta", "Djakarta", "La capitale de l’Indonésie.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-manille", "Manille", "La capitale des Philippines.", Category.GEOGRAPHY, Difficulty.HARD),
         Card("seed-taipei", "Taipei", "La grande ville du nord de Taïwan, avec sa tour 101.", Category.GEOGRAPHY, Difficulty.HARD),
@@ -2421,11 +2419,11 @@ object ExtraCards {
         Card("seed-cardigan", "Cardigan", "Un gilet de laine boutonné.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-jogging", "Jogging", "Un pantalon de sport molletonné.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-bermuda", "Bermuda", "Un short qui descend aux genoux.", Category.OBJECTS, Difficulty.HARD),
+        Card("seed-collant", "Collant", "On le porte sous une jupe.", Category.OBJECTS, Difficulty.HARD),
+        Card("seed-tutu", "Tutu", "La jupe en tulle des danseuses.", Category.OBJECTS, Difficulty.HARD),
     )
 
     private fun part6(): List<Card> = listOf(
-        Card("seed-collant", "Collant", "On le porte sous une jupe.", Category.OBJECTS, Difficulty.HARD),
-        Card("seed-tutu", "Tutu", "La jupe en tulle des danseuses.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-diademe", "Diadème", "Une petite couronne de princesse.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-broche", "Broche", "Un bijou qu’on épingle sur un vêtement.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-medaillon", "Médaillon", "Un bijou qui s’ouvre et cache une photo.", Category.OBJECTS, Difficulty.HARD),
@@ -2824,11 +2822,11 @@ object ExtraCards {
         Card("seed-mourir", "Mourir", "Le contraire de naître.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-guerir", "Guérir", "Aller mieux après une maladie.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-soigner", "Soigner", "Ce que fait le médecin.", Category.GENERAL, Difficulty.MEDIUM),
+        Card("seed-habiller", "Habiller", "Mettre des vêtements à quelqu’un.", Category.GENERAL, Difficulty.MEDIUM),
+        Card("seed-coiffer", "Coiffer", "Arranger les cheveux.", Category.GENERAL, Difficulty.MEDIUM),
     )
 
     private fun part7(): List<Card> = listOf(
-        Card("seed-habiller", "Habiller", "Mettre des vêtements à quelqu’un.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-coiffer", "Coiffer", "Arranger les cheveux.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-maquiller", "Maquiller", "Mettre du fard et du rouge à lèvres.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-reveiller", "Réveiller", "Tirer quelqu’un de son sommeil.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-selever", "Se lever", "Sortir du lit le matin.", Category.GENERAL, Difficulty.MEDIUM),
@@ -3227,11 +3225,11 @@ object ExtraCards {
         Card("seed-civilisation", "Civilisation", "Les Égyptiens ou les Mayas en avaient une.", Category.GENERAL, Difficulty.HARD),
         Card("seed-fossile", "Fossile", "La trace d’un être vivant figée dans la roche.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-sarcophage", "Sarcophage", "Le cercueil de pierre d’une momie.", Category.GENERAL, Difficulty.HARD),
+        Card("seed-chevalerie", "Chevalerie", "L’ordre des chevaliers du Moyen Âge.", Category.GENERAL, Difficulty.HARD),
+        Card("seed-croisade", "Croisade", "Une expédition des chevaliers vers Jérusalem.", Category.GENERAL, Difficulty.HARD),
     )
 
     private fun part8(): List<Card> = listOf(
-        Card("seed-chevalerie", "Chevalerie", "L’ordre des chevaliers du Moyen Âge.", Category.GENERAL, Difficulty.HARD),
-        Card("seed-croisade", "Croisade", "Une expédition des chevaliers vers Jérusalem.", Category.GENERAL, Difficulty.HARD),
         Card("seed-blason", "Blason", "Les armoiries d’une famille noble.", Category.GENERAL, Difficulty.HARD),
         Card("seed-epave", "Épave", "Un bateau coulé au fond de la mer.", Category.GENERAL, Difficulty.HARD),
         Card("seed-carteautresor", "Carte au trésor", "Une croix y marque l’endroit où creuser.", Category.GENERAL, Difficulty.MEDIUM),
@@ -3546,7 +3544,6 @@ object ExtraCards {
         Card("seed-toyota", "Toyota", "Le grand constructeur automobile japonais.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-volkswagen", "Volkswagen", "La marque de la Coccinelle.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-mercedes", "Mercedes", "Une voiture allemande à l’étoile.", Category.OBJECTS, Difficulty.MEDIUM),
-        Card("seed-bmw", "BMW", "Une voiture allemande de Munich.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-airbus", "Airbus", "Un avionneur européen de Toulouse.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-boeing", "Boeing", "Un avionneur américain.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-apple", "Apple", "La marque à la pomme.", Category.OBJECTS, Difficulty.EASY),
@@ -3610,7 +3607,6 @@ object ExtraCards {
         Card("seed-protegetibia", "Protège-tibia", "Il protège le bas de la jambe sous la chaussette.", Category.FOOTBALL, Difficulty.EASY),
         Card("seed-passedecisive", "Passe décisive", "Le dernier ballon avant le but.", Category.FOOTBALL, Difficulty.MEDIUM),
         Card("seed-neymar", "Neymar", "La star brésilienne passée par le PSG.", Category.FOOTBALL, Difficulty.EASY),
-        Card("seed-psg", "PSG", "Le club de la capitale.", Category.FOOTBALL, Difficulty.EASY),
         Card("seed-realmadrid", "Real Madrid", "Le club espagnol en blanc.", Category.FOOTBALL, Difficulty.EASY),
         Card("seed-barca", "Barça", "Le club de Barcelone.", Category.FOOTBALL, Difficulty.EASY),
         Card("seed-equipedefrance", "Équipe de France", "Les Bleus.", Category.FOOTBALL, Difficulty.EASY),
@@ -3630,13 +3626,13 @@ object ExtraCards {
         Card("seed-minnie", "Minnie", "La fiancée de Mickey, au nœud rose.", Category.CINEMA, Difficulty.EASY),
         Card("seed-simba", "Simba", "Le lionceau du Roi lion.", Category.CINEMA, Difficulty.EASY),
         Card("seed-dory", "Dory", "La poisson bleue qui oublie tout.", Category.CINEMA, Difficulty.EASY),
-    )
-
-    private fun part9(): List<Card> = listOf(
         Card("seed-woody", "Woody", "Le cow-boy de Toy Story.", Category.CINEMA, Difficulty.EASY),
         Card("seed-buzzleclair", "Buzz l’Éclair", "« Vers l’infini et au-delà ! »", Category.CINEMA, Difficulty.EASY),
         Card("seed-olaf", "Olaf", "Le bonhomme de neige de La Reine des neiges.", Category.CINEMA, Difficulty.EASY),
         Card("seed-elsa", "Elsa", "La reine aux pouvoirs glacés d’Arendelle.", Category.CINEMA, Difficulty.EASY),
+    )
+
+    private fun part9(): List<Card> = listOf(
         Card("seed-stitch", "Stitch", "Une petite créature bleue venue de l’espace, amie de Lilo.", Category.CINEMA, Difficulty.EASY),
         Card("seed-pikachu", "Pikachu", "Le Pokémon jaune électrique.", Category.CINEMA, Difficulty.EASY),
         Card("seed-mario", "Mario", "Le plombier moustachu de Nintendo.", Category.CINEMA, Difficulty.EASY),
@@ -3887,7 +3883,6 @@ object ExtraCards {
         Card("seed-soprano", "Soprano", "Le rappeur marseillais de Cosmo.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-gims", "Gims", "Le chanteur aux lunettes noires de Bella.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-ninho", "Ninho", "Le rappeur de Lettre à une femme.", Category.GENERAL, Difficulty.MEDIUM),
-        Card("seed-pnl", "PNL", "Le duo de rappeurs frères de QLF.", Category.GENERAL, Difficulty.HARD),
         Card("seed-orgue", "Orgue", "L’instrument à tuyaux des églises.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-flutedepan", "Flûte de Pan", "Des tuyaux de bambou collés côte à côte.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-solfege", "Solfège", "On y apprend à lire les notes.", Category.GENERAL, Difficulty.MEDIUM),
@@ -4033,14 +4028,14 @@ object ExtraCards {
         Card("seed-perle", "Perle", "Elle se forme dans une huître.", Category.OBJECTS, Difficulty.EASY),
         Card("seed-amethyste", "Améthyste", "Une pierre violette.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-turquoise", "Turquoise", "Une pierre et une couleur bleu-vert.", Category.GENERAL, Difficulty.MEDIUM),
-    )
-
-    private fun part10(): List<Card> = listOf(
         Card("seed-jade", "Jade", "Une pierre verte très prisée en Chine.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-ambre", "Ambre", "Une résine fossile couleur miel.", Category.OBJECTS, Difficulty.HARD),
         Card("seed-cristal", "Cristal", "Un verre très pur qui tinte.", Category.OBJECTS, Difficulty.MEDIUM),
         Card("seed-bronze", "Bronze", "La médaille de la troisième place.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-cuivre", "Cuivre", "Un métal orangé des fils électriques.", Category.GENERAL, Difficulty.MEDIUM),
+    )
+
+    private fun part10(): List<Card> = listOf(
         Card("seed-plomb", "Plomb", "Un métal lourd et gris, autrefois dans l’essence.", Category.GENERAL, Difficulty.HARD),
         Card("seed-etain", "Étain", "Un métal gris et malléable des vieilles cuillères et des chopes.", Category.GENERAL, Difficulty.HARD),
         Card("seed-zinc", "Zinc", "Le métal des toits de Paris.", Category.GENERAL, Difficulty.HARD),
@@ -4436,14 +4431,14 @@ object ExtraCards {
         Card("seed-signer", "Signer", "Écrire son nom au bas d’un contrat.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-voter", "Voter", "Mettre un bulletin dans l’urne.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-elire", "Élire", "Choisir par un vote.", Category.GENERAL, Difficulty.HARD),
-    )
-
-    private fun part11(): List<Card> = listOf(
         Card("seed-juger", "Juger", "Ce que fait le tribunal.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-condamner", "Condamner", "Déclarer coupable et punir.", Category.GENERAL, Difficulty.HARD),
         Card("seed-arreter", "Arrêter", "Ce que fait la police avec un voleur.", Category.GENERAL, Difficulty.MEDIUM),
         Card("seed-liberer", "Libérer", "Rendre la liberté.", Category.GENERAL, Difficulty.HARD),
         Card("seed-enqueter", "Enquêter", "Ce que fait l’inspecteur.", Category.GENERAL, Difficulty.HARD),
+    )
+
+    private fun part11(): List<Card> = listOf(
         Card("seed-espionner", "Espionner", "Surveiller en cachette.", Category.GENERAL, Difficulty.HARD),
         Card("seed-cambrioler", "Cambrioler", "Voler dans une maison.", Category.GENERAL, Difficulty.HARD),
         Card("seed-escroquer", "Escroquer", "Voler par la ruse.", Category.GENERAL, Difficulty.HARD),
