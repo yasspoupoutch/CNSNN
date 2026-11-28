@@ -129,6 +129,11 @@ jobs:
             if [ "$status" -ne 0 ]; then failed="$failed $name"; fi
             mkdir -p "$CI_ROOT/raw/$folder" "$CI_ROOT/screens/$folder"
             xcrun xcresulttool export attachments --path "$CI_ROOT/$folder.xcresult" --output-path "$CI_ROOT/raw/$folder" || true
+            for report in "$CI_ROOT/raw/$folder/"*.ips; do
+              [ -f "$report" ] || continue
+              echo "Rapport de plantage ($folder) :"
+              python3 Scripts/crash_summary.py "$report" || head -c 8000 "$report"
+            done
             python3 - "$CI_ROOT/raw/$folder" "$CI_ROOT/screens/$folder" <<'PY'
           import json, pathlib, re, shutil, sys
           source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
