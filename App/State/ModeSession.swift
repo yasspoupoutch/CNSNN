@@ -31,6 +31,12 @@ import CNSNNCore
     /// The answer of the word just passed, shown for a moment (Sprint and Survie).
     var passed: String?
     var passedTick = 0
+    /// The Sprint word just found, for the word that flies up from the answer line.
+    var foundWord: String?
+    /// Sprint: the Sprint clock (ms) at each word found, and the same for the record game on this
+    /// phone (the ghost that runs along the bar).
+    private(set) var foundTimes: [Int] = []
+    private(set) var ghost: [Int] = []
     /// The game picked up from a save.
     var resumed = false
     /// Results screen, with the records the game beat and the ones before it.
@@ -55,6 +61,8 @@ import CNSNNCore
     func begin(state: AppState) {
         answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false; publishedFound = 0
         previous = state.progress.records(mode)
+        foundWord = nil; foundTimes = []
+        ghost = mode == .sprint ? SprintGhost.timeline(best: previous.best(ModeStat.words)) : []
         if mode != .sprint, let run = ModeRunStore.load(mode), !run.finished {
             sprint = nil; survival = run.survival; duo = run.duo
             baseMs = run.resumedElapsedMs; start = .now; resumed = true
@@ -100,10 +108,18 @@ import CNSNNCore
         let text = answer, now = elapsedMs
         switch mode {
         case .sprint:
+            let word = sprint?.card?.wordFull
             switch sprint?.answer(text, elapsed: now) {
             case .right?:
-                answer = ""; answerWrong = false; successTick += 1; gain = "+1"; Haptics.success()
-            case .wrong?: wrong()
+                answer = ""; answerWrong = false; foundWord = word; successTick += 1; gain = "+1"; Haptics.success()
+                if let sprint {
+                    foundTimes.append(SprintGame.durationMs - sprint.remainingMs(elapsed: now))
+                    SprintSound.note(sprint.streak)
+                    if sprint.streak == 5 || sprint.streak == 8 { SprintSound.chord(sprint.streak) }
+                    let best = previous.best(ModeStat.words)
+                    if best > 0, sprint.found == best + 1 { SprintSound.record() }
+                }
+            case .wrong?: wrong(); SprintSound.miss()
             default: break
             }
         case .survival:
@@ -195,6 +211,7 @@ import CNSNNCore
         case .sprint:
             guard let sprint else { return }
             beaten = state.recordMode(.sprint, best: sprint.records.best, add: sprint.records.add)
+            if sprint.found > previous.best(ModeStat.words) { SprintGhost.save(foundTimes) }
             ModeRunStore.remember(sprint.used, mode: .sprint)
             if sprint.found > publishedFound { state.publishSprint(found: sprint.found) }
         case .survival:
@@ -211,6 +228,26 @@ import CNSNNCore
         over = mode != .duo || duo?.roundComplete != true
     }
 
+    /// Sprint: how many words the record game had found at this point of the clock.
+    func ghostCount(elapsed: Int) -> Int? {
+        guard let sprint, !ghost.isEmpty else { return nil }
+        let clock = SprintGame.durationMs - sprint.remainingMs(elapsed: elapsed)
+        return ghost.filter { $0 <= clock }.count
+    }
+
     /// A record beaten that existed before this game (the first game only sets them).
     func improved(_ key: String) -> Bool { beaten.contains(key) && previous.best(key) > 0 }
+}
+
+/// The record game of this phone, word by word: the Sprint clock (ms) at each word found. When the
+/// record was set elsewhere (another phone, an older version), the ghost runs at the record's even pace.
+enum SprintGhost {
+    private static let key = "sprint.ghost"
+    static func timeline(best: Int) -> [Int] {
+        guard best > 0 else { return [] }
+        let saved = UserDefaults.standard.array(forKey: key) as? [Int] ?? []
+        if saved.count == best { return saved }
+        return (1...best).map { Int(Double($0) * Double(SprintGame.durationMs) / (Double(best) + 0.5)) }
+    }
+    static func save(_ times: [Int]) { UserDefaults.standard.set(times, forKey: key) }
 }

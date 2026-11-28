@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import com.poupoutch.cnsnn.core.DuoGame
 import com.poupoutch.cnsnn.core.ModeRandom
 import com.poupoutch.cnsnn.core.ModeRecords
+import com.poupoutch.cnsnn.core.ModeStat
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.SprintGame
 import com.poupoutch.cnsnn.core.SurvivalGame
@@ -50,6 +51,14 @@ class ModeViewModel : ViewModel() {
     /** The answer of the word just passed, shown for a moment (Sprint and Survie). */
     var passed by mutableStateOf<String?>(null); private set
     var passedTick by mutableIntStateOf(0); private set
+    /** The Sprint word just found, for the word that flies up from the answer line. */
+    var foundWord by mutableStateOf<String?>(null); private set
+    /**
+     * Sprint: the Sprint clock (ms) at each word found, and the same for the record game on this phone
+     * (the ghost that runs along the bar).
+     */
+    private val foundTimes = mutableListOf<Int>()
+    private var ghost: List<Int> = emptyList()
     var resumed by mutableStateOf(false); private set
     var over by mutableStateOf(false); private set
     var beaten by mutableStateOf<Set<String>>(emptySet()); private set
@@ -74,6 +83,8 @@ class ModeViewModel : ViewModel() {
     fun begin(state: AppViewModel) {
         answer = ""; answerWrong = false; gain = null; passed = null; over = false; beaten = emptySet(); recorded = false; publishedFound = 0
         previous = state.progress.records(mode)
+        foundWord = null; foundTimes.clear()
+        ghost = if (mode == PlayMode.SPRINT) SprintGhost.timeline(state.local.sprintGhost, previous.best(ModeStat.WORDS)) else emptyList()
         val run = if (mode != PlayMode.SPRINT) state.local.loadRun(mode) else null
         if (run != null && !run.finished) {
             sprint = null; survival = run.survival; duo = run.duo
@@ -116,11 +127,15 @@ class ModeViewModel : ViewModel() {
         if (WordEngine.normalize(answer).isEmpty()) { mistakeTick++; return }
         val text = answer; val now = elapsedMs
         when (mode) {
-            PlayMode.SPRINT -> when (val outcome = sprint?.answer(text, now)) {
-                is SprintGame.Outcome.Right -> { answer = ""; answerWrong = false; successTick++; gain = "+1" }
+            PlayMode.SPRINT -> { val word = sprint?.card?.wordFull; when (val outcome = sprint?.answer(text, now)) {
+                is SprintGame.Outcome.Right -> {
+                    answer = ""; answerWrong = false; foundWord = word
+                    sprint?.let { foundTimes += SprintGame.DURATION_MS - it.remainingMs(now) }
+                    successTick++; gain = "+1"
+                }
                 SprintGame.Outcome.Wrong -> wrong()
                 else -> Unit
-            }
+            } }
             PlayMode.SURVIVAL -> when (val outcome = survival?.answer(text)) {
                 is SurvivalGame.Outcome.Right -> { answer = ""; answerWrong = false; successTick++; if (outcome.lifeGained) lifeGainedTick++ }
                 is SurvivalGame.Outcome.Wrong -> { wrong(); lifeLostTick++ }
@@ -206,6 +221,7 @@ class ModeViewModel : ViewModel() {
         when (mode) {
             PlayMode.SPRINT -> sprint?.let {
                 beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode)
+                if (it.found > previous.best(ModeStat.WORDS)) state.local.sprintGhost = foundTimes.toList()
                 if (it.found > publishedFound) state.publishSprint(it.found)
             }
             PlayMode.SURVIVAL -> survival?.let { beaten = state.recordMode(mode, it.best, it.add); state.local.remember(it.used, mode) }
@@ -215,11 +231,31 @@ class ModeViewModel : ViewModel() {
         over = mode != PlayMode.DUO || duo?.roundComplete != true
     }
 
+    /** Sprint: how many words the record game had found at this point of the clock (null: no record yet). */
+    fun ghostCount(elapsed: Int): Int? {
+        val game = sprint ?: return null
+        if (ghost.isEmpty()) return null
+        val clock = SprintGame.DURATION_MS - game.remainingMs(elapsed)
+        return ghost.count { it <= clock }
+    }
+
     /** A record beaten that existed before this game (the first game only sets them). */
     fun improved(key: String): Boolean = key in beaten && previous.best(key) > 0
 
     companion object {
         /** Fixed seed for the interface tests, so they know the words. */
         var testSeed: ULong? = null
+    }
+}
+
+/**
+ * The record game of this phone, word by word: the Sprint clock (ms) at each word found. When the record
+ * was set elsewhere (another phone, an older version), the ghost runs at the record's even pace.
+ */
+internal object SprintGhost {
+    fun timeline(saved: List<Int>, best: Int): List<Int> {
+        if (best <= 0) return emptyList()
+        if (saved.size == best) return saved
+        return (1..best).map { (it * SprintGame.DURATION_MS.toDouble() / (best + 0.5)).toInt() }
     }
 }
