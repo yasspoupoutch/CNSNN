@@ -34,7 +34,7 @@ jobs:
   capture:
     name: Prendre les captures App Store
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 70
     defaults:
       run:
         shell: bash
@@ -329,7 +329,7 @@ jobs:
       # iPad 13 pouces : l'app tourne en vraie app iPad, l'App Store demande donc des captures iPad
       # (2064 x 2752). Mêmes écrans que l'iPhone, publiés dans ios/ipad-<apparence>/.
       - name: Prendre les captures iPad 13 pouces
-        timeout-minutes: 12
+        timeout-minutes: 25
         run: |
           set -euo pipefail
           ipad=$(xcrun simctl list devices available -j | python3 -c '
