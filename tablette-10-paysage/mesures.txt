@@ -1,0 +1,43 @@
+Écran : 800 × 1220 dp
+Bouton C’est parti : marge 60 dp
+Lien J’ai déjà un compte : marge 12 dp
+Premier lancement : dernière règle à 1280 px, bouton à 2208 px
+Manche 1, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 1, indice 2 au-dessus de la réponse : marge 431 dp
+Manche 1, un mot trouvé, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 1, un mot trouvé, indice 2 au-dessus de la réponse : marge 431 dp
+Manche 2, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 2, indice 2 au-dessus de la réponse : marge 431 dp
+Manche 3, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 3, indice 2 au-dessus de la réponse : marge 431 dp
+Manche 4, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 4, indice 2 au-dessus de la réponse : marge 431 dp
+Manche 5, indice 1 au-dessus de la réponse : marge 532 dp
+Manche 5, indice 2 au-dessus de la réponse : marge 431 dp
+Sprint, carte 1, indice : marge 462 dp
+Sprint, carte 2, indice : marge 462 dp
+Sprint, carte 3, indice : marge 462 dp
+Sprint, carte 4, indice : marge 462 dp
+Sprint, carte 5, indice : marge 462 dp
+Sprint, carte 6, indice : marge 462 dp
+Sprint, carte 7, indice : marge 487 dp
+Sprint, carte 8, indice : marge 462 dp
+Survie, carte 1, indice : marge 497 dp
+Survie, carte 2, indice : marge 472 dp
+Survie, carte 3, indice : marge 472 dp
+Défi, mot 1, indice : marge 525 dp
+Défi, mot 2, indice : marge 525 dp
+Défi, mot 3, indice : marge 525 dp
+Défi, mot 4, indice : marge 525 dp
+Défi, mot 5, indice : marge 525 dp
+Duel, mot 1, indice : marge 460 dp
+Duel, mot 2, indice : marge 460 dp
+Classique, indices révélés, indice : marge 567 dp
+Mot du jour, indices révélés, indice : marge 567 dp
+Mot du jour, indices révélés, mot raté DITE : marge 525 dp
+Mot du jour, indices révélés, mot raté DRIGE : marge 525 dp
+Mot du jour, indices révélés, mot raté DKJFJD : marge 525 dp
+Mot du jour, deux lettres placées, indice : marge 598 dp
+Mot du jour, deux lettres placées, mot raté DITE : marge 556 dp
+Mot du jour, deux lettres placées, mot raté DRIGE : marge 556 dp
+Mot du jour, deux lettres placées, mot raté DKJFJD : marge 556 dp

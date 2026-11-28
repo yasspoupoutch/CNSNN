@@ -1,0 +1,43 @@
+Écran : 600 × 900 dp
+Bouton C’est parti : marge 60 dp
+Lien J’ai déjà un compte : marge 12 dp
+Premier lancement : dernière règle à 1280 px, bouton à 1568 px
+Manche 1, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 1, indice 2 au-dessus de la réponse : marge 111 dp
+Manche 1, un mot trouvé, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 1, un mot trouvé, indice 2 au-dessus de la réponse : marge 111 dp
+Manche 2, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 2, indice 2 au-dessus de la réponse : marge 111 dp
+Manche 3, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 3, indice 2 au-dessus de la réponse : marge 111 dp
+Manche 4, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 4, indice 2 au-dessus de la réponse : marge 111 dp
+Manche 5, indice 1 au-dessus de la réponse : marge 212 dp
+Manche 5, indice 2 au-dessus de la réponse : marge 111 dp
+Sprint, carte 1, indice : marge 142 dp
+Sprint, carte 2, indice : marge 142 dp
+Sprint, carte 3, indice : marge 142 dp
+Sprint, carte 4, indice : marge 142 dp
+Sprint, carte 5, indice : marge 142 dp
+Sprint, carte 6, indice : marge 142 dp
+Sprint, carte 7, indice : marge 167 dp
+Sprint, carte 8, indice : marge 142 dp
+Survie, carte 1, indice : marge 177 dp
+Survie, carte 2, indice : marge 152 dp
+Survie, carte 3, indice : marge 152 dp
+Défi, mot 1, indice : marge 230 dp
+Défi, mot 2, indice : marge 205 dp
+Défi, mot 3, indice : marge 205 dp
+Défi, mot 4, indice : marge 205 dp
+Défi, mot 5, indice : marge 205 dp
+Duel, mot 1, indice : marge 140 dp
+Duel, mot 2, indice : marge 140 dp
+Classique, indices révélés, indice : marge 247 dp
+Mot du jour, indices révélés, indice : marge 247 dp
+Mot du jour, indices révélés, mot raté DITE : marge 205 dp
+Mot du jour, indices révélés, mot raté DRIGE : marge 205 dp
+Mot du jour, indices révélés, mot raté DKJFJD : marge 205 dp
+Mot du jour, deux lettres placées, indice : marge 278 dp
+Mot du jour, deux lettres placées, mot raté DITE : marge 236 dp
+Mot du jour, deux lettres placées, mot raté DRIGE : marge 236 dp
+Mot du jour, deux lettres placées, mot raté DKJFJD : marge 236 dp
