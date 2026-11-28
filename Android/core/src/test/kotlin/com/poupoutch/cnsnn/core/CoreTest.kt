@@ -30,6 +30,13 @@ class WordEngineTest {
         assertEquals("LOEUVREDETE", WordEngine.normalize("  L’ŒUVRE — d'Été  "))
         assertTrue(WordEngine.matches("les aristochats", "Les Aristochats"))
         assertFalse(WordEngine.matches("", "A"))
+        assertTrue(WordEngine.matches("SUPER MARIO", "Super Mario"))
+        assertTrue(WordEngine.matches("calamar", "Calmar"))
+        assertTrue(WordEngine.matches("calmar", "Calmar"))
+        assertFalse(WordEngine.matches("calamar", "Calamar géant"))
+        WordEngine.variants.forEach { (word, others) ->
+            others.forEach { assertEquals(it, WordEngine.consonants(word), WordEngine.consonants(it)) }
+        }
     }
     @Test fun vowels() {
         assertTrue(WordEngine.isVowel('É')); assertTrue(WordEngine.isVowel('y')); assertTrue(WordEngine.isVowel('Œ'))

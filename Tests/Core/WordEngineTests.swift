@@ -32,6 +32,13 @@ final class WordEngineTests: XCTestCase {
   XCTAssertTrue(WordEngine.matches("elephant",word:"Éléphant"))
   XCTAssertFalse(WordEngine.matches("   ",word:""))
   XCTAssertFalse(WordEngine.matches("chocolats",word:"Chocolat"))
+  XCTAssertTrue(WordEngine.matches("SUPER MARIO",word:"Super Mario"))
+  XCTAssertTrue(WordEngine.matches("calamar",word:"Calmar"))
+  XCTAssertTrue(WordEngine.matches("calmar",word:"Calmar"))
+  XCTAssertFalse(WordEngine.matches("calamar",word:"Calamar géant"))
+  for (word, others) in WordEngine.variants {
+   for other in others { XCTAssertEqual(WordEngine.consonants(other), WordEngine.consonants(word), other) }
+  }
   XCTAssertFalse(WordEngine.validWord("AEIOUY"))
  }
  func testCatalogueInvariants() {

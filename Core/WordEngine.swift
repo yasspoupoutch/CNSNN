@@ -43,9 +43,19 @@ public enum WordEngine {
     public static func spoken(_ shown: String) -> String {
         shown.split(separator: " ").map { $0.map(String.init).joined(separator: ", ") }.joined(separator: " ; ")
     }
+    /// Other correct spellings of a card's word, with the same consonants so the board stays true
+    /// (CLMR is « calmar » and « calamar »). Keys and values are normalized; same table in WordEngine.kt.
+    public static let variants: [String: [String]] = [
+        "CALMAR": ["CALAMAR"],
+        "OIGNON": ["OGNON"],
+        "SOUPEALOIGNON": ["SOUPEALOGNON"],
+        "SHAMPOING": ["SHAMPOOING"],
+        "CACAHUETE": ["CACAHOUETE"],
+        "IGLOO": ["IGLOU"],
+    ]
     public static func matches(_ answer: String, word: String) -> Bool {
-        let normalized = normalize(answer)
-        return !normalized.isEmpty && normalized == normalize(word)
+        let normalized = normalize(answer), expected = normalize(word)
+        return !normalized.isEmpty && (normalized == expected || variants[expected, default: []].contains(normalized))
     }
     public static func validWord(_ word: String) -> Bool {
         let full = normalize(word)
