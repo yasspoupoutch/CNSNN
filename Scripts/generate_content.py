@@ -75,6 +75,8 @@ def check_word(word, where):
     full = normalize(word)
     if not 3 <= len(full) <= 40 or not consonants(word):
         raise Invalid(f'{where} : mot invalide « {word} »')
+    if not any(v in full for v in 'AEIOUY'):
+        raise Invalid(f'{where} : « {word} » n’a aucune voyelle à trouver')
 
 
 def load_cards():
