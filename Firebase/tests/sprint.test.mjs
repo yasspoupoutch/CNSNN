@@ -59,10 +59,13 @@ test('a record comes from the game just played: a second per word, within 150 s'
   await assertFails(setDoc(doc(user('bob'), 'sprintRecords/alice'), line('alice', 'Alice', 12, start)));
   await assertFails(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 12, start, { legacy: true })));
   await assertSucceeds(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 12, start)));
-  // The same game cannot be counted twice, and a lower or equal score never replaces the record.
-  await assertFails(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 13, start)));
-  start = await startedAgo('alice', 95000);
+  // The same game may raise its own line (score saved on leaving the app, then the final score),
+  // and a lower or equal score never replaces the record.
   await assertFails(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 12, start)));
+  await assertSucceeds(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 13, start)));
+  assert.equal((await read('sprintRecords/alice')).best, 13);
+  start = await startedAgo('alice', 95000);
+  await assertFails(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 13, start)));
   await assertSucceeds(setDoc(doc(db, 'sprintRecords/alice'), line('alice', 'Alice', 15, start)));
   assert.equal((await read('sprintRecords/alice')).best, 15);
 });

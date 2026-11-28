@@ -126,6 +126,7 @@ struct MainShell: View {
         }
         // "Proposer un mot" on the daily result: the form lives in Profil.
         .onChange(of: state.proposeRequest) { _, _ in tab = .profile }
+        .onChange(of: state.renameRequest) { _, _ in tab = .profile }
         .onChange(of: state.inviteCode) { _, code in if code != nil { tab = .play } }
         // A friend link: added once there is an account, then said in an alert.
         .task(id: (state.friendInviteCode ?? "") + "|" + (state.uid ?? "")) { await state.acceptFriendInvite() }
@@ -263,22 +264,10 @@ struct LaunchView: View {
 
 struct OnboardingView: View {
     @Environment(AppState.self) private var state
-    @AppStorage(CNSNNTheme.avatarKey) private var avatar = 0
-    @State private var step = 0
-    @State private var username = ""
-    @State private var accepted = false
     @State private var signingIn = false
-    @FocusState private var fieldFocused: Bool
-    private var trimmed: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var valid: Bool { (2...20).contains(trimmed.count) }
+    /// One screen, no question: the rules of the game, then straight in under an automatic pseudo
+    /// ("Joueur4821"), changed in Profil whenever the player likes.
     var body: some View {
-        ZStack {
-            if step == 0 { rules.transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)).combined(with: .opacity)) }
-            else { pseudo.transition(.move(edge: .trailing).combined(with: .opacity)) }
-        }.animation(CNSNNTheme.ease, value: step)
-    }
-
-    private var rules: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 0) {
@@ -302,10 +291,17 @@ struct OnboardingView: View {
                     }.padding(.horizontal, 6).padding(.top, 28)
                 }.padding(.horizontal, 26)
             }.scrollBounceBehavior(.basedOnSize)
-            Button("Continuer") { Haptics.selection(); step = 1 }
-                .buttonStyle(PrimaryPillStyle())
-                .padding(.horizontal, 26).padding(.bottom, 12)
+            VStack(spacing: 4) {
+                Button(state.isBusy ? "Un instant…" : "C’est parti", action: start)
+                    .buttonStyle(PrimaryPillStyle())
+                    .disabled(state.isBusy)
+                Button("J’ai déjà un compte") { signingIn = true }
+                    .scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("existing-account")
+            }.padding(.horizontal, 26).padding(.top, 12).padding(.bottom, 8)
         }
+        .sheet(isPresented: $signingIn) { SignInSheet() }
     }
 
     private func bullet(_ text: String) -> some View {
@@ -315,76 +311,10 @@ struct OnboardingView: View {
         }
     }
 
-    private var pseudo: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    CircleIconButton(symbol: "chevron.left", label: "Retour") { fieldFocused = false; step = 0 }
-                    Text("Choisissez un pseudo").scaledFont(34, .bold).tracking(-0.6).padding(.top, 22)
-                    Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.")
-                        .scaledFont(16).foregroundStyle(Palette.secondary).padding(.top, 8)
-                    AvatarView(name: trimmed.isEmpty ? "?" : trimmed, colorIndex: avatar, size: 104)
-                        .shadow(color: Palette.glassShadow, radius: 20, y: 16)
-                        .frame(maxWidth: .infinity).padding(.top, 34)
-                    AvatarPicker(selection: $avatar).frame(maxWidth: .infinity).padding(.top, 20)
-                    TextField("", text: $username, prompt: Text("ex. voyelle_hunter").foregroundStyle(Palette.tertiary))
-                        .scaledFont(19, .medium).foregroundStyle(Palette.foreground)
-                        .textContentType(.nickname).autocorrectionDisabled().textInputAutocapitalization(.never)
-                        .submitLabel(.go).onSubmit(start)
-                        .focused($fieldFocused)
-                        .padding(.horizontal, 20).frame(minHeight: 58)
-                        .glassPanel(radius: 20, padding: 0)
-                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(fieldFocused ? Palette.focusRing : .clear, lineWidth: 1))
-                        .padding(.top, 30)
-                        .accessibilityLabel("Pseudo, entre 2 et 20 caractères")
-                    Text(message.text).scaledFont(13).foregroundStyle(message.color)
-                        .frame(minHeight: 20).padding(.horizontal, 4).padding(.top, 10)
-                }.padding(.horizontal, 26).padding(.top, 10)
-            }.scrollDismissesKeyboard(.interactively).scrollBounceBehavior(.basedOnSize)
-            VStack(spacing: 12) {
-                acceptance
-                Button(state.isBusy ? "Un instant…" : "C’est parti", action: start)
-                    .buttonStyle(PrimaryPillStyle())
-                    .disabled(state.isBusy || !valid || !accepted)
-                Text("Modifiable à tout moment depuis votre profil.").scaledFont(12).foregroundStyle(Palette.tertiary)
-                Button("J’ai déjà un compte") { fieldFocused = false; signingIn = true }
-                    .scaledFont(15, .semibold).foregroundStyle(Palette.foreground)
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("existing-account")
-            }.padding(.horizontal, 26).padding(.bottom, 12)
-        }
-        .sheet(isPresented: $signingIn) { SignInSheet() }
-    }
-
-    /// Community rules and privacy policy, accepted before the first game.
-    private var acceptance: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Button { Haptics.selection(); accepted.toggle() } label: {
-                Image(systemName: accepted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(accepted ? Palette.mint : Palette.tertiary)
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityIdentifier("accept-rules")
-            .accessibilityLabel("J’accepte les règles de la communauté et la politique de confidentialité")
-            .accessibilityAddTraits(accepted ? .isSelected : [])
-            Text("J’accepte les [règles de la communauté](\(Site.rules.absoluteString)) et la [politique de confidentialité](\(Site.privacy.absoluteString)).")
-                .scaledFont(14).foregroundStyle(Palette.secondary).tint(Palette.foreground)
-                .fixedSize(horizontal: false, vertical: true).padding(.top, 11)
-        }
-    }
-
-    private var message: (text: String, color: Color) {
-        if trimmed.isEmpty { return ("", Palette.tertiary) }
-        return valid ? ("✓ Parfait", Palette.mint) : ("Entre 2 et 20 caractères", Palette.tertiary)
-    }
-
     private func start() {
-        guard valid, accepted, !state.isBusy else { return }
-        fieldFocused = false
+        guard !state.isBusy else { return }
         Haptics.success()
-        state.progress.rulesVersion = CommunityRules.version
-        Task { await state.start(username: username) }
+        Task { await state.start() }
     }
 }
 

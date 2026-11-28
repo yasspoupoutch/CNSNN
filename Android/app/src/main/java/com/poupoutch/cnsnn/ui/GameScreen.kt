@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -163,6 +164,17 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         else if (ReviewPrompt.isDue(state.progress.dailyWins, BuildConfig.VERSION_NAME, state.local.reviewAskedVersion)) state.reviewPending = true
     }
 
+    // A word just found here (not one loaded from earlier, not shown by a hint) bursts into letters first;
+    // on the ranked Mot du jour the place follows in big, then the sheet comes up.
+    val reduceMotion = rememberReduceMotion()
+    var celebration by remember { mutableStateOf<Long?>(null) }
+    var sheetShown by remember { mutableStateOf(true) }
+    LaunchedEffect(result?.id) {
+        if (result?.correct == true && game.celebrate && !reduceMotion && !game.tutorial) {
+            game.celebrate = false; sheetShown = false; celebration = System.nanoTime()
+        } else { sheetShown = true; if (result == null) celebration = null }
+    }
+
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
         Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
@@ -196,13 +208,20 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         AnimatedVisibility(result != null, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f)))
         }
-        AnimatedVisibility(result != null, Modifier.align(Alignment.BottomCenter),
+        AnimatedVisibility(result != null && sheetShown, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
             result?.let {
                 ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && game.hintsTaken == 0, game.standing,
                     game.pendingOfficial, game.ranked, game.usedHint, game.usedVowels, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
                     letters = game.lettersUsed, revealedWord = game.revealedWord,
                     next = { game.next(state) }, close = close)
+            }
+        }
+        val word = game.card?.wordFull?.uppercase()
+        celebration?.let { id ->
+            if (word != null) androidx.compose.runtime.key(id) {
+                WordCelebration(word, showsRank = mode == GameMode.DAILY && game.ranked && game.catchUpDay == null,
+                    standing = { game.standing }, showSheet = { sheetShown = true }, ended = { if (celebration == id) celebration = null })
             }
         }
     }
@@ -271,12 +290,10 @@ private fun androidx.compose.foundation.layout.ColumnScope.Board(state: AppViewM
             } else if (game.placed != null) {
                 // The hints after the sentence: the word's vowels, in gold, take their places one by one.
                 val placed = game.placed!!
-                Text(highlighted(placed), style = Type.serif(fitConsonants(if (placed.length > 9) 52 else if (placed.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters)),
-                    letterSpacing = 3.sp, maxLines = 1,
-                    modifier = Modifier.padding(top = if (available < 300.dp) 12.dp else 28.dp).onSizeChanged { letters = it.height }.semantics { contentDescription = "Lettres : " + WordEngine.spoken(placed) })
+                BoardLetters(placed, fitConsonants(if (placed.length > 9) 52 else if (placed.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters, WordEngine.lines(placed).size),
+                    gold = true, modifier = Modifier.padding(top = if (available < 300.dp) 12.dp else 28.dp).onSizeChanged { letters = it.height }.semantics { contentDescription = "Lettres : " + WordEngine.spoken(placed) })
             } else {
-                Text(consonants, style = Type.serif(fitConsonants(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters)),
-                    letterSpacing = 3.sp, maxLines = 1,
+                BoardLetters(consonants, fitConsonants(if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 88, available, if (content == 0 || letters == 0) 0 else content - letters, WordEngine.lines(consonants).size),
                     modifier = Modifier.padding(top = if (available < 300.dp) 12.dp else 28.dp).onSizeChanged { letters = it.height }.semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
             }
             Box(Modifier.padding(top = 18.dp).width(36.dp)) { Divider() }
@@ -373,15 +390,18 @@ fun AnswerLine(answer: String, mistakeTick: Int, active: Boolean, wrong: Boolean
         if (mistakeTick > 0) { shake.snapTo(0f); shake.animateTo(1f, tween(420)) }
     }
     val dx = (10 * sin(shake.value * PI * 4) * (1 - shake.value)).toFloat()
-    Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 24.dp).offset(x = dx.dp)
+    var room by remember { mutableIntStateOf(0) }
+    Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 24.dp).onSizeChanged { room = it.width }.offset(x = dx.dp)
         .drawBehind { drawLine(Palette.tertiary, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 2f) }
         .semantics { contentDescription = "Votre réponse : " + answer.ifEmpty { "vide" } },
         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         if (answer.isEmpty()) { Text("votre réponse", style = Type.serifItalic(22), color = Palette.tertiary); if (active) Caret(); return@Row }
         val typed = TypedAnswer(answer, if (active) cursor else null)
-        val size = if (answer.length > 14) 22.sp else 30.sp
+        // A long answer (an expression) shrinks to stay whole on the line, the caret included.
+        val start = if (answer.length > 14) 22 else 30
+        val size = fitToWidth(answer, androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(fontSize = start.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp)), room - with(LocalDensity.current) { 12.dp.roundToPx() }, min = 10).sp
         val letters: @Composable (String) -> Unit = { part ->
-            if (part.isNotEmpty()) Text(if (wrong) highlighted(part, Palette.red, Palette.red) else highlighted(part), fontSize = size, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1)
+            if (part.isNotEmpty()) Text(if (wrong) highlighted(part, Palette.red, Palette.red) else highlighted(part), fontSize = size, fontWeight = FontWeight.Medium, letterSpacing = 2.sp, maxLines = 1, softWrap = false)
         }
         var width by remember { mutableIntStateOf(0) }
         Row(Modifier.onSizeChanged { width = it.width }.then(if (place == null || !active) Modifier else Modifier.pointerInput(answer) {
@@ -623,18 +643,25 @@ fun VowelReveal(word: String, correct: Boolean, modifier: Modifier = Modifier, m
         }
         if (correct && vowelCount > 0) { delay(300); glow.animateTo(1f, tween(350)); delay(500); glow.animateTo(0f, tween(900)) }
     }
-    val size = minOf(maxSize, width / (maxOf(word.length, 1) * 0.8f))
-    Row(modifier.widthIn(max = 360.dp).drawBehind {
+    // A long expression goes on two or three lines, cut between its words, so it stays big enough to read
+    // (« QU’EST-CE QU’ON A / FAIT AU BON DIEU »); the vowels still slide in one after the other across the lines.
+    val lines = remember(word) { if (word.length > 16) WordEngine.lines(word, maxChars = 16) else listOf(word) }
+    val size = minOf(maxSize, width / (maxOf(lines.maxOf { it.length }, 1) * 0.8f))
+    Column(modifier.widthIn(max = 360.dp).drawBehind {
         if (glow.value > 0) drawCircle(Brush.radialGradient(listOf(Palette.accent.copy(alpha = 0.45f * glow.value), Color.Transparent), radius = this.size.width / 1.6f),
             radius = this.size.width / 1.6f)
-    }.semantics { contentDescription = word }) {
+    }.semantics { contentDescription = word }, horizontalAlignment = Alignment.CenterHorizontally) {
         var order = 0
-        word.forEach { c ->
-            if (isVowel(c)) {
-                val p = progress[order++].value
-                Text(c.toString(), fontSize = size.sp, fontWeight = FontWeight.Black, color = if (correct) Palette.accent else Palette.secondary,
-                    modifier = Modifier.collapse(p).alpha(p.coerceIn(0f, 1f)), softWrap = false)
-            } else Text(c.toString(), fontSize = size.sp, fontWeight = FontWeight.Black, color = Palette.foreground, softWrap = false)
+        lines.forEach { line ->
+            Row {
+                line.forEach { c ->
+                    if (isVowel(c)) {
+                        val p = progress[order++].value
+                        Text(c.toString(), fontSize = size.sp, fontWeight = FontWeight.Black, color = if (correct) Palette.accent else Palette.secondary,
+                            modifier = Modifier.collapse(p).alpha(p.coerceIn(0f, 1f)), softWrap = false)
+                    } else Text(c.toString(), fontSize = size.sp, fontWeight = FontWeight.Black, color = Palette.foreground, softWrap = false)
+                }
+            }
         }
     }
 }
@@ -683,16 +710,17 @@ private fun HintNudge() {
 }
 
 /**
- * The consonants' size on a game board: `base`, or smaller (not under 40 sp) when the rest of the board
- * (`rest` px: hint, theme, paddings) needs the room, so nothing has to scroll on a small phone.
+ * The consonants' size on a game board: `base`, or smaller (not under 40 sp, 26 sp for an expression on several
+ * `lines`) when the rest of the board (`rest` px: hint, theme, paddings) needs the room, so nothing has to scroll
+ * on a small phone.
  */
 @Composable
-internal fun fitConsonants(base: Int, available: androidx.compose.ui.unit.Dp, rest: Int): Int {
+internal fun fitConsonants(base: Int, available: androidx.compose.ui.unit.Dp, rest: Int, lines: Int = 1): Int {
     if (rest <= 0) return base
     val density = LocalDensity.current
     val room = available - with(density) { rest.toDp() } - 12.dp
     // The serif line takes about 1.2 × its size (line height and font padding), times the font scale.
-    return (room.value / 1.2f / density.fontScale).toInt().coerceIn(40, base)
+    return (room.value / 1.2f / lines / density.fontScale).toInt().coerceIn(if (lines > 1) 26 else 40, base)
 }
 
 /** Under the board once the first hint is taken (Mot du jour). */

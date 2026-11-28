@@ -3,6 +3,11 @@ import Observation
 import CNSNNCore
 
 @MainActor @Observable final class GameSession {
+    /// Interface tests only: the Classique card to deal (`--classic-card=seed-…`, CNSNNScreenshotTests.testLongExpressions).
+    static var testCardID: String? {
+        guard ProcessInfo.processInfo.arguments.contains("--uitesting") else { return nil }
+        return ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--classic-card=") }.map { String($0.dropFirst("--classic-card=".count)) }
+    }
     enum Phase: Equatable { case loading, playing, failed(String) }
     var phase: Phase = .playing
     var card: Card?
@@ -33,6 +38,8 @@ import CNSNNCore
     /// The finish is recorded on this iPhone and waits for the network to become official.
     var pendingOfficial = false
     var standing: DailyStanding?
+    /// The word was just found in this game: the screen celebrates it once.
+    var celebrate = false
     /// The word is secret: the server checks each guess and reveals the word at the end.
     var secret = false
     /// A guess or the hint is on its way to the server.
@@ -70,6 +77,9 @@ import CNSNNCore
             } else {
                 loadLocalDaily(key: key, state: state)
             }
+        } else if let id = Self.testCardID, let forced = state.cards.first(where: { $0.id == id }) {
+            // Interface tests only (`--classic-card=seed-…`): the Classique card to deal.
+            card = forced
         } else if ScreenshotDemo.isActive {
             // App Store screenshots: always the same public Classique card.
             card = ScreenshotDemo.classicCard
@@ -395,6 +405,7 @@ import CNSNNCore
         let attempt = Attempt(cardID: card.id, mode: mode, correct: correct, timeMs: ms, points: 0, date: Date(), dailyKey: dailyKey,
                               catchUp: catchUpDay != nil ? true : nil)
         result = attempt
+        celebrate = correct && !revealedWord
         state.record(attempt)
         if correct { Haptics.success() }
         if ranked, let cloud = state.cloud, let uid = state.uid, let dailyKey {

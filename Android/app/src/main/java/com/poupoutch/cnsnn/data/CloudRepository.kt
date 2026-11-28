@@ -26,6 +26,7 @@ import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.DailySchedule
 import com.poupoutch.cnsnn.core.DailyStanding
 import com.poupoutch.cnsnn.core.Difficulty
+import com.poupoutch.cnsnn.core.NameFilter
 import com.poupoutch.cnsnn.core.FriendCode
 import com.poupoutch.cnsnn.core.FriendStanding
 import com.poupoutch.cnsnn.core.GameMode
@@ -87,7 +88,7 @@ fun reservable(name: String): Boolean {
     return '/' !in key && key != "." && key != ".." && !(key.startsWith("__") && key.endsWith("__"))
 }
 /** The pseudo given to an account that signs in without a profile yet (made on the web, say). */
-fun fallbackName(): String = "Joueur" + (1000..9999).random()
+fun fallbackName(): String = NameFilter.automatic()
 
 class CloudRepository(
     private val auth: FirebaseAuth = com.poupoutch.cnsnn.Cloud.auth,
@@ -105,16 +106,24 @@ class CloudRepository(
         val ref = db.collection("users").document(user.uid)
         // Falls back to the cached profile offline, so a returning player keeps their identity.
         val doc = ref.get().await()
+        var username = username
         if (!doc.exists()) {
             if (doc.metadata.isFromCache) throw CloudError(CloudError.Kind.OFFLINE)
             // A deletion cut off halfway (network, app closed) must finish, never bring the profile back.
             if (db.collection("deletedUsers").document(user.uid).get(Source.SERVER).await().exists()) throw CloudError(CloudError.Kind.DELETION_PENDING)
+            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
+            // An automatic pseudo already taken is simply drawn again.
+            val batch = db.batch()
+            for (attempt in 1..5) {
+                try { reserve(username, user.uid, batch); break }
+                catch (e: CloudError) {
+                    if (e.kind != CloudError.Kind.USERNAME_TAKEN || attempt == 5 || !NameFilter.isAutomatic(username)) throw e
+                    username = NameFilter.automatic()
+                }
+            }
             val data = mutableMapOf<String, Any?>("uid" to user.uid, "username" to username, "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp(),
                 "score" to 0, "gamesPlayed" to 0, "correctAnswers" to 0, "bestTimeMs" to null, "currentStreak" to 0)
             if (rulesVersion != null) { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
-            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
-            val batch = db.batch()
-            reserve(username, user.uid, batch)
             batch.set(ref, data)
             batch.commit().await()
             return CloudProfile(user.uid, user.isAnonymous, username, user.email, rulesVersion)
@@ -448,7 +457,8 @@ class CloudRepository(
         val startedAt = db.collection("sprintRuns").document(uid).get(Source.SERVER).await().getTimestamp("startedAt") ?: return false
         val ref = db.collection("sprintRecords").document(uid)
         val old = ref.get(Source.SERVER).await()
-        if (found <= (old.getLong("best") ?: 0L) || old.getTimestamp("startedAt") == startedAt) return false
+        // The same game may raise its line: its score is saved when the app leaves the screen, then at the end.
+        if (found <= (old.getLong("best") ?: 0L)) return false
         ref.set(mapOf("uid" to uid, "username" to username, "best" to found, "rank" to SprintRecords.rank(found, millis(startedAt)),
             "startedAt" to startedAt, "at" to FieldValue.serverTimestamp())).await()
         return true
@@ -812,6 +822,15 @@ class CloudRepository(
         return id?.takeIf { it.isNotEmpty() }
     }
 
+    // ---- Crowns
+
+    /** Last week's number 1 and the last tournament's winner (written by Firebase/tools/champions.mjs). One read. */
+    suspend fun champions(): Champions {
+        val d = db.collection("meta").document("champions").get().await()
+        return Champions(d.getString("weekMonday") ?: "", d.getString("weekUid") ?: "", d.getString("weekName") ?: "",
+            d.getString("tournamentWeek") ?: "", d.getString("tournamentUid") ?: "", d.getString("tournamentName") ?: "")
+    }
+
     // ---- Weekly tournament (Core/Tournament.kt, same documents as the iPhone app)
 
     private fun tournament(week: String) = db.collection("tournaments").document(week)
@@ -827,7 +846,7 @@ class CloudRepository(
         tournament(week).collection("players").document(uid).get(Source.SERVER).await().exists()
     suspend fun signUp(week: String, uid: String, username: String) {
         val ref = tournament(week).collection("players").document(uid)
-        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp())))) throw CloudError(CloudError.Kind.OFFLINE)
+        if (!awaitWrite(ref.set(mapOf("uid" to uid, "name" to username, "at" to FieldValue.serverTimestamp(), "v" to 2)))) throw CloudError(CloudError.Kind.OFFLINE)
     }
     suspend fun withdraw(week: String, uid: String) {
         if (!awaitWrite(tournament(week).collection("players").document(uid).delete())) throw CloudError(CloudError.Kind.OFFLINE)
@@ -1138,5 +1157,28 @@ class CloudRepository(
          */
         suspend fun awaitWrite(task: Task<*>, timeoutMs: Long = 10_000): Boolean =
             withTimeoutOrNull(timeoutMs) { task.await(); true } ?: false
+    }
+}
+
+/**
+ * The crowns: last week's number 1 of the Mot du jour (on the daily card) and the winner of the last
+ * tournament (on the TOURNOI card). Written each morning by Firebase/tools/champions.mjs.
+ */
+data class Champions(val weekMonday: String, val weekUid: String, val weekName: String,
+                     val tournamentWeek: String, val tournamentUid: String, val tournamentName: String) {
+    /** Last week's number 1, only during the week after. */
+    fun weekCrown(today: String): Pair<String, String>? {
+        val week = com.poupoutch.cnsnn.core.DailyScore.weekIndex(weekMonday) ?: return null
+        val now = com.poupoutch.cnsnn.core.DailyScore.weekIndex(today) ?: return null
+        return if (weekUid.isNotEmpty() && week == now - 1) weekUid to weekName else null
+    }
+    /** The last tournament's winner, for three weeks at most (a week without a tournament keeps the crown). */
+    fun tournamentCrown(nowMs: Long): Pair<String, String>? {
+        val start = com.poupoutch.cnsnn.core.TournamentRules.deadlineMs(tournamentWeek) ?: return null
+        return if (tournamentUid.isNotEmpty() && nowMs - start < 21 * com.poupoutch.cnsnn.core.TournamentRules.DAY_MS) tournamentUid to tournamentName else null
+    }
+    fun encode(): String = listOf(weekMonday, weekUid, weekName, tournamentWeek, tournamentUid, tournamentName).joinToString("\u0001")
+    companion object {
+        fun decode(text: String?): Champions? = text?.split("\u0001")?.takeIf { it.size == 6 }?.let { Champions(it[0], it[1], it[2], it[3], it[4], it[5]) }
     }
 }

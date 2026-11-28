@@ -69,6 +69,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var challenges by mutableStateOf<List<Challenge>>(emptyList()); private set
     /** Asks Profil to open "Proposer un mot" (from the daily result). */
     var proposeRequest by mutableStateOf(0)
+    /** "Choisir mon pseudo" on the home screen: Profil opens the pseudo box. */
+    var renameRequest by mutableStateOf(0)
     /** Asks the home page to open the challenge sheet (from the daily result). */
     var challengeRequest by mutableStateOf(0)
     /** The code of a challenge link the app was opened with, waiting for the challenge sheet to join it. */
@@ -182,23 +184,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun chooseAvatar(index: Int) { avatar = index; local.avatar = index }
 
-    /** First pseudo: the player accepted the community rules on the same screen. */
-    fun start(username: String) = viewModelScope.launch {
+    /**
+     * First launch: no question, the player plays at once under an automatic pseudo ("Joueur4821"),
+     * which they can change in Profil (the community rules are accepted then).
+     */
+    fun start() = viewModelScope.launch {
         if (isBusy) return@launch
-        val name = username.trim()
-        if (name.length !in 2..20) { error = "Choisissez un pseudo de 2 à 20 caractères."; return@launch }
-        if (!NameFilter.isAllowed(name)) { error = REFUSED_NAME; return@launch }
         isBusy = true
-        try {
+        var name = NameFilter.automatic()
+        testPseudo?.let { chosen ->
+            name = chosen
             progress = progress.copy(rulesVersion = maxOf(progress.rulesVersion ?: 0, CommunityRules.VERSION))
-            activate(cloud.bootstrap(name, CommunityRules.VERSION), preservingGuest = true)
+        }
+        try {
+            activate(cloud.bootstrap(name, progress.rulesVersion), preservingGuest = true)
         } catch (e: Exception) {
-            if (CloudError.code(e) == CloudError.Code.SERVER_FULL) {
-                // The free quota is used up for today: enter as a guest, the account is made at the next launch.
-                note(e); update { it.copy(username = name) }; return@launch
-            }
-            val pseudo = e is CloudError && e.kind in listOf(CloudError.Kind.USERNAME_TAKEN, CloudError.Kind.USERNAME_INVALID)
-            error = (if (pseudo) "" else "Connexion impossible : ") + CloudError.message(e); return@launch
+            // Offline, or the free quota used up for today: play as a guest, the account is made at the next launch.
+            note(e); update { it.copy(username = name) }; return@launch
         } finally { isBusy = false }
         refreshAll()
     }
@@ -448,11 +450,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         game.stop()
         recordMode(PlayMode.SPRINT, game.best, game.add)
     }
+    /**
+     * The score of the last Sprint on its way to the ranking. The next game's start waits for it: a
+     * quick « Rejouer » used to move the game's start on the server before the score got there, and
+     * the rules then refused the score (it no longer came from the game just started).
+     */
+    private var sprintPublishing: Job? = null
     /** A Sprint starts: the server notes the time, so the score can go on the Sprint ranking at the end. */
     fun startSprintRun() {
         val user = uid ?: return
         if (isSuspended || isServerFull) return
-        cloud.startSprint(user)
+        val pending = sprintPublishing?.takeIf { it.isActive } ?: return cloud.startSprint(user)
+        viewModelScope.launch { pending.join(); cloud.startSprint(user) }
     }
     /**
      * A Sprint ended on time: a new best goes on the Sprint ranking (the rules check the game).
@@ -462,10 +471,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val user = uid ?: return
         if (isSuspended || isServerFull || found <= 0) return
         val name = progress.username.ifEmpty { "Joueur" }
-        viewModelScope.launch {
+        val previous = sprintPublishing
+        sprintPublishing = viewModelScope.launch {
+            previous?.join()
             if (runCatching { cloud.publishSprint(user, name, found) }.getOrDefault(false)) {
                 rankings = rankings.copy(readAt = rankings.readAt - "sprint" - "sprintLeader")
-                refreshSprintLeader()
+                viewModelScope.launch { refreshSprintLeader() }
             }
         }
     }
@@ -570,6 +581,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         rankings = rankings.copy(sprintLeader = top.firstOrNull(), readAt = rankings.readAt + ("sprintLeader" to System.currentTimeMillis()))
     }
     fun refreshSprintLeaderSoon() { viewModelScope.launch { refreshSprintLeader() } }
+
+    /** The crowns of the home page: read again every 6 hours (pictures: set by the test). */
+    var champions by mutableStateOf(local.champions)
+    private var championsReadAt = 0L
+    suspend fun refreshChampions() {
+        if (uid == null || isServerFull || System.currentTimeMillis() - championsReadAt < 6 * 3_600_000L) return
+        val read = runCatching { cloud.champions() }.getOrNull() ?: return
+        champions = read; championsReadAt = System.currentTimeMillis(); local.champions = read
+    }
+    /** Pictures only: the crowns shown without reading them. */
+    fun showChampions(value: com.poupoutch.cnsnn.data.Champions) { champions = value; championsReadAt = Long.MAX_VALUE / 2 }
     fun rankingRead(key: String) { rankings = rankings.copy(readAt = rankings.readAt + (key to System.currentTimeMillis())) }
     fun forgetRankings() { rankings = rankings.copy(readAt = emptyMap()) }
     /** A new friend: the friends ranking is read again next time it shows. */
@@ -682,7 +704,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** A live duel to open ("random", "link" or "join:ID"), or "tournament": the app's navigation takes it. */
     var liveDuelRequest by mutableStateOf<String?>(null)
     /** The weekly tournament (sign-ups, bracket), read when it is on screen. */
-    val tournament = TournamentStore()
+    val tournament = TournamentStore().also { store ->
+        store.changed = { if (!store.demo) com.poupoutch.cnsnn.reminders.TournamentAlarms.update(getApplication(), store) }
+    }
     /** A live duel counts as a challenge played in the attendance numbers. */
     fun noteLiveDuelPlayed() = notePlayed("challenge")
 
@@ -746,6 +770,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val RANKING_REFRESH_MS = 30_000L
         const val SPRINT_KEEP_MS = 300_000L
         const val SPRINT_LEADER_KEEP_MS = 900_000L
+        /** Interface tests: plays as a player who chose this pseudo instead of "Joueur4821". */
+        @androidx.annotation.VisibleForTesting var testPseudo: String? = null
         const val REFUSED_NAME = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
         const val SUSPENDED_TEXT = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
     }

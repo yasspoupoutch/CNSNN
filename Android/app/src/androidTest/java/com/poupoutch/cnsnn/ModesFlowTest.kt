@@ -1,5 +1,6 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.state.AppViewModel
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -47,11 +48,9 @@ class ModesFlowTest {
         rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription(text)).fetchSemanticsNodes().isNotEmpty() }
 
     private fun home() {
-        rule.waitUntil(15_000) { has("Continuer") || has("Bonjour,") }
-        if (has("Continuer")) {
-            rule.onNodeWithText("Continuer").performClick()
-            rule.onNodeWithText("Pseudo").performTextInput("Testeur")
-            rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
+        rule.waitUntil(15_000) { has("J’ai déjà un compte") || has("Bonjour,") }
+        if (has("J’ai déjà un compte")) {
+            AppViewModel.testPseudo = "Testeur"
             rule.onNodeWithText("C’est parti").performClick()
         }
         waitFor("Bonjour,", 20_000)
@@ -100,10 +99,10 @@ class ModesFlowTest {
         expected.answer(first.wordFull, 0)
         type(expected.card!!.wordFull)
         waitForDescription("Mots : 2")
-        waitFor("×2")
+        waitFor("Combo ×2")
         // A wrong answer keeps the word and resets the combo; the answer stays, in red, to fix a typo.
         type("XQ")
-        waitFor("×1")
+        waitFor("Combo ×1")
         waitForDescription("Votre réponse : XQ")
         rule.onNodeWithText("Passer · −5 s").performClick()
         // Stopping counts the game with its words.

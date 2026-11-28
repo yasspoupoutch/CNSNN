@@ -44,6 +44,15 @@ class NameFilterTest {
     @Test fun ordinaryPseudosStay() {
         for (name in listOf("Monique", "Computer", "Nazim", "Constance", "Pedro", "Yasin", "Poupoutch", "Violette", "Montenegro", "Alexandre")) assertTrue(name, NameFilter.isAllowed(name))
     }
+    @Test fun automaticPseudo() {
+        repeat(200) {
+            val name = NameFilter.automatic()
+            assertTrue(name, NameFilter.isAutomatic(name))
+            assertTrue(name, NameFilter.isAllowed(name))
+            assertTrue(name, name.length in 2..20)
+        }
+        for (name in listOf("Joueur", "Joueur123", "Joueur123456", "joueur4821", "Joueur48a1", "Camille", "Joueur 4821")) assertFalse(name, NameFilter.isAutomatic(name))
+    }
 }
 
 class GameRulesTest {
@@ -279,6 +288,9 @@ class ProgressMergeTest {
         assertTrue(CommunityRules.mustAccept(Progress(username = "Alice")))
         assertFalse(CommunityRules.mustAccept(Progress(username = "Alice", rulesVersion = 1)))
         assertFalse(CommunityRules.mustAccept(Progress()))
+        // The automatic pseudo: nothing written yet, the rules come when a pseudo is chosen.
+        assertFalse(CommunityRules.mustAccept(Progress(username = "Joueur4821")))
+        assertFalse(CommunityRules.accepted(Progress(username = "Joueur4821")))
     }
 
     @Test fun twoDevicesKeepEveryGame() {
@@ -381,6 +393,24 @@ class TypedAnswerTest {
         assertEquals(WordEngine.Placed(4, listOf("OVR", "OEVR", "OEUVR")), WordEngine.placedVowels("Œuvre"))
         assertEquals(listOf("ELPHNT", "ELEPHNT"), WordEngine.placedVowels("Éléphant").steps)
         assertEquals(WordEngine.Placed(1, emptyList()), WordEngine.placedVowels("Bus"))
+    }
+    /** Same vectors as Tests/Core/WordEngineTests.swift: long expressions go on several lines, never cut. */
+    @Test fun longBoardsGoOnSeveralLines() {
+        val bonDieu = WordEngine.shownConsonants("Qu’est-ce qu’on a fait au Bon Dieu")
+        assertEquals("QST C QN – FT – BN D", bonDieu)
+        assertEquals(listOf("QST C QN –", "FT – BN D"), WordEngine.lines(bonDieu))
+        assertEquals(listOf("L CMMNT", "D LNN"), WordEngine.lines(WordEngine.shownConsonants("La Communauté de l’anneau")))
+        assertEquals(listOf("L R LN"), WordEngine.lines("L R LN"))
+        assertEquals(listOf("NTCNSTTTNNLLMNT"), WordEngine.lines("NTCNSTTTNNLLMNT"))
+        assertEquals(listOf("QU’EST-CE QU’ON A", "FAIT AU BON DIEU"), WordEngine.lines("QU’EST-CE QU’ON A FAIT AU BON DIEU", maxChars = 18))
+        assertEquals("QUST C QN – FT – BN D", WordEngine.placedVowels("Qu’est-ce qu’on a fait au Bon Dieu").steps.first())
+        assertEquals("LA CMMNT D LNN", WordEngine.placedVowels("La Communauté de l’anneau").steps.first())
+        // Every card's board fits in three lines of 10 letters at most, or the most even cut.
+        (SeedCards.all + ExtraCards.all).forEach { card ->
+            val lines = WordEngine.lines(WordEngine.shownConsonants(card.wordFull))
+            assertEquals(WordEngine.shownConsonants(card.wordFull), lines.joinToString(" "))
+            assert(lines.size <= 3) { card.wordFull }
+        }
     }
     @Test fun placedVowelsCostAndRevealedRank() {
         assertEquals(220_000, DailyScore.scoreMs(100_000, usedHint = true, correct = true, usedVowels = true, letters = 2))

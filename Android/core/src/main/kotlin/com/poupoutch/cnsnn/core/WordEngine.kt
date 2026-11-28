@@ -24,16 +24,46 @@ object WordEngine {
     fun placedVowels(value: String): Placed {
         val letters = normalize(value)
         val total = letters.count { it in "AEIOUY" }
+        // An expression keeps its words apart, like the board (« QUST C QN – FT – BN DN »), so it can go on several lines.
+        val words = boardWords(value)
         val steps = (1 until total).map { k ->
             var seen = 0
-            letters.filter { c -> c !in "AEIOUY" || ++seen <= k }
+            if (words.size <= 1) letters.filter { c -> c !in "AEIOUY" || ++seen <= k }
+            else words.joinToString(" ") { word -> normalize(word).filter { c -> c !in "AEIOUY" || ++seen <= k }.ifEmpty { "–" } }
         }
         return Placed(maxOf(total, 1), steps)
+    }
+    private fun boardWords(value: String) = value.split(Regex("[\\s\\-‐‑–—]+")).filter { normalize(it).isNotEmpty() }
+    /**
+     * A board (or an expression) cut on its spaces into as few lines as possible, at most `maxLines`, each line
+     * `maxChars` long at most when it can be, the lines as even as they can be. A single word stays on one line
+     * (the screen shrinks it instead). « QST C QN – FT – BN DN » is « QST C QN », « – FT – », « BN DN ».
+     */
+    fun lines(text: String, maxChars: Int = 10, maxLines: Int = 3): List<String> {
+        val words = text.split(" ").filter { it.isNotEmpty() }
+        if (words.size <= 1 || text.length <= maxChars) return listOf(text)
+        fun cuts(start: Int, left: Int): List<List<Int>> =
+            if (left == 1) listOf(emptyList())
+            else (start + 1..words.size - left + 1).flatMap { cut -> cuts(cut, left - 1).map { listOf(cut) + it } }
+        var best = listOf(text)
+        // Every way to cut the words into n lines, from one line up: the first n whose lines all fit wins,
+        // the most even one among them; if none fits, the most even with the most lines allowed.
+        for (n in 1..minOf(maxLines, words.size)) {
+            var bestWidest = Int.MAX_VALUE
+            for (cut in cuts(0, n)) {
+                val bounds = listOf(0) + cut + words.size
+                val split = bounds.zipWithNext { a, b -> words.subList(a, b).joinToString(" ") }
+                val widest = split.maxOf { it.length }
+                if (widest < bestWidest) { best = split; bestWidest = widest }
+            }
+            if (bestWidest <= maxChars) break
+        }
+        return best
     }
     /** What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
      *  with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants. */
     fun shownConsonants(value: String): String {
-        val words = value.split(Regex("[\\s\\-‐‑–—]+")).filter { normalize(it).isNotEmpty() }
+        val words = boardWords(value)
         if (words.size <= 1) return consonants(value)
         return words.joinToString(" ") { consonants(it).ifEmpty { "–" } }
     }

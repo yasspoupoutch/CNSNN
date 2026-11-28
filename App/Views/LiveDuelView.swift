@@ -308,7 +308,7 @@ struct WordsBoard: View {
                 ZStack {
                     if showPassed, let passed {
                         Text("C’était : " + passed.uppercased())
-                            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                            .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.4).fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
                             .transition(.opacity)
                     }
@@ -330,9 +330,7 @@ struct WordsBoard: View {
         VStack(spacing: 0) {
             Text("Mot \(number) sur \(ChallengeRules.words)").scaledFont(12).foregroundStyle(Palette.tertiary)
             let consonants = card.wordNoVowels
-            Text(consonants)
-                .font(Typo.serif(consonants.count > 5 ? 56 : 72)).tracking(3)
-                .lineLimit(1).minimumScaleFactor(0.35).padding(.top, 4)
+            BoardLetters(text: consonants, size: consonants.count > 5 ? 56 : 72).padding(.top, 4)
                 .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
@@ -353,7 +351,7 @@ struct WordsBoard: View {
             if !answer.isEmpty { AnswerLetters(answer: answer, wrong: answerWrong, cursor: cursor, place: placeCursor) }
             if TypedAnswer(text: answer, cursor: cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)

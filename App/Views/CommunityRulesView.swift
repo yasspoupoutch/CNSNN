@@ -29,11 +29,14 @@ struct CommunityRulesView: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
     var accepting = false
+    /// Accepting before choosing a pseudo or proposing a word: the player may also step back.
+    var onAccept: (() -> Void)? = nil
     var body: some View {
         NavigationStack {
             List {
                 if accepting {
-                    Text("Pour que CNSNN reste agréable pour tous, merci de lire et d’accepter ces règles.")
+                    Text(onAccept == nil ? "Pour que CNSNN reste agréable pour tous, merci de lire et d’accepter ces règles."
+                         : "Avant d’écrire quelque chose que les autres joueurs verront, merci de lire et d’accepter ces règles.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 ForEach(Array(CommunityRules.items.enumerated()), id: \.offset) { index, item in
@@ -45,14 +48,18 @@ struct CommunityRulesView: View {
                 Link("Lire la version complète", destination: Site.rules)
                 if accepting {
                     Section {
-                        Button("J’accepte") { Haptics.success(); state.acceptRules(); dismiss() }
+                        Button("J’accepte") { Haptics.success(); state.acceptRules(); dismiss(); onAccept?() }
+                            .accessibilityIdentifier("rules.accept")
                             .font(.headline).frame(maxWidth: .infinity)
                     }
                 }
             }
             .navigationTitle("Règles de la communauté")
-            .toolbar { if !accepting { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } } }
+            .toolbar {
+                if !accepting { ToolbarItem(placement: .confirmationAction) { Button("Fermer") { dismiss() } } }
+                else if onAccept != nil { ToolbarItem(placement: .cancellationAction) { Button("Annuler") { dismiss() } } }
+            }
         }
-        .interactiveDismissDisabled(accepting)
+        .interactiveDismissDisabled(accepting && onAccept == nil)
     }
 }

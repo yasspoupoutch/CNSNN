@@ -131,49 +131,116 @@ struct ChallengeTile: View {
 // MARK: - Home cards
 
 /// Home: the DUEL and TOURNOI cards, side by side (one under the other on the largest text sizes).
-/// No read here: the tournament line comes from the calendar, or from what the tournament screen already read.
+/// The TOURNOI card says where I stand (a gold "À jouer" when my match is open and not played yet) and
+/// wears the crown of the last tournament's winner.
 struct DuelTournamentCards: View {
     @Environment(AppState.self) private var state
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
     var duel: () -> Void
     var tournament: () -> Void
 
     var body: some View {
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+        let status = tournamentStatus
+        let crown = state.champions?.tournamentCrown(nowMs: state.tournament.nowMs)
+        let mine = crown != nil && crown?.uid == (state.uid ?? state.tournament.demoUID)
         layout {
             card(symbol: "bolt.fill", tint: Palette.duelText, title: "Duel", line: "En direct, au hasard ou avec un ami", id: "duelCard", action: duel)
-            card(symbol: "trophy.fill", tint: Palette.accent, title: "Tournoi", line: tournamentLine, id: "tournamentCard", action: tournament)
+            card(symbol: "trophy.fill", tint: Palette.accent, title: "Tournoi", line: status.line, id: "tournamentCard", toPlay: status.toPlay,
+                 crowned: mine, footer: crown.map { mine ? "Vainqueur du dernier tournoi" : "Vainqueur : " + $0.name }, action: tournament)
         }.fixedSize(horizontal: false, vertical: true)
     }
 
-    private var tournamentLine: String {
+    /// Where I stand: my match to play, played, through, out; otherwise the sign-ups.
+    private var tournamentStatus: (line: String, toPlay: Bool) {
         let store = state.tournament
-        if store.currentMine { return "Votre match de la semaine" }
-        let now = Int(Date().timeIntervalSince1970 * 1000)
+        let now = store.nowMs
+        if store.currentMine, store.currentLoaded, let uid = state.uid ?? store.demoUID {
+            let bracket = store.bracket
+            let week = store.currentWeek
+            switch bracket.standing(of: uid, nowMs: now) {
+            case .match(let round, let match):
+                let end = TournamentRules.roundEndMs(week: week, round: round) ?? 0
+                if !match.decided {
+                    if store.run(round: round, uid: uid)?.finishedMs == nil { return ("Votre match est ouvert jusqu’à " + TournamentText.day(end), true) }
+                    return ("Match joué · résultat au plus tard " + TournamentText.day(end), false)
+                }
+                if round == bracket.rounds.count { return ("Champion de la semaine !", false) }
+                return ("Qualifié ! Prochain match " + TournamentText.day(end), false)
+            case .through(let round):
+                return ("Qualifié · prochain match " + TournamentText.day(TournamentRules.roundStartMs(week: week, round: round + 1) ?? 0), false)
+            case .eliminated:
+                return (store.nextMine ? "Éliminé · inscrit au prochain" : "Éliminé · revanche au prochain tournoi", false)
+            case .champion:
+                return ("Champion de la semaine !", false)
+            case .out:
+                break
+            }
+        } else if store.currentMine {
+            return ("Votre match de la semaine", false)
+        }
         let day = TournamentRules.deadlineMs(week: TournamentRules.nextWeek(nowMs: now)).map(TournamentText.day) ?? "lundi 9 h"
-        if store.nextMine { return "Inscrit · début \(day)" }
-        return "Inscriptions jusqu’à \(day)"
+        if store.nextMine { return ("Inscrit · début \(day)", false) }
+        return ("Inscriptions jusqu’à \(day)", false)
     }
 
-    private func card(symbol: String, tint: Color, title: String, line: String, id: String, action: @escaping () -> Void) -> some View {
-        Button { Haptics.selection(); action() } label: {
+    private func card(symbol: String, tint: Color, title: String, line: String, id: String, toPlay: Bool = false, crowned: Bool = false,
+                      footer: String? = nil, action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+        return Button { Haptics.selection(); action() } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Image(systemName: symbol).font(.system(size: 15, weight: .bold)).foregroundStyle(tint)
                     Text(title.uppercased()).scaledFont(17, .heavy).tracking(1.2).foregroundStyle(Palette.foreground)
+                    Spacer(minLength: 0)
+                    if crowned {
+                        Image(systemName: "crown.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.accent)
+                            .shadow(color: Palette.accent.opacity(0.6), radius: 6)
+                    }
                 }
-                Text(line).scaledFont(13).foregroundStyle(Palette.duelSoft).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                if toPlay {
+                    HStack(spacing: 6) {
+                        Circle().fill(Palette.onAccent).frame(width: 6, height: 6)
+                            .opacity(pulse ? 0.35 : 1)
+                        Text("À JOUER").scaledFont(11, .heavy).tracking(0.8)
+                    }
+                    .foregroundStyle(Palette.onAccent)
+                    .padding(.horizontal, 9).frame(minHeight: 22)
+                    .background(Capsule().fill(LinearGradient(colors: [Palette.accentTop, Palette.accentBottom], startPoint: .top, endPoint: .bottom)))
+                }
+                Text(line).scaledFont(13, toPlay ? .semibold : .regular).foregroundStyle(toPlay ? Palette.foreground : Palette.duelSoft)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                if let footer {
+                    HStack(spacing: 5) {
+                        Image(systemName: "crown.fill").font(.system(size: 10, weight: .semibold))
+                        Text(footer).scaledFont(11, .semibold).lineLimit(1).minimumScaleFactor(0.8)
+                    }.foregroundStyle(Palette.accent)
+                }
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .modifier(DuelSurface())
-            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                // My match is waiting: a glowing gold edge.
+                if toPlay {
+                    shape.strokeBorder(Palette.accent.opacity(pulse ? 0.45 : 0.95), lineWidth: 1.5)
+                        .shadow(color: Palette.accent.opacity(0.5), radius: pulse ? 3 : 9)
+                }
+            }
+            .contentShape(shape)
         }
         .buttonStyle(PressStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(title + ". " + line)
+        .accessibilityLabel(title + (toPlay ? ". À jouer" : "") + ". " + line + (footer.map { ". " + $0 } ?? ""))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(id)
+        .onChange(of: toPlay, initial: true) { _, play in
+            // No endless animation under test: the UI tests wait for the app to be idle.
+            guard play, !reduceMotion, !pulse, !RuntimeFlags.isTesting else { return }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
+        }
     }
 }
 
@@ -640,7 +707,7 @@ struct ChallengeGameView: View {
             ZStack {
                 if showPassed, let passed = session.passed {
                     Text("C’était : " + passed.uppercased())
-                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                        .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.4).fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14).frame(minHeight: 32).glassCapsule()
                         .transition(.opacity)
                 }
@@ -661,9 +728,7 @@ struct ChallengeGameView: View {
         VStack(spacing: 0) {
             Text("Mot \(number) sur \(ChallengeRules.words)").scaledFont(12).foregroundStyle(Palette.tertiary)
             let consonants = card.wordNoVowels
-            Text(consonants)
-                .font(Typo.serif(consonants.count > 5 ? 60 : 80)).tracking(3)
-                .lineLimit(1).minimumScaleFactor(0.35).padding(.top, 6)
+            BoardLetters(text: consonants, size: consonants.count > 5 ? 60 : 80).padding(.top, 6)
                 .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
@@ -684,7 +749,7 @@ struct ChallengeGameView: View {
             if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
             if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)

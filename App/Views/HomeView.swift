@@ -87,11 +87,16 @@ struct HomeView: View {
             if state.inviteCode != nil { showChallenges = true }
             await state.refreshChallenges()
             await state.refreshSprintLeader()
+            await state.refreshChampions()
+            await state.tournament.refresh(state: state)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             todayKey = DailySchedule.key()
-            Task { await state.refreshChallenges(); await state.refreshSprintLeader() }
+            Task {
+                await state.refreshChallenges(); await state.refreshSprintLeader()
+                await state.refreshChampions(); await state.tournament.refresh(state: state)
+            }
         }
         .task(id: todayKey) {
             // Wakes up just after midnight to show the new word, then waits for the next day.
@@ -108,6 +113,12 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Bonjour,").scaledFont(15).foregroundStyle(Palette.secondary)
                 Text(state.progress.username).scaledFont(30, .bold).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.6)
+                // The automatic pseudo ("Joueur4821"): a quiet way to choose one, never a question.
+                if NameFilter.isAutomatic(state.progress.username) {
+                    Button { Haptics.selection(); state.renameRequest += 1 } label: {
+                        Label("Choisir mon pseudo", systemImage: "pencil").scaledFont(13, .semibold).foregroundStyle(Palette.secondary)
+                    }.buttonStyle(PressStyle()).padding(.top, 2).accessibilityIdentifier("home.choose-pseudo")
+                }
             }
             Spacer(minLength: 12)
             let streak = state.official?.currentStreak() ?? state.progress.streak()
@@ -125,7 +136,10 @@ struct HomeView: View {
     /// One card for the day: the kicker with Classement and Partager at the top right, the consonants
     /// (or the found word) with Jouer, then this week's 7 days at the bottom.
     private var dailyCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let crown = state.champions?.weekCrown(today: todayKey)
+        let crowned = crown != nil && crown?.uid == state.uid
+        return VStack(alignment: .leading, spacing: 0) {
+            if let crown { weekCrown(name: crown.name, mine: crowned) }
             HStack(alignment: .center, spacing: 8) {
                 dailyKicker(done: todayAttempt?.correct == true)
                 Spacer(minLength: 4)
@@ -164,7 +178,31 @@ struct HomeView: View {
                 Rectangle().fill(Palette.line).frame(height: 1).padding(.top, 16).padding(.bottom, 12)
                 weekRow
             }
-        }.glassCard(radius: 32, padding: 20).tutorialTarget(.daily).padding(.top, 2)
+        }.glassCard(radius: 32, padding: 20)
+        .overlay {
+            // Last week's number 1: a gold edge on their own card.
+            if crowned {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [Palette.accentTop, Palette.accent.opacity(0.25)], startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
+                    .allowsHitTesting(false)
+            }
+        }
+        .tutorialTarget(.daily).padding(.top, 2)
+    }
+
+    /// Last week's number 1 of the Mot du jour, crowned at the top of the card.
+    private func weekCrown(name: String, mine: Bool) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "crown.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.accent)
+                .symbolEffect(.bounce, value: mine)
+            Text(mine ? "Vous êtes numéro 1 de la semaine dernière !" : name + " · numéro 1 de la semaine dernière")
+                .scaledFont(12, .semibold).foregroundStyle(Palette.accent).lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 10).frame(minHeight: 26)
+        .background(Capsule().fill(Palette.accentSoft))
+        .padding(.bottom, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("weekCrown")
     }
 
     private func cornerIcon(_ symbol: String) -> some View {
@@ -486,7 +524,7 @@ struct ShareCard: View {
             HighlightedWord(word: "CONSONNE", font: Typo.wordmark(30))
             Text(title.uppercased()).font(.system(size: 13, weight: .bold)).tracking(1.6).foregroundStyle(Palette.secondary).padding(.top, 10)
             Spacer(minLength: 16)
-            Text(consonants).font(Typo.serif(72)).tracking(4).foregroundStyle(Palette.foreground).lineLimit(1).minimumScaleFactor(0.3)
+            BoardLetters(text: consonants, size: 72, tracking: 4).foregroundStyle(Palette.foreground)
             Capsule().fill(Palette.accent).frame(width: 44, height: 4).padding(.top, 18)
             Text(outcome).font(.system(size: 21, weight: .semibold)).foregroundStyle(correct ? Palette.mint : Palette.secondary)
                 .multilineTextAlignment(.center).padding(.top, 18)

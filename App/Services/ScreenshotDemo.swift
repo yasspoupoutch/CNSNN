@@ -10,6 +10,12 @@ enum ScreenshotDemo {
     static let uid = "demo-camille"
     /// The live duel's pictures (`--duel-demo`): an invented duel against Léa, played on its own.
     static var duelActive: Bool { isActive && ProcessInfo.processInfo.arguments.contains("--duel-demo") }
+    /// The crowns on the home page: Camille won last week and the last tournament.
+    static var champions: Champions {
+        let now = Date()
+        return Champions(weekMonday: DailySchedule.key(now.addingTimeInterval(-7 * 86_400)), weekUid: uid, weekName: "Camille",
+                         tournamentWeek: TournamentDemo.week, tournamentUid: uid, tournamentName: "Camille")
+    }
     /// The word found today, shown on the home page.
     static var todayCard: Card { card("Croissant") }
     /// The Classique card being played.
@@ -48,6 +54,8 @@ enum ScreenshotDemo {
         let now = Date()
         let today = DailySchedule.key(now)
         var progress = state.progress
+        // The avatar colour of the screenshots (third colour; there is no picker at first launch any more).
+        UserDefaults.standard.set(2, forKey: CNSNNTheme.avatarKey)
 
         // Classique: 164 cards over the last two weeks, 142 found, the last ones in a row.
         var attempts: [Attempt] = []

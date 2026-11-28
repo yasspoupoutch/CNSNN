@@ -31,6 +31,12 @@ import CNSNNCore
     /// The answer of the word just passed, shown for a moment (Sprint and Survie).
     var passed: String?
     var passedTick = 0
+    /// The Sprint word just found, for the word that flies up from the answer line.
+    var foundWord: String?
+    /// Sprint: the Sprint clock (ms) at each word found, and the same for the record game on this
+    /// phone (the ghost that runs along the bar).
+    private(set) var foundTimes: [Int] = []
+    private(set) var ghost: [Int] = []
     /// The game picked up from a save.
     var resumed = false
     /// Results screen, with the records the game beat and the ones before it.
@@ -40,6 +46,8 @@ import CNSNNCore
     private var start = ContinuousClock.now
     private var baseMs = 0
     private var recorded = false
+    /// Sprint: the score already sent to the ranking during this game (when the app left the screen).
+    private var publishedFound = 0
 
     init(mode: PlayMode) { self.mode = mode }
 
@@ -51,8 +59,10 @@ import CNSNNCore
 
     /// Picks up the saved game of this mode, or starts a new one.
     func begin(state: AppState) {
-        answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false
+        answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false; publishedFound = 0
         previous = state.progress.records(mode)
+        foundWord = nil; foundTimes = []
+        ghost = mode == .sprint ? SprintGhost.timeline(best: previous.best(ModeStat.words)) : []
         if mode != .sprint, let run = ModeRunStore.load(mode), !run.finished {
             sprint = nil; survival = run.survival; duo = run.duo
             baseMs = run.resumedElapsedMs; start = .now; resumed = true
@@ -98,10 +108,18 @@ import CNSNNCore
         let text = answer, now = elapsedMs
         switch mode {
         case .sprint:
+            let word = sprint?.card?.wordFull
             switch sprint?.answer(text, elapsed: now) {
             case .right?:
-                answer = ""; answerWrong = false; successTick += 1; gain = "+1"; Haptics.success()
-            case .wrong?: wrong()
+                answer = ""; answerWrong = false; foundWord = word; successTick += 1; gain = "+1"; Haptics.success()
+                if let sprint {
+                    foundTimes.append(SprintGame.durationMs - sprint.remainingMs(elapsed: now))
+                    SprintSound.note(sprint.streak)
+                    if sprint.streak == 5 || sprint.streak == 8 { SprintSound.chord(sprint.streak) }
+                    let best = previous.best(ModeStat.words)
+                    if best > 0, sprint.found == best + 1 { SprintSound.record() }
+                }
+            case .wrong?: wrong(); SprintSound.miss()
             default: break
             }
         case .survival:
@@ -153,6 +171,15 @@ import CNSNNCore
         afterMove(state: state)
     }
 
+    /// Sprint: the app leaves the screen. Its clock keeps running and it may be closed while away, so the
+    /// score so far goes on the ranking now, while the game is still recent enough for the server
+    /// (otherwise a game ended in the background kept its record on the phone only).
+    func leaveApp(state: AppState) {
+        guard mode == .sprint, let sprint, !sprint.finished, sprint.found > publishedFound else { return }
+        publishedFound = sprint.found
+        state.publishSprint(found: sprint.found)
+    }
+
     /// Ends the game now and counts it: a Sprint with its score so far, a Survie run as it stands, a
     /// Double sens game with its unplayed rounds lost.
     func quit(state: AppState) {
@@ -184,8 +211,9 @@ import CNSNNCore
         case .sprint:
             guard let sprint else { return }
             beaten = state.recordMode(.sprint, best: sprint.records.best, add: sprint.records.add)
+            if sprint.found > previous.best(ModeStat.words) { SprintGhost.save(foundTimes) }
             ModeRunStore.remember(sprint.used, mode: .sprint)
-            state.publishSprint(found: sprint.found)
+            if sprint.found > publishedFound { state.publishSprint(found: sprint.found) }
         case .survival:
             guard let survival else { return }
             beaten = state.recordMode(.survival, best: survival.records.best, add: survival.records.add)
@@ -200,6 +228,26 @@ import CNSNNCore
         over = mode != .duo || duo?.roundComplete != true
     }
 
+    /// Sprint: how many words the record game had found at this point of the clock.
+    func ghostCount(elapsed: Int) -> Int? {
+        guard let sprint, !ghost.isEmpty else { return nil }
+        let clock = SprintGame.durationMs - sprint.remainingMs(elapsed: elapsed)
+        return ghost.filter { $0 <= clock }.count
+    }
+
     /// A record beaten that existed before this game (the first game only sets them).
     func improved(_ key: String) -> Bool { beaten.contains(key) && previous.best(key) > 0 }
+}
+
+/// The record game of this phone, word by word: the Sprint clock (ms) at each word found. When the
+/// record was set elsewhere (another phone, an older version), the ghost runs at the record's even pace.
+enum SprintGhost {
+    private static let key = "sprint.ghost"
+    static func timeline(best: Int) -> [Int] {
+        guard best > 0 else { return [] }
+        let saved = UserDefaults.standard.array(forKey: key) as? [Int] ?? []
+        if saved.count == best { return saved }
+        return (1...best).map { Int(Double($0) * Double(SprintGame.durationMs) / (Double(best) + 0.5)) }
+    }
+    static func save(_ times: [Int]) { UserDefaults.standard.set(times, forKey: key) }
 }

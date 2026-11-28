@@ -2,18 +2,11 @@ import XCTest
 final class CNSNNUITests: XCTestCase {
     @MainActor func testLocalOnboardingAndNavigation() {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting"]
+        app.launchArguments = ["--uitesting", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout:5))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout:5))
-        field.tap();field.typeText("Camille")
-        // The start button waits for the community rules to be accepted.
-        XCTAssertFalse(app.buttons["C’est parti"].isEnabled)
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
         XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout:5))
         app.buttons["Stats"].tap()
         XCTAssertTrue(app.staticTexts["Statistiques"].waitForExistence(timeout:5))
@@ -31,20 +24,43 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Mot du jour"].waitForExistence(timeout:5))
     }
 
+    /// First launch: no pseudo to type, no box to tick. The player plays as "Joueur…", and accepts the
+    /// community rules only when choosing a pseudo.
+    @MainActor func testFirstLaunchWithAutomaticPseudo() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting"]
+        app.launch()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["existing-account"].exists)
+        start.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Joueur'")).firstMatch.waitForExistence(timeout:5))
+        // No rules sheet at launch.
+        XCTAssertFalse(app.buttons["rules.accept"].waitForExistence(timeout:2))
+        let choose = app.buttons["home.choose-pseudo"]
+        XCTAssertTrue(choose.waitForExistence(timeout:5))
+        choose.tap()
+        // The rules come first, then the pseudo box.
+        let accept = app.buttons["rules.accept"]
+        XCTAssertTrue(accept.waitForExistence(timeout:5))
+        accept.tap()
+        let alert = app.alerts["Choisir mon pseudo"]
+        XCTAssertTrue(alert.waitForExistence(timeout:5))
+        alert.textFields.firstMatch.typeText("Camille")
+        alert.buttons["Enregistrer"].tap()
+        XCTAssertTrue(app.staticTexts["Camille"].firstMatch.waitForExistence(timeout:5))
+        XCTAssertFalse(app.buttons["home.choose-pseudo"].exists)
+    }
+
     /// New install: the ads measurement question once (nothing sent before "Oui"), then the switch in Profil.
     @MainActor func testAdMeasurementQuestionAndProfileSwitch() {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--ask-ads"]
+        app.launchArguments = ["--uitesting", "--ask-ads", "--pseudo", "Camille"]
         app.launch()
         let alert = app.alerts["Aider CNSNN à se faire connaître ?"]
         XCTAssertTrue(alert.waitForExistence(timeout:8))
         alert.buttons["Non merci"].tap()
         XCTAssertFalse(alert.waitForExistence(timeout:2))
-        app.buttons["Continuer"].tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout:5))
-        field.tap();field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
         app.buttons["C’est parti"].tap()
         XCTAssertTrue(app.buttons["Profil"].waitForExistence(timeout:5))
         app.buttons["Profil"].tap()
@@ -57,7 +73,7 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "1")
         // Asked once only: a relaunch goes straight to the game.
         app.terminate()
-        app.launchArguments = ["--uitesting"]
+        app.launchArguments = ["--uitesting", "--pseudo", "Camille"]
         app.launch()
         XCTAssertFalse(app.alerts["Aider CNSNN à se faire connaître ?"].waitForExistence(timeout:3))
     }
@@ -65,16 +81,11 @@ final class CNSNNUITests: XCTestCase {
     /// Survie, Sprint and Double sens from the home page: lives lost, a Sprint stopped, rounds skipped, results and records.
     @MainActor func testModesFromHome() {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--mode-seed=42"]
+        app.launchArguments = ["--uitesting", "--mode-seed=42", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 5))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
         func tile(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title + ".")).firstMatch }
 
         // Survie: three skips cost the three lives.
@@ -135,16 +146,11 @@ final class CNSNNUITests: XCTestCase {
     /// word is found, even with the longest word and a time in hours.
     @MainActor func testHomeFitsScreenWithDailyFound() {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--daily-found"]
+        app.launchArguments = ["--uitesting", "--daily-found", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 5))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
 
         let ranking = app.buttons["Classement"]
         XCTAssertTrue(ranking.waitForExistence(timeout: 5))
@@ -200,16 +206,11 @@ final class CNSNNUITests: XCTestCase {
     /// TROU or AUTEUR, then Indice (tapped) with the theme and the clock. Profil > Revoir le tutoriel shows it again, and Passer closes it.
     @MainActor func testTutorial() {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--tutorial"]
+        app.launchArguments = ["--uitesting", "--tutorial", "--pseudo", "Camille"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 5))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
 
         XCTAssertTrue(app.staticTexts["Le mot du jour"].waitForExistence(timeout: 5))
         // Only Jouer, ringed in gold, goes on: it opens the real Mot du jour page.

@@ -1,5 +1,6 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.state.AppViewModel
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -29,11 +30,9 @@ class TutorialFlowTest {
         rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty() }
 
     @Test fun tutorialFromProfile() {
-        rule.waitUntil(15_000) { has("Continuer") || has("Bonjour,") }
-        if (has("Continuer")) {
-            rule.onNodeWithText("Continuer").performClick()
-            rule.onNodeWithText("Pseudo").performTextInput("Tuto")
-            rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
+        rule.waitUntil(15_000) { has("J’ai déjà un compte") || has("Bonjour,") }
+        if (has("J’ai déjà un compte")) {
+            AppViewModel.testPseudo = "Tuto"
             rule.onNodeWithText("C’est parti").performClick()
         }
         rule.waitUntil(20_000) { has("Bonjour,") }
