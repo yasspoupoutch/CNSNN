@@ -164,6 +164,17 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         else if (ReviewPrompt.isDue(state.progress.dailyWins, BuildConfig.VERSION_NAME, state.local.reviewAskedVersion)) state.reviewPending = true
     }
 
+    // A word just found here (not one loaded from earlier, not shown by a hint) bursts into letters first;
+    // on the ranked Mot du jour the place follows in big, then the sheet comes up.
+    val reduceMotion = rememberReduceMotion()
+    var celebration by remember { mutableStateOf<Long?>(null) }
+    var sheetShown by remember { mutableStateOf(true) }
+    LaunchedEffect(result?.id) {
+        if (result?.correct == true && game.celebrate && !reduceMotion && !game.tutorial) {
+            game.celebrate = false; sheetShown = false; celebration = System.nanoTime()
+        } else { sheetShown = true; if (result == null) celebration = null }
+    }
+
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = result == null)
         Column(Modifier.readableWidth().fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 12.dp)) {
@@ -197,13 +208,20 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
         AnimatedVisibility(result != null, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f)))
         }
-        AnimatedVisibility(result != null, Modifier.align(Alignment.BottomCenter),
+        AnimatedVisibility(result != null && sheetShown, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
             result?.let {
                 ResultSheet(state, it, game.card, mode, game.finishedHere && game.wrongAnswers == 0 && game.hintsTaken == 0, game.standing,
                     game.pendingOfficial, game.ranked, game.usedHint, game.usedVowels, game.wrongAnswers, game.officialMs(it), catchUp = game.catchUpDay != null,
                     letters = game.lettersUsed, revealedWord = game.revealedWord,
                     next = { game.next(state) }, close = close)
+            }
+        }
+        val word = game.card?.wordFull?.uppercase()
+        celebration?.let { id ->
+            if (word != null) androidx.compose.runtime.key(id) {
+                WordCelebration(word, showsRank = mode == GameMode.DAILY && game.ranked && game.catchUpDay == null,
+                    standing = { game.standing }, showSheet = { sheetShown = true }, ended = { if (celebration == id) celebration = null })
             }
         }
     }
