@@ -102,8 +102,22 @@ final class CNSNNScreenshotTests: XCTestCase {
 
         let tile = app.buttons["duelCard"]
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        // The crowns: last week's number 1 on the daily card, the last tournament's winner on TOURNOI.
+        XCTAssertTrue(app.descendants(matching: .any)["weekCrown"].firstMatch.waitForExistence(timeout: 10))
+        capture("duel-09-couronne")
         app.swipeUp()
         capture("duel-00-accueil")
+
+        // The weekly tournament (an invented one, TournamentDemo): my match of the day, then the bracket.
+        let cup = app.buttons["tournamentCard"]
+        XCTAssertTrue(cup.waitForExistence(timeout: 5))
+        cup.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Si vous gagnez")).firstMatch.waitForExistence(timeout: 10))
+        capture("duel-10-tournoi")
+        app.swipeUp(); app.swipeUp()
+        capture("duel-11-tableau")
+        app.buttons["Fermer"].firstMatch.tap()
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
         tile.tap()
         let random = app.buttons["liveRandom"]
         XCTAssertTrue(random.waitForExistence(timeout: 5))

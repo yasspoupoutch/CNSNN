@@ -15,6 +15,7 @@ class CnsnnApp : Application() {
         if (host.isNotEmpty()) Cloud.useEmulators(this, host)
         Reminders.createChannel(this)
         ChallengeWatch.createChannel(this)
+        com.poupoutch.cnsnn.reminders.TournamentAlarms.createChannel(this)
         com.poupoutch.cnsnn.ads.AdMeasurement.apply(this)
     }
 }

@@ -444,6 +444,17 @@ import CNSNNCore
     }
     static let rankingRefreshSeconds: TimeInterval = 30
 
+    /// The crowns of the home page, kept on the phone so they show at once; read again every 6 hours.
+    var champions: Champions? = Champions.saved
+    private var championsReadAt: Date?
+    func refreshChampions() async {
+        if ScreenshotDemo.isActive { champions = ScreenshotDemo.duelActive ? ScreenshotDemo.champions : nil; return }
+        guard let cloud, uid != nil, !isServerFull else { return }
+        if let at = championsReadAt, Date().timeIntervalSince(at) < 6 * 3600 { return }
+        guard let read = try? await cloud.champions() else { return }
+        champions = read; championsReadAt = Date(); read.save()
+    }
+
     // MARK: Results
 
     func record(_ attempt: Attempt) {
@@ -709,4 +720,31 @@ import CNSNNCore
         do { progress.submissions = try await cloud.submissions(uid: uid); persist() }
         catch { /* Offline: keep the last known statuses. */ }
     }
+}
+
+/// The crowns: last week's number 1 of the Mot du jour (on the daily card) and the winner of the last
+/// tournament (on the TOURNOI card). Written each morning by Firebase/tools/champions.mjs.
+struct Champions: Codable, Equatable {
+    var weekMonday: String
+    var weekUid: String
+    var weekName: String
+    var tournamentWeek: String
+    var tournamentUid: String
+    var tournamentName: String
+
+    /// Last week's number 1, only during the week after.
+    func weekCrown(today: String) -> (uid: String, name: String)? {
+        guard !weekUid.isEmpty, let week = DailyScore.weekIndex(weekMonday), let now = DailyScore.weekIndex(today), week == now - 1 else { return nil }
+        return (weekUid, weekName)
+    }
+    /// The last tournament's winner, for three weeks at most (a week without a tournament keeps the crown).
+    func tournamentCrown(nowMs: Int) -> (uid: String, name: String)? {
+        guard !tournamentUid.isEmpty, let start = TournamentRules.deadlineMs(week: tournamentWeek),
+              nowMs - start < 21 * TournamentRules.dayMs else { return nil }
+        return (tournamentUid, tournamentName)
+    }
+
+    private static let key = "cnsnn.champions"
+    static var saved: Champions? { UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(Champions.self, from: $0) } }
+    func save() { if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key) } }
 }

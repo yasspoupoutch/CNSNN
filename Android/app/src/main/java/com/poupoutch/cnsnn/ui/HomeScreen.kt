@@ -107,7 +107,11 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     var seenRequest by rememberSaveable { mutableStateOf(state.challengeRequest) }
     LaunchedEffect(state.challengeRequest) { if (state.challengeRequest != seenRequest) { seenRequest = state.challengeRequest; challenges = true } }
     LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) challenges = true }
-    LaunchedEffect(state.uid) { state.refreshChallenges(); state.refreshSprintLeader() }
+    LaunchedEffect(state.uid) {
+        state.refreshChallenges(); state.refreshSprintLeader(); state.refreshChampions()
+        state.tournament.refresh(state)
+    }
+    val homeScope = rememberCoroutineScope()
     // The day on screen, moved on at midnight and whenever the app comes back (a notification tap
     // the next morning), so yesterday's found word never stays up.
     var today by remember { mutableStateOf(DailySchedule.key()) }
@@ -118,7 +122,8 @@ fun HomeScreen(state: AppViewModel, play: (GameMode, Category?, Difficulty?) -> 
     val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     androidx.compose.runtime.DisposableEffect(lifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon(); state.refreshSprintLeaderSoon() }
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { today = DailySchedule.key(); state.refreshChallengesSoon(); state.refreshSprintLeaderSoon()
+                homeScope.launch { state.refreshChampions(); state.tournament.refresh(state) } }
         }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
@@ -280,7 +285,12 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit, catc
         if (state.uid != null || attempt != null) CornerIcon(Icons.Filled.Leaderboard, "Classement") { state.leaderboardRequest++ }
         if (attempt != null) CornerIcon(Icons.Filled.Share, "Partager") { Share.result(context, attempt, state.card(attempt.cardID), GameMode.DAILY) }
     }
-    SectionCard(Modifier.tutorialTarget(TutorialTarget.DAILY), radius = 28.dp, padding = 18.dp) {
+    val crown = state.champions?.weekCrown(today)
+    val crowned = crown != null && crown.first == state.uid
+    // Last week's number 1: a gold edge on their own card.
+    val edge = if (crowned) Modifier.border(1.5.dp, Brush.verticalGradient(listOf(Palette.accentTop, Palette.accent.copy(alpha = 0.25f))), RoundedCornerShape(28.dp)) else Modifier
+    SectionCard(Modifier.tutorialTarget(TutorialTarget.DAILY).then(edge), radius = 28.dp, padding = 18.dp) {
+        if (crown != null) WeekCrown(crown.second, crowned)
         if (attempt != null) {
             val card = state.card(attempt.cardID)
             DailyFoundTitle((card?.wordFull ?: "").uppercase(), attempt.correct, actions)
@@ -308,6 +318,18 @@ private fun DailyCard(state: AppViewModel, today: String, play: () -> Unit, catc
             Box(Modifier.padding(top = 16.dp, bottom = 12.dp).fillMaxWidth().height(1.dp).background(Palette.border))
             WeekRow(state, today, playToday = play, catchUp = catchUp)
         }
+    }
+}
+
+/** Last week's number 1 of the Mot du jour, crowned at the top of the card. */
+@Composable
+private fun WeekCrown(name: String, mine: Boolean) {
+    Row(Modifier.padding(bottom = 8.dp).background(Palette.accent.copy(alpha = 0.14f), RoundedCornerShape(13.dp)).heightIn(min = 26.dp)
+        .padding(horizontal = 10.dp).testTag("weekCrown").semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Icon(CrownIcon, null, Modifier.size(15.dp), tint = Palette.accent)
+        Text(if (mine) "Vous êtes numéro 1 de la semaine dernière !" else "$name · numéro 1 de la semaine dernière",
+            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

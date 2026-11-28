@@ -1040,6 +1040,16 @@ enum DailyGuesses {
                         from: side("from", uid: from), to: side("to", uid: to), code: d["code"] as? String)
     }
 
+    // MARK: Crowns
+
+    /// Last week's number 1 and the last tournament's winner (written by Firebase/tools/champions.mjs). One read.
+    func champions() async throws -> Champions {
+        let d = try await db.collection("meta").document("champions").getDocument().data() ?? [:]
+        return Champions(weekMonday: d["weekMonday"] as? String ?? "", weekUid: d["weekUid"] as? String ?? "", weekName: d["weekName"] as? String ?? "",
+                         tournamentWeek: d["tournamentWeek"] as? String ?? "", tournamentUid: d["tournamentUid"] as? String ?? "",
+                         tournamentName: d["tournamentName"] as? String ?? "")
+    }
+
     // MARK: Weekly tournament
 
     private func tournament(_ week: String) -> DocumentReference { db.collection("tournaments").document(week) }
@@ -1060,7 +1070,7 @@ enum DailyGuesses {
     }
     func signUp(week: String, uid: String, username: String) async throws {
         let ref = tournament(week).collection("players").document(uid)
-        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp(), "v": 2], completion: done) }) else { throw CloudError.offline }
     }
     func withdraw(week: String, uid: String) async throws {
         let ref = tournament(week).collection("players").document(uid)
