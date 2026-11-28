@@ -181,6 +181,13 @@ jobs:
           set -euo pipefail
           mkdir -p "$CI_ROOT/attachments" "$CI_ROOT/shots"
           xcrun xcresulttool export attachments --path "$CI_ROOT/mots-longs.xcresult" --output-path "$CI_ROOT/attachments"
+          # A crash of the app: its report (exception and the app's own frames) in the log.
+          for report in "$CI_ROOT/attachments/"*.ips; do
+            [ -f "$report" ] || continue
+            echo "::group::Rapport de plantage $(basename "$report")"
+            python3 Scripts/crash_summary.py "$report" || head -c 8000 "$report"
+            echo "::endgroup::"
+          done
           python3 - "$CI_ROOT/attachments" "$CI_ROOT/shots" <<'PY'
           import json, pathlib, re, shutil, sys
           source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])

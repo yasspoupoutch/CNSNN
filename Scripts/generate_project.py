@@ -12,7 +12,7 @@ def configs(key,settings):
  ids=[config(key+'-'+name,{**settings,**({'SWIFT_OPTIMIZATION_LEVEL':q('-Onone'),'DEBUG_INFORMATION_FORMAT':'dwarf','SWIFT_ACTIVE_COMPILATION_CONDITIONS':q('DEBUG $(inherited)'), 'ENABLE_TESTABILITY':'YES'} if name=='Debug' else {'SWIFT_OPTIMIZATION_LEVEL':q('-O'),'DEBUG_INFORMATION_FORMAT':q('dwarf-with-dsym')})}) for name in ['Debug','Release']]
  return obj(key+'-configs','isa = XCConfigurationList; buildConfigurations = '+array(ids)+'; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
 main=ident('main');products=[];groups=[];targets=[]
-common={'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SWIFT_VERSION':'5.0','CLANG_ENABLE_MODULES':'YES','SWIFT_STRICT_CONCURRENCY':'targeted','TARGETED_DEVICE_FAMILY':q('1'),'CODE_SIGN_STYLE':'Automatic'}
+common={'SDKROOT':'iphoneos','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SWIFT_VERSION':'5.0','CLANG_ENABLE_MODULES':'YES','SWIFT_STRICT_CONCURRENCY':'targeted','TARGETED_DEVICE_FAMILY':q('1,2'),'CODE_SIGN_STYLE':'Automatic'}
 projectcfg=configs('Project',common)
 # Firebase SDK, linked only to app. Resolves in Xcode on Mac.
 remote=obj('firebase','isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 12.19.3;};')

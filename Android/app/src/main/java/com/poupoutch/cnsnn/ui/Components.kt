@@ -34,6 +34,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -56,8 +58,11 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 /** Night background with two slow cool glows; gold stays for the vowels. */
-/** Content at most 560 dp wide, centred, on tablets and unfolded phones (like the iPhone app); no change on a phone. */
-fun Modifier.readableWidth(): Modifier = fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 560.dp)
+/** Content at most 560 dp wide, centred, on unfolded phones; 680 dp on a tablet (like the iPhone app on iPad); no change on a phone. */
+fun Modifier.readableWidth(): Modifier = composed {
+    val wide = LocalConfiguration.current.screenWidthDp >= 720
+    fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = if (wide) 680.dp else 560.dp)
+}
 
 @Composable
 fun AmbientBackground(dimmed: Boolean = false) {

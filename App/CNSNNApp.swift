@@ -14,6 +14,7 @@ import CNSNNCore
     var body: some Scene {
         WindowGroup {
             RootView().environment(state).preferredColorScheme(.dark)
+                .background(MinimumWindowSize().allowsHitTesting(false).accessibilityHidden(true))
                 // Above this size the glass cards stop fitting on a phone screen.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .tint(CNSNNTheme.accent).task { await state.connectIfConfigured() }

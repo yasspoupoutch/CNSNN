@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 /// App Store screenshots, run only by the "CNSNN - Captures App Store" workflow
 /// (.github/workflows/ios-screenshots.yml). `--screenshots` fills the app with an invented profile,
@@ -200,14 +201,10 @@ final class CNSNNScreenshotTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--uitesting", "--classic-card=seed-questcequonafaitaubondieu", "--mode-seed=7"]
         app.launch()
-        let next = app.buttons["Continuer"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10))
-        next.tap()
-        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap(); field.typeText("Camille")
-        app.buttons["accept-rules"].tap()
-        app.buttons["C’est parti"].tap()
+        // One welcome screen since the automatic pseudo: no pseudo to type, no box to tick.
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
         XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout: 10))
         dismissKeyboardIfNeeded(app)
 
@@ -228,6 +225,101 @@ final class CNSNNScreenshotTests: XCTestCase {
         capture("mots-longs-3-reponse")
         app.buttons["Valider"].tap()
         capture("mots-longs-4-trouve", settle: 4)
+    }
+
+    /// Every main screen fits the device without scrolling: run by the "CNSNN - Écrans iPhone et iPad"
+    /// workflow (.github/workflows/ios-ecrans.yml) on a small iPhone, a big iPhone and iPads (portrait,
+    /// then landscape). The pictures are kept so a person can look at them.
+    @MainActor func testScreenFit() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--screenshots", "--mode-seed=7"]
+        app.launch()
+        let iPad = UIDevice.current.userInterfaceIdiom == .pad
+        if iPad { XCUIDevice.shared.orientation = .portrait }
+
+        // 1. Welcome page: the last line of the rules and both buttons on screen, no scrolling.
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 2)
+        assertOnScreen(app, app.staticTexts["Un mot du jour commun, et le mode Classique sans limite"], "dernière règle")
+        assertOnScreen(app, start, "C’est parti")
+        assertOnScreen(app, app.buttons["existing-account"], "J’ai déjà un compte")
+        capture("01-bienvenue")
+        start.tap()
+
+        // 2. Home, the tab bar reachable.
+        XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
+        assertOnScreen(app, app.buttons["Profil"], "barre d’onglets")
+        capture("02-accueil")
+
+        // 3. Classique: clue, letters and the whole keyboard on screen.
+        playClassic(app, name: "03-classique")
+
+        // 4. Sprint.
+        let sprint = tile(app, "Sprint")
+        XCTAssertTrue(sprint.waitForExistence(timeout: 10))
+        sprint.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        assertKeyboardOnScreen(app)
+        capture("04-sprint", settle: 2)
+        app.buttons["Quitter"].tap()
+        let stop = app.buttons["Arrêter le sprint"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let home = app.buttons["Accueil"]
+        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        home.tap()
+
+        // 5. Profil.
+        let profile = app.buttons["Profil"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 10))
+        profile.tap()
+        capture("05-profil")
+
+        // 6. iPad turned sideways: home and a game again.
+        guard iPad else { return }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.buttons["Jouer"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Classement"].waitForExistence(timeout: 10))
+        assertOnScreen(app, app.buttons["Profil"], "barre d’onglets (paysage)")
+        capture("06-accueil-paysage", settle: 2)
+        playClassic(app, name: "07-classique-paysage")
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    @MainActor private func playClassic(_ app: XCUIApplication, name: String) {
+        let classic = tile(app, "Classique")
+        XCTAssertTrue(classic.waitForExistence(timeout: 10))
+        classic.tap()
+        let launch = app.buttons["Lancer une partie"]
+        XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        launch.tap()
+        let close = app.buttons["Fermer"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 5))
+        for letter in ["P", "A", "P", "I", "L"] { app.buttons[letter].firstMatch.tap() }
+        assertKeyboardOnScreen(app)
+        assertOnScreen(app, close, "Fermer")
+        capture(name)
+        close.tap()
+    }
+
+    @MainActor private func assertKeyboardOnScreen(_ app: XCUIApplication) {
+        for key in ["A", "P", "W", "Valider", "Effacer"] {
+            assertOnScreen(app, app.buttons[key].firstMatch, "touche \(key)")
+        }
+    }
+
+    /// The element is drawn whole inside the window, so nobody has to scroll to reach it.
+    @MainActor private func assertOnScreen(_ app: XCUIApplication, _ element: XCUIElement, _ what: String,
+                                           file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5), "\(what) absent", file: file, line: line)
+        let window = app.windows.firstMatch.frame
+        let frame = element.frame
+        XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(frame),
+                      "\(what) dépasse de l’écran : \(frame) hors de \(window)", file: file, line: line)
+        XCTAssertTrue(element.isHittable, "\(what) pas touchable", file: file, line: line)
     }
 
     /// Types a word on the game's own keyboard, at a pace a viewer can follow.
