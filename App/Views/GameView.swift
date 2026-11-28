@@ -66,7 +66,7 @@ struct GameView: View {
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: sheetShown)
         .onChange(of: session.result?.id) { _, _ in
             // A word just found here (not one loaded from earlier, not shown by a hint): it bursts first.
-            if session.result?.correct == true, session.celebrate, !reduceMotion, tutorial == nil {
+            if mode == .daily, session.result?.correct == true, session.celebrate, !reduceMotion, tutorial == nil {
                 session.celebrate = false; sheetShown = false; celebration = UUID()
             } else { sheetShown = true; if session.result == nil { celebration = nil } }
         }
