@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fills the App Store listing of the version being prepared (created from "version" in LISTING_JSON
-when none is): texts, category, copyright and iPhone 6.9" screenshots. Never submits anything to Apple review.
+when none is): texts, category, copyright, iPhone 6.9" screenshots and, with IPAD_SHOTS, iPad 13" ones. Never submits anything to Apple review.
 
 Usage: asc_listing.py KEY_ID ISSUER_ID KEY_PATH BUNDLE_ID LISTING_JSON SCREENSHOT_DIR [PREVIEW_MP4]
 The screenshots are SCREENSHOT_DIR/<name>.png, in the order of "screenshots" in LISTING_JSON. The
@@ -18,6 +18,8 @@ listing = json.load(open(listing_path, encoding='utf-8'))
 API = 'https://api.appstoreconnect.apple.com'
 # Apple's API names the 6.9" iPhone slot APP_IPHONE_67; it takes 1320 x 2868 screenshots.
 DISPLAY = 'APP_IPHONE_67'
+# The 13" iPad slot (2064 x 2752 or 2048 x 2732), required once the app runs on iPad.
+IPAD_DISPLAY = 'APP_IPAD_PRO_3GEN_129'
 EDITABLE = {'PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED', 'METADATA_REJECTED'}
 
 
@@ -123,43 +125,53 @@ else:
         'relationships': {'appStoreVersion': {'data': {'type': 'appStoreVersions', 'id': version['id']}}}}})['data']
 print(f'Description, mots-clés et texte promotionnel ({locale}) enregistrés.')
 
-# Screenshots: empty the 6.9" set, then upload in order.
-sets = call('GET', f"/v1/appStoreVersionLocalizations/{version_loc['id']}/appScreenshotSets")['data']
-shot_set = first(sets, screenshotDisplayType=DISPLAY)
-if shot_set is None:
-    shot_set = call('POST', '/v1/appScreenshotSets', {'data': {
-        'type': 'appScreenshotSets', 'attributes': {'screenshotDisplayType': DISPLAY},
-        'relationships': {'appStoreVersionLocalization': {'data': {
-            'type': 'appStoreVersionLocalizations', 'id': version_loc['id']}}}}})['data']
-for old in call('GET', f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")['data']:
-    call('DELETE', f"/v1/appScreenshots/{old['id']}")
+# Screenshots: empty each set, then upload in order. iPhone 6.9" always; iPad 13" when IPAD_SHOTS
+# names a folder of 2064 x 2752 screenshots (needed since the app runs natively on iPad).
+def upload_set(display, folder):
+    sets = call('GET', f"/v1/appStoreVersionLocalizations/{version_loc['id']}/appScreenshotSets")['data']
+    shot_set = first(sets, screenshotDisplayType=display)
+    if shot_set is None:
+        shot_set = call('POST', '/v1/appScreenshotSets', {'data': {
+            'type': 'appScreenshotSets', 'attributes': {'screenshotDisplayType': display},
+            'relationships': {'appStoreVersionLocalization': {'data': {
+                'type': 'appStoreVersionLocalizations', 'id': version_loc['id']}}}}})['data']
+    for old in call('GET', f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")['data']:
+        call('DELETE', f"/v1/appScreenshots/{old['id']}")
 
-for name in listing['screenshots']:
-    path = os.path.join(shots_dir, f'{name}.png')
-    data = open(path, 'rb').read()
-    shot = call('POST', '/v1/appScreenshots', {'data': {
-        'type': 'appScreenshots', 'attributes': {'fileName': f'{name}.png', 'fileSize': len(data)},
-        'relationships': {'appScreenshotSet': {'data': {'type': 'appScreenshotSets', 'id': shot_set['id']}}}}})['data']
-    for op in shot['attributes']['uploadOperations']:
-        part = data[op['offset']:op['offset'] + op['length']]
-        headers = {h['name']: h['value'] for h in op.get('requestHeaders', [])}
-        urllib.request.urlopen(urllib.request.Request(op['url'], data=part, method=op['method'], headers=headers),
-                               timeout=120).read()
-    call('PATCH', f"/v1/appScreenshots/{shot['id']}", {'data': {
-        'type': 'appScreenshots', 'id': shot['id'],
-        'attributes': {'uploaded': True, 'sourceFileChecksum': hashlib.md5(data).hexdigest()}}})
-    print(f'Capture envoyée : {name}.png')
+    for name in listing['screenshots']:
+        path = os.path.join(folder, f'{name}.png')
+        data = open(path, 'rb').read()
+        shot = call('POST', '/v1/appScreenshots', {'data': {
+            'type': 'appScreenshots', 'attributes': {'fileName': f'{name}.png', 'fileSize': len(data)},
+            'relationships': {'appScreenshotSet': {'data': {'type': 'appScreenshotSets', 'id': shot_set['id']}}}}})['data']
+        for op in shot['attributes']['uploadOperations']:
+            part = data[op['offset']:op['offset'] + op['length']]
+            headers = {h['name']: h['value'] for h in op.get('requestHeaders', [])}
+            urllib.request.urlopen(urllib.request.Request(op['url'], data=part, method=op['method'], headers=headers),
+                                   timeout=120).read()
+        call('PATCH', f"/v1/appScreenshots/{shot['id']}", {'data': {
+            'type': 'appScreenshots', 'id': shot['id'],
+            'attributes': {'uploaded': True, 'sourceFileChecksum': hashlib.md5(data).hexdigest()}}})
+        print(f'Capture envoyée ({display}) : {name}.png')
 
-# Apple processes the files for a few seconds; report the final state of each.
-for _ in range(12):
-    shots = call('GET', f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")['data']
-    states = [(s['attributes'].get('assetDeliveryState') or {}).get('state') for s in shots]
-    if all(state in ('COMPLETE', 'FAILED') for state in states):
-        break
-    time.sleep(5)
-print('État des captures : ' + ', '.join(f"{s['attributes']['fileName']} {st}" for s, st in zip(shots, states)))
-if 'FAILED' in states or len(shots) != len(listing['screenshots']):
-    sys.exit('::error::Une capture a été refusée par Apple.')
+    # Apple processes the files for a few seconds; report the final state of each.
+    for _ in range(12):
+        shots = call('GET', f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")['data']
+        states = [(s['attributes'].get('assetDeliveryState') or {}).get('state') for s in shots]
+        if all(state in ('COMPLETE', 'FAILED') for state in states):
+            break
+        time.sleep(5)
+    print(f'État des captures ({display}) : ' + ', '.join(f"{s['attributes']['fileName']} {st}" for s, st in zip(shots, states)))
+    if 'FAILED' in states or len(shots) != len(listing['screenshots']):
+        sys.exit(f'::error::Une capture {display} a été refusée par Apple.')
+
+
+upload_set(DISPLAY, shots_dir)
+ipad_dir = os.environ.get('IPAD_SHOTS')
+if ipad_dir and os.path.isdir(ipad_dir):
+    upload_set(IPAD_DISPLAY, ipad_dir)
+else:
+    print('Pas de captures iPad fournies : le jeu de captures iPad 13 pouces n’est pas modifié.')
 
 # App preview video: the same upload dance as the screenshots, in the 6.9" preview set. Apple
 # processes the video for several minutes; its state is only reported here.

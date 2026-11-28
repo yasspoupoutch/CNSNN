@@ -559,7 +559,36 @@ struct LetterKeyboard: View {
     private let rows = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
     /// One key with its share of the gaps: the touch area. The cap is drawn inside it.
     static let rowHeight: CGFloat = 57.5
+    /// An iPad with a keyboard attached (or a Mac): typing on it works like the keys on screen.
+    @FocusState private var hardwareKeys: Bool
     var body: some View {
+        keys
+            .focusable(interactions: .edit)
+            .focused($hardwareKeys)
+            .focusEffectDisabled()
+            .onKeyPress(phases: [.down, .repeat]) { key in handle(key) }
+            .onAppear { hardwareKeys = true }
+    }
+
+    /// Letters (accents dropped), space, ⌫, ⏎ and ← → from a hardware keyboard.
+    private func handle(_ key: KeyPress) -> KeyPress.Result {
+        if key.modifiers.contains(.command) || key.modifiers.contains(.control) { return .ignored }
+        switch key.key {
+        case .delete: delete(); return .handled
+        case .return: if key.phase == .down { submit() }; return .handled
+        case .leftArrow: if let moveCursor { moveCursor(-1); return .handled }; return .ignored
+        case .rightArrow: if let moveCursor { moveCursor(1); return .handled }; return .ignored
+        case .space: if key.phase == .down { press(" ") }; return .handled
+        default: break
+        }
+        guard key.phase == .down else { return .ignored }
+        let letter = key.characters.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR")).uppercased()
+        guard letter.unicodeScalars.count == 1, let scalar = letter.unicodeScalars.first, (65...90).contains(scalar.value) else { return .ignored }
+        press(letter)
+        return .handled
+    }
+
+    private var keys: some View {
         GeometryReader { geo in
             let unit = geo.size.width / 10
             VStack(spacing: 0) {
@@ -1038,28 +1067,41 @@ enum LetterBurst {
         return Layout(xs: xs, y: centerY, size: size)
     }
 
-    @ViewBuilder static func symbols(letters: [Character], size: CGFloat) -> some View {
-        ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
-            Text(String(letter)).font(.system(size: size, weight: .heavy))
-                .foregroundStyle(Vowels.contains(letter) ? Palette.accent : Palette.foreground).tag("w\(index)")
+    /// Only what is drawn: the gaps of an expression ("Qu’est-ce qu’on a fait au Bon Dieu") are no
+    /// symbol (an empty symbol made SwiftUI's Canvas stop the app), and each tag is listed once, flat.
+    struct Symbol: Identifiable { let id: String; let text: String; let size: CGFloat?; let color: Color }
+
+    static func symbolTags(letters: [Character]) -> [Symbol] {
+        var tags: [Symbol] = []
+        for (index, letter) in letters.enumerated() where drawable(letter) {
+            tags.append(Symbol(id: "w\(index)", text: String(letter), size: nil, color: Vowels.contains(letter) ? Palette.accent : Palette.foreground))
         }
-        ForEach(Array(Set(letters.map { String($0) })).sorted(), id: \.self) { letter in
-            ForEach(0..<colors.count, id: \.self) { color in
-                Text(letter).font(.system(size: 22, weight: .heavy)).foregroundStyle(colors[color]).tag("s\(letter)\(color)")
-            }
+        for letter in Array(Set(letters.filter(drawable).map { String($0) })).sorted() {
+            for color in colors.indices { tags.append(Symbol(id: "s\(letter)\(color)", text: letter, size: 22, color: colors[color])) }
+        }
+        return tags
+    }
+
+    static func drawable(_ letter: Character) -> Bool { !letter.isWhitespace }
+
+    @ViewBuilder static func symbols(letters: [Character], size: CGFloat) -> some View {
+        ForEach(symbolTags(letters: letters)) { symbol in
+            Text(symbol.text).font(.system(size: max(symbol.size ?? size, 1), weight: .heavy))
+                .foregroundStyle(symbol.color).tag(symbol.id)
         }
     }
 
     static func particles(letters: [Character], layout: Layout) -> [Particle] {
         let perLetter = max(4, min(11, 100 / max(letters.count, 1)))
         var all: [Particle] = []
-        for (index, letter) in letters.enumerated() {
+        let shown = letters.filter(drawable)
+        for (index, letter) in letters.enumerated() where drawable(letter) {
             let x = layout.xs[index], dx = x - layout.xs[letters.count / 2]
             all.append(Particle(symbol: "w\(index)", x: x, y: layout.y, vx: dx * 2.4 + .random(in: -80...80), vy: .random(in: -520 ... -260),
                                 drag: 0.5, gravity: 1100, spin: 0, turn: .random(in: -5...5), phase: 0, scale: 1, big: true))
             for _ in 0..<perLetter {
                 let angle = CGFloat.random(in: 0 ..< 2 * .pi), speed = CGFloat.random(in: 160...580)
-                let pick = letters.randomElement() ?? letter, roll = Double.random(in: 0..<1)
+                let pick = shown.randomElement() ?? letter, roll = Double.random(in: 0..<1)
                 let color = roll < 0.15 ? 2 : (Vowels.contains(pick) ? 0 : 1)
                 all.append(Particle(symbol: "s\(pick)\(color)", x: x + .random(in: -10...10), y: layout.y + .random(in: -20...20),
                                     vx: cos(angle) * speed, vy: sin(angle) * speed - 220, drag: 2.6, gravity: 620,

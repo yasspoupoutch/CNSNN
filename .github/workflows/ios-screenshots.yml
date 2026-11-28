@@ -1,7 +1,7 @@
 name: CNSNN - Captures App Store
 
 # Lancement manuel uniquement : captures d'écran et aperçu vidéo App Store sur un simulateur iPhone
-# 6,9 pouces (1320 x 2868), et les mêmes captures sur l'iPhone Duo pour vérifier la mise en page. L'app tourne avec `--uitesting --screenshots` : profil, classement et défis
+# 6,9 pouces (1320 x 2868), sur un iPad 13 pouces (2064 x 2752, dossier ios/ipad-<apparence>/), et les mêmes captures sur l'iPhone Duo pour vérifier la mise en page. L'app tourne avec `--uitesting --screenshots` : profil, classement et défis
 # inventés, hors ligne (App/Services/ScreenshotDemo.swift), et seulement des cartes publiques du
 # Classique, jamais un mot du jour secret. Les PNG sont publiés en artefact et sur la branche
 # `store-screenshots` (dossier ios/<apparence>/).
@@ -326,6 +326,65 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # iPad 13 pouces : l'app tourne en vraie app iPad, l'App Store demande donc des captures iPad
+      # (2064 x 2752). Mêmes écrans que l'iPhone, publiés dans ios/ipad-<apparence>/.
+      - name: Prendre les captures iPad 13 pouces
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          ipad=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = [d for runtime in json.load(sys.stdin)["devices"].values() for d in runtime if d["name"].startswith(("iPad Pro 13", "iPad Air 13", "iPad Pro (12.9"))]
+          print(devices[-1]["udid"] if devices else "")')
+          if [ -z "$ipad" ]; then
+            echo '::warning::Pas de simulateur iPad 13 pouces sur ce runner : captures iPad non prises.'
+            exit 0
+          fi
+          xcrun simctl boot "$ipad" 2>/dev/null || true; xcrun simctl bootstatus "$ipad" -b
+          xcrun simctl ui "$ipad" appearance "$APPEARANCE"
+          xcrun simctl status_bar "$ipad" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --batteryState charged --batteryLevel 100 || true
+          xcodebuild test-without-building \
+            -project CNSNN.xcodeproj -scheme CNSNN -configuration Debug -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$ipad" -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution -parallel-testing-enabled NO \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests/testAppStoreScreenshots \
+            -resultBundlePath "$CI_ROOT/ipad.xcresult" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            > "$CI_ROOT/logs/ipad.log" 2>&1 || { tail -40 "$CI_ROOT/logs/ipad.log"; exit 1; }
+          rm -rf "$CI_ROOT/ipad-raw" "$CI_ROOT/ipad"; mkdir -p "$CI_ROOT/ipad-raw" "$CI_ROOT/ipad"
+          xcrun xcresulttool export attachments --path "$CI_ROOT/ipad.xcresult" --output-path "$CI_ROOT/ipad-raw"
+          python3 - "$CI_ROOT/ipad-raw" "$CI_ROOT/ipad" <<'PY'
+          import json, pathlib, re, shutil, sys
+          source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          manifest = json.loads((source / 'manifest.json').read_text())
+          for test in manifest if isinstance(manifest, list) else [manifest]:
+              for attachment in test.get('attachments', []):
+                  match = re.match(r'(\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*)', attachment.get('suggestedHumanReadableName', ''))
+                  if match:
+                      shutil.copyfile(source / attachment['exportedFileName'], target / (match.group(1) + '.png'))
+          PY
+          for file in "$CI_ROOT/ipad/"*.png; do
+            width=$(sips -g pixelWidth "$file" | awk '/pixelWidth/ {print $2}')
+            height=$(sips -g pixelHeight "$file" | awk '/pixelHeight/ {print $2}')
+            echo "$(basename "$file") : ${width} x ${height}"
+            case "${width}x${height}" in
+              2064x2752|2048x2732) ;;
+              *) echo "::error::Capture iPad de taille inattendue (${width} x ${height})."; exit 1 ;;
+            esac
+          done
+          xcrun simctl shutdown "$ipad" || true
+
+      - name: Conserver les captures iPad
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cnsnn-screenshots-ipad-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/cnsnn-ci/ipad/
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Conserver les captures en artefact
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -394,6 +453,13 @@ jobs:
           name: cnsnn-screenshots-ios-${{ env.APPEARANCE }}
           path: ${{ runner.temp }}/screenshots
 
+      - name: Récupérer les captures iPad
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cnsnn-screenshots-ipad-${{ env.APPEARANCE }}
+          path: ${{ runner.temp }}/ipad
+
       - name: Récupérer la vidéo brute
         uses: actions/download-artifact@v4
         with:
@@ -438,6 +504,10 @@ jobs:
           rm -rf "ios/$APPEARANCE"
           mkdir -p "ios/$APPEARANCE"
           cp "$RUNNER_TEMP/screenshots/"*.png "ios/$APPEARANCE/"
+          if ls "$RUNNER_TEMP/ipad/"*.png > /dev/null 2>&1; then
+            rm -rf "ios/ipad-$APPEARANCE"; mkdir -p "ios/ipad-$APPEARANCE"
+            cp "$RUNNER_TEMP/ipad/"*.png "ios/ipad-$APPEARANCE/"
+          fi
           if [ -f "$RUNNER_TEMP/preview/preview.mp4" ]; then cp "$RUNNER_TEMP/preview/preview.mp4" "ios/$APPEARANCE/preview.mp4"; fi
           ls -l "ios/$APPEARANCE"
           git add -A .
