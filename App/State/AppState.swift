@@ -254,10 +254,12 @@ import CNSNNCore
 
     // MARK: Profile and catalogue
 
-    func rename(_ name: String) async {
+    /// `quiet`: the problem is only returned (said by the caller), not shown in the app's alert.
+    @discardableResult func rename(_ name: String, quiet: Bool = false) async -> String? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (2...20).contains(name.count) else { error = "Le pseudo doit contenir 2 à 20 caractères."; return }
-        guard NameFilter.isAllowed(name) else { error = AppState.refusedName; return }
+        func fail(_ message: String) -> String { if !quiet { error = message }; return message }
+        guard (2...20).contains(name.count) else { return fail("Le pseudo doit contenir 2 à 20 caractères.") }
+        guard NameFilter.isAllowed(name) else { return fail(AppState.refusedName) }
         do {
             if let cloud, let uid { try await cloud.rename(uid: uid, username: name) }
             progress.username = name
@@ -266,7 +268,8 @@ import CNSNNCore
             rankings.readAt = [:]
             if let uid { challenges = challenges.map { $0.renaming([uid: name]) } }
             await refreshOfficial()
-        } catch { self.error = CloudError.message(error) }
+            return nil
+        } catch { return fail(CloudError.message(error)) }
     }
     /// Classic plays the built-in cards plus every approved community card. The community cards are kept
     /// on this device and downloaded again only when a moderator changed the catalogue (`meta/cards`),

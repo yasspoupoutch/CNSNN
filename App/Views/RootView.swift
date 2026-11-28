@@ -84,6 +84,9 @@ struct MainShell: View {
     /// "À vous de jouer" at the end of the tutorial: the real daily game opens once it has closed.
     @State private var dailyAfterTutorial = false
     @State private var askReminder = false
+    /// Offered once, back from a first word found or a first game: choose a pseudo instead of "Joueur4821".
+    @AppStorage(PseudoOfferSheet.offeredKey) private var pseudoOffered = false
+    @State private var offerPseudo = false
     var body: some View {
         ZStack(alignment: .bottom) {
             // Every page stays alive so it keeps its state, as with a native tab view.
@@ -118,6 +121,9 @@ struct MainShell: View {
         }
         .onChange(of: state.tutorialRequest) { _, _ in tab = .play; showTutorial = true }
         .onChange(of: state.leaderboardRequest) { _, _ in tab = .stats }
+        .sheet(isPresented: $offerPseudo) {
+            PseudoOfferSheet().presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .alert("Un rappel à 12h ?", isPresented: $askReminder) {
             Button("Oui, me le rappeler") { Task { await turnOnReminder() } }
             Button("Non merci", role: .cancel) {}
@@ -162,6 +168,12 @@ struct MainShell: View {
         if dailyAfterTutorial {
             dailyAfterTutorial = false
             Task { try? await Task.sleep(for: .seconds(0.3)); game = GameRoute(mode: .daily) }
+            return
+        }
+        // The pseudo first (the reminder stays pending for the next game).
+        if state.progress.pseudoOfferDue(offered: pseudoOffered) {
+            pseudoOffered = true
+            Task { try? await Task.sleep(for: .seconds(0.6)); offerPseudo = true }
             return
         }
         if state.reminderPending { offerReminder() } else { askReviewIfPending() }
@@ -325,6 +337,89 @@ struct OnboardingView: View {
         guard !state.isBusy else { return }
         Haptics.success()
         Task { await state.start() }
+    }
+}
+
+/// Offered once, back from a first word found (Mot du jour, Classique) or a first game (Sprint,
+/// Survie, Double sens): the automatic pseudo, ready to change. Changing it asks to accept the
+/// community rules (the pseudo is seen by other players); "Plus tard" keeps "Joueur4821".
+struct PseudoOfferSheet: View {
+    static let offeredKey = "cnsnn.pseudoOffered"
+    @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var accepted = false
+    @State private var saving = false
+    /// A refused or taken pseudo, said here (the app's alert cannot show over this sheet).
+    @State private var problem: String?
+    @FocusState private var focused: Bool
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var changed: Bool { trimmed != state.progress.username }
+    private var valid: Bool { (2...20).contains(trimmed.count) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Votre pseudo").scaledFont(34, .bold).tracking(-0.6).padding(.top, 28)
+                    Text("Les autres joueurs vous voient sous ce nom dans les classements et les duels. Vous pouvez le garder ou le changer.")
+                        .scaledFont(16).foregroundStyle(Palette.secondary).padding(.top, 8)
+                    TextField("", text: $name, prompt: Text("ex. voyelle_hunter").foregroundStyle(Palette.tertiary))
+                        .scaledFont(19, .medium).foregroundStyle(Palette.foreground)
+                        .textContentType(.nickname).autocorrectionDisabled().textInputAutocapitalization(.never)
+                        .focused($focused).submitLabel(.done)
+                        .padding(.horizontal, 20).frame(minHeight: 58)
+                        .glassPanel(radius: 20, padding: 0)
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(focused ? Palette.focusRing : .clear, lineWidth: 1))
+                        .padding(.top, 26)
+                        .accessibilityLabel("Pseudo, entre 2 et 20 caractères")
+                        .accessibilityIdentifier("pseudo-offer.field")
+                    if let problem { Text(problem).scaledFont(13).foregroundStyle(Palette.red).padding(.horizontal, 4).padding(.top, 10) }
+                    if changed && !state.rulesAccepted { acceptance.padding(.top, 14) }
+                }.padding(.horizontal, 26)
+            }.scrollDismissesKeyboard(.interactively).scrollBounceBehavior(.basedOnSize)
+            VStack(spacing: 4) {
+                Button(saving ? "Un instant…" : (changed ? "Enregistrer" : "Garder ce pseudo"), action: save)
+                    .buttonStyle(PrimaryPillStyle())
+                    .disabled(saving || (changed && (!valid || !(accepted || state.rulesAccepted))))
+                    .accessibilityIdentifier("pseudo-offer.save")
+                Button("Plus tard") { dismiss() }
+                    .scaledFont(15, .semibold).foregroundStyle(Palette.foreground).frame(minHeight: 44)
+            }.padding(.horizontal, 26).padding(.top, 12).padding(.bottom, 8)
+        }
+        .onAppear { name = state.progress.username }
+        .animation(CNSNNTheme.ease, value: changed)
+    }
+
+    /// Community rules and privacy policy, accepted once before a pseudo the other players will see.
+    private var acceptance: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Button { Haptics.selection(); accepted.toggle() } label: {
+                Image(systemName: accepted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(accepted ? Palette.mint : Palette.tertiary)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityIdentifier("pseudo-offer.accept")
+            .accessibilityLabel("J’accepte les règles de la communauté et la politique de confidentialité")
+            .accessibilityAddTraits(accepted ? .isSelected : [])
+            Text("J’accepte les [règles de la communauté](\(Site.rules.absoluteString)) et la [politique de confidentialité](\(Site.privacy.absoluteString)).")
+                .scaledFont(14).foregroundStyle(Palette.secondary).tint(Palette.foreground)
+                .fixedSize(horizontal: false, vertical: true).padding(.top, 11)
+        }
+    }
+
+    private func save() {
+        guard changed else { dismiss(); return }
+        guard valid, accepted || state.rulesAccepted, !saving else { return }
+        focused = false
+        saving = true
+        Task {
+            if !state.rulesAccepted { state.acceptRules() }
+            let failure = await state.rename(trimmed, quiet: true)
+            saving = false
+            // A refused or taken pseudo: said in the sheet, which stays to try another one.
+            if let failure { problem = failure } else { Haptics.success(); dismiss() }
+        }
     }
 }
 

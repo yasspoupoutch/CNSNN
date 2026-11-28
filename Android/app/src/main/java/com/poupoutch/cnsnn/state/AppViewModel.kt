@@ -329,18 +329,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Profile and catalogue
 
-    fun rename(name: String) = viewModelScope.launch {
+    fun rename(name: String) = viewModelScope.launch { renaming(name)?.let { error = it } }
+    /** Renames the player; returns the problem (refused, taken, offline…) or null once saved. */
+    suspend fun renaming(name: String): String? {
         val clean = name.trim()
-        if (clean.length !in 2..20) { error = "Le pseudo doit contenir 2 à 20 caractères."; return@launch }
-        if (!NameFilter.isAllowed(clean)) { error = REFUSED_NAME; return@launch }
-        try {
+        if (clean.length !in 2..20) return "Le pseudo doit contenir 2 à 20 caractères."
+        if (!NameFilter.isAllowed(clean)) return REFUSED_NAME
+        return try {
             uid?.let { cloud.rename(it, clean) }
             update { it.copy(username = clean) }
             // The kept rankings still show the old pseudo: read them again.
             forgetRankings()
             uid?.let { me -> challenges = challenges.map { it.renaming(mapOf(me to clean)) } }
             refreshOfficial()
-        } catch (e: Exception) { error = CloudError.message(e) }
+            null
+        } catch (e: Exception) { CloudError.message(e) }
     }
     /**
      * Classique plays the built-in cards plus every approved community card. The catalogue is
