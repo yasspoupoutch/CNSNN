@@ -69,6 +69,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var challenges by mutableStateOf<List<Challenge>>(emptyList()); private set
     /** Asks Profil to open "Proposer un mot" (from the daily result). */
     var proposeRequest by mutableStateOf(0)
+    /** "Choisir mon pseudo" on the home screen: Profil opens the pseudo box. */
+    var renameRequest by mutableStateOf(0)
     /** Asks the home page to open the challenge sheet (from the daily result). */
     var challengeRequest by mutableStateOf(0)
     /** The code of a challenge link the app was opened with, waiting for the challenge sheet to join it. */
@@ -182,23 +184,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun chooseAvatar(index: Int) { avatar = index; local.avatar = index }
 
-    /** First pseudo: the player accepted the community rules on the same screen. */
-    fun start(username: String) = viewModelScope.launch {
+    /**
+     * First launch: no question, the player plays at once under an automatic pseudo ("Joueur4821"),
+     * which they can change in Profil (the community rules are accepted then).
+     */
+    fun start() = viewModelScope.launch {
         if (isBusy) return@launch
-        val name = username.trim()
-        if (name.length !in 2..20) { error = "Choisissez un pseudo de 2 à 20 caractères."; return@launch }
-        if (!NameFilter.isAllowed(name)) { error = REFUSED_NAME; return@launch }
         isBusy = true
-        try {
+        var name = NameFilter.automatic()
+        testPseudo?.let { chosen ->
+            name = chosen
             progress = progress.copy(rulesVersion = maxOf(progress.rulesVersion ?: 0, CommunityRules.VERSION))
-            activate(cloud.bootstrap(name, CommunityRules.VERSION), preservingGuest = true)
+        }
+        try {
+            activate(cloud.bootstrap(name, progress.rulesVersion), preservingGuest = true)
         } catch (e: Exception) {
-            if (CloudError.code(e) == CloudError.Code.SERVER_FULL) {
-                // The free quota is used up for today: enter as a guest, the account is made at the next launch.
-                note(e); update { it.copy(username = name) }; return@launch
-            }
-            val pseudo = e is CloudError && e.kind in listOf(CloudError.Kind.USERNAME_TAKEN, CloudError.Kind.USERNAME_INVALID)
-            error = (if (pseudo) "" else "Connexion impossible : ") + CloudError.message(e); return@launch
+            // Offline, or the free quota used up for today: play as a guest, the account is made at the next launch.
+            note(e); update { it.copy(username = name) }; return@launch
         } finally { isBusy = false }
         refreshAll()
     }
@@ -768,6 +770,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val RANKING_REFRESH_MS = 30_000L
         const val SPRINT_KEEP_MS = 300_000L
         const val SPRINT_LEADER_KEEP_MS = 900_000L
+        /** Interface tests: plays as a player who chose this pseudo instead of "Joueur4821". */
+        @androidx.annotation.VisibleForTesting var testPseudo: String? = null
         const val REFUSED_NAME = "Ce pseudo n’est pas autorisé. Choisissez-en un autre."
         const val SUSPENDED_TEXT = "Votre compte est suspendu par la modération : le mot du jour classé, les propositions et les signalements ne sont plus disponibles. Contactez le support depuis votre profil."
     }

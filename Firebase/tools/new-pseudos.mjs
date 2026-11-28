@@ -72,11 +72,21 @@ export function parisDate(iso) {
 
 // latest: the last players who chose a pseudo, repeated in every message, so a notification the
 // phone missed (ntfy keeps them only 12 h) never loses a name.
-export function message(pseudos, total, checkedAt, latest = []) {
+// Since the app gives new players an automatic pseudo ("Joueur4821") until they choose one, those are
+// counted apart: the list shows the names players chose.
+export const AUTOMATIC = /^Joueur[0-9]{4,5}$/;
+export function message(allPseudos, total, checkedAt, allLatest = []) {
+  const pseudos = allPseudos.filter((p) => !AUTOMATIC.test(p.pseudo));
+  const latest = allLatest.filter((p) => !AUTOMATIC.test(p.pseudo));
+  const automatic = allPseudos.length - pseudos.length;
   const n = pseudos.length;
-  const title = n === 0 ? 'CNSNN : aucun nouveau pseudo' : n === 1 ? 'CNSNN : 1 nouveau pseudo' : `CNSNN : ${n} nouveaux pseudos`;
+  const players = n + automatic;
+  const title = automatic === 0
+    ? (n === 0 ? 'CNSNN : aucun nouveau pseudo' : n === 1 ? 'CNSNN : 1 nouveau pseudo' : `CNSNN : ${n} nouveaux pseudos`)
+    : (players === 1 ? 'CNSNN : 1 nouveau joueur' : `CNSNN : ${players} nouveaux joueurs`);
   const lines = pseudos.slice(0, 30).map((p) => `• ${p.pseudo} (${parisTime(p.createdAt)})`);
   if (n > 30) lines.push(`… et ${n - 30} autres`);
+  if (automatic) lines.push(`${automatic === 1 ? '1 joueur garde' : `${automatic} joueurs gardent`} le pseudo automatique (Joueur…)`);
   if (total != null) lines.push(`Total : ${total} joueur${total > 1 ? "s" : ""} avec un pseudo`);
   if (latest.length) lines.push(`Derniers inscrits : ${latest.map((p) => `${p.pseudo} (${parisDate(p.createdAt)})`).join(', ')}`);
   if (checkedAt) lines.push(`Vérifié ${parisTime(checkedAt)} (heure française)`);

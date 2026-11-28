@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SportsEsports
@@ -142,7 +143,7 @@ fun RootScreen(state: AppViewModel) {
         }
     }
     // Players from before the community rules accept them once before playing on.
-    if (introDone && !state.isRestoring && CommunityRules.mustAccept(state.progress)) RulesAcceptance(state::acceptRules)
+    if (introDone && !state.isRestoring && CommunityRules.mustAccept(state.progress)) RulesAcceptance(accept = state::acceptRules)
     state.error?.let { message ->
         AlertDialog(onDismissRequest = { state.error = null }, confirmButton = { TextButton({ state.error = null }) { Text("Compris") } },
             title = { Text("CNSNN") }, text = { Text(message) })
@@ -239,6 +240,8 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
     // "Proposer un mot" on the daily result: the form lives in Profil.
     var seenPropose by rememberSaveable { mutableStateOf(state.proposeRequest) }
     LaunchedEffect(state.proposeRequest) { if (state.proposeRequest != seenPropose) { seenPropose = state.proposeRequest; tab = Tab.PROFILE } }
+    var seenRename by rememberSaveable { mutableStateOf(state.renameRequest) }
+    LaunchedEffect(state.renameRequest) { if (state.renameRequest != seenRename) { seenRename = state.renameRequest; tab = Tab.PROFILE } }
     // A challenge link opened the app: back to the home page, whose sheet joins it.
     LaunchedEffect(state.inviteCode) { if (state.inviteCode != null) tab = Tab.PLAY }
     val holder = rememberSaveableStateHolder()
@@ -320,13 +323,12 @@ private fun ReminderOffer(state: AppViewModel) {
 
 @Composable
 private fun OnboardingScreen(state: AppViewModel) {
-    var step by rememberSaveable { mutableStateOf(0) }
-    AnimatedContent(step, transitionSpec = {
-        if (targetState > initialState) (slideInHorizontally { it } + fadeIn()) togetherWith (slideOutHorizontally { -it } + fadeOut())
-        else (slideInHorizontally { -it } + fadeIn()) togetherWith (slideOutHorizontally { it } + fadeOut())
-    }, label = "onboarding") { page ->
-        if (page == 0) Rules { step = 1 } else Pseudo(state) { step = 0 }
-    }
+    // One screen, no question: the rules of the game, then straight in under an automatic pseudo
+    // ("Joueur4821"), changed in Profil whenever the player likes.
+    val haptics = rememberHaptics()
+    var signingIn by rememberSaveable { mutableStateOf(false) }
+    Welcome(state.isBusy, start = { if (!state.isBusy) { haptics.success(); state.start() } }, existing = { signingIn = true })
+    if (signingIn) SignInDialog(state) { signingIn = false }
     // New players only, once: may the app tell Meta that its ads brought a player? (ads/AdMeasurement.kt)
     val context = LocalContext.current
     var askAds by rememberSaveable { mutableStateOf(com.poupoutch.cnsnn.ads.AdMeasurement.shouldAsk(context)) }
@@ -340,7 +342,7 @@ private fun OnboardingScreen(state: AppViewModel) {
 }
 
 @Composable
-private fun Rules(next: () -> Unit) {
+private fun Welcome(busy: Boolean, start: () -> Unit, existing: () -> Unit) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(50.dp))
@@ -363,7 +365,10 @@ private fun Rules(next: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
         }
-        PrimaryButton("Continuer", onClick = next, modifier = Modifier.padding(bottom = 12.dp))
+        PrimaryButton(if (busy) "Un instant…" else "C’est parti", enabled = !busy, onClick = start)
+        TextButton(existing, Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, bottom = 8.dp)) {
+            Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -372,86 +377,6 @@ private fun Bullet(text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(Modifier.padding(top = 8.dp).size(6.dp).background(Palette.tertiary, CircleShape))
         Text(text, color = Palette.secondary)
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun Pseudo(state: AppViewModel, back: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var accepted by rememberSaveable { mutableStateOf(false) }
-    var signingIn by rememberSaveable { mutableStateOf(false) }
-    val trimmed = name.trim()
-    val valid = trimmed.length in 2..20
-    val haptics = rememberHaptics()
-    val links = LocalUriHandler.current
-    val start = { if (valid && accepted && !state.isBusy) { haptics.success(); state.start(name) } }
-    // On a small phone with the keyboard up (Galaxy S9), everything that matters stays on screen without
-    // scrolling: the box to tick and the button are pinned at the bottom, and the avatar steps aside while typing.
-    val typing = WindowInsets.isImeVisible
-    val short = LocalConfiguration.current.screenHeightDp < 760
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 26.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            IconButton(back, Modifier.padding(top = 6.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
-            Text("Choisissez un pseudo", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = if (short) 10.dp else 16.dp))
-            AnimatedVisibility(!typing) {
-                Column {
-                    Text("Pas d’inscription, pas d’email. Juste un nom pour jouer.", color = Palette.secondary, modifier = Modifier.padding(top = 8.dp))
-                    Avatar(trimmed.ifEmpty { "?" }, state.avatar, if (short) 92.dp else 104.dp,
-                        Modifier.align(Alignment.CenterHorizontally).padding(top = if (short) 22.dp else 34.dp))
-                    AvatarPicker(state.avatar, state::chooseAvatar, Modifier.align(Alignment.CenterHorizontally).padding(top = if (short) 14.dp else 20.dp))
-                }
-            }
-            OutlinedTextField(name, { name = it.take(20) }, Modifier.fillMaxWidth().padding(top = if (typing || short) 18.dp else 30.dp),
-                placeholder = { Text("ex. voyelle_hunter") }, singleLine = true, shape = RoundedCornerShape(20.dp),
-                label = { Text("Pseudo") }, supportingText = {
-                    when {
-                        trimmed.isEmpty() -> Text("Entre 2 et 20 caractères")
-                        valid -> Text("✓ Parfait", color = Palette.mint)
-                        else -> Text("Entre 2 et 20 caractères")
-                    }
-                },
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { start() }),
-                colors = TextFieldDefaults.colors(focusedContainerColor = Palette.fill1, unfocusedContainerColor = Palette.fill1))
-        }
-        Column(Modifier.padding(top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Acceptance(accepted, links) { haptics.selection(); accepted = it }
-            PrimaryButton(if (state.isBusy) "Un instant…" else "C’est parti", Modifier.padding(top = 10.dp), enabled = valid && accepted && !state.isBusy, onClick = start)
-            AnimatedVisibility(!typing) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Modifiable à tout moment depuis votre profil.", style = MaterialTheme.typography.bodySmall, color = Palette.tertiary,
-                        modifier = Modifier.padding(top = 12.dp))
-                    TextButton({ signingIn = true }, Modifier.padding(top = 4.dp)) { Text("J’ai déjà un compte", fontWeight = FontWeight.SemiBold) }
-                }
-            }
-        }
-    }
-    if (signingIn) SignInDialog(state) { signingIn = false }
-}
-
-/**
- * Community rules and privacy policy, accepted before the first game, as on the iPhone: the box ticks,
- * the two underlined words open the pages.
- */
-@Composable
-private fun Acceptance(accepted: Boolean, links: androidx.compose.ui.platform.UriHandler, toggle: (Boolean) -> Unit) {
-    val linkStyle = TextLinkStyles(SpanStyle(color = Palette.foreground, textDecoration = TextDecoration.Underline))
-    fun link(url: String) = LinkAnnotation.Url(url, linkStyle) { runCatching { links.openUri(url) } }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clip(CircleShape).toggleable(accepted, role = Role.Checkbox, onValueChange = toggle)
-            .semantics { contentDescription = "J’accepte les règles de la communauté et la politique de confidentialité" },
-            contentAlignment = Alignment.Center) {
-            Checkbox(accepted, onCheckedChange = null,
-                colors = CheckboxDefaults.colors(checkedColor = Palette.accent, checkmarkColor = Palette.onAccent, uncheckedColor = Palette.tertiary))
-        }
-        Text(buildAnnotatedString {
-            append("J’accepte les ")
-            withLink(link(Site.RULES)) { append("règles de la communauté") }
-            append(" et la ")
-            withLink(link(Site.PRIVACY)) { append("politique de confidentialité") }
-            append(".")
-        }, fontSize = 14.sp, color = Palette.secondary, modifier = Modifier.padding(start = 4.dp))
     }
 }
 
@@ -497,17 +422,22 @@ private fun SignInDialog(state: AppViewModel, close: () -> Unit) {
     )
 }
 
-/** Blocking sheet: the rules, and a single way on. */
+/**
+ * The rules to accept. Blocking for a player whose rules changed (a single way on); before choosing a
+ * pseudo or proposing a word (`cancel`), the player may also step back.
+ */
 @Composable
-private fun RulesAcceptance(accept: () -> Unit) {
+fun RulesAcceptance(cancel: (() -> Unit)? = null, accept: () -> Unit) {
     val haptics = rememberHaptics()
-    Dialog({}, DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Dialog({ cancel?.invoke() }, DialogProperties(dismissOnBackPress = cancel != null, dismissOnClickOutside = false, usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize()) {
             AmbientBackground(dimmed = true)
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
+                if (cancel != null) IconButton(cancel, Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.Close, "Annuler") }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    Text(CommunityRules.TITLE, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 28.dp))
-                    Text("Pour que CNSNN reste agréable pour tous, merci de lire et d’accepter ces règles.", color = Palette.secondary,
+                    Text(CommunityRules.TITLE, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = if (cancel != null) 8.dp else 28.dp))
+                    Text(if (cancel == null) "Pour que CNSNN reste agréable pour tous, merci de lire et d’accepter ces règles."
+                         else "Avant d’écrire quelque chose que les autres joueurs verront, merci de lire et d’accepter ces règles.", color = Palette.secondary,
                         modifier = Modifier.padding(top = 8.dp, bottom = 18.dp))
                     CommunityRulesList()
                     Spacer(Modifier.height(16.dp))

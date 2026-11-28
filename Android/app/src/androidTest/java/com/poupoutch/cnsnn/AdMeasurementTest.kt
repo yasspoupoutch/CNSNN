@@ -27,9 +27,9 @@ class AdMeasurementTest {
         context.getSharedPreferences("cnsnn", Context.MODE_PRIVATE).edit().remove(AdMeasurement.KEY).commit()
         AdMeasurement.askInTests = true
         ActivityScenario.launch(MainActivity::class.java).use {
-            rule.waitUntil(15_000) { rule.onAllNodes(hasText("Continuer")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
+            rule.waitUntil(15_000) { rule.onAllNodes(hasText("J’ai déjà un compte")).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasText("Bonjour,")).fetchSemanticsNodes().isNotEmpty() }
             // A player who already has a pseudo never sees it: only new players are asked.
-            if (rule.onAllNodes(hasText("Continuer")).fetchSemanticsNodes().isEmpty()) return
+            if (rule.onAllNodes(hasText("J’ai déjà un compte")).fetchSemanticsNodes().isEmpty()) return
             rule.onNodeWithText(AdMeasurement.TITLE).assertExists()
             rule.onNodeWithText("Non merci").performClick()
             rule.waitUntil(5_000) { rule.onAllNodes(hasText(AdMeasurement.TITLE)).fetchSemanticsNodes().isEmpty() }

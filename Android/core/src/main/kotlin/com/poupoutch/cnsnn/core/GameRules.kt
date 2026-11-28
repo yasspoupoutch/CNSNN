@@ -208,8 +208,13 @@ object CommunityRules {
         "Du respect : pas de harcèlement, pas de signalements abusifs.",
         "La modération peut refuser une carte, masquer un pseudo ou suspendre un compte. Une question : jeucnsnn@gmail.com.",
     )
-    /** A player with a pseudo who has not accepted the current version yet. */
-    fun mustAccept(progress: Progress): Boolean = progress.username.isNotEmpty() && (progress.rulesVersion ?: 0) < VERSION
+    /**
+     * A player who chose their pseudo and has not accepted the current version yet. A player with the
+     * automatic pseudo has written nothing others can see: they accept when they choose a pseudo or propose a word.
+     */
+    fun mustAccept(progress: Progress): Boolean =
+        progress.username.isNotEmpty() && !NameFilter.isAutomatic(progress.username) && !accepted(progress)
+    fun accepted(progress: Progress): Boolean = (progress.rulesVersion ?: 0) >= VERSION
 }
 
 /** The Mot du jour allows 20 guesses, each counted by the server before it is checked. */

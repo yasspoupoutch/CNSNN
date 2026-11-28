@@ -184,15 +184,20 @@ enum DailyGuesses {
         let ref = db.collection("users").document(user.uid)
         // Falls back to the cached profile offline, so a returning player keeps their identity.
         let doc = try await ref.getDocument()
+        var username = username
         if !doc.exists {
             guard !doc.metadata.isFromCache else { throw CloudError.offline }
             // A deletion cut off halfway (network, app closed) must finish, never bring the profile back.
             if try await db.collection("deletedUsers").document(user.uid).getDocument(source: .server).exists { throw CloudError.deletionPending }
+            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
+            // An automatic pseudo already taken is simply drawn again.
+            let batch = db.batch()
+            for attempt in 1...5 {
+                do { try await reserve(username, uid: user.uid, in: batch); break }
+                catch CloudError.usernameTaken where attempt < 5 && NameFilter.isAutomatic(username) { username = NameFilter.automatic() }
+            }
             var data: [String: Any] = ["uid":user.uid,"username":username,"createdAt":FieldValue.serverTimestamp(),"updatedAt":FieldValue.serverTimestamp(),"score":0,"gamesPlayed":0,"correctAnswers":0,"bestTimeMs":NSNull(),"currentStreak":0]
             if let rulesVersion { data["rulesVersion"] = rulesVersion; data["rulesAcceptedAt"] = FieldValue.serverTimestamp() }
-            // The pseudo is reserved in the same batch: the server refuses a profile whose pseudo is taken.
-            let batch = db.batch()
-            try await reserve(username, uid: user.uid, in: batch)
             batch.setData(data, forDocument: ref)
             try await batch.commit()
         }
@@ -238,7 +243,7 @@ enum DailyGuesses {
         }
     }
     /// The pseudo given to an account that signs in without a profile yet (made on the web, say).
-    static func fallbackName() -> String { "Joueur\(Int.random(in: 1000...9999))" }
+    static func fallbackName() -> String { NameFilter.automatic() }
 
     /// Records that the player accepted the community rules (best effort: the app keeps its own copy).
     func acceptRules(uid: String, version: Int) {

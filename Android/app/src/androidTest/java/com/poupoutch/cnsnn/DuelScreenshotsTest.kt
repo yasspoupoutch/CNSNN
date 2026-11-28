@@ -49,10 +49,8 @@ class DuelScreenshotsTest {
         Cloud.useEmulators(context, host)
         FirebaseAuth.getInstance(Cloud.app!!).signOut()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        waitFor("Continuer")
-        rule.onNodeWithText("Continuer").performClick()
-        rule.onNodeWithText("Pseudo").performTextInput("Camille")
-        rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
+        waitFor("J’ai déjà un compte")
+        AppViewModel.testPseudo = "Camille"
         rule.onNodeWithText("C’est parti").performClick()
         waitFor("Bonjour,")
         rule.skipTutorial()

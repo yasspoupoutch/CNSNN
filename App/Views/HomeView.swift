@@ -113,6 +113,12 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Bonjour,").scaledFont(15).foregroundStyle(Palette.secondary)
                 Text(state.progress.username).scaledFont(30, .bold).tracking(-0.6).lineLimit(1).minimumScaleFactor(0.6)
+                // The automatic pseudo ("Joueur4821"): a quiet way to choose one, never a question.
+                if NameFilter.isAutomatic(state.progress.username) {
+                    Button { Haptics.selection(); state.renameRequest += 1 } label: {
+                        Label("Choisir mon pseudo", systemImage: "pencil").scaledFont(13, .semibold).foregroundStyle(Palette.secondary)
+                    }.buttonStyle(PressStyle()).padding(.top, 2).accessibilityIdentifier("home.choose-pseudo")
+                }
             }
             Spacer(minLength: 12)
             let streak = state.official?.currentStreak() ?? state.progress.streak()

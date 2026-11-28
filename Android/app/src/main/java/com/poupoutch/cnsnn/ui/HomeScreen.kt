@@ -87,6 +87,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.alpha
 import com.poupoutch.cnsnn.core.CatchUp
+import com.poupoutch.cnsnn.core.NameFilter
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Edit
 import com.poupoutch.cnsnn.core.DailyScore
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -261,6 +264,14 @@ private fun Header(state: AppViewModel) {
         Column(Modifier.weight(1f)) {
             Text("Bonjour,", color = Palette.secondary)
             Text(state.progress.username, style = MaterialTheme.typography.headlineMedium, maxLines = 1)
+            // The automatic pseudo ("Joueur4821"): a quiet way to choose one, never a question.
+            if (NameFilter.isAutomatic(state.progress.username)) {
+                Row(Modifier.clip(RoundedCornerShape(50)).clickable { state.renameRequest++ }.testTag("home.choose-pseudo")
+                    .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Edit, null, Modifier.size(14.dp), tint = Palette.secondary)
+                    Text("Choisir mon pseudo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
         }
         val streak = state.streak
         Surface(shape = RoundedCornerShape(50), color = Palette.fill1) {

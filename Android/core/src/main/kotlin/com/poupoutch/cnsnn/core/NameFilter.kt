@@ -17,6 +17,11 @@ object NameFilter {
     private val whole = setOf("pute", "lapute", "con", "lecon", "nazi", "bite", "pd", "ntm", "nique", "pede", "viol", "suce", "sucemoi")
     private val leet = mapOf('0' to 'o', '1' to 'i', '3' to 'e', '4' to 'a', '5' to 's', '7' to 't', '@' to 'a', '$' to 's')
 
+    /** The pseudo a new player gets at first launch, until they choose one in Profil ("Joueur4821"). */
+    fun automatic(): String = "Joueur" + (1000..99999).random()
+    /** True for a pseudo given automatically: the player has not chosen one yet. */
+    fun isAutomatic(name: String): Boolean = Regex("Joueur[0-9]{4,5}").matches(name)
+
     fun isAllowed(name: String): Boolean {
         val key = simplified(name)
         return key !in whole && anywhere.none { key.contains(it) }

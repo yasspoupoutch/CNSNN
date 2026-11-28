@@ -127,3 +127,15 @@ test('message lists at most 30 pseudos', () => {
   assert.match(m.body, /… et 2 autres/);
   assert.equal(message([{ pseudo: 'x', createdAt: '2026-11-16T12:00:00Z' }], null).title, 'CNSNN : 1 nouveau pseudo');
 });
+
+test('automatic pseudos (Joueur4821) are counted apart, not listed', () => {
+  const at = '2026-11-16T12:00:00Z';
+  const m = message([{ pseudo: 'Joueur4821', createdAt: at }, { pseudo: 'Sara', createdAt: at }, { pseudo: 'Joueur10234', createdAt: at }], 10, null,
+    [{ pseudo: 'Joueur4821', createdAt: at }, { pseudo: 'Sara', createdAt: at }]);
+  assert.equal(m.title, 'CNSNN : 3 nouveaux joueurs');
+  assert.match(m.body, /• Sara/);
+  assert.doesNotMatch(m.body, /• Joueur/);
+  assert.match(m.body, /2 joueurs gardent le pseudo automatique/);
+  assert.match(m.body, /Derniers inscrits : Sara \(/);
+  assert.equal(message([{ pseudo: 'Joueur4821', createdAt: at }], 1).title, 'CNSNN : 1 nouveau joueur');
+});

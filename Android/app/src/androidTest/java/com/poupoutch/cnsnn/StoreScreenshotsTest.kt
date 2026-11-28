@@ -1,5 +1,6 @@
 package com.poupoutch.cnsnn
 
+import com.poupoutch.cnsnn.state.AppViewModel
 import android.graphics.Bitmap
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -78,10 +79,8 @@ class StoreScreenshotsTest {
             .grantRuntimePermission(context.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
 
         ActivityScenario.launch(MainActivity::class.java)
-        waitFor("Continuer")
-        rule.onNodeWithText("Continuer").performClick()
-        rule.onNodeWithText("Pseudo").performTextInput("Alex")
-        rule.onNodeWithContentDescription("J’accepte les règles de la communauté", substring = true).performClick()
+        waitFor("J’ai déjà un compte")
+        AppViewModel.testPseudo = "Alex"
         rule.onNodeWithText("C’est parti").performClick()
         waitFor("Bonjour,")
         rule.skipTutorial()

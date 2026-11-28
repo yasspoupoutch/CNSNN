@@ -54,6 +54,8 @@ enum ScreenshotDemo {
         let now = Date()
         let today = DailySchedule.key(now)
         var progress = state.progress
+        // The avatar colour of the screenshots (third colour; there is no picker at first launch any more).
+        UserDefaults.standard.set(2, forKey: CNSNNTheme.avatarKey)
 
         // Classique: 164 cards over the last two weeks, 142 found, the last ones in a row.
         var attempts: [Attempt] = []

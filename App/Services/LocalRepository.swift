@@ -40,4 +40,10 @@ enum RuntimeFlags {
     static var isTesting: Bool {
         ProcessInfo.processInfo.arguments.contains("--uitesting") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
+    /// Interface tests: `--pseudo Camille` plays as a player who chose "Camille" instead of "Joueur4821".
+    static var testPseudo: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isTesting, let index = arguments.firstIndex(of: "--pseudo"), index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
+    }
 }
