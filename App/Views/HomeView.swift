@@ -524,7 +524,7 @@ struct ShareCard: View {
             HighlightedWord(word: "CONSONNE", font: Typo.wordmark(30))
             Text(title.uppercased()).font(.system(size: 13, weight: .bold)).tracking(1.6).foregroundStyle(Palette.secondary).padding(.top, 10)
             Spacer(minLength: 16)
-            Text(consonants).font(Typo.serif(72)).tracking(4).foregroundStyle(Palette.foreground).lineLimit(1).minimumScaleFactor(0.3)
+            BoardLetters(text: consonants, size: 72, tracking: 4).foregroundStyle(Palette.foreground)
             Capsule().fill(Palette.accent).frame(width: 44, height: 4).padding(.top, 18)
             Text(outcome).font(.system(size: 21, weight: .semibold)).foregroundStyle(correct ? Palette.mint : Palette.secondary)
                 .multilineTextAlignment(.center).padding(.top, 18)

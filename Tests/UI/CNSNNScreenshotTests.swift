@@ -193,6 +193,43 @@ final class CNSNNScreenshotTests: XCTestCase {
         print("PREVIEW_END \(Date().timeIntervalSince1970)")
     }
 
+    /// The longest expression of the game on a small iPhone (mots-longs-ios.yml): the consonants on several
+    /// lines, the vowels placed by the hints, the whole answer typed, then the word revealed. Nothing cut.
+    @MainActor func testLongExpressions() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--classic-card=seed-questcequonafaitaubondieu", "--mode-seed=7"]
+        app.launch()
+        let next = app.buttons["Continuer"]
+        XCTAssertTrue(next.waitForExistence(timeout: 10))
+        next.tap()
+        let field = app.textFields["Pseudo, entre 2 et 20 caractères"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("Camille")
+        app.buttons["accept-rules"].tap()
+        app.buttons["C’est parti"].tap()
+        XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout: 10))
+        dismissKeyboardIfNeeded(app)
+
+        let classic = tile(app, "Classique")
+        XCTAssertTrue(classic.waitForExistence(timeout: 10))
+        classic.tap()
+        let launch = app.buttons["Lancer une partie"]
+        XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        launch.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        capture("mots-longs-1-consonnes")
+        let hint = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Indice'")).firstMatch
+        for _ in 0..<2 where hint.exists { hint.tap(); Thread.sleep(forTimeInterval: 1) }
+        let letter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Lettre'")).firstMatch
+        for _ in 0..<2 where letter.waitForExistence(timeout: 2) { letter.tap(); Thread.sleep(forTimeInterval: 1) }
+        capture("mots-longs-2-lettres")
+        type(app, "QUESTCEQUONAFAITAUBONDIEU")
+        capture("mots-longs-3-reponse")
+        app.buttons["Valider"].tap()
+        capture("mots-longs-4-trouve", settle: 4)
+    }
+
     /// Types a word on the game's own keyboard, at a pace a viewer can follow.
     @MainActor private func type(_ app: XCUIApplication, _ word: String) {
         for letter in word {

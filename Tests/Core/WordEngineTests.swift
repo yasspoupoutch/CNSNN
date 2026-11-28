@@ -87,6 +87,24 @@ final class WordEngineTests: XCTestCase {
         XCTAssertEqual(WordEngine.placedVowels("Bus").letters, 1)
         XCTAssertEqual(WordEngine.placedVowels("Bus").steps, [])
     }
+    /// Same vectors as Android CoreTest: long expressions go on several lines, never cut.
+    func testLongBoardsGoOnSeveralLines() {
+        let bonDieu = WordEngine.shownConsonants("Qu’est-ce qu’on a fait au Bon Dieu")
+        XCTAssertEqual(bonDieu, "QST C QN – FT – BN D")
+        XCTAssertEqual(WordEngine.lines(bonDieu), ["QST C QN –", "FT – BN D"])
+        XCTAssertEqual(WordEngine.lines(WordEngine.shownConsonants("La Communauté de l’anneau")), ["L CMMNT", "D LNN"])
+        XCTAssertEqual(WordEngine.lines("L R LN"), ["L R LN"])
+        XCTAssertEqual(WordEngine.lines("NTCNSTTTNNLLMNT"), ["NTCNSTTTNNLLMNT"])
+        XCTAssertEqual(WordEngine.lines("QU’EST-CE QU’ON A FAIT AU BON DIEU", maxChars: 18), ["QU’EST-CE QU’ON A", "FAIT AU BON DIEU"])
+        XCTAssertEqual(WordEngine.placedVowels("Qu’est-ce qu’on a fait au Bon Dieu").steps.first, "QUST C QN – FT – BN D")
+        XCTAssertEqual(WordEngine.placedVowels("La Communauté de l’anneau").steps.first, "LA CMMNT D LNN")
+        for card in SeedCards.all + ExtraCards.all {
+            let shown = WordEngine.shownConsonants(card.wordFull)
+            let lines = WordEngine.lines(shown)
+            XCTAssertEqual(lines.joined(separator: " "), shown)
+            XCTAssertLessThanOrEqual(lines.count, 3, card.wordFull)
+        }
+    }
     func testPlacedVowelsCostThirtySecondsEachAndRevealedRanksAfterFound() {
         XCTAssertEqual(DailyScore.scoreMs(timeMs: 100_000, usedHint: true, usedVowels: true, letters: 2, correct: true), 220_000)
         XCTAssertEqual(DailyScore.scoreMs(timeMs: 590_000, usedHint: true, usedVowels: true, letters: 3, correct: true), 600_000)

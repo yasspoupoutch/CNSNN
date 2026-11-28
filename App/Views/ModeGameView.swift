@@ -213,7 +213,7 @@ struct ModeGameView: View {
         ZStack {
             if showPassed, let passed = session.passed {
                 Text("C’était : " + passed.uppercased())
-                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.6)
+                    .scaledFont(14, .semibold).foregroundStyle(Palette.secondary).lineLimit(1).minimumScaleFactor(0.4)
                     .padding(.horizontal, 14).frame(minHeight: 32)
                     .background(Capsule().fill(Palette.surface.opacity(0.92)).overlay(Capsule().strokeBorder(Palette.glassBorder, lineWidth: 1)))
                     .fixedSize(horizontal: false, vertical: true)
@@ -227,9 +227,7 @@ struct ModeGameView: View {
     private func clue(_ card: Card) -> some View {
         VStack(spacing: 0) {
             let consonants = card.wordNoVowels
-            Text(consonants)
-                .font(Typo.serif(consonants.count > 5 ? 60 : 80)).tracking(3)
-                .lineLimit(1).minimumScaleFactor(0.35)
+            BoardLetters(text: consonants, size: consonants.count > 5 ? 60 : 80)
                 .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
                 .id(card.id)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
@@ -265,7 +263,7 @@ struct ModeGameView: View {
             if !session.answer.isEmpty { AnswerLetters(answer: session.answer, wrong: session.answerWrong, cursor: session.cursor, place: session.placeCursor) }
             if TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)

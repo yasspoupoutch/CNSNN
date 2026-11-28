@@ -166,16 +166,12 @@ struct GameView: View {
                     .padding(.top, 40)
             } else if let placed = session.placed {
                 // The hints after the sentence: the word's vowels, in gold, take their places one by one.
-                Text(Self.goldVowels(placed))
-                    .font(Typo.serif(placed.count > 5 ? 64 : 88)).tracking(3)
-                    .lineLimit(1).minimumScaleFactor(0.35)
+                BoardLetters(text: placed, size: placed.count > 5 ? 64 : 88, gold: true)
                     .padding(.top, 40)
                     .contentTransition(.opacity)
                     .accessibilityLabel("Lettres : " + WordEngine.spoken(placed))
             } else {
-                Text(consonants)
-                    .font(Typo.serif(consonants.count > 5 ? 64 : 88)).tracking(3)
-                    .lineLimit(1).minimumScaleFactor(0.35)
+                BoardLetters(text: consonants, size: consonants.count > 5 ? 64 : 88)
                     .padding(.top, 40)
                     .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
             }
@@ -288,7 +284,7 @@ struct GameView: View {
             }
             if session.result == nil, TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 56)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)
@@ -723,7 +719,9 @@ struct AnswerLetters: View {
             letter.foregroundColor = wrong ? Palette.red : Vowels.contains(character) ? Palette.accent : Palette.foreground
             line += letter
         }
-        return Text(line).tracking(4.4).scaledFont(30, .medium)
+        // The letter spacing does not shrink with the letters: a long expression gets a tighter one, so it
+        // shrinks less and stays whole on the line (« QUESTCEQUONAFAITAUBONDIEU »).
+        return Text(line).tracking(answer.count > 14 ? 1.5 : 4.4).scaledFont(30, .medium)
     }
 }
 
@@ -783,6 +781,27 @@ struct FlowLayout: Layout {
 }
 
 /// The word with its vowels sliding into the gaps between the consonants.
+/// The board's letters: the consonants, or the word with its vowels placed (in gold). An expression goes on
+/// two or three lines, cut between its words (WordEngine.lines), and the letters shrink only when a line still
+/// does not fit the screen: the whole board always shows, never cut (« Qu’est-ce qu’on a fait au Bon Dieu »).
+struct BoardLetters: View {
+    let text: String
+    /// The size of a short board on one line; an expression on several lines is a little smaller.
+    var size: CGFloat
+    var tracking: CGFloat = 3
+    var gold = false
+    var body: some View {
+        let lines = WordEngine.lines(text)
+        let shown = lines.joined(separator: "\n")
+        Group {
+            if gold { Text(GameView.goldVowels(shown)) } else { Text(shown) }
+        }
+        .font(Typo.serif(lines.count > 1 ? min(size, 50) : size)).tracking(tracking)
+        .multilineTextAlignment(.center)
+        .lineLimit(lines.count).minimumScaleFactor(0.3)
+    }
+}
+
 struct VowelReveal: View {
     static let firstDelay = 0.35
     static let step = 0.16
@@ -795,17 +814,26 @@ struct VowelReveal: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Letters are separate views here (the vowels slide in), so the size is chosen for the
     /// whole word from its length, instead of each letter shrinking on its own. It does not
-    /// change while the vowels slide in.
+    /// change while the vowels slide in. A long expression goes on two or three lines, cut
+    /// between its words, so it stays big enough to read (« QU’EST-CE QU’ON A / FAIT AU BON DIEU »).
     var body: some View {
-        let size = min(maxSize, width / (CGFloat(max(word.count, 1)) * 0.8))
-        letters.font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
+        let lines = word.count > 16 ? WordEngine.lines(word, maxChars: 16) : [word]
+        let longest = lines.map(\.count).max() ?? 1
+        let size = min(maxSize, width / (CGFloat(max(longest, 1)) * 0.8))
+        VStack(spacing: size * 0.12) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { number, line in
+                // The vowels still slide in one after the other across the lines.
+                letters(line, firstVowel: lines[..<number].reduce(0) { total, earlier in total + earlier.filter(Vowels.contains).count })
+            }
+        }
+        .font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
     }
-    private var letters: some View {
-        let letters = Array(word.enumerated())
+    private func letters(_ line: String, firstVowel: Int) -> some View {
+        let letters = Array(line.enumerated())
         return HStack(spacing: 0) {
             ForEach(letters, id: \.offset) { index, character in
                 if Vowels.contains(character) {
-                    let order = letters[..<index].filter { Vowels.contains($0.element) }.count
+                    let order = firstVowel + letters[..<index].filter { Vowels.contains($0.element) }.count
                     CollapseLayout(progress: revealed ? 1 : 0) {
                         Text(String(character))
                             .foregroundStyle(correct ? Palette.accent : Palette.secondary)

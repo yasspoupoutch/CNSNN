@@ -64,6 +64,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -383,10 +384,17 @@ internal fun ColumnScope.Clue(card: Card, passed: String? = null, passedTick: In
 private fun PassedBadge(passed: String?, passedTick: Int, modifier: Modifier) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(passedTick) { if (passedTick > 0 && passed != null) { visible = true; delay(2000); visible = false } }
-    AnimatedVisibility(visible && passed != null, modifier, enter = fadeIn(), exit = fadeOut()) {
-        Surface(shape = RoundedCornerShape(50), color = Palette.fill1, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
-            Text("C’était : " + (passed ?: "").uppercase(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
+    // The whole answer on one line, smaller if it is a long expression (« C’était : LA BELLE AU BOIS DORMANT »),
+    // on an opaque pill so the hint under it does not show through.
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        val text = "C’était : " + (passed ?: "").uppercase()
+        val room = with(LocalDensity.current) { (maxWidth - 28.dp - 16.dp).roundToPx() }
+        val size = fitToWidth(text, androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)), room, min = 9)
+        AnimatedVisibility(visible && passed != null, enter = fadeIn(), exit = fadeOut()) {
+            Surface(shape = RoundedCornerShape(50), color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.line)) {
+                Text(text, fontSize = size.sp, fontWeight = FontWeight.SemiBold, color = Palette.secondary, maxLines = 1, softWrap = false,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite })
+            }
         }
     }
 }
@@ -408,7 +416,7 @@ private fun ClueText(card: Card) {
                 Column(Modifier.onSizeChanged { content = it.height }, horizontalAlignment = Alignment.CenterHorizontally) {
                     val consonants = shown.wordNoVowels
                     val base = if (consonants.length > 9) 52 else if (consonants.length > 5) 64 else 84
-                    Text(consonants, style = Type.serif(fitConsonants(base, available, if (content == 0 || letters == 0) 0 else content - letters)), letterSpacing = 3.sp, maxLines = 1,
+                    BoardLetters(consonants, fitConsonants(base, available, if (content == 0 || letters == 0) 0 else content - letters, WordEngine.lines(consonants).size),
                         modifier = Modifier.padding(top = if (tight) 8.dp else 18.dp).onSizeChanged { letters = it.height }
                             .semantics { contentDescription = "Consonnes : " + WordEngine.spoken(consonants) })
                     Text("${shown.category.label} · ${shown.difficulty.label}", fontSize = 12.sp, color = Palette.tertiary, modifier = Modifier.padding(top = 4.dp))

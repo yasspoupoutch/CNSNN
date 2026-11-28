@@ -23,19 +23,56 @@ public enum WordEngine {
     public static func placedVowels(_ value: String) -> (letters: Int, steps: [String]) {
         let letters = Array(normalize(value))
         let total = letters.filter { "AEIOUY".contains($0) }.count
+        // An expression keeps its words apart, like the board (« QUST C QN – FT – BN DN »), so it can go on several lines.
+        let words = boardWords(value)
         let steps = total < 2 ? [] : (1..<total).map { k -> String in
             var seen = 0
-            return String(letters.filter { c in
+            let keep: (Character) -> Bool = { c in
                 guard "AEIOUY".contains(c) else { return true }
                 seen += 1; return seen <= k
-            })
+            }
+            guard words.count > 1 else { return String(letters.filter(keep)) }
+            return words.map { word -> String in
+                let placed = String(normalize(word).filter(keep))
+                return placed.isEmpty ? "–" : placed
+            }.joined(separator: " ")
         }
         return (max(total, 1), steps)
+    }
+    private static func boardWords(_ value: String) -> [String] {
+        value.split(whereSeparator: { $0.isWhitespace || "-‐‑–—".contains($0) }).map(String.init).filter { !normalize($0).isEmpty }
+    }
+    /// A board (or an expression) cut on its spaces into as few lines as possible, at most `maxLines`, each line
+    /// `maxChars` long at most when it can be, the lines as even as they can be. A single word stays on one line
+    /// (the screen shrinks it instead). « QST C QN – FT – BN DN » is « QST C QN », « – FT – », « BN DN ».
+    public static func lines(_ text: String, maxChars: Int = 10, maxLines: Int = 3) -> [String] {
+        let words = text.split(separator: " ").map(String.init)
+        guard words.count > 1, text.count > maxChars else { return [text] }
+        func cuts(_ start: Int, _ left: Int) -> [[Int]] {
+            guard left > 1 else { return [[]] }
+            return (start + 1...words.count - left + 1).flatMap { cut in cuts(cut, left - 1).map { [cut] + $0 } }
+        }
+        var best: [String] = [text]
+        var bestWidest = Int.max
+        // Every way to cut the words into n lines, from one line up: the first n whose lines all fit wins,
+        // the most even one among them; if none fits, the most even with the most lines allowed.
+        let most = min(maxLines, words.count)
+        for n in 1...most {
+            bestWidest = Int.max
+            for cut in cuts(0, n) {
+                let bounds = [0] + cut + [words.count]
+                let split = zip(bounds, bounds.dropFirst()).map { words[$0..<$1].joined(separator: " ") }
+                let widest = split.map(\.count).max() ?? 0
+                if widest < bestWidest { best = split; bestWidest = widest }
+            }
+            if bestWidest <= maxChars { break }
+        }
+        return best
     }
     /// What the board shows: the consonants of each word, a space between words (a hyphen splits them too), a dash for a word
     /// with no consonant (« Où est Charlie » is « – ST CHRL »). A single word is just its consonants.
     public static func shownConsonants(_ value: String) -> String {
-        let words = value.split(whereSeparator: { $0.isWhitespace || "-‐‑–—".contains($0) }).map(String.init).filter { !normalize($0).isEmpty }
+        let words = boardWords(value)
         guard words.count > 1 else { return consonants(value) }
         return words.map { consonants($0).isEmpty ? "–" : consonants($0) }.joined(separator: " ")
     }
