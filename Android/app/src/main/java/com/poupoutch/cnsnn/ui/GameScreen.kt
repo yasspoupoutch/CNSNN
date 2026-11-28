@@ -183,7 +183,7 @@ private fun GameContent(state: AppViewModel, game: GameViewModel, mode: GameMode
     var celebration by remember { mutableStateOf<Long?>(null) }
     var sheetShown by remember { mutableStateOf(true) }
     LaunchedEffect(result?.id) {
-        if (result?.correct == true && game.celebrate && !reduceMotion && !game.tutorial) {
+        if (mode == GameMode.DAILY && result?.correct == true && game.celebrate && !reduceMotion && !game.tutorial) {
             game.celebrate = false; sheetShown = false; celebration = System.nanoTime()
         } else { sheetShown = true; if (result == null) celebration = null }
     }
