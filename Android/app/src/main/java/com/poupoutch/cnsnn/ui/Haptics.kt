@@ -11,6 +11,8 @@ class Haptics(private val view: View) {
     fun key() = view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     fun selection() = view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     fun success() = view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CONTEXT_CLICK)
+    /** The found word bursting into letters: a firm thump. */
+    fun burst() = view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     fun retry() = view.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS)
 }
 

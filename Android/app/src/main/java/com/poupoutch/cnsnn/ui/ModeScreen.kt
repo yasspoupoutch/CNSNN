@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -59,6 +60,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
@@ -92,6 +95,8 @@ import com.poupoutch.cnsnn.core.records
 import com.poupoutch.cnsnn.state.AppViewModel
 import com.poupoutch.cnsnn.state.ModeViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.min
 
 /** Sprint, Survie and Double sens: the game board, keyboard and results of each mode. */
 @Composable
@@ -113,6 +118,20 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
     BackHandler(onBack = leave)
     LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0) haptics.retry() }
     LaunchedEffect(game.successTick) { if (game.successTick > 0) haptics.success() }
+    // Sprint notes: higher with each word in a row, a chord at 5 and 8, three notes past the record, a low note for a mistake.
+    val sound = rememberSoundContext()
+    if (mode == PlayMode.SPRINT) {
+        LaunchedEffect(game.successTick) {
+            val sprint = game.sprint ?: return@LaunchedEffect
+            if (game.successTick == 0) return@LaunchedEffect
+            SprintSound.note(sound, sprint.streak)
+            if (sprint.streak == 5 || sprint.streak == 8) SprintSound.chord(sound, sprint.streak)
+            val best = game.previous.best(ModeStat.WORDS)
+            if (best > 0 && sprint.found == best + 1) SprintSound.record(sound)
+        }
+        LaunchedEffect(game.mistakeTick) { if (game.mistakeTick > 0 && game.answerWrong) SprintSound.miss(sound) }
+    }
+    var rainTick by remember { mutableIntStateOf(0) }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground(dimmed = !game.over)
@@ -130,8 +149,9 @@ fun ModeScreen(state: AppViewModel, mode: PlayMode, close: () -> Unit) {
         }
         AnimatedVisibility(game.over, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it }, exit = slideOutVertically { it }) {
-            ModeResult(state, game, replay = { haptics.selection(); game.begin(state) }, close = close)
+            ModeResult(state, game, replay = { haptics.selection(); rainTick = 0; game.begin(state) }, close = close, rain = { rainTick++ })
         }
+        if (rainTick > 0) androidx.compose.runtime.key(rainTick) { VowelRain() }
     }
 
     if (confirmQuit) AlertDialog({ confirmQuit = false },
@@ -232,13 +252,14 @@ internal fun missedSentence(words: List<String>): String? =
 private fun ColumnScope.SprintBoard(state: AppViewModel, game: ModeViewModel, sprint: SprintGame) {
     game.version // The core games are plain objects: each part re-reads them after every move.
     SprintClock { sprint.remainingMs(game.elapsedMs) }
-    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Stat("${sprint.found}", if (sprint.found > 1) "mots" else "mot", Modifier.weight(1f))
-        Stat("×${maxOf(1, sprint.streak)}", "combo", Modifier.weight(1f), highlight = sprint.streak > 1)
-        var showGain by remember { mutableStateOf(false) }
-        LaunchedEffect(game.successTick) { if (game.successTick > 0) { showGain = true; delay(900); showGain = false } }
-        Stat(if (showGain) game.gain ?: "" else "${sprint.accuracy} %", if (showGain) "trouvé" else "précision", Modifier.weight(1f), highlight = showGain)
-    }
+    // The record holder for the bar (cached: at most 2 reads every 15 minutes).
+    LaunchedEffect(Unit) { state.refreshSprintLeader() }
+    // The record's ghost moves on its own: re-read twice a second.
+    var ghostTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(500); ghostTick++ } }
+    ghostTick
+    SprintRecordBar(sprint.found, sprint.streak, sprint.accuracy, game.previous.best(ModeStat.WORDS), state.sprintLeader, state.uid, game.successTick,
+        game.ghostCount(game.elapsedMs), Modifier.padding(top = 12.dp))
     sprint.card?.let { Clue(it, game.passed, game.passedTick) }
     Controls(state, game, "Passer · −5 s", "Passer ce mot, 5 secondes de pénalité")
 }
@@ -399,7 +420,10 @@ private fun ClueText(card: Card) {
 @Composable
 private fun Controls(state: AppViewModel, game: ModeViewModel, skip: String, skipLabel: String) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong, game.cursor) { game.placeCursor(it) }
+        Box {
+            AnswerLine(game.answer, game.mistakeTick, true, game.answerWrong, game.cursor) { game.placeCursor(it) }
+            if (game.mode == PlayMode.SPRINT) FlyingWord(game.foundWord, game.successTick, Modifier.matchParentSize().padding(horizontal = 24.dp))
+        }
         SkipChip(skip, skipLabel) { game.skip(state) }
     }
     LetterKeyboard(press = { game.press(it) }, delete = { game.delete() }, clear = { game.clear() }, moveCursor = { game.moveCursor(it) }, submit = { game.submit(state) }, enabled = !game.finished)
@@ -427,15 +451,45 @@ private fun Stat(value: String, label: String, modifier: Modifier, highlight: Bo
 // ---- Results
 
 @Composable
-private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> Unit, close: () -> Unit) {
+private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> Unit, close: () -> Unit, rain: () -> Unit = {}) {
     val mode = game.mode
     val haptics = rememberHaptics()
     val reduce = rememberReduceMotion()
+    val sound = rememberSoundContext()
     val mainKey = mode.mainRecord
     val records = state.progress.records(mode)
     val celebrate = remember { Animatable(if (reduce) 1f else 0.85f) }
+    // Sprint: the score counts up word by word (null: the final score), then the game record line and a glowing Rejouer.
+    val sprintShow = mode == PlayMode.SPRINT && !reduce
+    val personalBefore = game.previous.best(ModeStat.WORDS)
+    var counted by remember { mutableStateOf<Int?>(if (sprintShow) 0 else null) }
+    var gold by remember { mutableStateOf(false) }
+    var near by remember { mutableStateOf(!sprintShow) }
+    var glowing by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (game.improved(mainKey)) { haptics.success(); if (!reduce) { delay(250); celebrate.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 300f)) } }
+        if (!sprintShow) {
+            if (game.improved(mainKey)) { haptics.success(); if (!reduce) { delay(250); celebrate.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 300f)) } }
+            return@LaunchedEffect
+        }
+        // One note per word, higher and higher. Passing the old record turns the score gold, plays the
+        // record notes and lets the gold vowels fall. About 2 to 4 seconds; the buttons work all along.
+        val total = game.sprint?.found ?: 0
+        val improved = game.improved(mainKey)
+        delay(500)
+        for (value in 1..total) {
+            counted = value
+            SprintSound.note(sound, min(value, SprintSound.steps)); haptics.key()
+            if (improved && value == personalBefore + 1) {
+                gold = true; SprintSound.record(sound); haptics.success(); rain()
+                launch { celebrate.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 300f)) }
+                delay(700)
+            }
+            delay(if (value < total - 3) 110 else 220)
+        }
+        counted = null
+        if (!improved && mainKey in game.beaten) haptics.success()
+        delay(400)
+        near = true; glowing = true
     }
     val now = game.elapsedMs
     val (kicker, value, unit) = when (mode) {
@@ -452,9 +506,14 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
         color = Palette.surfaceHigh, border = androidx.compose.foundation.BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Palette.border)))) {
         Column(Modifier.padding(horizontal = 22.dp, vertical = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(kicker, style = Type.serifItalic(24), color = Palette.secondary)
-            Text(Format.number(value), fontSize = 60.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp, modifier = Modifier.padding(top = 4.dp))
+            val shown = counted ?: value
+            val goldNumber = mode == PlayMode.SPRINT && (gold || (!sprintShow && game.improved(mainKey)))
+            Text(Format.number(shown), fontSize = 60.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp, modifier = Modifier.padding(top = 4.dp),
+                color = if (goldNumber) Palette.accent else Palette.foreground,
+                style = androidx.compose.ui.text.TextStyle(shadow = if (goldNumber) androidx.compose.ui.graphics.Shadow(Palette.accent.copy(alpha = 0.45f), blurRadius = 28f) else null))
             Text(unit, fontSize = 13.sp, color = Palette.tertiary)
-            Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (mode == PlayMode.SPRINT) ResultRecordBar(shown, personalBefore, state.sprintLeader, state.uid, goldNumber, Modifier.padding(top = 14.dp).padding(horizontal = 6.dp))
+            Row(Modifier.padding(top = if (mode == PlayMode.SPRINT) 10.dp else 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 tiles.forEach { (v, l) ->
                     Surface(Modifier.weight(1f), shape = RoundedCornerShape(20.dp), color = Palette.fill1) {
                         Column(Modifier.padding(vertical = 12.dp).semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -466,6 +525,9 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
             }
             Box(Modifier.padding(top = 14.dp)) {
                 when {
+                    // Until the count passes the old record.
+                    game.improved(mainKey) && sprintShow && !gold -> Text("Record : " + recordText(mode, personalBefore),
+                        color = Palette.secondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     game.improved(mainKey) -> Row(Modifier.scale(celebrate.value), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.EmojiEvents, null, tint = Palette.mint)
                         Text("Nouveau record personnel", color = Palette.mint, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(start = 6.dp))
@@ -475,12 +537,31 @@ private fun ModeResult(state: AppViewModel, game: ModeViewModel, replay: () -> U
                         color = Palette.secondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
+            // "Plus que 3 mots pour battre Inès": the game record, when someone else holds it.
+            val leader = state.sprintLeader
+            if (mode == PlayMode.SPRINT && leader != null && leader.uid != state.uid && leader.best >= value) {
+                val missing = leader.best - value + 1
+                val nearAlpha by animateFloatAsState(if (near) 1f else 0f, tween(400), label = "near")
+                Text("Plus que $missing mot${if (missing > 1) "s" else ""} pour battre ${leader.username}", style = Type.serifItalic(21), color = Palette.accent,
+                    textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp).alpha(nearAlpha))
+            }
             missedText(game)?.let {
                 Text(it, fontSize = 13.sp, color = Palette.tertiary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TonalButton("Accueil", Modifier.weight(1f), onClick = close)
-                PrimaryButton("Rejouer", Modifier.weight(1f), onClick = replay)
+                val pulse = if (glowing) {
+                    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "rejouer")
+                    transition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(700), androidx.compose.animation.core.RepeatMode.Reverse), label = "glow").value
+                } else 0f
+                PrimaryButton("Rejouer", Modifier.weight(1f).drawBehind {
+                    if (pulse > 0f) {
+                        val r = 16.dp.toPx() * pulse
+                        drawRoundRect(Brush.radialGradient(listOf(Palette.accent.copy(alpha = 0.5f * pulse), Color.Transparent), center, size.width / 2 + r),
+                            androidx.compose.ui.geometry.Offset(-r, -r), androidx.compose.ui.geometry.Size(size.width + 2 * r, size.height + 2 * r),
+                            androidx.compose.ui.geometry.CornerRadius(size.height / 2 + r))
+                    }
+                }, onClick = replay)
             }
             Spacer(Modifier.height(10.dp))
             Text("Record personnel : il ne compte pas dans les classements du mot du jour.", fontSize = 11.sp, color = Palette.tertiary, textAlign = TextAlign.Center)
