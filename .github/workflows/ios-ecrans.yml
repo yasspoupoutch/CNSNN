@@ -104,7 +104,7 @@ jobs:
 
       - name: Lancer testScreenFit sur chaque appareil
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           failed=''
           IFS=';' read -ra list <<< "$DEVICES"
           for entry in "${list[@]}"; do
@@ -120,9 +120,12 @@ jobs:
               -only-testing:CNSNNUITests/CNSNNScreenshotTests/testScreenFit \
               -resultBundlePath "$CI_ROOT/$folder.xcresult" \
               ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
-              > "$CI_ROOT/logs/$folder.log" 2>&1
-            status=$?
-            grep -E "error:|failed|passed|dépasse|pas touchable|absent" "$CI_ROOT/logs/$folder.log" | tail -30
+              > "$CI_ROOT/logs/$folder.log" 2>&1 && status=0 || status=$?
+            grep -E "error:|failed|passed|dépasse|pas touchable|absent" "$CI_ROOT/logs/$folder.log" | tail -30 || true
+            if [ "$status" -ne 0 ]; then
+              xcrun xcresulttool get test-results summary --path "$CI_ROOT/$folder.xcresult" --compact 2>/dev/null | head -c 6000 || true
+              echo
+            fi
             if [ "$status" -ne 0 ]; then failed="$failed $name"; fi
             mkdir -p "$CI_ROOT/raw/$folder" "$CI_ROOT/screens/$folder"
             xcrun xcresulttool export attachments --path "$CI_ROOT/$folder.xcresult" --output-path "$CI_ROOT/raw/$folder" || true
