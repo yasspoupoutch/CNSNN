@@ -46,6 +46,8 @@ import CNSNNCore
     private var start = ContinuousClock.now
     private var baseMs = 0
     private var recorded = false
+    /// Sprint: the score already sent to the ranking during this game (when the app left the screen).
+    private var publishedFound = 0
 
     init(mode: PlayMode) { self.mode = mode }
 
@@ -57,7 +59,7 @@ import CNSNNCore
 
     /// Picks up the saved game of this mode, or starts a new one.
     func begin(state: AppState) {
-        answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false
+        answer = ""; answerWrong = false; gain = nil; passed = nil; over = false; beaten = []; recorded = false; publishedFound = 0
         previous = state.progress.records(mode)
         foundWord = nil; foundTimes = []
         ghost = mode == .sprint ? SprintGhost.timeline(best: previous.best(ModeStat.words)) : []
@@ -169,6 +171,15 @@ import CNSNNCore
         afterMove(state: state)
     }
 
+    /// Sprint: the app leaves the screen. Its clock keeps running and it may be closed while away, so the
+    /// score so far goes on the ranking now, while the game is still recent enough for the server
+    /// (otherwise a game ended in the background kept its record on the phone only).
+    func leaveApp(state: AppState) {
+        guard mode == .sprint, let sprint, !sprint.finished, sprint.found > publishedFound else { return }
+        publishedFound = sprint.found
+        state.publishSprint(found: sprint.found)
+    }
+
     /// Ends the game now and counts it: a Sprint with its score so far, a Survie run as it stands, a
     /// Double sens game with its unplayed rounds lost.
     func quit(state: AppState) {
@@ -202,7 +213,7 @@ import CNSNNCore
             beaten = state.recordMode(.sprint, best: sprint.records.best, add: sprint.records.add)
             if sprint.found > previous.best(ModeStat.words) { SprintGhost.save(foundTimes) }
             ModeRunStore.remember(sprint.used, mode: .sprint)
-            state.publishSprint(found: sprint.found)
+            if sprint.found > publishedFound { state.publishSprint(found: sprint.found) }
         case .survival:
             guard let survival else { return }
             beaten = state.recordMode(.survival, best: survival.records.best, add: survival.records.add)

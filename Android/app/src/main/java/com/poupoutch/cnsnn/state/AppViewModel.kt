@@ -448,11 +448,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         game.stop()
         recordMode(PlayMode.SPRINT, game.best, game.add)
     }
+    /**
+     * The score of the last Sprint on its way to the ranking. The next game's start waits for it: a
+     * quick « Rejouer » used to move the game's start on the server before the score got there, and
+     * the rules then refused the score (it no longer came from the game just started).
+     */
+    private var sprintPublishing: Job? = null
     /** A Sprint starts: the server notes the time, so the score can go on the Sprint ranking at the end. */
     fun startSprintRun() {
         val user = uid ?: return
         if (isSuspended || isServerFull) return
-        cloud.startSprint(user)
+        val pending = sprintPublishing?.takeIf { it.isActive } ?: return cloud.startSprint(user)
+        viewModelScope.launch { pending.join(); cloud.startSprint(user) }
     }
     /**
      * A Sprint ended on time: a new best goes on the Sprint ranking (the rules check the game).
@@ -462,10 +469,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val user = uid ?: return
         if (isSuspended || isServerFull || found <= 0) return
         val name = progress.username.ifEmpty { "Joueur" }
-        viewModelScope.launch {
+        val previous = sprintPublishing
+        sprintPublishing = viewModelScope.launch {
+            previous?.join()
             if (runCatching { cloud.publishSprint(user, name, found) }.getOrDefault(false)) {
                 rankings = rankings.copy(readAt = rankings.readAt - "sprint" - "sprintLeader")
-                refreshSprintLeader()
+                viewModelScope.launch { refreshSprintLeader() }
             }
         }
     }

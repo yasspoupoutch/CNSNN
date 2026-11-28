@@ -510,20 +510,30 @@ import CNSNNCore
         game.stop()
         recordMode(.sprint, best: game.records.best, add: game.records.add)
     }
+    /// The score of the last Sprint on its way to the ranking. The next game's start waits for it: a
+    /// quick « Rejouer » used to move the game's start on the server before the score got there, and
+    /// the rules then refused the score (it no longer came from the game just started).
+    private var sprintPublishing: Task<Void, Never>?
     /// A Sprint starts: the server notes the time, so the score can go on the Sprint ranking at the end.
     func startSprintRun() {
         guard let cloud, let uid, !isSuspended, !isServerFull else { return }
-        cloud.startSprint(uid: uid)
+        guard let pending = sprintPublishing else { cloud.startSprint(uid: uid); return }
+        Task { await pending.value; cloud.startSprint(uid: uid) }
     }
     /// A Sprint ended on time: a new best goes on the Sprint ranking (the rules check the game).
     /// Best effort: offline, or a game that started offline, simply stays a personal record.
     func publishSprint(found: Int) {
         guard let cloud, let uid, !isSuspended, !isServerFull, found > 0 else { return }
         let name = progress.username.isEmpty ? "Joueur" : progress.username
-        Task {
+        // Also called as the app leaves the screen: iOS gives it a few seconds to reach the server.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "sprint", expirationHandler: nil)
+        let previous = sprintPublishing
+        sprintPublishing = Task {
+            defer { UIApplication.shared.endBackgroundTask(background) }
+            await previous?.value
             guard (try? await cloud.publishSprint(uid: uid, username: name, found: found)) == true else { return }
             rankings.readAt["sprint"] = nil; rankings.readAt["sprintLeader"] = nil
-            await refreshSprintLeader()
+            Task { await refreshSprintLeader() }
         }
     }
 
