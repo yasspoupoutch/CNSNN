@@ -34,7 +34,7 @@ jobs:
   capture:
     name: Prendre les captures App Store
     runs-on: xcode-27
-    timeout-minutes: 70
+    timeout-minutes: 85
     defaults:
       run:
         shell: bash
@@ -332,10 +332,22 @@ jobs:
         timeout-minutes: 25
         run: |
           set -euo pipefail
-          ipad=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          devices = [d for runtime in json.load(sys.stdin)["devices"].values() for d in runtime if d["name"].startswith(("iPad Pro 13", "iPad Air 13", "iPad Pro (12.9"))]
-          print(devices[-1]["udid"] if devices else "")')
+          # Les iPhone encore allumés ralentissent tant le runner que l'iPad ne devient jamais « idle » :
+          # on les éteint. Même choix d'iPad que le workflow ios-ecrans (runtime du SDK, iPad Pro 13 d'abord).
+          xcrun simctl shutdown all 2>/dev/null || true
+          sdk=$(xcodebuild -version -sdk iphonesimulator SDKVersion)
+          ipad=$(xcrun simctl list --json | SDK="$sdk" python3 -c '
+          import json, os, sys
+          listing = json.load(sys.stdin)
+          major = int(os.environ["SDK"].split(".")[0])
+          devices = []
+          for runtime in listing["runtimes"]:
+              if runtime.get("isAvailable") and ".iOS-" in runtime["identifier"] and int(runtime["version"].split(".")[0]) == major:
+                  devices += [d for d in listing["devices"].get(runtime["identifier"], []) if d.get("isAvailable")]
+          for prefix in ("iPad Pro 13-inch (M5)", "iPad Pro 13", "iPad Air 13", "iPad Pro (12.9"):
+              match = [d for d in devices if d["name"].startswith(prefix)]
+              if match:
+                  print(match[0]["udid"]); print(match[0]["name"], file=sys.stderr); break')
           if [ -z "$ipad" ]; then
             echo '::warning::Pas de simulateur iPad 13 pouces sur ce runner : captures iPad non prises.'
             exit 0
@@ -350,6 +362,7 @@ jobs:
             -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" -derivedDataPath "$CI_ROOT/DerivedData" \
             -disableAutomaticPackageResolution -parallel-testing-enabled NO \
             -only-testing:CNSNNUITests/CNSNNScreenshotTests/testAppStoreScreenshots \
+            -retry-tests-on-failure -test-iterations 2 \
             -resultBundlePath "$CI_ROOT/ipad.xcresult" \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
             > "$CI_ROOT/logs/ipad.log" 2>&1 || { tail -40 "$CI_ROOT/logs/ipad.log"; exit 1; }
