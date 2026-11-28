@@ -22,4 +22,19 @@ final class NameFilterTests: XCTestCase {
             XCTAssertFalse(NameFilter.isAutomatic(name), name)
         }
     }
+    func testPseudoOfferAfterFirstWordOrGame() {
+        var progress = Progress()
+        progress.username = "Joueur4821"
+        XCTAssertFalse(progress.pseudoOfferDue(offered: false), "Nothing played yet")
+        progress.attempts.append(Attempt(cardID: "x", mode: .classic, correct: false, timeMs: 1000, points: 0, date: Date()))
+        XCTAssertFalse(progress.pseudoOfferDue(offered: false), "A missed word is not enough")
+        var sprint = progress
+        sprint.recordMode(.sprint, best: [ModeStat.words: 0], add: [ModeStat.games: 1], device: "d")
+        XCTAssertTrue(sprint.pseudoOfferDue(offered: false), "A first Sprint game, even with no word")
+        progress.attempts.append(Attempt(cardID: "y", mode: .daily, correct: true, timeMs: 1000, points: 50, date: Date()))
+        XCTAssertTrue(progress.pseudoOfferDue(offered: false))
+        XCTAssertFalse(progress.pseudoOfferDue(offered: true), "Offered once only")
+        progress.username = "Camille"
+        XCTAssertFalse(progress.pseudoOfferDue(offered: false), "A chosen pseudo")
+    }
 }

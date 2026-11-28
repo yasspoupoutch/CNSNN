@@ -364,6 +364,16 @@ data class ModeRecords(
 
 fun Progress.records(mode: PlayMode): ModeRecords = modes?.get(mode.key) ?: ModeRecords()
 
+/** A first word found (Mot du jour, Classique), or a first game finished (Sprint, Survie, Double sens), found words or not. */
+val Progress.hasPlayedAFirstGame: Boolean
+    get() = correctAnswers > 0 || (modes ?: emptyMap()).values.any { it.total(ModeStat.GAMES) > 0 }
+
+/**
+ * The player still has the automatic pseudo and is back from a first word or game: the one moment
+ * CNSNN offers to choose a pseudo (`offered`: already offered on this device).
+ */
+fun Progress.pseudoOfferDue(offered: Boolean): Boolean = !offered && NameFilter.isAutomatic(username) && hasPlayedAFirstGame
+
 /** Adds one finished game. Returns the new progress and the records it beat (its first game sets them). */
 fun Progress.recordingMode(mode: PlayMode, best: Map<String, Int>, add: Map<String, Int>, device: String): Pair<Progress, Set<String>> {
     val records = records(mode)

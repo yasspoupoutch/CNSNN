@@ -113,6 +113,8 @@ import com.poupoutch.cnsnn.core.Difficulty
 import com.poupoutch.cnsnn.core.GameMode
 import com.poupoutch.cnsnn.core.PlayMode
 import com.poupoutch.cnsnn.core.Site
+import com.poupoutch.cnsnn.core.pseudoOfferDue
+import androidx.compose.ui.platform.testTag
 import com.poupoutch.cnsnn.reminders.Reminders
 import com.poupoutch.cnsnn.state.AppViewModel
 import kotlinx.coroutines.delay
@@ -285,8 +287,90 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
             TutorialOverlay(targets, play = { tutorial = false; playTutorial() }, skip = { state.local.tutorialSeen = true; tutorial = false })
         }
     }
-    ReminderOffer(state)
+    // Back from a first word found or a first game, the automatic pseudo ("Joueur4821") is offered once,
+    // ready to change. The reminder offer waits for a later return to the home page: one question at a time.
+    var offerPseudo by rememberSaveable { mutableStateOf(false) }
+    var pseudoThisVisit by remember { mutableStateOf(false) }
+    val pseudoDue = state.progress.pseudoOfferDue(state.local.pseudoOffered)
+    LaunchedEffect(pseudoDue) {
+        if (!pseudoDue) return@LaunchedEffect
+        pseudoThisVisit = true
+        delay(600)
+        state.local.pseudoOffered = true
+        offerPseudo = true
+    }
+    if (offerPseudo) PseudoOffer(state) { offerPseudo = false }
+    ReminderOffer(state, paused = pseudoDue || pseudoThisVisit || offerPseudo)
     ReviewOffer(state)
+}
+
+/**
+ * The automatic pseudo, ready to change. Changing it asks to accept the community rules (the pseudo is
+ * seen by other players); "Plus tard" keeps "Joueur4821", still changeable in Profil.
+ */
+@Composable
+private fun PseudoOffer(state: AppViewModel, close: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf(state.progress.username) }
+    var accepted by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var problem by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    val links = LocalUriHandler.current
+    val trimmed = name.trim()
+    val changed = trimmed != state.progress.username
+    val rulesOk = accepted || CommunityRules.accepted(state.progress)
+    val canSave = !saving && (!changed || (trimmed.length in 2..20 && rulesOk))
+    fun save() {
+        if (!changed) { close(); return }
+        if (!canSave) return
+        saving = true; problem = null
+        scope.launch {
+            if (!CommunityRules.accepted(state.progress)) state.acceptRules()
+            val failure = state.renaming(trimmed)
+            saving = false
+            // A refused or taken pseudo: said here, the window stays to try another one.
+            if (failure == null) { haptics.success(); close() } else problem = failure
+        }
+    }
+    AlertDialog(onDismissRequest = close,
+        title = { Text("Votre pseudo") },
+        text = {
+            Column {
+                Text("Les autres joueurs vous voient sous ce nom dans les classements et les duels. Vous pouvez le garder ou le changer.",
+                    fontSize = 14.sp, color = Palette.secondary)
+                OutlinedTextField(name, { name = it.take(20); problem = null }, Modifier.fillMaxWidth().padding(top = 14.dp).testTag("pseudo-offer.field"),
+                    label = { Text("Pseudo") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { save() }))
+                problem?.let { Text(it, fontSize = 13.sp, color = Palette.red, modifier = Modifier.padding(top = 6.dp)) }
+                if (changed && !CommunityRules.accepted(state.progress)) {
+                    val linkStyle = TextLinkStyles(SpanStyle(color = Palette.foreground, textDecoration = TextDecoration.Underline))
+                    fun link(url: String) = LinkAnnotation.Url(url, linkStyle) { runCatching { links.openUri(url) } }
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(48.dp).clip(CircleShape).toggleable(accepted, role = Role.Checkbox) { haptics.selection(); accepted = it }
+                            .semantics { contentDescription = "J’accepte les règles de la communauté et la politique de confidentialité" },
+                            contentAlignment = Alignment.Center) {
+                            Checkbox(accepted, onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Palette.accent, checkmarkColor = Palette.onAccent, uncheckedColor = Palette.tertiary))
+                        }
+                        Text(buildAnnotatedString {
+                            append("J’accepte les ")
+                            withLink(link(Site.RULES)) { append("règles de la communauté") }
+                            append(" et la ")
+                            withLink(link(Site.PRIVACY)) { append("politique de confidentialité") }
+                            append(".")
+                        }, fontSize = 13.sp, color = Palette.secondary, modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({ save() }, enabled = canSave, modifier = Modifier.testTag("pseudo-offer.save")) {
+                Text(if (saving) "Un instant…" else if (changed) "Enregistrer" else "Garder ce pseudo")
+            }
+        },
+        dismissButton = { TextButton(close) { Text("Plus tard") } })
 }
 
 /**
@@ -295,14 +379,14 @@ private fun MainShell(state: AppViewModel, play: (GameMode, Category?, Difficult
  * Accepted or not, it is never asked again; it stays in Profil.
  */
 @Composable
-private fun ReminderOffer(state: AppViewModel) {
+private fun ReminderOffer(state: AppViewModel, paused: Boolean = false) {
     val context = LocalContext.current
     // Kept across rotation and process death: the question is asked only once.
     var asking by rememberSaveable { mutableStateOf(false) }
     fun turnOn() { state.local.reminderMinutes = Reminders.DEFAULT_MINUTES; state.local.remindersEnabled = true; state.refreshGlance(force = true) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) turnOn() }
-    LaunchedEffect(state.reminderPending) {
-        if (!state.reminderPending) return@LaunchedEffect
+    LaunchedEffect(state.reminderPending, paused) {
+        if (!state.reminderPending || paused) return@LaunchedEffect
         delay(800)
         // Cleared only now: clearing the key before the pause cancelled this effect at once, so the
         // offer never showed (and was marked as made). Leaving the home page during the pause keeps it pending.

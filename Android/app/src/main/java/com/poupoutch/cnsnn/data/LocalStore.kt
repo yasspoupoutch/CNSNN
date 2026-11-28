@@ -81,6 +81,10 @@ class LocalStore(context: Context) {
     var reminderOffered: Boolean
         get() = prefs.getBoolean("reminders.offered", false)
         set(value) { prefs.edit().putBoolean("reminders.offered", value).apply() }
+    /** The choice of a pseudo was offered once, back from a first word or game (see PseudoOffer). */
+    var pseudoOffered: Boolean
+        get() = prefs.getBoolean("pseudo.offered", false)
+        set(value) { prefs.edit().putBoolean("pseudo.offered", value).apply() }
     /** Offered once to every player without the reminder, new ones and those from before 1.2. */
     val reminderOfferDue: Boolean get() = !remindersEnabled && !reminderOffered
 

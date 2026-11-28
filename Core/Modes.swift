@@ -356,6 +356,17 @@ public struct ModeRecords: Codable, Sendable, Equatable {
 extension Progress {
     public func records(_ mode: PlayMode) -> ModeRecords { modes?[mode.rawValue] ?? ModeRecords() }
 
+    /// A first word found (Mot du jour, Classique), or a first game finished (Sprint, Survie, Double sens),
+    /// found words or not.
+    public var hasPlayedAFirstGame: Bool {
+        correctAnswers > 0 || (modes ?? [:]).values.contains { $0.total(ModeStat.games) > 0 }
+    }
+    /// The player still has the automatic pseudo and is back from a first word or game: the one moment
+    /// CNSNN offers to choose a pseudo (`offered`: already offered on this device).
+    public func pseudoOfferDue(offered: Bool) -> Bool {
+        !offered && NameFilter.isAutomatic(username) && hasPlayedAFirstGame
+    }
+
     /// Adds one finished game. Returns the records it beat (its first game sets them).
     @discardableResult public mutating func recordMode(_ mode: PlayMode, best: [String: Int], add: [String: Int], device: String) -> Set<String> {
         var records = self.records(mode)

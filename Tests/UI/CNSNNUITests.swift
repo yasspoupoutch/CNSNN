@@ -52,6 +52,49 @@ final class CNSNNUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home.choose-pseudo"].exists)
     }
 
+    /// Back from a first game (a Double sens with no pair found), the automatic pseudo is offered once:
+    /// keeping it needs nothing; changing it asks to accept the community rules first.
+    @MainActor func testPseudoOfferedAfterFirstGame() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--mode-seed=42"]
+        app.launch()
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let duo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Double sens.")).firstMatch
+        XCTAssertTrue(duo.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Votre pseudo"].exists, "Nothing asked before a first game")
+        duo.tap()
+        for round in 1...5 {
+            let skipRound = app.buttons["Passer la manche et voir les mots"]
+            XCTAssertTrue(skipRound.waitForExistence(timeout: 5))
+            skipRound.tap()
+            let go = app.buttons[round == 5 ? "Voir le résultat" : "Manche suivante"]
+            XCTAssertTrue(go.waitForExistence(timeout: 5))
+            go.tap()
+        }
+        XCTAssertTrue(app.staticTexts["Partie terminée"].waitForExistence(timeout: 5))
+        app.buttons["Accueil"].tap()
+        XCTAssertTrue(app.staticTexts["Votre pseudo"].waitForExistence(timeout: 5))
+        let save = app.buttons["pseudo-offer.save"]
+        XCTAssertEqual(save.label, "Garder ce pseudo")
+        XCTAssertFalse(app.buttons["pseudo-offer.accept"].exists, "No box to tick while the pseudo is kept")
+        let field = app.textFields["pseudo-offer.field"]
+        field.tap()
+        field.press(forDuration: 1.2)
+        if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
+        else if app.menuItems["Tout sélectionner"].exists { app.menuItems["Tout sélectionner"].tap() }
+        field.typeText(XCUIKeyboardKey.delete.rawValue)
+        field.typeText("Camille")
+        XCTAssertTrue(app.buttons["pseudo-offer.accept"].waitForExistence(timeout: 3), "Changing the pseudo asks to accept the rules")
+        XCTAssertFalse(save.isEnabled)
+        app.buttons["pseudo-offer.accept"].tap()
+        XCTAssertEqual(save.label, "Enregistrer")
+        save.tap()
+        XCTAssertFalse(app.staticTexts["Votre pseudo"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Camille"].firstMatch.waitForExistence(timeout: 5))
+    }
+
     /// New install: the ads measurement question once (nothing sent before "Oui"), then the switch in Profil.
     @MainActor func testAdMeasurementQuestionAndProfileSwitch() {
         let app = XCUIApplication()

@@ -44,6 +44,18 @@ class NameFilterTest {
     @Test fun ordinaryPseudosStay() {
         for (name in listOf("Monique", "Computer", "Nazim", "Constance", "Pedro", "Yasin", "Poupoutch", "Violette", "Montenegro", "Alexandre")) assertTrue(name, NameFilter.isAllowed(name))
     }
+    @Test fun pseudoOfferAfterFirstWordOrGame() {
+        var progress = Progress(username = "Joueur4821")
+        assertFalse("Nothing played yet", progress.pseudoOfferDue(false))
+        progress = progress.copy(attempts = listOf(Attempt(cardID = "x", mode = GameMode.CLASSIC, correct = false, timeMs = 1000, date = Instant.EPOCH)))
+        assertFalse("A missed word is not enough", progress.pseudoOfferDue(false))
+        val sprint = progress.recordingMode(PlayMode.SPRINT, mapOf(ModeStat.WORDS to 0), mapOf(ModeStat.GAMES to 1), "d").first
+        assertTrue("A first Sprint game, even with no word", sprint.pseudoOfferDue(false))
+        progress = progress.copy(attempts = progress.attempts + Attempt(cardID = "y", mode = GameMode.DAILY, correct = true, timeMs = 1000, date = Instant.EPOCH))
+        assertTrue(progress.pseudoOfferDue(false))
+        assertFalse("Offered once only", progress.pseudoOfferDue(true))
+        assertFalse("A chosen pseudo", progress.copy(username = "Camille").pseudoOfferDue(false))
+    }
     @Test fun automaticPseudo() {
         repeat(200) {
             val name = NameFilter.automatic()
