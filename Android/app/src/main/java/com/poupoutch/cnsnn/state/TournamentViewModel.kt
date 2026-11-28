@@ -11,6 +11,7 @@ import com.poupoutch.cnsnn.core.ChallengeGame
 import com.poupoutch.cnsnn.core.ChallengeRules
 import com.poupoutch.cnsnn.core.ServerClock
 import com.poupoutch.cnsnn.core.TournamentBracket
+import com.poupoutch.cnsnn.core.TournamentDemo
 import com.poupoutch.cnsnn.core.TournamentPlayer
 import com.poupoutch.cnsnn.core.TournamentRules
 import com.poupoutch.cnsnn.core.TournamentRun
@@ -25,7 +26,9 @@ import kotlinx.coroutines.launch
  * runs from the round not yet settled. Read only when the tournament is on screen, at most once a minute.
  */
 class TournamentStore {
-    private var uid: String? = null
+    var uid: String? = null; private set
+    /** Called after each read or change: the app sets the tournament's notifications again from it. */
+    var changed: () -> Unit = {}
     var nextWeek by mutableStateOf(""); private set
     var nextCount by mutableIntStateOf(0); private set
     var nextMine by mutableStateOf(false); private set
@@ -41,11 +44,22 @@ class TournamentStore {
     /** The last round whose runs can no longer change (its 24 hours were over when they were read). */
     private var settled = 0
 
-    val nowMs: Long get() = System.currentTimeMillis()
+    /** Pictures only: an invented tournament ([TournamentDemo]), never read from or sent to the server. */
+    var demo = false; private set
+    private var demoNowMs: Long? = null
+    fun showDemo(me: String, name: String) {
+        val data = TournamentDemo.make(me, name)
+        demo = true; uid = me; demoNowMs = data.nowMs
+        currentWeek = TournamentDemo.WEEK; current = data.players; currentLoaded = true; currentMine = true; runs = data.runs
+        nextWeek = TournamentRules.nextWeek(data.nowMs); nextCount = 4; nextMine = false
+    }
+
+    val nowMs: Long get() = demoNowMs ?: System.currentTimeMillis()
     fun bracket(): TournamentBracket = TournamentBracket(currentWeek, current, runs, nowMs)
 
     /** The light look: next week's sign-ups and whether I play this week. */
     suspend fun refresh(state: AppViewModel, force: Boolean = false) {
+        if (demo) return
         val me = state.uid ?: return
         val now = nowMs
         val next = TournamentRules.nextWeek(now)
@@ -56,36 +70,45 @@ class TournamentStore {
         if (!force && next == nextWeek && now - readAt < 60_000) return
         loading = true
         try {
-            nextWeek = next
-            nextMine = state.cloud.isSignedUp(next, me)
-            nextCount = state.cloud.tournamentCount(next)
-            if (!currentLoaded) currentMine = state.cloud.isSignedUp(week, me)
+            // Read first, then set: the pictures' invented tournament may have arrived meanwhile.
+            val mine = state.cloud.isSignedUp(next, me)
+            val count = state.cloud.tournamentCount(next)
+            val playing = if (!currentLoaded) state.cloud.isSignedUp(week, me) else currentMine
+            if (demo) return
+            nextWeek = next; nextMine = mine; nextCount = count
+            if (!currentLoaded) currentMine = playing
             readAt = now
             if (currentMine || currentLoaded) loadBracket(state, force)
         } catch (e: Exception) {
             message = CloudError.message(e)
         } finally { loading = false }
+        changed()
     }
 
     /** The week under way: its players (once: they no longer change) and the runs still moving. */
     suspend fun loadBracket(state: AppViewModel, force: Boolean = false) {
+        if (demo) return
         if (!force && nowMs - runsReadAt < 60_000) return
         try {
             if (!currentLoaded) {
-                current = state.cloud.tournamentPlayers(currentWeek)
+                val players = state.cloud.tournamentPlayers(currentWeek)
+                if (demo) return
+                current = players
                 currentLoaded = true
                 uid?.let { me -> currentMine = current.any { it.uid == me } }
             }
             val now = nowMs
-            val total = TournamentRules.rounds(minOf(current.size, TournamentRules.MAX_PLAYERS))
+            val total = TournamentRules.rounds(current.size, currentWeek)
             val start = TournamentRules.deadlineMs(currentWeek) ?: return
             if (total == 0 || now < start) return
             val from = settled + 1
             if (from > total) return
             val fresh = state.cloud.tournamentRuns(currentWeek, from)
+            if (demo) return
             runs = runs.filter { it.round < from } + fresh
             runsReadAt = now
             settled = maxOf(settled, (1..total).lastOrNull { (TournamentRules.roundEndMs(currentWeek, it) ?: Long.MAX_VALUE) <= now } ?: 0)
+            changed()
         } catch (e: Exception) {
             message = CloudError.message(e)
         }
@@ -98,6 +121,7 @@ class TournamentStore {
         try {
             state.cloud.signUp(nextWeek, me, state.progress.username)
             nextMine = true; nextCount += 1; message = null
+            changed()
         } catch (e: Exception) { message = CloudError.message(e) }
     }
     suspend fun withdraw(state: AppViewModel) {
@@ -106,11 +130,12 @@ class TournamentStore {
         try {
             state.cloud.withdraw(nextWeek, me)
             nextMine = false; nextCount = maxOf(0, nextCount - 1); message = null
+            changed()
         } catch (e: Exception) { message = CloudError.message(e) }
     }
 
     /** My run of a round, just finished: no need to read everything again. */
-    fun note(run: TournamentRun) { runs = runs.filterNot { it.round == run.round && it.uid == run.uid } + run }
+    fun note(run: TournamentRun) { runs = runs.filterNot { it.round == run.round && it.uid == run.uid } + run; changed() }
     fun run(round: Int, uid: String): TournamentRun? = runs.firstOrNull { it.round == round && it.uid == uid }
 }
 

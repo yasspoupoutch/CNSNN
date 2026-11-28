@@ -72,6 +72,8 @@ class GameViewModel : ViewModel() {
     /** The finish is recorded on this phone and waits for the network to become official. */
     var pendingOfficial by mutableStateOf(false); private set
     var standing by mutableStateOf<DailyStanding?>(null); private set
+    /** The word was just found in this game: the screen celebrates it once. */
+    var celebrate = false
     /** A guess or the hint is on its way to the server. */
     var checking by mutableStateOf(false); private set
     /** Why the last check could not reach the server, shown under the board. */
@@ -103,8 +105,10 @@ class GameViewModel : ViewModel() {
     }
 
     /** The first-launch tutorial: the Mot du jour page with an example word, nothing recorded or sent. */
+    var tutorial = false; private set
     fun loadTutorial(example: Card) {
         if (loaded) return
+        tutorial = true
         loaded = true; mode = GameMode.DAILY; card = example; phase = Phase.Playing; ranked = false
         started = SystemClock.elapsedRealtime()
     }
@@ -127,7 +131,8 @@ class GameViewModel : ViewModel() {
                 loadRankedDaily(key, catchUp != null, state.cloud, uid, state)
             }
         } else {
-            card = CardPicker.candidates(state.cards, category, difficulty, state.progress.recentCards).randomOrNull()
+            card = testCardId?.let { id -> state.cards.firstOrNull { it.id == id } }
+                ?: CardPicker.candidates(state.cards, category, difficulty, state.progress.recentCards).randomOrNull()
         }
     }
 
@@ -428,6 +433,7 @@ class GameViewModel : ViewModel() {
         val ms = elapsedMs
         val attempt = Attempt(cardID = shown.id, mode = mode, correct = correct, timeMs = ms, date = Instant.now(), dailyKey = day,
             catchUp = if (catchUpDay != null) true else null)
+        celebrate = correct && !revealedWord
         result = attempt
         state.record(attempt)
         if (ranked && uid != null && day != null) {
@@ -458,5 +464,10 @@ class GameViewModel : ViewModel() {
         val day = attempt.dailyKey ?: return
         val rank = DailyScore.rank(day, officialMs(attempt), attempt.correct) ?: return
         standing = runCatching { cloud.standing(day, rank, attempt.correct) }.getOrNull()
+    }
+
+    companion object {
+        /** Tests only: the Classique card to deal (LongWordsTest). */
+        var testCardId: String? = null
     }
 }

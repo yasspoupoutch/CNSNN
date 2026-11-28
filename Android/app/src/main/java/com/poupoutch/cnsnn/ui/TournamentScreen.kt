@@ -1,6 +1,24 @@
 package com.poupoutch.cnsnn.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.Dp
+import com.poupoutch.cnsnn.core.TournamentLayout
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +54,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,6 +98,8 @@ internal object TournamentText {
         TournamentBracket.Slot.Empty -> "personne"
         TournamentBracket.Slot.Pending -> "à venir"
     }
+    /** "Gagnant de Léa / Sam" in a sentence: "le gagnant de Léa / Sam". */
+    fun lower(name: String): String = if (name.startsWith("Gagnant")) "le g" + name.drop(1) else name
 }
 
 private fun TournamentBracket.Slot.uid(): String? = (this as? TournamentBracket.Slot.Player)?.player?.uid
@@ -146,27 +168,33 @@ private fun Mine(store: TournamentStore, uid: String, play: (Int) -> Unit) {
             is TournamentBracket.Standing.InMatch -> {
                 val round = standing.round
                 val match = standing.match
-                val other = match.opponent(uid)
+                val others = match.opponents(uid).mapNotNull { (it as? TournamentBracket.Slot.Player)?.player?.name }
+                val other = if (others.isEmpty()) "personne" else others.joinToString(" et ")
                 val end = TournamentRules.roundEndMs(store.currentWeek, round) ?: 0
                 val run = store.run(round, uid)
                 Kicker(TournamentFormat.roundName(round, total), Duel.text)
-                Text("Contre ${TournamentText.name(other)}", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text("Contre $other", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                if (others.size > 1) Text("Match à 3 : le plus rapide des trois passe.", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Duel.soft)
                 val score = run?.scoreMs
                 if (match.decided) {
                     val won = match.winner?.uid == uid
                     Text(if (won) "Gagné ! Le tour suivant ouvre ${TournamentText.day(end)}." else "Perdu…",
                         fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (won) Palette.mint else Palette.red)
-                    val a = match.a.uid()?.let { store.run(round, it)?.scoreMs }
-                    val b = match.b.uid()?.let { store.run(round, it)?.scoreMs }
-                    Text("${TournamentText.name(match.a)} ${a?.let(ChallengeFormat::time) ?: "—"} · ${TournamentText.name(match.b)} ${b?.let(ChallengeFormat::time) ?: "—"}",
-                        fontSize = 13.sp, color = Palette.secondary)
                 } else if (score != null) {
                     Text("Votre temps : ${ChallengeFormat.time(score)}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Résultat dès que ${TournamentText.name(other)} a joué, au plus tard ${TournamentText.day(end)}.", fontSize = 13.sp, color = Palette.secondary)
+                    Text("Résultat dès que $other ${if (others.size > 1) "ont" else "a"} joué, au plus tard ${TournamentText.day(end)}.", fontSize = 13.sp, color = Palette.secondary)
                 } else {
                     Text(if (run == null) "5 mots, une seule partie : votre chrono démarre dès que vous commencez. Vous avez jusqu’à ${TournamentText.day(end)}."
                         else "Votre partie est commencée : le chrono tourne. Finissez avant ${TournamentText.day(end)}.", fontSize = 13.sp, color = Palette.secondary)
                     DuelButton(if (run == null) "Jouer mon match" else "Reprendre", Modifier.fillMaxWidth().testTag("tournamentPlay")) { play(round) }
+                }
+                // What comes next: "Si vous gagnez : contre le gagnant de Léa / Sam".
+                val index = bracket.rounds[round - 1].indexOf(match)
+                val next = if (match.winner == null || match.winner?.uid == uid) bracket.following(round, index) else null
+                if (next != null) {
+                    val names = next.second.map { TournamentText.lower(TournamentFormat.slotName(bracket, round + 1, next.first, it)) }
+                    Text((if (match.decided) "Prochain match : contre " else "Si vous gagnez : contre ") + names.joinToString(" et "),
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Duel.text)
                 }
             }
             is TournamentBracket.Standing.Through -> {
@@ -193,43 +221,151 @@ private fun Bracket(store: TournamentStore, uid: String?) {
         return
     }
     val bracket = store.bracket()
-    val total = bracket.rounds.size
     if (bracket.players.size < 2) {
         Text(if (bracket.players.isEmpty()) "Pas de tournoi cette semaine : inscrivez-vous au prochain !" else "Un seul inscrit cette semaine : pas de tournoi. Rendez-vous au prochain !",
             fontSize = 14.sp, color = Palette.secondary)
         return
     }
-    bracket.champion?.let { Text("Champion : ${it.name} 🏆", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.accent) }
-    bracket.rounds.withIndex().reversed().forEach { (index, matches) ->
-        val round = index + 1
-        if (round == 1 || (TournamentRules.roundStartMs(store.currentWeek, round) ?: 0) <= store.nowMs) {
-            Kicker(TournamentFormat.roundName(round, total), Palette.tertiary, Modifier.padding(top = 6.dp))
-            SectionCard(padding = 0.dp, radius = 20.dp) {
-                matches.forEachIndexed { k, match ->
-                    if (k > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.line))
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Side(store, round, match.a, match, uid, Modifier.weight(1f), TextAlign.Start)
-                        Text("vs", fontSize = 11.sp, color = Palette.tertiary)
-                        Side(store, round, match.b, match, uid, Modifier.weight(1f), TextAlign.End)
-                    }
+    Text("Résultats au fil de la journée : les temps s’affichent quand le match est fini.", fontSize = 12.sp, color = Palette.tertiary)
+    TournamentTree(store, bracket, uid)
+}
+
+/** Sizes of the bracket drawn like a football one (same as the iPhone's TournamentTree). */
+private object Tree {
+    val cardWidth = 136.dp
+    val columnGap = 28.dp
+    val slotHeight = 26.dp
+    val pad = 7.dp
+    val gap = 14.dp
+    val header = 34.dp
+    val trophy = 78.dp
+    val margin = 20.dp
+    fun height(slots: Int): Dp = pad * 2 + slotHeight * slots
+    fun x(column: Int): Dp = margin + (cardWidth + columnGap) * column
+    /** "Finale", "Demies", "Quarts", "8es", "16es", "Tour 1". */
+    fun shortName(round: Int, total: Int) = when (total - round) {
+        0 -> "Finale"; 1 -> "Demies"; 2 -> "Quarts"; 3 -> "8es"; 4 -> "16es"; else -> "Tour $round"
+    }
+}
+
+/** The 20 dp margins of the page given back to a wide child, so it scrolls from edge to edge. */
+private fun Modifier.bleed(side: Dp) = layout { measurable, constraints ->
+    val extra = side.roundToPx()
+    val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + 2 * extra, maxWidth = constraints.maxWidth + 2 * extra))
+    layout(placeable.width - 2 * extra, placeable.height) { placeable.place(-extra, 0) }
+}
+
+/**
+ * The bracket drawn like a football one ([TournamentLayout]): the first rounds on both sides, the final in
+ * the middle under the trophy, lines from each match to the next. It scrolls sideways and opens on my match.
+ */
+@Composable
+private fun TournamentTree(store: TournamentStore, bracket: TournamentBracket, me: String?) {
+    val layout = remember(bracket) { TournamentLayout(bracket, { Tree.height(it).value.toDouble() }, Tree.gap.value.toDouble()) }
+    val total = bracket.rounds.size
+    val width = Tree.x(layout.columns) - Tree.columnGap + Tree.margin
+    // Room for the round names, and for the trophy when the final sits too high for it.
+    val finalTop = layout.node(total, 0)?.let { (it.y - it.height / 2).dp } ?: 0.dp
+    val top = Tree.header + maxOf(0.dp, Tree.trophy - finalTop)
+    val height = top + layout.height.dp + 8.dp
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+    val target = me?.let { uid -> layout.nodes.lastOrNull { bracket.rounds[it.round - 1][it.index].has(uid) } } ?: layout.node(total, 0)
+    LaunchedEffect(target?.round, target?.index) {
+        val node = target ?: return@LaunchedEffect
+        val viewport = snapshotFlow { scroll.viewportSize }.first { it > 0 }
+        val centre = with(density) { (Tree.x(node.column) + Tree.cardWidth / 2).toPx() }
+        scroll.scrollTo((centre - viewport / 2f).toInt().coerceIn(0, scroll.maxValue))
+    }
+    Box(Modifier.fillMaxWidth().bleed(20.dp).horizontalScroll(scroll).testTag("tournamentTree")) {
+        Box(Modifier.size(width, height).drawBehind {
+            // The lines from each match to the next one: into the slot its winner takes, lit once it is known.
+            for (node in layout.nodes) {
+                if (node.round < 2) continue
+                val match = bracket.rounds[node.round - 1][node.index]
+                val parentTop = top.toPx() + (node.y - node.height / 2).toFloat() * density.density
+                match.from.forEachIndexed { position, source ->
+                    val child = layout.node(node.round - 1, source) ?: return@forEachIndexed
+                    val fromLeft = node.side == TournamentLayout.Side.Left || (node.side == TournamentLayout.Side.Center && child.side == TournamentLayout.Side.Left)
+                    val childEdge = (if (fromLeft) Tree.x(child.column) + Tree.cardWidth else Tree.x(child.column)).toPx()
+                    val parentEdge = (if (fromLeft) Tree.x(node.column) else Tree.x(node.column) + Tree.cardWidth).toPx()
+                    val mid = (childEdge + parentEdge) / 2
+                    val childY = top.toPx() + child.y.toFloat() * density.density
+                    val slotY = parentTop + (Tree.pad + Tree.slotHeight * (position + 0.5f)).toPx()
+                    val before = bracket.rounds[node.round - 2][source]
+                    val lit = before.decided && before.winner != null
+                    val path = Path().apply { moveTo(childEdge, childY); lineTo(mid, childY); lineTo(mid, slotY); lineTo(parentEdge, slotY) }
+                    drawPath(path, if (lit) Palette.mint.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.16f),
+                        style = Stroke(width = (if (lit) 2.dp else 1.5.dp).toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
+            }
+        }) {
+            for (column in 0 until layout.columns) {
+                val round = if (column < total) column + 1 else layout.columns - column
+                Text(Tree.shortName(round, total).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp,
+                    color = if (round == total) Palette.accent else Palette.tertiary, textAlign = TextAlign.Center, maxLines = 1,
+                    modifier = Modifier.offset(Tree.x(column), 8.dp).width(Tree.cardWidth))
+            }
+            layout.node(total, 0)?.let { final ->
+                val champion = bracket.champion
+                Column(Modifier.offset(Tree.x(final.column), top + (final.y - final.height / 2).dp - Tree.trophy + 4.dp).size(Tree.cardWidth, Tree.trophy - 8.dp)
+                    .semantics(mergeDescendants = true) { contentDescription = champion?.let { "Champion : ${it.name}" } ?: "Le vainqueur n’est pas encore connu" },
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
+                    Icon(if (champion == null) Icons.Filled.EmojiEvents else CrownIcon, null, Modifier.size(32.dp), tint = Palette.accent)
+                    Text(champion?.name ?: "Vainqueur ?", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = if (champion == null) Palette.tertiary else Palette.accent)
+                }
+            }
+            for (node in layout.nodes) {
+                val match = bracket.rounds[node.round - 1][node.index]
+                TreeCard(store, match, node.round, node.round == total, me,
+                    Modifier.offset(Tree.x(node.column), top + (node.y - node.height / 2).dp).size(Tree.cardWidth, node.height.dp))
             }
         }
     }
 }
 
 @Composable
-private fun Side(store: TournamentStore, round: Int, slot: TournamentBracket.Slot, match: TournamentBracket.Match, uid: String?, modifier: Modifier, align: TextAlign) {
+private fun TreeCard(store: TournamentStore, match: TournamentBracket.Match, round: Int, final: Boolean, me: String?, modifier: Modifier) {
+    val shape = RoundedCornerShape(14.dp)
+    val mine = me != null && match.has(me)
+    Column(modifier.clip(shape).background(Palette.surface.copy(alpha = 0.92f))
+        .background(Brush.linearGradient(listOf(Duel.color.copy(alpha = if (mine) 0.34f else 0.2f), Color.White.copy(alpha = 0.03f))))
+        .border(if (final || mine) 1.5.dp else 1.dp, if (final) Palette.accent.copy(alpha = 0.8f) else if (mine) Duel.text.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.12f), shape)
+        .padding(horizontal = 10.dp, vertical = Tree.pad)
+        .semantics(mergeDescendants = true) {}) {
+        match.slots.forEach { slot -> TreeSlot(store, match, round, slot, me) }
+    }
+}
+
+@Composable
+private fun TreeSlot(store: TournamentStore, match: TournamentBracket.Match, round: Int, slot: TournamentBracket.Slot, me: String?) {
     val id = slot.uid()
     val won = match.decided && id != null && match.winner?.uid == id
-    val mine = id != null && id == uid
-    // Times are shown once the match is decided, so nobody knows the time to beat.
-    val time = if (match.decided) id?.let { store.run(round, it)?.scoreMs }?.let(ChallengeFormat::time) else null
-    Column(modifier, horizontalAlignment = if (align == TextAlign.Start) Alignment.Start else Alignment.End) {
-        Text(TournamentText.name(slot), fontSize = 14.sp, fontWeight = if (won || mine) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            color = when { id == null -> Palette.tertiary; match.decided && !won -> Palette.tertiary; mine -> Duel.text; else -> Palette.foreground })
-        if (time != null) Text(time, fontSize = 11.sp, color = Palette.tertiary)
+    val lost = match.decided && id != null && !won
+    val mine = id != null && id == me
+    val run = id?.let { store.run(round, it) }
+    val opened = (TournamentRules.roundStartMs(store.currentWeek, round) ?: 0) <= store.nowMs
+    val status = when {
+        id == null -> ""
+        match.decided -> run?.scoreMs?.let(ChallengeFormat::time) ?: "—"
+        !opened -> ""
+        run?.finishedMs != null -> "✓"
+        run != null -> "en jeu"
+        else -> ""
+    }
+    val name = when (slot) {
+        is TournamentBracket.Slot.Player -> slot.player.name
+        TournamentBracket.Slot.Empty -> "personne"
+        TournamentBracket.Slot.Pending -> "…"
+    }
+    Row(Modifier.fillMaxWidth().height(Tree.slotHeight), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(name, fontSize = 13.sp, fontWeight = if (won || mine) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            textDecoration = if (lost) TextDecoration.LineThrough else null, modifier = Modifier.weight(1f),
+            color = when { id == null || lost -> Palette.tertiary; won -> Palette.mint; mine -> Duel.text; else -> Palette.foreground })
+        if (won) Icon(Icons.Filled.CheckCircle, null, Modifier.size(12.dp), tint = Palette.mint)
+        Text(status, fontSize = 11.sp, fontWeight = if (status == "✓") FontWeight.Bold else FontWeight.Normal, maxLines = 1,
+            color = if (status == "✓") Palette.mint else Palette.tertiary)
     }
 }
 

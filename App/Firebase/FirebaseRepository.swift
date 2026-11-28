@@ -588,7 +588,8 @@ enum DailyGuesses {
         guard let startedAt = run.data()?["startedAt"] as? Timestamp else { return false }
         let ref = db.collection("sprintRecords").document(uid)
         let old = try await ref.getDocument(source: .server).data()
-        guard found > (old?["best"] as? Int ?? 0), (old?["startedAt"] as? Timestamp) != startedAt else { return false }
+        // The same game may raise its line: its score is saved when the app leaves the screen, then at the end.
+        guard found > (old?["best"] as? Int ?? 0) else { return false }
         try await ref.setData(["uid": uid, "username": username, "best": found, "rank": SprintRecords.rank(best: found, startedAtMs: Self.millis(startedAt)),
                                "startedAt": startedAt, "at": FieldValue.serverTimestamp()])
         return true
@@ -1045,6 +1046,16 @@ enum DailyGuesses {
                         from: side("from", uid: from), to: side("to", uid: to), code: d["code"] as? String)
     }
 
+    // MARK: Crowns
+
+    /// Last week's number 1 and the last tournament's winner (written by Firebase/tools/champions.mjs). One read.
+    func champions() async throws -> Champions {
+        let d = try await db.collection("meta").document("champions").getDocument().data() ?? [:]
+        return Champions(weekMonday: d["weekMonday"] as? String ?? "", weekUid: d["weekUid"] as? String ?? "", weekName: d["weekName"] as? String ?? "",
+                         tournamentWeek: d["tournamentWeek"] as? String ?? "", tournamentUid: d["tournamentUid"] as? String ?? "",
+                         tournamentName: d["tournamentName"] as? String ?? "")
+    }
+
     // MARK: Weekly tournament
 
     private func tournament(_ week: String) -> DocumentReference { db.collection("tournaments").document(week) }
@@ -1065,7 +1076,7 @@ enum DailyGuesses {
     }
     func signUp(week: String, uid: String, username: String) async throws {
         let ref = tournament(week).collection("players").document(uid)
-        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp()], completion: done) }) else { throw CloudError.offline }
+        guard try await Self.awaitWrite({ done in ref.setData(["uid": uid, "name": username, "at": FieldValue.serverTimestamp(), "v": 2], completion: done) }) else { throw CloudError.offline }
     }
     func withdraw(week: String, uid: String) async throws {
         let ref = tournament(week).collection("players").document(uid)

@@ -1,0 +1,234 @@
+name: CNSNN - Expressions longues sur iPhone
+
+# Les expressions les plus longues (« Qu’est-ce qu’on a fait au Bon Dieu ») sur le plus petit iPhone
+# disponible : consonnes sur plusieurs lignes, voyelles placées, réponse tapée, mot révélé.
+# Captures en artefact et sur la branche `apercus-mots-longs`.
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/mots-longs-ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnsnn-mots-longs-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: Expressions longues sur petit iPhone (simulateur)
+    runs-on: xcode-27
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      CI: 'true'
+      NSUnbufferedIO: 'YES'
+      APPEARANCE: dark
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Vérifier Xcode 27 et la structure du projet
+        run: |
+          set -euo pipefail
+          printf 'CI_ROOT=%s/cnsnn-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/cnsnn-ci/logs"
+          xcodebuild -version | tee "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"
+          if ! grep -Eq '^Xcode 27([.]|$)' "$RUNNER_TEMP/cnsnn-ci/logs/xcode-version.log"; then
+            echo '::error::Le runner doit fournir Xcode 27.'
+            exit 1
+          fi
+          python3 Scripts/verify_project.py
+
+      - name: Télécharger les dépendances Firebase avec Swift Package Manager
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/packages.log"
+
+      # iPhone 17 Pro Max (écran 6,9 pouces, 1320 x 2868) de préférence, sinon le plus récent des
+      # « Pro Max », sur un iOS compatible avec le SDK.
+      - name: Choisir un simulateur iPhone 6,9 pouces
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          sdk = subprocess.check_output(
+              ['xcodebuild', '-version', '-sdk', 'iphonesimulator', 'SDKVersion'],
+              text=True,
+          ).strip()
+          sdk_version = tuple(int(part) for part in sdk.split('.')[:2])
+          listing = json.loads(subprocess.check_output(
+              ['xcrun', 'simctl', 'list', '--json'], text=True,
+          ))
+          candidates = []
+          for runtime in listing['runtimes']:
+              if not runtime.get('isAvailable') or '.iOS-' not in runtime['identifier']:
+                  continue
+              version = tuple(int(part) for part in runtime['version'].split('.')[:2])
+              if version[0] != sdk_version[0] or version > sdk_version:
+                  continue
+              for device in listing['devices'].get(runtime['identifier'], []):
+                  name = device['name']
+                  if not device.get('isAvailable') or not name.startswith('iPhone') or 'Max' in name or 'Plus' in name or 'Air' in name:
+                      continue
+                  generation = int(re.search(r'iPhone (\d+)', name).group(1)) if re.search(r'iPhone (\d+)', name) else 0
+                  # The smallest screen first: iPhone SE, then 16e / 13 mini, then the plain models.
+                  preferred = 3 if 'SE' in name else 2 if ('16e' in name or 'mini' in name) else 1 if 'Pro' not in name else 0
+                  candidates.append((preferred, generation, version, name, device['udid']))
+          if not candidates:
+              raise SystemExit(f'Aucun petit simulateur iPhone disponible pour le SDK {sdk}.')
+          _, _, version, name, identifier = sorted(candidates, reverse=True)[0]
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as file:
+              file.write(f'SIMULATOR_ID={identifier}\n')
+              file.write(f'SIMULATOR_NAME={name}\n')
+          print(f'Simulateur choisi : {name}, iOS {version[0]}.{version[1]}, {identifier}')
+          PY
+
+      - name: Compiler l'application et les tests UI sans signature Apple
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/build.log"
+
+      # Simulateur remis à neuf, barre d'état d'une capture Apple (9:41, batterie pleine, réseau au
+      # maximum) et apparence choisie.
+      - name: Préparer le simulateur (barre d'état, apparence)
+        run: |
+          set -euo pipefail
+          xcrun simctl shutdown "$SIMULATOR_ID" 2>/dev/null || true
+          xcrun simctl erase "$SIMULATOR_ID"
+          xcrun simctl boot "$SIMULATOR_ID"
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl ui "$SIMULATOR_ID" appearance "$APPEARANCE"
+          xcrun simctl status_bar "$SIMULATOR_ID" override \
+            --time '9:41' \
+            --dataNetwork wifi \
+            --wifiMode active \
+            --wifiBars 3 \
+            --cellularMode active \
+            --cellularBars 4 \
+            --operatorName '' \
+            --batteryState charged \
+            --batteryLevel 100
+          echo "Simulateur prêt : $SIMULATOR_NAME, apparence $APPEARANCE"
+
+      - name: Prendre les captures (CNSNNScreenshotTests/testLongExpressions)
+        run: |
+          set -euo pipefail
+          xcodebuild test-without-building \
+            -project CNSNN.xcodeproj \
+            -scheme CNSNN \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$CI_ROOT/SourcePackages" \
+            -derivedDataPath "$CI_ROOT/DerivedData" \
+            -disableAutomaticPackageResolution \
+            -parallel-testing-enabled NO \
+            -only-testing:CNSNNUITests/CNSNNScreenshotTests/testLongExpressions \
+            -resultBundlePath "$CI_ROOT/mots-longs.xcresult" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            2>&1 | tee "$CI_ROOT/logs/mots-longs.log" | tail -60
+
+      - name: Extraire les captures du résultat
+        if: ${{ always() && !cancelled() }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$CI_ROOT/attachments" "$CI_ROOT/shots"
+          xcrun xcresulttool export attachments --path "$CI_ROOT/mots-longs.xcresult" --output-path "$CI_ROOT/attachments"
+          python3 - "$CI_ROOT/attachments" "$CI_ROOT/shots" <<'PY'
+          import json, pathlib, re, shutil, sys
+          source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          manifest = json.loads((source / 'manifest.json').read_text())
+          if isinstance(manifest, dict):
+              manifest = [manifest]
+          for test in manifest:
+              for attachment in test.get('attachments', []):
+                  match = re.match(r'(mots-longs-\d(?:-[a-z0-9]+)*)', attachment.get('suggestedHumanReadableName', ''))
+                  if match:
+                      shutil.copyfile(source / attachment['exportedFileName'], target / (match.group(1) + '.png'))
+                      print('Capture :', match.group(1))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: cnsnn-mots-longs-ios
+          path: ${{ runner.temp }}/cnsnn-ci/shots/
+          if-no-files-found: warn
+          retention-days: 7
+
+  publier:
+    name: Publier les captures sur la branche apercus-mots-longs
+    needs: ios
+    if: needs.ios.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cnsnn-mots-longs-ios
+          path: ${{ runner.temp }}/shots
+      - name: Pousser les captures
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout --orphan apercus-mots-longs
+          git rm -rf --quiet .
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          mkdir -p ios
+          cp "$RUNNER_TEMP/shots/"* ios/
+          git add -A .
+          git commit -m "Captures expressions longues depuis ${GITHUB_SHA::7}"
+          git push --force origin HEAD:refs/heads/apercus-mots-longs

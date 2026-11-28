@@ -35,7 +35,7 @@ async function players() {
   await seed('users/alice', { uid: 'alice', username: 'Alice' });
   await seed('users/bob', { uid: 'bob', username: 'Bob' });
 }
-const signUp = (uid, name, over = {}) => ({ uid, name, at: serverTimestamp(), ...over });
+const signUp = (uid, name, over = {}) => ({ uid, name, at: serverTimestamp(), v: 2, ...over });
 
 test('sign-ups: own place, real name, server time, only before Monday 08:00 UTC', async () => {
   await players();
@@ -47,6 +47,10 @@ test('sign-ups: own place, real name, server time, only before Monday 08:00 UTC'
   await assertFails(setDoc(doc(a, `tournaments/${iso(start(upcoming) + DAY)}/players/alice`), signUp('alice', 'Alice')));
   await assertFails(setDoc(doc(a, `tournaments/${current}/players/alice`), signUp('alice', 'Alice')));
   await assertFails(setDoc(doc(a, `tournaments/${iso(start(upcoming) + 7 * DAY)}/players/alice`), signUp('alice', 'Alice')));
+  await assertFails(setDoc(doc(a, `tournaments/${upcoming}/players/alice`), signUp('alice', 'Alice', { v: 3 })));
+  // The apps from before the new bracket (no 'v') sign up only for the tournaments before 2026-12-07.
+  const oldApp = setDoc(doc(a, `tournaments/${upcoming}/players/alice`), { uid: 'alice', name: 'Alice', at: serverTimestamp() });
+  if (upcoming >= '2026-12-07') await assertFails(oldApp); else { await assertSucceeds(oldApp); await deleteDoc(doc(a, `tournaments/${upcoming}/players/alice`)); }
   await assertSucceeds(setDoc(doc(a, `tournaments/${upcoming}/players/alice`), signUp('alice', 'Alice')));
   // Everyone sees who signed up; withdrawing is possible before the draw.
   assert.equal((await getDocs(collection(user('bob'), `tournaments/${upcoming}/players`))).size, 1);

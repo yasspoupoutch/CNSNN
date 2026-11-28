@@ -22,9 +22,13 @@ sleep 20
 adb shell pm grant com.poupoutch.cnsnn android.permission.POST_NOTIFICATIONS || true
 adb shell am instrument -w -e class com.poupoutch.cnsnn.SmallScreenTest -e smallScreen true \
   com.poupoutch.cnsnn.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/instrument.log"
+# Then the longest expressions, on the profile SmallScreenTest just made.
+adb shell am instrument -w -e class com.poupoutch.cnsnn.LongWordsTest -e smallScreen true \
+  com.poupoutch.cnsnn.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/instrument-mots-longs.log"
 for name in $(adb shell run-as com.poupoutch.cnsnn ls files/shots 2>/dev/null | tr -d "\r" || true); do
   adb exec-out run-as com.poupoutch.cnsnn cat "files/shots/$name" > "$out/$name"
 done
 ls -l "$out"
 cat "$out/mesures.txt" || true
 grep -q '^OK (1 test)' "$out/instrument.log" || { echo "::error::Un élément est caché sur petit écran (voir instrument.log et zz-echec.png)."; exit 1; }
+grep -q '^OK (1 test)' "$out/instrument-mots-longs.log" || { echo "::error::Une expression longue est coupée sur petit écran (voir instrument-mots-longs.log)."; exit 1; }

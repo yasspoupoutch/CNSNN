@@ -25,6 +25,9 @@ struct GameView: View {
     @State private var demo = TutorialDemo()
     /// "Un indice ?" beside the Indice button, 30 s into the Mot du jour and 30 s after the first hint.
     @State private var hintNudge = false
+    /// The found word bursting into letters (and the Mot du jour place), before the result sheet.
+    @State private var celebration: UUID?
+    @State private var sheetShown = true
 
     var body: some View {
         ZStack {
@@ -41,6 +44,7 @@ struct GameView: View {
             }.padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 6).readableWidth()
             if let result = session.result {
                 Palette.dim.ignoresSafeArea().transition(.opacity)
+                if sheetShown {
                 VStack {
                     Spacer()
                     ResultSheet(result: result, card: session.card, mode: mode, firstTry: finishedHere && session.wrongAnswers == 0 && session.hintsTaken == 0,
@@ -48,9 +52,24 @@ struct GameView: View {
                                 catchUp: catchUpDay != nil, next: nextCard, close: { dismiss() })
                         .padding(.horizontal, 8)
                 }.readableWidth().transition(.move(edge: .bottom))
+                }
+            }
+            if let celebration, let word = session.card?.wordFull.uppercased() {
+                WordCelebration(word: word, showsRank: mode == .daily && session.ranked && catchUpDay == nil,
+                                standing: { session.standing },
+                                showSheet: { sheetShown = true },
+                                ended: { if self.celebration == celebration { self.celebration = nil } })
+                    .id(celebration)
             }
         }
         .animation(reduceMotion ? nil : CNSNNTheme.ease, value: session.result?.id)
+        .animation(reduceMotion ? nil : CNSNNTheme.ease, value: sheetShown)
+        .onChange(of: session.result?.id) { _, _ in
+            // A word just found here (not one loaded from earlier, not shown by a hint): it bursts first.
+            if session.result?.correct == true, session.celebrate, !reduceMotion, tutorial == nil {
+                session.celebrate = false; sheetShown = false; celebration = UUID()
+            } else { sheetShown = true; if session.result == nil { celebration = nil } }
+        }
         // The board and keyboard share one screen, so the game caps text growth lower than the rest of the app.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .alert("Signaler la carte", isPresented: $reporting) {
@@ -147,16 +166,12 @@ struct GameView: View {
                     .padding(.top, 40)
             } else if let placed = session.placed {
                 // The hints after the sentence: the word's vowels, in gold, take their places one by one.
-                Text(Self.goldVowels(placed))
-                    .font(Typo.serif(placed.count > 5 ? 64 : 88)).tracking(3)
-                    .lineLimit(1).minimumScaleFactor(0.35)
+                BoardLetters(text: placed, size: placed.count > 5 ? 64 : 88, gold: true)
                     .padding(.top, 40)
                     .contentTransition(.opacity)
                     .accessibilityLabel("Lettres : " + WordEngine.spoken(placed))
             } else {
-                Text(consonants)
-                    .font(Typo.serif(consonants.count > 5 ? 64 : 88)).tracking(3)
-                    .lineLimit(1).minimumScaleFactor(0.35)
+                BoardLetters(text: consonants, size: consonants.count > 5 ? 64 : 88)
                     .padding(.top, 40)
                     .accessibilityLabel("Consonnes : " + WordEngine.spoken(consonants))
             }
@@ -269,7 +284,7 @@ struct GameView: View {
             }
             if session.result == nil, TypedAnswer(text: session.answer, cursor: session.cursor).inside == nil { Caret() }
         }
-        .lineLimit(1).minimumScaleFactor(0.4)
+        .lineLimit(1).minimumScaleFactor(0.3)
         .frame(maxWidth: .infinity, minHeight: 56)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.tertiary).frame(height: 1) }
         .padding(.horizontal, 24)
@@ -733,7 +748,9 @@ struct AnswerLetters: View {
             letter.foregroundColor = wrong ? Palette.red : Vowels.contains(character) ? Palette.accent : Palette.foreground
             line += letter
         }
-        return Text(line).tracking(4.4).scaledFont(30, .medium)
+        // The letter spacing does not shrink with the letters: a long expression gets a tighter one, so it
+        // shrinks less and stays whole on the line (« QUESTCEQUONAFAITAUBONDIEU »).
+        return Text(line).tracking(answer.count > 14 ? 1.5 : 4.4).scaledFont(30, .medium)
     }
 }
 
@@ -793,6 +810,27 @@ struct FlowLayout: Layout {
 }
 
 /// The word with its vowels sliding into the gaps between the consonants.
+/// The board's letters: the consonants, or the word with its vowels placed (in gold). An expression goes on
+/// two or three lines, cut between its words (WordEngine.lines), and the letters shrink only when a line still
+/// does not fit the screen: the whole board always shows, never cut (« Qu’est-ce qu’on a fait au Bon Dieu »).
+struct BoardLetters: View {
+    let text: String
+    /// The size of a short board on one line; an expression on several lines is a little smaller.
+    var size: CGFloat
+    var tracking: CGFloat = 3
+    var gold = false
+    var body: some View {
+        let lines = WordEngine.lines(text)
+        let shown = lines.joined(separator: "\n")
+        Group {
+            if gold { Text(GameView.goldVowels(shown)) } else { Text(shown) }
+        }
+        .font(Typo.serif(lines.count > 1 ? min(size, 50) : size)).tracking(tracking)
+        .multilineTextAlignment(.center)
+        .lineLimit(lines.count).minimumScaleFactor(0.3)
+    }
+}
+
 struct VowelReveal: View {
     static let firstDelay = 0.35
     static let step = 0.16
@@ -805,17 +843,26 @@ struct VowelReveal: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Letters are separate views here (the vowels slide in), so the size is chosen for the
     /// whole word from its length, instead of each letter shrinking on its own. It does not
-    /// change while the vowels slide in.
+    /// change while the vowels slide in. A long expression goes on two or three lines, cut
+    /// between its words, so it stays big enough to read (« QU’EST-CE QU’ON A / FAIT AU BON DIEU »).
     var body: some View {
-        let size = min(maxSize, width / (CGFloat(max(word.count, 1)) * 0.8))
-        letters.font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
+        let lines = word.count > 16 ? WordEngine.lines(word, maxChars: 16) : [word]
+        let longest = lines.map(\.count).max() ?? 1
+        let size = min(maxSize, width / (CGFloat(max(longest, 1)) * 0.8))
+        VStack(spacing: size * 0.12) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { number, line in
+                // The vowels still slide in one after the other across the lines.
+                letters(line, firstVowel: lines[..<number].reduce(0) { total, earlier in total + earlier.filter(Vowels.contains).count })
+            }
+        }
+        .font(.system(size: size, weight: .heavy)).tracking(size * 0.06).fixedSize()
     }
-    private var letters: some View {
-        let letters = Array(word.enumerated())
+    private func letters(_ line: String, firstVowel: Int) -> some View {
+        let letters = Array(line.enumerated())
         return HStack(spacing: 0) {
             ForEach(letters, id: \.offset) { index, character in
                 if Vowels.contains(character) {
-                    let order = letters[..<index].filter { Vowels.contains($0.element) }.count
+                    let order = firstVowel + letters[..<index].filter { Vowels.contains($0.element) }.count
                     CollapseLayout(progress: revealed ? 1 : 0) {
                         Text(String(character))
                             .foregroundStyle(correct ? Palette.accent : Palette.secondary)
@@ -882,6 +929,215 @@ private struct HintNudge: View {
                 withAnimation(.easeInOut(duration: 0.5)) { dim = false }
                 try? await Task.sleep(for: .milliseconds(500))
             }
+        }
+    }
+}
+
+// MARK: - Celebration
+
+/// A found word (Classique and Mot du jour): the word in big, a breath, then its letters burst and fall
+/// as confetti (vowels gold, consonants ivory, a few turquoise). On the ranked Mot du jour, the place
+/// follows in big ("Vous êtes 12e"), then the result sheet comes up. A tap skips to the sheet. Same
+/// timings and colours as Android's WordCelebration.
+struct WordCelebration: View {
+    let word: String
+    /// The Mot du jour place, read live (the server ranks the result a moment after the finish).
+    var showsRank: Bool
+    var standing: () -> DailyStanding?
+    /// The sheet may come up now; `ended` removes this overlay once the confetti have fallen.
+    var showSheet: () -> Void
+    var ended: () -> Void
+    @State private var start = Date()
+    @State private var burst: [LetterBurst.Particle] = []
+    @State private var place: (shown: Int, rank: Int, players: Int)?
+    @State private var pop = false
+    @State private var sheetUp = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let letters = Array(word)
+            let layout = LetterBurst.layout(count: letters.count, width: geo.size.width, centerY: geo.size.height * 0.36)
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSince(start)
+                Canvas { context, size in
+                    LetterBurst.draw(in: &context, size: size, t: t, letters: letters, layout: layout, particles: burst)
+                } symbols: {
+                    LetterBurst.symbols(letters: letters, size: layout.size)
+                }
+            }
+            .onAppear {
+                burst = LetterBurst.particles(letters: letters, layout: layout)
+            }
+            if let place {
+                RankReveal(shown: place.shown, rank: place.rank, players: place.players, pop: pop)
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.36)
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .allowsHitTesting(!sheetUp)
+        .onTapGesture { up(); ended() }
+        .accessibilityHidden(true)
+        .task { await run() }
+    }
+
+    private func up() { guard !sheetUp else { return }; sheetUp = true; withAnimation(.easeOut(duration: 0.25)) { place = nil }; showSheet() }
+
+    @MainActor private func run() async {
+        try? await Task.sleep(for: .seconds(LetterBurst.explodeAt))
+        Haptics.burst()
+        guard showsRank else {
+            try? await Task.sleep(for: .seconds(0.25)); up()
+            try? await Task.sleep(for: .seconds(LetterBurst.duration - LetterBurst.explodeAt - 0.25)); ended()
+            return
+        }
+        // Waits for the place (up to 3 s), then counts from the number of players down to it.
+        var waited = 0.0
+        while standing()?.rank == nil, waited < 3 { try? await Task.sleep(for: .seconds(0.1)); waited += 0.1 }
+        guard !sheetUp, let found = standing(), let rank = found.rank else { up(); try? await Task.sleep(for: .seconds(1.5)); ended(); return }
+        if waited < 0.4 { try? await Task.sleep(for: .seconds(0.4 - waited)) }
+        let players = max(found.players, rank)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { place = (players, rank, players) }
+        for value in RankReveal.steps(from: players, to: rank) {
+            try? await Task.sleep(for: .seconds(value - rank < 4 ? 0.12 : 0.045))
+            guard !sheetUp else { return }
+            place = (value, rank, players)
+            Haptics.key()
+        }
+        Haptics.success()
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.45)) { pop = true }
+        try? await Task.sleep(for: .seconds(0.25))
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { pop = false }
+        try? await Task.sleep(for: .seconds(1.4))
+        up()
+        try? await Task.sleep(for: .seconds(0.5)); ended()
+    }
+}
+
+/// "Vous êtes" / "12e" in big gold / "sur 87 joueurs aujourd'hui".
+private struct RankReveal: View {
+    var shown: Int
+    var rank: Int
+    var players: Int
+    var pop: Bool
+    /// From the number of players down to the place, in shrinking jumps (about 12 steps).
+    static func steps(from players: Int, to rank: Int) -> [Int] {
+        var values: [Int] = [], value = players
+        while value > rank { value = max(rank, value - max(1, Int((Double(value - rank) / 5).rounded()))); values.append(value) }
+        return values
+    }
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Vous êtes").font(Typo.serifItalic(30)).foregroundStyle(Palette.foreground.opacity(0.85))
+            HStack(alignment: .top, spacing: 2) {
+                Text("\(shown)").font(.system(size: 120, weight: .heavy)).monospacedDigit().contentTransition(.numericText(countsDown: true))
+                Text(shown == 1 ? "er" : "e").font(.system(size: 44, weight: .heavy)).padding(.top, 16)
+            }
+            .foregroundStyle(LinearGradient(colors: [Color(red: 1, green: 0.94, blue: 0.77), Palette.accent], startPoint: .top, endPoint: .bottom))
+            .shadow(color: Palette.accent.opacity(0.45), radius: 24)
+            .scaleEffect(pop ? 1.12 : 1)
+            .lineLimit(1).minimumScaleFactor(0.5)
+            Text("sur \(Format.number(players)) joueur\(players > 1 ? "s" : "") aujourd’hui").font(.system(size: 16)).foregroundStyle(Palette.secondary)
+        }
+        .fixedSize()
+    }
+}
+
+/// The letters of the found word and their confetti, drawn in one Canvas. Positions are a function of
+/// time (linear drag and gravity), so nothing is stored per frame.
+enum LetterBurst {
+    static let explodeAt = 0.55
+    static let duration = 3.0
+    struct Layout { let xs: [CGFloat]; let y: CGFloat; let size: CGFloat }
+    struct Particle {
+        let symbol: String
+        let x: CGFloat, y: CGFloat, vx: CGFloat, vy: CGFloat
+        /// Drag and gravity: the word's letters fall fast, the small ones float down.
+        let drag: CGFloat, gravity: CGFloat
+        let spin: CGFloat, turn: CGFloat, phase: CGFloat, scale: CGFloat
+        let big: Bool
+    }
+    static let colors: [Color] = [Palette.accent, Palette.foreground, Palette.mint]
+
+    static func layout(count: Int, width: CGFloat, centerY: CGFloat) -> Layout {
+        let size = min(60, width * 0.86 / (CGFloat(max(count, 1)) * 0.68))
+        let step = size * 0.68
+        let xs = (0..<count).map { width / 2 + (CGFloat($0) - CGFloat(count - 1) / 2) * step }
+        return Layout(xs: xs, y: centerY, size: size)
+    }
+
+    @ViewBuilder static func symbols(letters: [Character], size: CGFloat) -> some View {
+        ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
+            Text(String(letter)).font(.system(size: size, weight: .heavy))
+                .foregroundStyle(Vowels.contains(letter) ? Palette.accent : Palette.foreground).tag("w\(index)")
+        }
+        ForEach(Array(Set(letters.map { String($0) })).sorted(), id: \.self) { letter in
+            ForEach(0..<colors.count, id: \.self) { color in
+                Text(letter).font(.system(size: 22, weight: .heavy)).foregroundStyle(colors[color]).tag("s\(letter)\(color)")
+            }
+        }
+    }
+
+    static func particles(letters: [Character], layout: Layout) -> [Particle] {
+        let perLetter = max(4, min(11, 100 / max(letters.count, 1)))
+        var all: [Particle] = []
+        for (index, letter) in letters.enumerated() {
+            let x = layout.xs[index], dx = x - layout.xs[letters.count / 2]
+            all.append(Particle(symbol: "w\(index)", x: x, y: layout.y, vx: dx * 2.4 + .random(in: -80...80), vy: .random(in: -520 ... -260),
+                                drag: 0.5, gravity: 1100, spin: 0, turn: .random(in: -5...5), phase: 0, scale: 1, big: true))
+            for _ in 0..<perLetter {
+                let angle = CGFloat.random(in: 0 ..< 2 * .pi), speed = CGFloat.random(in: 160...580)
+                let pick = letters.randomElement() ?? letter, roll = Double.random(in: 0..<1)
+                let color = roll < 0.15 ? 2 : (Vowels.contains(pick) ? 0 : 1)
+                all.append(Particle(symbol: "s\(pick)\(color)", x: x + .random(in: -10...10), y: layout.y + .random(in: -20...20),
+                                    vx: cos(angle) * speed, vy: sin(angle) * speed - 220, drag: 2.6, gravity: 620,
+                                    spin: .random(in: 0..<6), turn: .random(in: -6...6), phase: .random(in: 0..<6), scale: .random(in: 0.6...1.3), big: false))
+            }
+        }
+        return all
+    }
+
+    static func draw(in context: inout GraphicsContext, size: CGSize, t: Double, letters: [Character], layout: Layout, particles: [Particle]) {
+        if t < explodeAt {
+            // The word, gathering itself before it bursts.
+            let tension = max(0, (t - 0.25) / (explodeAt - 0.25))
+            let scale = 1 + 0.08 * tension, shake = 2 * tension
+            var glow = context
+            glow.opacity = 0.35 * tension
+            glow.fill(Path(ellipseIn: CGRect(x: size.width / 2 - 170, y: layout.y - 90, width: 340, height: 180)),
+                      with: .radialGradient(Gradient(colors: [Palette.accent, .clear]), center: CGPoint(x: size.width / 2, y: layout.y), startRadius: 0, endRadius: 170))
+            for index in letters.indices {
+                guard let symbol = context.resolveSymbol(id: "w\(index)") else { continue }
+                let x = size.width / 2 + (layout.xs[index] - size.width / 2) * scale + .random(in: -shake...shake)
+                var letter = context
+                letter.translateBy(x: x, y: layout.y + .random(in: -shake...shake))
+                letter.scaleBy(x: scale, y: scale)
+                letter.draw(symbol, at: .zero)
+            }
+            return
+        }
+        let s = t - explodeAt
+        // A short flash where the word was.
+        if s < 0.25 {
+            var flash = context
+            flash.opacity = 0.7 * (1 - s / 0.25)
+            flash.fill(Path(CGRect(origin: .zero, size: size)), with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.95, blue: 0.77), Palette.accent.opacity(0.5), .clear]),
+                       center: CGPoint(x: size.width / 2, y: layout.y), startRadius: 0, endRadius: 260))
+        }
+        let fade = max(0, min(1, (duration - t) / 0.6))
+        for particle in particles {
+            guard let symbol = context.resolveSymbol(id: particle.symbol) else { continue }
+            let k = particle.drag, e = exp(-k * s), travel = (1 - e) / k
+            let x = particle.x + particle.vx * travel + (particle.big ? 0 : sin(s * 4 + particle.phase) * 8)
+            let y = particle.y + particle.vy * travel + particle.gravity / k * (s - travel)
+            guard y < size.height + 60 else { continue }
+            var piece = context
+            piece.opacity = fade
+            piece.translateBy(x: x, y: y)
+            piece.rotate(by: .radians(particle.spin + particle.turn * s))
+            piece.scaleBy(x: particle.scale * (particle.big ? 1 : cos(s * 4 + particle.phase)), y: particle.scale)
+            piece.draw(symbol, at: .zero)
         }
     }
 }

@@ -99,6 +99,7 @@ class ReminderReceiver : BroadcastReceiver() {
 class RescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Reminders.schedule(context)
+        TournamentAlarms.schedule(context)
         com.poupoutch.cnsnn.widget.DailyWidget.refresh(context)
     }
 }

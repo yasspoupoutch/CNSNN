@@ -51,6 +51,11 @@ class LocalStore(context: Context) {
     fun befriended(uid: String): Set<String> = prefs.getStringSet("challenge.befriended.$uid", emptySet())!!.toSet()
     fun setBefriended(uid: String, ids: Set<String>) { prefs.edit().putStringSet("challenge.befriended.$uid", ids).apply() }
 
+    /** Sprint: the clock (ms) at each word of this phone's record game, for the ghost on the bar. */
+    var sprintGhost: List<Int>
+        get() = prefs.getString("sprint.ghost", null)?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+        set(value) { prefs.edit().putString("sprint.ghost", value.joinToString(",")).apply() }
+
     var hiddenPlayers: Set<String>
         get() = prefs.getStringSet("hiddenPlayers", emptySet())!!.toSet()
         set(value) { prefs.edit().putStringSet("hiddenPlayers", value).apply() }
@@ -59,6 +64,11 @@ class LocalStore(context: Context) {
     var tutorialSeen: Boolean
         get() = prefs.getBoolean("tutorial.seen", false)
         set(value) { prefs.edit().putBoolean("tutorial.seen", value).apply() }
+
+    /** The crowns of the home page, kept so they show at once. */
+    var champions: Champions?
+        get() = Champions.decode(prefs.getString("champions", null))
+        set(value) { prefs.edit().putString("champions", value?.encode()).apply() }
 
     var remindersEnabled: Boolean
         get() = prefs.getBoolean("reminders.enabled", false)

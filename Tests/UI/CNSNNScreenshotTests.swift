@@ -91,8 +91,22 @@ final class CNSNNScreenshotTests: XCTestCase {
 
         let tile = app.buttons["duelCard"]
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        // The crowns: last week's number 1 on the daily card, the last tournament's winner on TOURNOI.
+        XCTAssertTrue(app.descendants(matching: .any)["weekCrown"].firstMatch.waitForExistence(timeout: 10))
+        capture("duel-09-couronne")
         app.swipeUp()
         capture("duel-00-accueil")
+
+        // The weekly tournament (an invented one, TournamentDemo): my match of the day, then the bracket.
+        let cup = app.buttons["tournamentCard"]
+        XCTAssertTrue(cup.waitForExistence(timeout: 5))
+        cup.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Si vous gagnez")).firstMatch.waitForExistence(timeout: 10))
+        capture("duel-10-tournoi")
+        app.swipeUp(); app.swipeUp()
+        capture("duel-11-tableau")
+        app.buttons["Fermer"].firstMatch.tap()
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
         tile.tap()
         let random = app.buttons["liveRandom"]
         XCTAssertTrue(random.waitForExistence(timeout: 5))
@@ -178,6 +192,39 @@ final class CNSNNScreenshotTests: XCTestCase {
         if week.waitForExistence(timeout: 3) { week.tap() }
         Thread.sleep(forTimeInterval: 3)
         print("PREVIEW_END \(Date().timeIntervalSince1970)")
+    }
+
+    /// The longest expression of the game on a small iPhone (mots-longs-ios.yml): the consonants on several
+    /// lines, the vowels placed by the hints, the whole answer typed, then the word revealed. Nothing cut.
+    @MainActor func testLongExpressions() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--classic-card=seed-questcequonafaitaubondieu", "--mode-seed=7"]
+        app.launch()
+        // One welcome screen since the automatic pseudo: no pseudo to type, no box to tick.
+        let start = app.buttons["C’est parti"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        XCTAssertTrue(app.buttons["Stats"].waitForExistence(timeout: 10))
+        dismissKeyboardIfNeeded(app)
+
+        let classic = tile(app, "Classique")
+        XCTAssertTrue(classic.waitForExistence(timeout: 10))
+        classic.tap()
+        let launch = app.buttons["Lancer une partie"]
+        XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        launch.tap()
+        XCTAssertTrue(app.buttons["Valider"].waitForExistence(timeout: 10))
+        capture("mots-longs-1-consonnes")
+        let hint = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Indice'")).firstMatch
+        for _ in 0..<2 where hint.exists { hint.tap(); Thread.sleep(forTimeInterval: 1) }
+        let letter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Lettre'")).firstMatch
+        for _ in 0..<2 where letter.waitForExistence(timeout: 2) { letter.tap(); Thread.sleep(forTimeInterval: 1) }
+        capture("mots-longs-2-lettres")
+        type(app, "QUESTCEQUONAFAITAUBONDIEU")
+        capture("mots-longs-3-reponse")
+        app.buttons["Valider"].tap()
+        capture("mots-longs-4-trouve", settle: 4)
     }
 
     /// Every main screen fits the device without scrolling: run by the "CNSNN - Écrans iPhone et iPad"

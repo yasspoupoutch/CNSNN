@@ -99,10 +99,10 @@ class ModesFlowTest {
         expected.answer(first.wordFull, 0)
         type(expected.card!!.wordFull)
         waitForDescription("Mots : 2")
-        waitFor("×2")
+        waitFor("Combo ×2")
         // A wrong answer keeps the word and resets the combo; the answer stays, in red, to fix a typo.
         type("XQ")
-        waitFor("×1")
+        waitFor("Combo ×1")
         waitForDescription("Votre réponse : XQ")
         rule.onNodeWithText("Passer · −5 s").performClick()
         // Stopping counts the game with its words.
